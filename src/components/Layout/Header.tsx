@@ -10,7 +10,6 @@ export const Header = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     if (user && userProfile) {
@@ -35,24 +34,11 @@ export const Header = () => {
   };
 
   const handleSignOut = async () => {
-    if (signingOut) return;
-    
     try {
-      setSigningOut(true);
-      console.log('Starting sign out process...');
-      
       await signOut();
-      
-      // Navigate to home page after successful sign out
-      navigate('/', { replace: true });
-      
-      console.log('Sign out completed successfully');
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
-      // Even if there's an error, try to navigate away
-      navigate('/', { replace: true });
-    } finally {
-      setSigningOut(false);
     }
   };
 
@@ -153,14 +139,9 @@ export const Header = () => {
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    disabled={signingOut}
-                    className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
+                    className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-all"
                   >
-                    {signingOut ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                    ) : (
-                      <LogOut className="w-5 h-5" />
-                    )}
+                    <LogOut className="w-5 h-5" />
                   </button>
                 </div>
               ) : (
@@ -212,14 +193,9 @@ export const Header = () => {
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    disabled={signingOut}
-                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
                   >
-                    {signingOut ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                    ) : (
-                      <LogOut className="w-4 h-4" />
-                    )}
+                    <LogOut className="w-4 h-4" />
                   </button>
                 </div>
               </nav>
@@ -271,10 +247,9 @@ export const Header = () => {
                       </Link>
                       <button
                         onClick={handleSignOut}
-                        disabled={signingOut}
-                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2 disabled:opacity-50"
+                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2"
                       >
-                        {signingOut ? 'Signing out...' : 'Sign Out'}
+                        Sign Out
                       </button>
                     </div>
                   ) : (
@@ -330,11 +305,10 @@ export const Header = () => {
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      disabled={signingOut}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2 disabled:opacity-50"
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+                      <span>Sign Out</span>
                     </button>
                   </div>
                 )

@@ -41,47 +41,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
     // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          if (mounted) {
-            setLoading(false);
-          }
-          return;
-        }
-
-        console.log('Initial session:', session?.user?.id);
-        
-        if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchUserProfile(session.user);
-          } else {
-            setLoading(false);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user);
+      } else {
+        setLoading(false);
       }
-    };
-
-    initializeAuth();
+    });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
       console.log('Auth state changed:', event, session?.user?.id);
       setUser(session?.user ?? null);
       
@@ -100,10 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleGitHubSignIn = async (user: SupabaseUser) => {
@@ -260,7 +230,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
-          console.log('Developer profile found:', devProfileData);
           setDeveloperProfile(devProfileData);
           setNeedsOnboarding(false);
         }
@@ -351,15 +320,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               location: '',
               experience_years: 0,
               desired_salary: 0,
-              skills_categories: {},
-              profile_strength: 0,
-              public_profile_slug: null,
-              notification_preferences: {
-                email: true,
-                in_app: true,
-                assignments: true,
-                messages: true
-              }
             });
 
           if (devError) {
@@ -603,32 +563,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    try {
-      console.log('Signing out...');
-      
-      // Clear state first
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
-      
-      // Then sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase signOut error:', error);
-        throw error;
-      }
-      
-      console.log('Successfully signed out');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      // Even if there's an error, clear the local state
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
-      throw error;
-    }
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setUser(null);
+    setUserProfile(null);
+    setDeveloperProfile(null);
+    setNeedsOnboarding(false);
   };
 
   const value = {
