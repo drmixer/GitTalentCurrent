@@ -29,7 +29,8 @@ import {
   Plus,
   Loader,
   Download,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 import { User, Developer, Recruiter, Assignment, Hire, JobRole } from '../types';
 
@@ -333,6 +334,15 @@ export const AdminDashboard = () => {
       )}
 
       {/* Stats Grid */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-black text-gray-900">Overview</h2>
+        <button
+          onClick={fetchDashboardData}
+          className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Data
+        </button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
@@ -384,9 +394,12 @@ export const AdminDashboard = () => {
           <div className="space-y-4">
             {pendingRecruiters.slice(0, 5).map((recruiter) => (
               <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="font-semibold text-gray-900">{recruiter.user.name}</div>
-                  <div className="text-sm text-gray-600">{recruiter.company_name}</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
+                  <div className="text-sm text-gray-600">{recruiter.company_name || 'Unknown Company'}</div>
+                  <div className="text-xs text-gray-500">
+                    {recruiter.user?.email || 'No email'} • Created {new Date(recruiter.user?.created_at || Date.now()).toLocaleDateString()}
+                  </div>
                 </div>
                 <div className="flex space-x-2">
                   <button 
@@ -405,7 +418,19 @@ export const AdminDashboard = () => {
               </div>
             ))}
             {pendingRecruiters.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No pending approvals</p>
+              <div className="text-center py-8">
+                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No pending approvals</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  New recruiter signups will appear here for approval
+                </p>
+                <button
+                  onClick={fetchDashboardData}
+                  className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium inline-flex items-center"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> Check Again
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -459,11 +484,11 @@ export const AdminDashboard = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {recruiter.user.name.split(' ').map(n => n[0]).join('')}
+                        {recruiter.user?.name?.split(' ').map(n => n[0]).join('') || 'R'}
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">{recruiter.user.name}</div>
-                        <div className="text-sm text-gray-500">{recruiter.user.email}</div>
+                        <div className="text-sm font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
+                        <div className="text-sm text-gray-500">{recruiter.user?.email || 'No email'}</div>
                       </div>
                     </div>
                   </td>
@@ -473,16 +498,16 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      recruiter.user.is_approved 
+                      recruiter.user?.is_approved 
                         ? 'bg-emerald-100 text-emerald-800' 
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {recruiter.user.is_approved ? (
+                      {recruiter.user?.is_approved ? (
                         <CheckCircle className="w-3 h-3 mr-1" />
                       ) : (
                         <Clock className="w-3 h-3 mr-1" />
                       )}
-                      {recruiter.user.is_approved ? 'Approved' : 'Pending'}
+                      {recruiter.user?.is_approved ? 'Approved' : 'Pending'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -490,7 +515,7 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {!recruiter.user.is_approved && (
+                      {!recruiter.user?.is_approved && (
                         <>
                           <button 
                             onClick={() => approveRecruiter(recruiter.user_id)}
