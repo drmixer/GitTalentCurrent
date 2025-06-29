@@ -1,0 +1,288 @@
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+
+export const Header = () => {
+  const { user, userProfile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const getDashboardPath = () => {
+    if (!userProfile) return '/dashboard';
+    switch (userProfile.role) {
+      case 'admin':
+        return '/admin';
+      case 'recruiter':
+        return '/recruiter';
+      case 'developer':
+        return '/developer';
+      default:
+        return '/dashboard';
+    }
+  };
+
+  const isPublicPage = ['/', '/features', '/pricing', '/about', '/contact', '/login', '/signup'].includes(location.pathname);
+
+  const scrollToSection = (sectionId: string) => {
+    setMobileMenuOpen(false);
+    if (location.pathname !== '/') {
+      navigate('/');
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
+  const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentTransparent.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudFRyYW5zcGFyZW50LnBuZyIsImlhdCI6MTc1MTE3MzAyNiwiZXhwIjoxODE0MjQ1MDI2fQ.MYaFFrD9tDFprRRFwD4L-rlAleWAXYbVCpYnWp7c630';
+
+  return (
+    <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-48">
+          {/* Logo */}
+          <Link to="/" className="flex items-center group py-8">
+            <div className="h-40 w-auto flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+              <img 
+                src={logoUrl} 
+                alt="GitTalent Logo" 
+                className="h-full w-auto object-contain"
+                onError={(e) => {
+                  // Fallback to icon if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const fallback = target.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center" style={{ display: 'none' }}>
+                <GitBranch className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation */}
+          {isPublicPage ? (
+            <nav className="hidden md:flex items-center space-x-8">
+              {[
+                { label: 'Features', id: 'features' },
+                { label: 'Pricing', id: 'pricing' },
+                { label: 'About', id: 'about' },
+                { label: 'Contact', id: 'contact' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => scrollToSection(item.id)}
+                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200 hover:scale-105"
+                >
+                  {item.label}
+                </button>
+              ))}
+              
+              {user ? (
+                <div className="flex items-center space-x-4">
+                  {userProfile?.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <Link
+                    to={getDashboardPath()}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-bold shadow-lg hover:shadow-xl hover:scale-105 duration-300"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-all"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-4">
+                  <Link
+                    to="/login"
+                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-bold shadow-lg hover:shadow-xl hover:scale-105 duration-300"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+            </nav>
+          ) : (
+            user && userProfile && (
+              <nav className="hidden md:flex items-center space-x-6">
+                <Link
+                  to={getDashboardPath()}
+                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+                <Link
+                  to="/messages"
+                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Messages</span>
+                </Link>
+                <div className="flex items-center space-x-4">
+                  <Link
+                    to="/profile"
+                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-semibold">{userProfile.name}</span>
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </nav>
+            )
+          )}
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="w-6 h-6 text-gray-600" />
+            ) : (
+              <Menu className="w-6 h-6 text-gray-600" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden absolute top-48 left-0 right-0 bg-white border-b border-gray-200 shadow-lg">
+            <div className="px-4 py-6 space-y-4">
+              {isPublicPage ? (
+                <>
+                  {[
+                    { label: 'Features', id: 'features' },
+                    { label: 'Pricing', id: 'pricing' },
+                    { label: 'About', id: 'about' },
+                    { label: 'Contact', id: 'contact' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => scrollToSection(item.id)}
+                      className="block w-full text-left text-gray-600 hover:text-gray-900 font-medium py-2"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                  
+                  {user ? (
+                    <div className="pt-4 border-t border-gray-200 space-y-4">
+                      <Link
+                        to={getDashboardPath()}
+                        className="block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-bold text-center"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
+                      <button
+                        onClick={handleSignOut}
+                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-4 border-t border-gray-200 space-y-4">
+                      <Link
+                        to="/login"
+                        className="block text-gray-600 hover:text-gray-900 font-medium py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Login
+                      </Link>
+                      <Link
+                        to="/signup"
+                        className="block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-bold text-center"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Sign Up
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : (
+                user && userProfile && (
+                  <div className="space-y-4">
+                    <Link
+                      to={getDashboardPath()}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Briefcase className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </Link>
+                    <Link
+                      to="/messages"
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Messages</span>
+                    </Link>
+                    <Link
+                      to="/profile"
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>{userProfile.name}</span>
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+};

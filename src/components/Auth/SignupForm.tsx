@@ -1,0 +1,349 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github } from 'lucide-react';
+
+export const SignupForm = () => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    role: 'developer' as 'developer' | 'recruiter',
+    company_name: '',
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const { signUp, signInWithGitHub } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const userData = {
+        name: formData.name,
+        role: formData.role,
+        is_approved: formData.role === 'developer', // Auto-approve developers
+      };
+
+      await signUp(formData.email, formData.password, userData);
+      
+      if (formData.role === 'recruiter') {
+        alert('Your account has been created and is pending admin approval. You will be notified once approved.');
+      }
+      
+      navigate('/dashboard');
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGitHubSignUp = async () => {
+    if (!formData.name.trim()) {
+      setError('Please enter your name first');
+      return;
+    }
+
+    setError('');
+    setGithubLoading(true);
+
+    try {
+      // Store the name in localStorage to use after GitHub auth
+      localStorage.setItem('pendingGitHubName', formData.name);
+      await signInWithGitHub();
+      // Navigation will be handled by the redirect
+    } catch (error: any) {
+      setError(error.message);
+      setGithubLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  // Show GitHub option for developers, but disable if no name
+  const showGitHubOption = formData.role === 'developer';
+  const isGitHubDisabled = !formData.name.trim();
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center space-x-3 mb-8">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <GitBranch className="w-7 h-7 text-white" />
+            </div>
+            <span className="text-2xl font-black text-gray-900">GitTalent</span>
+          </Link>
+          <h2 className="text-3xl font-black text-gray-900 mb-3">
+            Create your account
+          </h2>
+          <p className="text-gray-600">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+            >
+              Sign in here
+            </Link>
+          </p>
+        </div>
+
+        {/* Form */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-8">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+                  <p className="text-sm font-medium text-red-800">{error}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-5">
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  I am a
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, role: 'developer' }))}
+                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                      formData.role === 'developer'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    <Code className="w-5 h-5 mr-2" />
+                    <span className="font-semibold">Developer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, role: 'recruiter' }))}
+                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                      formData.role === 'recruiter'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    <Users className="w-5 h-5 mr-2" />
+                    <span className="font-semibold">Recruiter</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
+                  Full name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    required
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    placeholder="Enter your full name"
+                    value={formData.name}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              {/* GitHub Sign Up Option for Developers */}
+              {showGitHubOption && (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-gray-500 font-medium">Choose signup method</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGitHubSignUp}
+                    disabled={githubLoading || isGitHubDisabled}
+                    className={`w-full flex items-center justify-center px-6 py-4 border-2 rounded-2xl font-bold transition-all duration-300 group ${
+                      isGitHubDisabled 
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500'
+                    }`}
+                  >
+                    {githubLoading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
+                        Connecting to GitHub...
+                      </div>
+                    ) : (
+                      <>
+                        <Github className={`w-5 h-5 mr-3 transition-transform ${!isGitHubDisabled ? 'group-hover:scale-110' : ''}`} />
+                        Continue with GitHub
+                      </>
+                    )}
+                  </button>
+                  
+                  {isGitHubDisabled && (
+                    <p className="text-xs text-amber-600 text-center font-medium">
+                      ⚠️ Please enter your name above to continue with GitHub
+                    </p>
+                  )}
+                  
+                  {!isGitHubDisabled && (
+                    <p className="text-xs text-gray-500 text-center">
+                      ✨ Automatically imports your GitHub profile and projects
+                    </p>
+                  )}
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              {formData.role === 'recruiter' && (
+                <div>
+                  <label htmlFor="company_name" className="block text-sm font-bold text-gray-700 mb-2">
+                    Company name
+                  </label>
+                  <div className="relative">
+                    <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      id="company_name"
+                      name="company_name"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                      placeholder="Enter your company name"
+                      value={formData.company_name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                    Creating account...
+                  </div>
+                ) : (
+                  'Create account'
+                )}
+              </button>
+            </div>
+
+            {formData.role === 'recruiter' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-yellow-400 mr-3 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-800 mb-1">Approval Required</p>
+                    <p className="text-sm text-yellow-700">
+                      Recruiter accounts require admin approval before you can access the platform. 
+                      You'll be notified once your account is approved.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8">
+          <p className="text-sm text-gray-600">
+            By creating an account, you agree to our{' '}
+            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500">
+              Privacy Policy
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
