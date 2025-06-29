@@ -1,17 +1,20 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User } from '../types';
+import { User, Developer } from '../types';
 
 interface AuthContextType {
   user: SupabaseUser | null;
   userProfile: User | null;
+  developerProfile: Developer | null;
   loading: boolean;
+  needsOnboarding: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGitHub: () => Promise<void>;
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  createDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,7 +30,9 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -55,6 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await fetchUserProfile(session.user.id);
       } else {
         setUserProfile(null);
+        setDeveloperProfile(null);
+        setNeedsOnboarding(false);
         setLoading(false);
       }
     });
@@ -69,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error checking existing profile:', profileError);
@@ -127,16 +134,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Create role-specific profile
         if (userData.role === 'developer') {
-          const { error: devError } = await supabase
-            .from('developers')
-            .insert({
-              user_id: user.id,
-              github_handle: user.user_metadata?.user_name || '',
-              bio: user.user_metadata?.bio || '',
-              availability: true,
-              top_languages: [],
-              linked_projects: [],
-            });
+          const { error: devError } = await supabase.rpc('create_developer_profile', {
+            p_user_id: user.id,
+            p_github_handle: user.user_metadata?.user_name || '',
+            p_bio: user.user_metadata?.bio || '',
+            p_availability: true,
+            p_top_languages: [],
+            p_linked_projects: [],
+          });
 
           if (devError) {
             console.error('Error creating developer profile:', devError);
@@ -165,29 +170,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      // Fetch user profile
+      const { data: userProfileData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile doesn't exist, this is expected for new users
-          console.log('User profile not found, user may need to complete signup');
-          setUserProfile(null);
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('Error fetching user profile:', userError);
+        throw userError;
+      }
+
+      if (!userProfileData) {
+        console.log('User profile not found, user may need to complete signup');
+        setUserProfile(null);
+        setDeveloperProfile(null);
+        setNeedsOnboarding(false);
+        setLoading(false);
+        return;
+      }
+
+      setUserProfile(userProfileData);
+
+      // If user is a developer, try to fetch developer profile
+      if (userProfileData.role === 'developer') {
+        const { data: devProfileData, error: devError } = await supabase
+          .from('developers')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (devError && devError.code !== 'PGRST116') {
+          console.error('Error fetching developer profile:', devError);
+        }
+
+        if (!devProfileData) {
+          // Developer profile doesn't exist, needs onboarding
+          console.log('Developer profile not found, needs onboarding');
+          setDeveloperProfile(null);
+          setNeedsOnboarding(true);
         } else {
-          console.error('Error fetching user profile:', error);
-          throw error;
+          setDeveloperProfile(devProfileData);
+          setNeedsOnboarding(false);
         }
       } else {
-        setUserProfile(data);
+        setDeveloperProfile(null);
+        setNeedsOnboarding(false);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching profiles:', error);
       setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { data, error } = await supabase.rpc('create_developer_profile', {
+        p_user_id: user.id,
+        p_github_handle: profileData.github_handle || '',
+        p_bio: profileData.bio || '',
+        p_availability: profileData.availability ?? true,
+        p_top_languages: profileData.top_languages || [],
+        p_linked_projects: profileData.linked_projects || [],
+        p_location: profileData.location || '',
+        p_experience_years: profileData.experience_years || 0,
+        p_hourly_rate: profileData.hourly_rate || 0,
+      });
+
+      if (error) {
+        console.error('Error creating developer profile:', error);
+        return false;
+      }
+
+      // Refresh profiles after creation
+      await fetchUserProfile(user.id);
+      return true;
+    } catch (error) {
+      console.error('Error in createDeveloperProfile:', error);
+      return false;
     }
   };
 
@@ -243,7 +310,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .from('users')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         // If trigger didn't create the profile, create it manually
         if (!existingProfile) {
@@ -262,17 +329,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     setUser(null);
     setUserProfile(null);
+    setDeveloperProfile(null);
+    setNeedsOnboarding(false);
   };
 
   const value = {
     user,
     userProfile,
+    developerProfile,
     loading,
+    needsOnboarding,
     signIn,
     signInWithGitHub,
     signUp,
     signOut,
     refreshProfile,
+    createDeveloperProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

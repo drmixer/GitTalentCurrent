@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
+import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             <Route path="/login" element={<LoginForm />} />
             <Route path="/signup" element={<SignupForm />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/onboarding" element={<DeveloperOnboarding />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/recruiter" element={<RecruiterDashboard />} />
             <Route path="/developer" element={<DeveloperDashboard />} />
