@@ -86,11 +86,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const pendingName = localStorage.getItem('pendingGitHubName');
         localStorage.removeItem('pendingGitHubName'); // Clean up
 
+        // Extract GitHub username from user metadata
+        const githubUsername = user.user_metadata?.user_name || user.user_metadata?.preferred_username;
+        const fullName = pendingName || user.user_metadata?.full_name || user.user_metadata?.name || 'GitHub User';
+
         // Try to create user profile using the database function
         const { data, error } = await supabase.rpc('create_user_profile', {
           user_id: user.id,
           user_email: user.email!,
-          user_name: pendingName || user.user_metadata?.full_name || user.user_metadata?.name || 'GitHub User',
+          user_name: fullName,
           user_role: 'developer',
           company_name: ''
         });
@@ -98,9 +102,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (error) {
           console.warn('Database function failed, this might be expected if profile already exists:', error);
         }
+
+        // If this is a GitHub user, also try to create/update developer profile with GitHub data
+        if (githubUsername) {
+          await createOrUpdateGitHubDeveloperProfile(user.id, githubUsername, user.user_metadata);
+        }
       }
     } catch (error) {
       console.error('Error in handleGitHubSignIn:', error);
+    }
+  };
+
+  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, githubMetadata: any) => {
+    try {
+      // Check if developer profile exists
+      const { data: existingProfile } = await supabase
+        .from('developers')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const profileData = {
+        user_id: userId,
+        github_handle: githubUsername,
+        bio: githubMetadata?.bio || '',
+        availability: true,
+        top_languages: [],
+        linked_projects: [],
+        location: githubMetadata?.location || '',
+        experience_years: 0,
+        hourly_rate: 0,
+      };
+
+      if (existingProfile) {
+        // Update existing profile with GitHub data
+        await supabase
+          .from('developers')
+          .update({
+            github_handle: githubUsername,
+            bio: githubMetadata?.bio || existingProfile.bio,
+            location: githubMetadata?.location || existingProfile.location,
+          })
+          .eq('user_id', userId);
+      } else {
+        // Create new developer profile
+        await supabase
+          .from('developers')
+          .insert(profileData);
+      }
+
+      console.log('GitHub developer profile created/updated successfully');
+    } catch (error) {
+      console.error('Error creating/updating GitHub developer profile:', error);
     }
   };
 

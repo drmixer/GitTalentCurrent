@@ -5,25 +5,29 @@ interface GitHubRepo {
   id: number;
   name: string;
   full_name: string;
-  description: string;
+  description: string | null;
   html_url: string;
   stargazers_count: number;
-  language: string;
+  language: string | null;
   topics: string[];
   updated_at: string;
+  created_at: string;
+  fork: boolean;
+  private: boolean;
 }
 
 interface GitHubUser {
   login: string;
-  name: string;
-  bio: string;
+  name: string | null;
+  bio: string | null;
   public_repos: number;
   followers: number;
   following: number;
-  location: string;
-  blog: string;
-  company: string;
+  location: string | null;
+  blog: string | null;
+  company: string | null;
   avatar_url: string;
+  created_at: string;
 }
 
 interface GitHubLanguages {
@@ -43,6 +47,8 @@ interface GitHubContextType extends GitHubData {
   refreshGitHubData: () => Promise<void>;
   getTopLanguages: (limit?: number) => string[];
   getTopRepos: (limit?: number) => GitHubRepo[];
+  syncLanguagesToProfile: () => Promise<void>;
+  syncProjectsToProfile: () => Promise<void>;
 }
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
@@ -56,7 +62,7 @@ export const useGitHub = () => {
 };
 
 export const GitHubProvider = ({ children }: { children: ReactNode }) => {
-  const { user, developerProfile } = useAuth();
+  const { user, developerProfile, updateDeveloperProfile } = useAuth();
   const [githubData, setGitHubData] = useState<GitHubData>({
     user: null,
     repos: [],
@@ -69,6 +75,16 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (developerProfile?.github_handle) {
       refreshGitHubData();
+    } else {
+      // Clear data if no GitHub handle
+      setGitHubData({
+        user: null,
+        repos: [],
+        languages: {},
+        totalStars: 0,
+        loading: false,
+        error: ''
+      });
     }
   }, [developerProfile?.github_handle]);
 
@@ -82,33 +98,80 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
 
       // Fetch GitHub user data
-      const userResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}`);
+      const userResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}`, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'GitTalent-App'
+        }
+      });
+      
       if (!userResponse.ok) {
-        throw new Error(`GitHub user not found: ${userResponse.status}`);
+        if (userResponse.status === 404) {
+          throw new Error(`GitHub user '${developerProfile.github_handle}' not found`);
+        } else if (userResponse.status === 403) {
+          throw new Error('GitHub API rate limit exceeded. Please try again later.');
+        } else {
+          throw new Error(`GitHub API error: ${userResponse.status}`);
+        }
       }
+      
       const userData: GitHubUser = await userResponse.json();
 
-      // Fetch user's repositories
-      const reposResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}/repos?sort=updated&per_page=100`);
+      // Fetch user's repositories (public only)
+      const reposResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}/repos?sort=updated&per_page=100&type=public`, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'GitTalent-App'
+        }
+      });
+      
       if (!reposResponse.ok) {
         throw new Error(`Failed to fetch repositories: ${reposResponse.status}`);
       }
+      
       const reposData: GitHubRepo[] = await reposResponse.json();
 
+      // Filter out forks unless they have significant stars
+      const filteredRepos = reposData.filter(repo => 
+        !repo.fork || repo.stargazers_count > 5
+      );
+
       // Calculate total stars
-      const totalStars = reposData.reduce((sum, repo) => sum + repo.stargazers_count, 0);
+      const totalStars = filteredRepos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
 
       // Aggregate languages from repositories
       const languageStats: GitHubLanguages = {};
-      reposData.forEach(repo => {
+      
+      // For each repo with a language, fetch detailed language stats
+      for (const repo of filteredRepos.slice(0, 20)) { // Limit to avoid rate limiting
         if (repo.language) {
-          languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
+          try {
+            const langResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/languages`, {
+              headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'GitTalent-App'
+              }
+            });
+            
+            if (langResponse.ok) {
+              const langData = await langResponse.json();
+              Object.entries(langData).forEach(([lang, bytes]) => {
+                languageStats[lang] = (languageStats[lang] || 0) + (bytes as number);
+              });
+            } else {
+              // Fallback to just counting repos by primary language
+              languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
+            }
+          } catch (error) {
+            // Fallback to just counting repos by primary language
+            languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
+          }
         }
-      });
+      }
 
       setGitHubData({
         user: userData,
-        repos: reposData,
+        repos: filteredRepos,
         languages: languageStats,
         totalStars,
         loading: false,
@@ -134,16 +197,43 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   const getTopRepos = (limit: number = 10): GitHubRepo[] => {
     return githubData.repos
-      .filter(repo => !repo.name.includes('.github.io') && repo.stargazers_count > 0)
+      .filter(repo => !repo.name.includes('.github.io') && !repo.fork)
       .sort((a, b) => b.stargazers_count - a.stargazers_count)
       .slice(0, limit);
+  };
+
+  const syncLanguagesToProfile = async () => {
+    if (!developerProfile || githubData.loading) return;
+    
+    const topLanguages = getTopLanguages(15);
+    if (topLanguages.length > 0) {
+      await updateDeveloperProfile({
+        top_languages: topLanguages
+      });
+    }
+  };
+
+  const syncProjectsToProfile = async () => {
+    if (!developerProfile || githubData.loading) return;
+    
+    const topRepos = getTopRepos(8).map(repo => repo.html_url);
+    if (topRepos.length > 0) {
+      const existingProjects = developerProfile.linked_projects || [];
+      const uniqueProjects = [...new Set([...existingProjects, ...topRepos])];
+      
+      await updateDeveloperProfile({
+        linked_projects: uniqueProjects
+      });
+    }
   };
 
   const value = {
     ...githubData,
     refreshGitHubData,
     getTopLanguages,
-    getTopRepos
+    getTopRepos,
+    syncLanguagesToProfile,
+    syncProjectsToProfile
   };
 
   return <GitHubContext.Provider value={value}>{children}</GitHubContext.Provider>;
