@@ -21,11 +21,11 @@ export const SignupForm = () => {
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
-    if (!authLoading && user && userProfile) {
-      console.log('✅ User already authenticated with profile, redirecting to dashboard...');
+    if (!authLoading && user) {
+      console.log('✅ User already authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, userProfile, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,10 +58,8 @@ export const SignupForm = () => {
       await signUp(formData.email.trim(), formData.password, userData);
       
       if (formData.role === 'recruiter') {
-        setSuccess('Your account has been created and is pending admin approval. You will be notified once approved.');
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        setSuccess('Your account has been created and is pending admin approval. Redirecting to dashboard...');
+        // Navigation will happen automatically via useEffect when user loads
       } else {
         setSuccess('Account created successfully! Redirecting to dashboard...');
         // Navigation will happen automatically via useEffect when profile loads

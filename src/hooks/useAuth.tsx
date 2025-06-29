@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Get initial session
     const initializeAuth = async () => {
       try {
-        console.log('🔄 Initializing auth...');
+        console.log('🔄 Initializing auth... Checking for existing session');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (mounted) {
           setUser(session?.user ?? null);
           if (session?.user) {
-            console.log('✅ Session found, fetching profile for user:', session.user.id);
+            console.log('✅ Session found for user:', session.user.id);
             await fetchUserProfile(session.user);
           } else {
             console.log('ℹ️ No session found');
@@ -82,10 +82,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {      
       if (!mounted) return;
 
-      console.log('🔄 Auth state changed:', event, session?.user?.id);
+      console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
       
       // Prevent processing during sign out
       if (signingOut && event === 'SIGNED_OUT') {
@@ -97,6 +97,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
         setSigningOut(false);
         return;
+      } else if (signingOut) {
+        console.log('🔄 Still in signing out process, ignoring auth change');
+        return;
       }
 
       // Prevent auto-redirect if on login/signup pages
@@ -106,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          if (event === 'SIGNED_IN') {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             console.log('✅ User signed in, handling profile setup...');
             await handleGitHubSignIn(session.user);
           }
@@ -221,8 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Fetching user profile for:', authUser.id);
-      console.log('🔄 Auth user metadata:', authUser.user_metadata);
-      console.log('🔄 Auth user app_metadata:', authUser.app_metadata);
+      console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
       // Add a small delay to ensure database operations are complete
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -237,7 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If we get a 500 error or the user doesn't exist, try to create the profile
       if (userError || !userProfileData) {
         console.log('⚠️ User profile not found, attempting to create:', userError?.message);
-        console.log('🔄 Auth user metadata for profile creation:', authUser.user_metadata);
+        console.log('🔄 Auth user metadata for profile creation:', JSON.stringify(authUser.user_metadata));
         
         // Try to create the user profile
         const success = await createUserProfileFromAuth(authUser);
@@ -255,8 +257,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (retryError) {
             console.error('❌ Error fetching user profile after creation:', retryError);
             setUserProfile(null);
-            setDeveloperProfile(null);
-            setNeedsOnboarding(false);
+            setDeveloperProfile(null);            
+            setNeedsOnboarding(true); // Set to true to trigger onboarding if profile creation failed
             setLoading(false);
             return;
           }
@@ -266,8 +268,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.error('❌ Failed to create user profile');
           setUserProfile(null);
-          setDeveloperProfile(null);
-          setNeedsOnboarding(false);
+          setDeveloperProfile(null);          
+          setNeedsOnboarding(true); // Set to true to trigger onboarding if profile creation failed
           setLoading(false);
           return;
         }
@@ -279,8 +281,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('❌ Error fetching profiles:', error);
       setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
+      setDeveloperProfile(null);      
+      setNeedsOnboarding(true); // Set to true to trigger onboarding if profile fetch failed
       setLoading(false);
     }
   };
@@ -653,6 +655,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshProfile = async () => {
     if (user) {
       console.log('🔄 Refreshing profile...');
+      setLoading(true);
       await fetchUserProfile(user);
     }
   };

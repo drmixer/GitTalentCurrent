@@ -15,11 +15,11 @@ export const LoginForm = () => {
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
-    if (!authLoading && user && userProfile) {
-      console.log('✅ User already authenticated with profile, redirecting to dashboard...');
+    if (!authLoading && user) {
+      console.log('✅ User already authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, userProfile, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
