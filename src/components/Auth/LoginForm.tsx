@@ -15,11 +15,11 @@ export const LoginForm = () => {
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
-    if (!authLoading && user && userProfile) {
-      console.log('User already authenticated, redirecting to dashboard...');
+    if (!authLoading && user) {
+      console.log('✅ User already authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, userProfile, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +28,7 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      // Navigation will be handled by the useEffect above after profile is loaded
+      // Navigation will be handled by the useEffect above
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
@@ -43,7 +43,7 @@ export const LoginForm = () => {
 
     try {
       await signInWithGitHub();
-      // Navigation will be handled by the redirect URL
+      // Navigation will be handled by the redirect
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
@@ -57,7 +57,7 @@ export const LoginForm = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking authentication...</p>
+          <p className="text-gray-600 font-medium">Checking authentication...</p>
         </div>
       </div>
     );

@@ -226,18 +226,28 @@ export const RecruiterDashboard = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <p className="text-gray-500 text-sm mt-2">Fetching your recruiter profile...</p>
         </div>
       </div>
     );
   }
 
-  if (!userProfile || userProfile.role !== 'recruiter') {
+  // Redirect if not authenticated
+  if (!userProfile) {
+    console.log('❌ No user profile, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Redirect if not a recruiter
+  if (userProfile.role !== 'recruiter') {
+    console.log('❌ Not a recruiter role, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
   // Show pending approval message
   if (!userProfile.is_approved) {
+    console.log('⚠️ Recruiter not approved yet');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">

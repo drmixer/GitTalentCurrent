@@ -273,19 +273,28 @@ const DeveloperDashboardContent = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <p className="text-gray-600 font-medium">Loading your dashboard...</p>
+          <p className="text-gray-500 text-sm mt-2">Fetching your developer profile...</p>
         </div>
       </div>
     );
   }
 
-  // Redirect if not authenticated or not a developer
-  if (!userProfile || userProfile.role !== 'developer') {
+  // Redirect if not authenticated
+  if (!userProfile) {
+    console.log('❌ No user profile, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Redirect if not a developer
+  if (userProfile.role !== 'developer') {
+    console.log('❌ Not a developer role, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
   // Redirect to onboarding if no developer profile
   if (!developerProfile) {
+    console.log('❌ No developer profile, redirecting to onboarding');
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -296,7 +305,7 @@ const DeveloperDashboardContent = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-12">
             <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-            <span className="text-gray-600">Loading dashboard data...</span>
+            <span className="text-gray-600 font-medium">Loading dashboard data...</span>
           </div>
         </div>
       </div>

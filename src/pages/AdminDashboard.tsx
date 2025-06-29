@@ -260,13 +260,22 @@ export const AdminDashboard = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <p className="text-gray-500 text-sm mt-2">Fetching admin data...</p>
         </div>
       </div>
     );
   }
 
-  if (!userProfile || userProfile.role !== 'admin') {
+  // Redirect if not authenticated
+  if (!userProfile) {
+    console.log('❌ No user profile, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Redirect if not an admin
+  if (userProfile.role !== 'admin') {
+    console.log('❌ Not an admin role, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
