@@ -23,13 +23,11 @@ import { Developer, User as UserType } from '../../types';
 interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
-  developer?: Developer & { user: UserType };
   onClose?: () => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
-  developer: initialDeveloper,
   developer: initialDeveloper,
   onClose
 }) => {
