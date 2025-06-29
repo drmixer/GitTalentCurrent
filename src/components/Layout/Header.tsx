@@ -97,7 +97,7 @@ export const Header = () => {
                   if (fallback) fallback.style.display = 'flex';
                 }}
               />
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center" style={{ display: 'none' }}>
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center hidden">
                 <GitBranch className="w-6 h-6 text-white" />
               </div>
             </div>

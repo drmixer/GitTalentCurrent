@@ -124,19 +124,19 @@ export const SignupForm = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <img 
-                src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjI5Mzc4LCJleHAiOjE3ODI3NjUzNzh9.d6zoyw7HdUn4z6mPJiFwIm7RCQYnDBfRXursnPHuGmo"
-                alt="GitTalent"
-                className="w-7 h-7 object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const fallback = target.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = 'block';
-                }}
-              />
-              <GitBranch className="w-7 h-7 text-white" style={{ display: 'none' }} />
+            <img 
+              src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjI5Mzc4LCJleHAiOjE3ODI3NjUzNzh9.d6zoyw7HdUn4z6mPJiFwIm7RCQYnDBfRXursnPHuGmo"
+              alt="GitTalent"
+              className="w-12 h-12 object-contain"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+            />
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg hidden">
+              <GitBranch className="w-7 h-7 text-white" />
             </div>
             <span className="text-2xl font-black text-gray-900">GitTalent</span>
           </Link>
