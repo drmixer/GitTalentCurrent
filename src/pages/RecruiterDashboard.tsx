@@ -215,7 +215,7 @@ export const RecruiterDashboard: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const stats = {
+  const calculatedStats = {
     totalJobs: jobs.length,
     activeJobs: jobs.filter(job => job.is_active).length,
     totalAssignments: assignments.length,
@@ -467,28 +467,28 @@ export const RecruiterDashboard: React.FC = () => {
           <StatsCard
             icon={Briefcase}
             title="Total Jobs"
-            value={stats.totalJobs}
+            value={calculatedStats.totalJobs}
             subtitle="All time"
             color="bg-gradient-to-r from-blue-500 to-blue-600"
           />
           <StatsCard
             icon={TrendingUp}
             title="Active Jobs"
-            value={stats.activeJobs}
+            value={calculatedStats.activeJobs}
             subtitle="Currently hiring"
             color="bg-gradient-to-r from-green-500 to-green-600"
           />
           <StatsCard
             icon={Users}
             title="Total Assignments"
-            value={stats.totalAssignments}
+            value={calculatedStats.totalAssignments}
             subtitle="All time"
             color="bg-gradient-to-r from-purple-500 to-purple-600"
           />
           <StatsCard
             icon={UserPlus}
             title="Pending"
-            value={stats.pendingAssignments}
+            value={calculatedStats.pendingAssignments}
             subtitle="Awaiting response"
             color="bg-gradient-to-r from-orange-500 to-orange-600"
           />
