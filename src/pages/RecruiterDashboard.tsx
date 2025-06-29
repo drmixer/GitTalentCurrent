@@ -26,33 +26,6 @@ import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperList } from '../components/DeveloperList';
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
 import { Navigate } from 'react-router-dom';
-import { 
-  Briefcase, 
-  Users, 
-  MessageSquare, 
-  TrendingUp, 
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Eye,
-  Mail,
-  Calendar,
-  MapPin,
-  DollarSign,
-  Clock,
-  CheckCircle,
-  UserCheck,
-  Star,
-  Github,
-  Code,
-  Award,
-  Building,
-  Loader,
-  Download,
-  ArrowLeft,
-  Upload
-} from 'lucide-react';
 
 interface JobRole {
   id: string;
