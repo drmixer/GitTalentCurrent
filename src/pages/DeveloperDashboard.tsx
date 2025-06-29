@@ -6,36 +6,7 @@ import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
 import { GitHubProvider, useGitHub } from '../hooks/useGitHub';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
-import { 
-  Code, 
-  Github, 
-  Star, 
-  GitFork, 
-  MessageSquare, 
-  Briefcase,
-  TrendingUp,
-  Calendar,
-  MapPin,
-  DollarSign,
-  Clock,
-  CheckCircle,
-  Eye,
-  Edit,
-  Plus,
-  Award,
-  Building,
-  Mail,
-  ExternalLink,
-  Activity,
-  Users,
-  Target,
-  Loader,
-  Save,
-  X,
-  AlertCircle,
-  RefreshCw,
-  Sync
-} from 'lucide-react';
+import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
 
 interface MessageThread {
