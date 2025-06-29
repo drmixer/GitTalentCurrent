@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { DeveloperSnapshotCard } from '../components/Profile/DeveloperSnapshotCard';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
@@ -59,8 +60,8 @@ export const RecruiterDashboard = () => {
   const [showJobForm, setShowJobForm] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showHireModal, setShowHireModal] = useState(false);
   const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [showHireModal, setShowHireModal] = useState(false);
   const [selectedDeveloper, setSelectedDeveloper] = useState<(Developer & { user: UserType }) | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
@@ -586,126 +587,86 @@ export const RecruiterDashboard = () => {
                   {assignment.developer?.user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-xl font-black text-gray-900">{assignment.developer?.user?.name || 'Unknown Developer'}</h3>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      assignment.developer?.availability 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        assignment.developer?.availability ? 'bg-emerald-500' : 'bg-gray-500'
-                      }`}></div>
-                      {assignment.developer?.availability ? 'Available' : 'Busy'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                    {assignment.developer?.github_handle && (
-                      <div className="flex items-center">
-                        <Github className="w-4 h-4 mr-1" />
-                        @{assignment.developer.github_handle}
-                      </div>
-                    )}
-                    {assignment.developer?.location && (
-                      <div className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {assignment.developer.location}
-                      </div>
-                    )}
-                    <div className="flex items-center">
-                      <Code className="w-4 h-4 mr-1" />
-                      {assignment.developer?.experience_years || 0} years
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    {assignment.developer?.top_languages?.slice(0, 4).map((lang, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                  assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                  assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {assignment.status}
-                </span>
-                <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 rounded-xl p-4 mb-4">
-              <div className="text-sm font-semibold text-gray-900 mb-1">Assigned to: {assignment.job_role?.title}</div>
-              <div className="text-xs text-gray-600">Assigned on {new Date(assignment.assigned_at).toLocaleDateString()}</div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => {
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Developer Snapshot Card */}
+              <div className="md:col-span-2">
+                <DeveloperSnapshotCard 
+                  developer={assignment.developer}
+                  onViewFullProfile={() => {
                     setSelectedDeveloper(assignment.developer);
                     setShowDeveloperProfile(true);
                   }}
-                  className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
-                >
-                  <Eye className="w-4 h-4 mr-2 inline" />
-                  View Profile
-                </button>
-                <button 
-                  onClick={() => setSelectedThread({
-                    otherUserId: assignment.developer_id,
-                    otherUserName: assignment.developer?.user?.name || 'Developer',
-                    otherUserRole: 'developer',
-                    unreadCount: 0,
-                    jobContext: {
-                      id: assignment.job_role_id,
-                      title: assignment.job_role?.title || 'Job'
-                    }
-                  })}
-                  className="px-4 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors font-semibold"
-                >
-                  <Mail className="w-4 h-4 mr-2 inline" />
-                  Message
-                </button>
+                />
               </div>
-              <div className="flex items-center space-x-2">
-                {assignment.status === 'New' && (
+              
+              {/* Assignment Info */}
+              <div className="flex flex-col justify-between">
+                <div>
+                  <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-1">Assigned to: {assignment.job_role?.title}</div>
+                    <div className="text-xs text-gray-600">Assigned on {new Date(assignment.assigned_at).toLocaleDateString()}</div>
+                    <div className="mt-3">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                        assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                        assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                        assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {assignment.status}
+                      </span>
+                    </div>
+                  </div>
+                  
                   <button 
-                    onClick={() => updateAssignmentStatus(assignment.id, 'Contacted')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                    onClick={() => setSelectedThread({
+                      otherUserId: assignment.developer_id,
+                      otherUserName: assignment.developer?.user?.name || 'Developer',
+                      otherUserRole: 'developer',
+                      unreadCount: 0,
+                      jobContext: {
+                        id: assignment.job_role_id,
+                        title: assignment.job_role?.title || 'Job'
+                      }
+                    })}
+                    className="w-full mb-3 flex items-center justify-center px-4 py-3 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors font-semibold"
                   >
-                    <UserCheck className="w-4 h-4 mr-2 inline" />
-                    Mark Contacted
+                    <Mail className="w-4 h-4 mr-2" />
+                    Message Developer
                   </button>
-                )}
-                {assignment.status === 'Contacted' && (
-                  <button 
-                    onClick={() => updateAssignmentStatus(assignment.id, 'Shortlisted')}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
-                  >
-                    <Star className="w-4 h-4 mr-2 inline" />
-                    Shortlist
-                  </button>
-                )}
-                {assignment.status === 'Shortlisted' && (
-                  <button 
-                    onClick={() => {
-                      setSelectedAssignment(assignment);
-                      setShowHireModal(true);
-                    }}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-semibold"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2 inline" />
-                    Mark as Hired
-                  </button>
-                )}
+                </div>
+                
+                <div>
+                  {assignment.status === 'New' && (
+                    <button 
+                      onClick={() => updateAssignmentStatus(assignment.id, 'Contacted')}
+                      className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Mark Contacted
+                    </button>
+                  )}
+                  {assignment.status === 'Contacted' && (
+                    <button 
+                      onClick={() => updateAssignmentStatus(assignment.id, 'Shortlisted')}
+                      className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                    >
+                      <Star className="w-4 h-4 mr-2" />
+                      Shortlist
+                    </button>
+                  )}
+                  {assignment.status === 'Shortlisted' && (
+                    <button 
+                      onClick={() => {
+                        setSelectedAssignment(assignment);
+                        setShowHireModal(true);
+                      }}
+                      className="w-full flex items-center justify-center px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-semibold"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Mark as Hired
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

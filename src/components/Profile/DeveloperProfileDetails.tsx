@@ -23,11 +23,13 @@ import { Developer, User as UserType } from '../../types';
 interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
+  developer?: Developer & { user: UserType };
   onClose?: () => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
+  developer: initialDeveloper,
   developer: initialDeveloper,
   onClose
 }) => {
@@ -38,7 +40,10 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
-    console.log('DeveloperProfileDetails useEffect - initialDeveloper:', initialDeveloper);
+    if (initialDeveloper) {
+      setDeveloper(initialDeveloper);
+      setLoading(false);
+    } else if (developerId) {
     console.log('DeveloperProfileDetails useEffect - developerId:', developerId);
     
     if (initialDeveloper) {
@@ -55,7 +60,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setLoading(true);
       setError('');
       
-      console.log('Fetching developer profile for ID:', developerId);
+      const { data, error: fetchError } = await supabase
 
       const { data, error: fetchError } = await supabase
         .from('developers')
@@ -63,23 +68,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           *,
           user:users(*)
         `)
-        .eq('user_id', developerId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching developer profile:', fetchError);
-        throw fetchError;
-      }
-      
-      if (!data) {
-        console.log('No developer profile found or no permission to access');
-        throw new Error('Developer profile not found or you do not have permission to view it');
-      }
-      
-      console.log('Developer profile fetched successfully:', data);
-      setDeveloper(data);
-    } catch (error: any) {
-      console.error('Error fetching developer profile:', error);
       setError(error.message || 'Failed to load developer profile');
     } finally {
       setLoading(false);
