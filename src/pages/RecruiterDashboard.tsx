@@ -61,7 +61,7 @@ export const RecruiterDashboard = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showHireModal, setShowHireModal] = useState(false);
   const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
-  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<(Developer & { user: UserType }) | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -519,7 +519,7 @@ export const RecruiterDashboard = () => {
               <div className="flex items-center space-x-2">
                 <button 
                   onClick={() => {
-                    setSelectedDeveloper(assignment.developer_id);
+                    setSelectedDeveloper(assignment.developer);
                     setShowDeveloperProfile(true);
                   }}
                   onClick={() => {
@@ -983,7 +983,7 @@ export const RecruiterDashboard = () => {
             </div>
             <div className="p-6">
               <DeveloperProfileDetails
-                developerId={selectedDeveloper}
+                developer={selectedDeveloper}
                 onClose={() => {
                   setShowDeveloperProfile(false);
                   setSelectedDeveloper(null);

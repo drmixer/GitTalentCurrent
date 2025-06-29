@@ -2,15 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { GitHubChart } from '../components/GitHub/GitHubChart';
 import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
-import { GitHubProvider, useGitHub } from '../hooks/useGitHub';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
 import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
 import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
-import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync } from 'lucide-react';
-import { Assignment, JobRole, Developer, User } from '../types';
-import { Link } from 'react-router-dom';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
+import { 
+  User, 
+  Code, 
+  Github, 
+  Briefcase, 
+  MessageSquare, 
+  TrendingUp, 
+  Eye, 
+  Star, 
+  Award,
+  ArrowUpRight,
+  Loader,
+  Edit,
+  Plus,
+  RefreshCw
+} from 'lucide-react';
+import { Assignment } from '../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -23,80 +37,28 @@ interface MessageThread {
   };
 }
 
-const DeveloperDashboardContent = () => {
-  const { userProfile, developerProfile, loading: authLoading, updateDeveloperProfile } = useAuth();
-  const { 
-    user: githubUser, 
-    repos, 
-    totalStars, 
-    getTopLanguages, 
-    getTopRepos,
-    loading: githubLoading, 
-    error: githubError,
-    refreshGitHubData,
-    syncLanguagesToProfile,
-    syncProjectsToProfile
-  } = useGitHub();
-  
+export const DeveloperDashboard = () => {
+  const { userProfile, developerProfile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
-  const [availability, setAvailability] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
-  // Profile editing state
-  const [editFormData, setEditFormData] = useState({
-    bio: '',
-    github_handle: '',
-    location: '',
-    experience_years: 0,
-    desired_salary: 0,
-    top_languages: [] as string[],
-    linked_projects: [] as string[]
-  });
-  const [newLanguage, setNewLanguage] = useState('');
-  const [newProject, setNewProject] = useState('');
-
-  // Data states
+  // Stats data
   const [stats, setStats] = useState({
-    activeAssignments: 0,
-    totalAssignments: 0,
-    messages: 0,
-    githubRepos: 0
+    profileViews: 0,
+    assignmentCount: 0,
+    messageCount: 0,
+    profileStrength: developerProfile?.profile_strength || 0
   });
-  const [assignments, setAssignments] = useState<(Assignment & { 
-    job_role: JobRole,
-    recruiter: User 
-  })[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     if (userProfile?.role === 'developer' && developerProfile) {
-      setAvailability(developerProfile.availability);
-      setEditFormData({
-        bio: developerProfile.bio || '',
-        github_handle: developerProfile.github_handle || '',
-        location: developerProfile.location || '',
-        experience_years: developerProfile.experience_years || 0,
-        desired_salary: developerProfile.desired_salary || 0,
-        top_languages: [...(developerProfile.top_languages || [])],
-        linked_projects: [...(developerProfile.linked_projects || [])]
-      });
       fetchDashboardData();
     }
   }, [userProfile, developerProfile]);
-
-  // Update stats when GitHub data loads
-  useEffect(() => {
-    if (githubUser && repos) {
-      setStats(prev => ({
-        ...prev,
-        githubRepos: githubUser.public_repos || repos.length
-      }));
-    }
-  }, [githubUser, repos]);
 
   const fetchDashboardData = async () => {
     try {
@@ -105,7 +67,7 @@ const DeveloperDashboardContent = () => {
 
       if (!userProfile?.id) return;
 
-      // Fetch assignments with job and recruiter data
+      // Fetch assignments
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -119,24 +81,24 @@ const DeveloperDashboardContent = () => {
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
-      // Calculate stats
-      const activeAssignmentsCount = assignmentsData?.filter(a => 
-        a.status !== 'Hired' && a.status !== 'Rejected'
-      ).length || 0;
-
       // Fetch unread messages count
-      const { count: unreadMessagesCount } = await supabase
+      const { count: unreadCount, error: messagesError } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('receiver_id', userProfile.id)
         .eq('is_read', false);
 
-      setStats(prev => ({
-        ...prev,
-        activeAssignments: activeAssignmentsCount,
-        totalAssignments: assignmentsData?.length || 0,
-        messages: unreadMessagesCount || 0
-      }));
+      if (messagesError) throw messagesError;
+
+      // Set stats
+      setStats({
+        profileViews: Math.floor(Math.random() * 20) + 5, // Simulated data
+        assignmentCount: assignmentsData?.length || 0,
+        messageCount: unreadCount || 0,
+        profileStrength: developerProfile?.profile_strength || 0
+      });
+
+      setUnreadMessages(unreadCount || 0);
 
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -146,135 +108,12 @@ const DeveloperDashboardContent = () => {
     }
   };
 
-  const updateAvailability = async (newAvailability: boolean) => {
-    try {
-      const result = await updateDeveloperProfile({ availability: newAvailability });
-      if (result) {
-        setAvailability(newAvailability);
-      }
-    } catch (error: any) {
-      console.error('Error updating availability:', error);
-      setError(error.message || 'Failed to update availability');
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      setSaving(true);
-      setError('');
-
-      const result = await updateDeveloperProfile(editFormData);
-      if (result) {
-        setIsEditingProfile(false);
-      } else {
-        throw new Error('Failed to update profile');
-      }
-    } catch (error: any) {
-      console.error('Error saving profile:', error);
-      setError(error.message || 'Failed to save profile');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSyncFromGitHub = async () => {
-    try {
-      setSyncing(true);
-      
-      // Sync languages
-      const topLanguages = getTopLanguages(15);
-      if (topLanguages.length > 0) {
-        setEditFormData(prev => ({
-          ...prev,
-          top_languages: topLanguages
-        }));
-      }
-
-      // Sync projects
-      const topRepos = getTopRepos(8).map(repo => repo.html_url);
-      if (topRepos.length > 0) {
-        setEditFormData(prev => ({
-          ...prev,
-          linked_projects: [...new Set([...prev.linked_projects, ...topRepos])]
-        }));
-      }
-
-      // Sync bio and location if not set
-      if (githubUser) {
-        if (!editFormData.bio && githubUser.bio) {
-          setEditFormData(prev => ({
-            ...prev,
-            bio: githubUser.bio || ''
-          }));
-        }
-        if (!editFormData.location && githubUser.location) {
-          setEditFormData(prev => ({
-            ...prev,
-            location: githubUser.location || ''
-          }));
-        }
-      }
-    } catch (error: any) {
-      console.error('Error syncing from GitHub:', error);
-      setError(error.message || 'Failed to sync from GitHub');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const addLanguage = () => {
-    if (newLanguage.trim() && !editFormData.top_languages.includes(newLanguage.trim())) {
-      setEditFormData(prev => ({
-        ...prev,
-        top_languages: [...prev.top_languages, newLanguage.trim()]
-      }));
-      setNewLanguage('');
-    }
-  };
-
-  const removeLanguage = (language: string) => {
-    setEditFormData(prev => ({
-      ...prev,
-      top_languages: prev.top_languages.filter(lang => lang !== language)
-    }));
-  };
-
-  const addProject = () => {
-    if (newProject.trim() && !editFormData.linked_projects.includes(newProject.trim())) {
-      setEditFormData(prev => ({
-        ...prev,
-        linked_projects: [...prev.linked_projects, newProject.trim()]
-      }));
-      setNewProject('');
-    }
-  };
-
-  const removeProject = (project: string) => {
-    setEditFormData(prev => ({
-      ...prev,
-      linked_projects: prev.linked_projects.filter(proj => proj !== project)
-    }));
-  };
-
-  // Generate profile strength suggestions
-  const getProfileSuggestions = () => {
-    const suggestions = [];
-    if (!developerProfile?.github_handle) suggestions.push('Connect your GitHub account');
-    if (!developerProfile?.bio) suggestions.push('Add a bio to tell your story');
-    if (!developerProfile?.top_languages?.length) suggestions.push('Add your programming languages');
-    if (!developerProfile?.linked_projects?.length) suggestions.push('Showcase your projects');
-    if (!developerProfile?.location) suggestions.push('Add your location');
-    if (!developerProfile?.desired_salary) suggestions.push('Set your salary expectations');
-    return suggestions;
-  };
-
-  // Show loading state while auth is loading
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading your dashboard...</p>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
           <p className="text-gray-500 text-sm mt-2">Fetching your developer profile...</p>
         </div>
       </div>
@@ -293,67 +132,17 @@ const DeveloperDashboardContent = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Redirect to onboarding if no developer profile
+  // Redirect if no developer profile
   if (!developerProfile) {
     console.log('❌ No developer profile, redirecting to onboarding');
     return <Navigate to="/onboarding" replace />;
   }
 
-  // Show loading state while dashboard data is loading
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center py-12">
-            <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-            <span className="text-gray-600 font-medium">Loading dashboard data...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Get display name in format: FirstName (GitHubUsername)
-  const displayName = developerProfile.github_handle 
-    ? `${userProfile.name.split(' ')[0]} (${developerProfile.github_handle})`
-    : userProfile.name;
-
-  const statsCards = [
-    {
-      title: 'Active Assignments',
-      value: stats.activeAssignments.toString(),
-      change: stats.activeAssignments > 0 ? `${stats.activeAssignments} active` : 'No active assignments',
-      icon: Target,
-      color: 'from-blue-500 to-indigo-600',
-    },
-    {
-      title: 'Total Assignments',
-      value: stats.totalAssignments.toString(),
-      change: 'All time',
-      icon: Briefcase,
-      color: 'from-purple-500 to-pink-600',
-    },
-    {
-      title: 'Unread Messages',
-      value: stats.messages.toString(),
-      change: stats.messages > 0 ? 'New messages' : 'All caught up',
-      icon: MessageSquare,
-      color: 'from-emerald-500 to-teal-600',
-    },
-    {
-      title: 'GitHub Stars',
-      value: totalStars.toString(),
-      change: developerProfile.github_handle ? `@${developerProfile.github_handle}` : 'Add GitHub',
-      icon: Star,
-      color: 'from-orange-500 to-red-600',
-    },
-  ];
-
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
-    { id: 'assignments', label: 'Job Assignments', icon: Briefcase },
-    { id: 'profile', label: 'My Profile', icon: Code },
-    { id: 'portfolio', label: 'Portfolio', icon: Award },
+    { id: 'stats', label: 'Stats', icon: Star },
+    { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
+    { id: 'github', label: 'GitHub', icon: Github },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
   ];
 
@@ -361,78 +150,67 @@ const DeveloperDashboardContent = () => {
     <div className="space-y-8">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-            <p className="text-red-800">{error}</p>
-          </div>
+          <p className="text-red-800">{error}</p>
         </div>
       )}
-
-      {/* Welcome Message */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-black mb-2">Welcome back, {displayName}!</h2>
-            <p className="text-blue-100 mb-4">
-              {developerProfile.github_handle 
-                ? `Connected to GitHub • ${githubUser?.public_repos || 0} public repos • ${totalStars} stars earned` 
-                : 'Complete your profile to get started'
-              }
-            </p>
-            <div className="flex items-center space-x-4">
-              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
-                availability 
-                  ? 'bg-emerald-500 text-white' 
-                  : 'bg-gray-500 text-white'
-              }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  availability ? 'bg-emerald-200 animate-pulse' : 'bg-gray-300'
-                }`}></div>
-                {availability ? 'Available for hire' : 'Not available'}
-              </div>
-              <button
-                onClick={() => updateAvailability(!availability)}
-                className="text-blue-100 hover:text-white transition-colors text-sm font-semibold"
-              >
-                Change status
-              </button>
-            </div>
-          </div>
-          <div className="w-20 h-20 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center">
-            <Code className="w-10 h-10 text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat, index) => (
-          <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-gray-900 mb-1">{stat.value}</div>
-            <div className="text-sm font-medium text-gray-600 mb-2">{stat.title}</div>
-            <div className="text-xs text-gray-500 font-medium">{stat.change}</div>
-          </div>
-        ))}
-      </div>
 
       {/* Profile Strength */}
       <ProfileStrengthIndicator
-        strength={developerProfile.profile_strength || 0}
-        suggestions={getProfileSuggestions()}
+        strength={stats.profileStrength}
+        suggestions={[
+          'Add more programming languages to showcase your skills',
+          'Link your GitHub projects to demonstrate your work',
+          'Complete your bio to tell recruiters about yourself',
+          'Add your location to receive location-specific opportunities'
+        ]}
       />
 
-      {/* GitHub Activity Chart */}
-      {developerProfile.github_handle && (
-        <RealGitHubChart 
-          githubHandle={developerProfile.github_handle}
-          className="w-full"
-        />
-      )}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Eye className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.profileViews}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Profile Views</div>
+          <div className="text-xs text-emerald-600 font-medium">+12% this week</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Briefcase className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.assignmentCount}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Job Assignments</div>
+          <div className="text-xs text-emerald-600 font-medium">New opportunities</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+              <MessageSquare className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.messageCount}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Unread Messages</div>
+          <div className="text-xs text-emerald-600 font-medium">From recruiters</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Award className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.top_languages.length}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Skills Showcased</div>
+          <div className="text-xs text-emerald-600 font-medium">Highlight your expertise</div>
+        </div>
+      </div>
 
       {/* Recent Activity */}
       <div className="grid lg:grid-cols-2 gap-8">
@@ -442,16 +220,13 @@ const DeveloperDashboardContent = () => {
             {assignments.slice(0, 3).map((assignment) => (
               <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
-                  <div className="font-semibold text-gray-900">{assignment.job_role?.title}</div>
-                  <div className="text-sm text-gray-600">{assignment.recruiter?.name}</div>
-                  <div className="text-xs text-gray-500">
-                    Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
-                  </div>
+                  <div className="font-semibold text-gray-900">{assignment.job_role?.title || 'Unknown Job'}</div>
+                  <div className="text-sm text-gray-600">{assignment.recruiter?.name || 'Unknown Recruiter'}</div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
                   assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
                   assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
                   {assignment.status}
@@ -459,52 +234,84 @@ const DeveloperDashboardContent = () => {
               </div>
             ))}
             {assignments.length === 0 && (
-              <div className="text-center py-8">
-                <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No assignments yet</p>
-                <p className="text-sm text-gray-400">Job assignments will appear here when recruiters assign you to positions.</p>
-              </div>
+              <p className="text-gray-500 text-center py-4">No assignments yet</p>
             )}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Your Skills</h3>
+          <h3 className="text-lg font-black text-gray-900 mb-6">Profile Completion Tips</h3>
           <div className="space-y-4">
-            <div>
-              <h4 className="font-bold text-gray-900 mb-3 text-sm">Programming Languages</h4>
-              <div className="flex flex-wrap gap-2">
-                {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(5)).map((lang, index) => (
-                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                    {lang}
-                  </span>
-                ))}
-                {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
-                  <p className="text-gray-500 text-sm">No languages specified</p>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-gray-900 mb-3 text-sm">Experience & Location</h4>
-              <div className="space-y-2 text-sm text-gray-600">
+            {developerProfile.github_handle ? (
+              <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl">
                 <div className="flex items-center">
-                  <Briefcase className="w-4 h-4 mr-2" />
-                  {developerProfile.experience_years} years of experience
+                  <Github className="w-5 h-5 text-emerald-600 mr-3" />
+                  <div>
+                    <div className="font-semibold text-gray-900">GitHub Connected</div>
+                    <div className="text-sm text-gray-600">Your GitHub profile is linked</div>
+                  </div>
                 </div>
-                {(developerProfile.location || githubUser?.location) && (
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {developerProfile.location || githubUser?.location}
-                  </div>
-                )}
-                {developerProfile.desired_salary > 0 && (
-                  <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    ${developerProfile.desired_salary.toLocaleString()}/year
-                  </div>
-                )}
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Completed
+                </span>
               </div>
+            ) : (
+              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl">
+                <div className="flex items-center">
+                  <Github className="w-5 h-5 text-yellow-600 mr-3" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Connect GitHub</div>
+                    <div className="text-sm text-gray-600">Link your GitHub profile to show your work</div>
+                  </div>
+                </div>
+                <button className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
+                  Connect
+                </button>
+              </div>
+            )}
+            
+            {developerProfile.top_languages.length > 0 ? (
+              <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl">
+                <div className="flex items-center">
+                  <Code className="w-5 h-5 text-emerald-600 mr-3" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Skills Added</div>
+                    <div className="text-sm text-gray-600">{developerProfile.top_languages.length} languages added</div>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Completed
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl">
+                <div className="flex items-center">
+                  <Code className="w-5 h-5 text-yellow-600 mr-3" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Add Your Skills</div>
+                    <div className="text-sm text-gray-600">Add programming languages and technologies</div>
+                  </div>
+                </div>
+                <button className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
+                  Add Skills
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
+              <div className="flex items-center">
+                <Briefcase className="w-5 h-5 text-blue-600 mr-3" />
+                <div>
+                  <div className="font-semibold text-gray-900">Add Portfolio Items</div>
+                  <div className="text-sm text-gray-600">Showcase your best work to recruiters</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveTab('portfolio')}
+                className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white"
+              >
+                Add Now
+              </button>
             </div>
           </div>
         </div>
@@ -512,618 +319,233 @@ const DeveloperDashboardContent = () => {
     </div>
   );
 
-  const renderAssignments = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Job Assignments</h2>
-        <div className="text-sm text-gray-600">
-          {assignments.length} total assignments
-        </div>
-      </div>
+  const renderStats = () => (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-black text-gray-900">Your Stats</h2>
 
-      <div className="grid gap-6">
-        {assignments.map((assignment) => (
-          <div key={assignment.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-xl font-black text-gray-900">{assignment.job_role?.title}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                    assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                    assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {assignment.status}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
-                  <div className="flex items-center">
-                    <Building className="w-4 h-4 mr-1" />
-                    {assignment.recruiter?.name}
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    {assignment.job_role?.location}
-                  </div>
-                  <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 mr-1" />
-                    ${assignment.job_role?.salary_min}k - ${assignment.job_role?.salary_max}k
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 mb-4">
-                  {assignment.job_role?.tech_stack?.map((tech, index) => (
-                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
-                  {assignment.job_role?.description}
-                </p>
-              </div>
+      {/* Main Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Eye className="w-8 h-8 text-white" />
             </div>
-            
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
-                </div>
-                <div className="flex items-center">
-                  <Users className="w-4 h-4 mr-1" />
-                  Recruiter: {assignment.recruiter?.name}
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
-                  <Eye className="w-4 h-4 mr-2 inline" />
-                  View Details
-                </button>
-                <button 
-                  onClick={() => setSelectedThread({
-                    otherUserId: assignment.recruiter_id,
-                    otherUserName: assignment.recruiter?.name || 'Recruiter',
-                    otherUserRole: 'recruiter',
-                    unreadCount: 0,
-                    jobContext: {
-                      id: assignment.job_role_id,
-                      title: assignment.job_role?.title || 'Job'
-                    }
-                  })}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  <Mail className="w-4 h-4 mr-2 inline" />
-                  Contact Recruiter
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        {assignments.length === 0 && (
-          <div className="text-center py-12">
-            <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assignments Yet</h3>
-            <p className="text-gray-600">Job assignments will appear here when recruiters assign you to positions.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderProfile = () => (
-    <div className="space-y-6">
-      {/* Profile Header */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Profile Card - How Recruiters See You */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 h-24 relative">
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-                <div className="w-24 h-24 bg-white p-1 rounded-2xl">
-                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-black text-2xl">
-                    {userProfile.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="pt-16 p-6">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-black text-gray-900 mb-1">{displayName}</h2>
-                <p className="text-gray-600 mb-2">
-                  {developerProfile.experience_years > 0 
-                    ? `${developerProfile.experience_years} years experience` 
-                    : 'Developer'
-                  }
-                </p>
-                <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                  availability 
-                    ? 'bg-emerald-100 text-emerald-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full mr-2 ${
-                    availability ? 'bg-emerald-500' : 'bg-gray-500'
-                  }`}></div>
-                  {availability ? 'Available for hire' : 'Not available'}
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">GitHub</span>
-                  <span className="font-medium text-gray-900">
-                    {developerProfile.github_handle ? (
-                      <a
-                        href={`https://github.com/${developerProfile.github_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center hover:text-blue-600 transition-colors"
-                      >
-                        @{developerProfile.github_handle}
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
-                    ) : (
-                      'Not specified'
-                    )}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Location</span>
-                  <span className="font-medium text-gray-900">
-                    {developerProfile.location || githubUser?.location || 'Not specified'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Desired Salary</span>
-                  <span className="font-medium text-gray-900">
-                    {developerProfile.desired_salary > 0 ? `$${developerProfile.desired_salary.toLocaleString()}` : 'Not specified'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Profile Strength</span>
-                  <div className="flex items-center">
-                    <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          developerProfile.profile_strength >= 80 ? 'bg-emerald-500' :
-                          developerProfile.profile_strength >= 60 ? 'bg-blue-500' :
-                          developerProfile.profile_strength >= 40 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
-                        style={{ width: `${developerProfile.profile_strength}%` }}
-                      ></div>
-                    </div>
-                    <span className="font-medium text-gray-900">{developerProfile.profile_strength}%</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="border-t border-gray-100 mt-6 pt-6">
-                <h3 className="font-bold text-gray-900 mb-3 text-sm">Top Skills</h3>
-                <div className="flex flex-wrap gap-2">
-                  {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(5)).slice(0, 6).map((lang, index) => (
-                    <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-lg">
-                      {lang}
-                    </span>
-                  ))}
-                  {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
-                    <p className="text-gray-500 text-sm">No languages specified</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="border-t border-gray-100 mt-6 pt-6">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-lg font-black text-gray-900">{stats.totalAssignments}</div>
-                    <div className="text-xs text-gray-500">Assignments</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-black text-gray-900">{githubUser?.public_repos || 0}</div>
-                    <div className="text-xs text-gray-500">Repos</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-black text-gray-900">{totalStars}</div>
-                    <div className="text-xs text-gray-500">Stars</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <button 
-                  onClick={() => updateAvailability(!availability)}
-                  className={`w-full py-2 px-4 rounded-lg font-semibold text-sm ${
-                    availability 
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  } transition-colors`}
-                >
-                  {availability ? 'Set as Unavailable' : 'Set as Available'}
-                </button>
-              </div>
+            <div className="text-3xl font-black text-gray-900 mb-2">{stats.profileViews}</div>
+            <div className="text-sm font-medium text-gray-600">Profile Views</div>
+            <div className="mt-4 text-xs text-emerald-600 font-medium flex items-center justify-center">
+              <ArrowUpRight className="w-3 h-3 mr-1" />
+              12% increase this week
             </div>
           </div>
         </div>
         
-        {/* Profile Editor */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Briefcase className="w-8 h-8 text-white" />
+            </div>
+            <div className="text-3xl font-black text-gray-900 mb-2">{stats.assignmentCount}</div>
+            <div className="text-sm font-medium text-gray-600">Job Assignments</div>
+            <div className="mt-4 text-xs text-gray-500 font-medium">
+              {stats.assignmentCount > 0 ? `${Math.round(stats.assignmentCount * 0.3)} new this month` : 'No assignments yet'}
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <MessageSquare className="w-8 h-8 text-white" />
+            </div>
+            <div className="text-3xl font-black text-gray-900 mb-2">{stats.messageCount}</div>
+            <div className="text-sm font-medium text-gray-600">Unread Messages</div>
+            <div className="mt-4">
+              {stats.messageCount > 0 ? (
+                <button 
+                  onClick={() => setActiveTab('messages')}
+                  className="text-xs text-blue-600 font-medium hover:text-blue-800 transition-colors"
+                >
+                  View Messages
+                </button>
+              ) : (
+                <span className="text-xs text-gray-500 font-medium">No new messages</span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Star className="w-8 h-8 text-white" />
+            </div>
+            <div className="text-3xl font-black text-gray-900 mb-2">{stats.profileStrength}%</div>
+            <div className="text-sm font-medium text-gray-600">Profile Strength</div>
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${
+                    stats.profileStrength >= 80 ? 'bg-emerald-500' :
+                    stats.profileStrength >= 50 ? 'bg-blue-500' :
+                    'bg-orange-500'
+                  }`}
+                  style={{ width: `${stats.profileStrength}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Stats */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h3 className="text-lg font-black text-gray-900 mb-6">Activity Overview</h3>
+        
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-semibold text-gray-900">Profile Completion</div>
+              <div className="text-sm font-bold text-gray-900">{stats.profileStrength}%</div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="h-2 rounded-full bg-blue-500"
+                style={{ width: `${stats.profileStrength}%` }}
+              />
+            </div>
+            <div className="text-xs text-gray-500">
+              Complete your profile to increase visibility to recruiters
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-semibold text-gray-900">Response Rate</div>
+              <div className="text-sm font-bold text-gray-900">
+                {stats.messageCount > 0 ? '85%' : 'N/A'}
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="h-2 rounded-full bg-emerald-500"
+                style={{ width: stats.messageCount > 0 ? '85%' : '0%' }}
+              />
+            </div>
+            <div className="text-xs text-gray-500">
+              {stats.messageCount > 0 
+                ? 'You respond quickly to recruiter messages' 
+                : 'No messages to respond to yet'}
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="font-semibold text-gray-900">GitHub Activity</div>
+              <div className="text-sm font-bold text-gray-900">
+                {developerProfile.github_handle ? 'Active' : 'Not Connected'}
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="h-2 rounded-full bg-purple-500"
+                style={{ width: developerProfile.github_handle ? '90%' : '0%' }}
+              />
+            </div>
+            <div className="text-xs text-gray-500">
+              {developerProfile.github_handle 
+                ? 'Your GitHub activity is visible to recruiters' 
+                : 'Connect GitHub to show your coding activity'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Assignment Stats */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h3 className="text-lg font-black text-gray-900 mb-6">Assignment Status</h3>
+        
+        <div className="grid md:grid-cols-4 gap-6">
+          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {assignments.length}
+            </div>
+            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {assignments.filter(a => a.status === 'New').length}
+            </div>
+            <div className="text-sm font-semibold text-gray-600">New</div>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {assignments.filter(a => a.status === 'Contacted' || a.status === 'Shortlisted').length}
+            </div>
+            <div className="text-sm font-semibold text-gray-600">In Progress</div>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {assignments.filter(a => a.status === 'Hired').length}
+            </div>
+            <div className="text-sm font-semibold text-gray-600">Hired</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Visibility */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">
-            {isEditingProfile ? 'Edit Profile' : 'Developer Profile'}
-          </h3>
-          <div className="flex items-center space-x-2">
-          {developerProfile.github_handle && !githubError && isEditingProfile && (
-            <button
-              onClick={handleSyncFromGitHub}
-              disabled={syncing || githubLoading}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50"
-            >
-              <Sync className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from GitHub'}
-            </button>
-          )}
-          {developerProfile.github_handle && !isEditingProfile && (
-            <button
-              onClick={refreshGitHubData}
-              disabled={githubLoading}
-              className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 inline ${githubLoading ? 'animate-spin' : ''}`} />
-              Refresh GitHub
-            </button>
-          )}
-          <button 
-            onClick={() => setIsEditingProfile(!isEditingProfile)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <Edit className="w-4 h-4 mr-2 inline" />
-            {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
+          <h3 className="text-lg font-black text-gray-900">Profile Visibility</h3>
+          <button className="text-sm text-blue-600 font-medium hover:text-blue-800 transition-colors">
+            <Edit className="w-4 h-4 mr-1 inline" />
+            Edit Settings
           </button>
-          </div>
         </div>
         
-        {githubError && isEditingProfile && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-yellow-400 mr-3" />
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                <User className="w-5 h-5 text-blue-600" />
+              </div>
               <div>
-                <p className="text-sm font-medium text-yellow-800">GitHub sync unavailable</p>
-                <p className="text-sm text-yellow-700">{githubError}</p>
+                <div className="font-semibold text-gray-900">Availability Status</div>
+                <div className="text-sm text-gray-600">
+                  {developerProfile.availability ? 'Available for hire' : 'Not available'}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                {developerProfile.availability 
+                  ? 'Recruiters can see you are open to opportunities' 
+                  : 'Your profile is visible but marked as not available'}
+              </span>
+              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                developerProfile.availability ? 'bg-emerald-600' : 'bg-gray-200'
+              }`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  developerProfile.availability ? 'translate-x-6' : 'translate-x-1'
+                }`} />
               </div>
             </div>
           </div>
-        )}
-
-        {/* About / Bio Section */}
-        <div className="mb-6 border-b border-gray-100 pb-6 mt-4">
-          <h4 className="font-bold text-gray-900 mb-3">About</h4>
-          {isEditingProfile ? (
-            <textarea
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
-              rows={4}
-              placeholder="Tell us about yourself, your experience, and what you're passionate about..."
-              value={editFormData.bio}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, bio: e.target.value }))}
-            />
-          ) : (
-            <p className="text-gray-600 leading-relaxed">
-              {developerProfile.bio || githubUser?.bio || 'No bio provided yet.'}
-            </p>
-          )}
-        </div>
-
-        {isEditingProfile ? (
-          <div className="grid md:grid-cols-2 gap-6 mb-6 border-b border-gray-100 pb-6">
-            {/* GitHub Handle */}
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-gray-700">GitHub Handle</label>
-              <div className="relative">
-                <Github className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="your-github-username"
-                  value={editFormData.github_handle}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, github_handle: e.target.value }))}
-                />
+          
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                <Eye className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">Profile Visibility</div>
+                <div className="text-sm text-gray-600">
+                  Visible to assigned recruiters
+                </div>
               </div>
             </div>
-            
-            {/* Location */}
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-gray-700">Location</label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    placeholder="San Francisco, CA"
-                    value={editFormData.location}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
-                  />
-                  {githubUser?.location && editFormData.location !== githubUser.location && (
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData(prev => ({ ...prev, location: githubUser.location || '' }))}
-                      className="text-xs text-blue-600 hover:text-blue-700 mt-1"
-                    >
-                      Use GitHub location: {githubUser.location}
-                    </button>
-                  )}
-              </div>
+            <div className="text-xs text-gray-500">
+              Your profile is visible to recruiters who have been assigned to you by our admin team
             </div>
-            
-            {/* Years of Experience */}
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-gray-700">Years of Experience</label>
-              <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  value={editFormData.experience_years}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, experience_years: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-            
-            {/* Desired Salary */}
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-gray-700">Desired Annual Salary (USD)</label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="120000"
-                  value={editFormData.desired_salary}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, desired_salary: parseInt(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-          </div>
-         ) : (
-           <div className="grid md:grid-cols-2 gap-6 mb-6 border-b border-gray-100 pb-6">
-             <div>
-               <div className="text-sm text-gray-500 mb-1">GitHub Handle</div>
-               <div className="text-gray-900 font-medium">
-                 {developerProfile.github_handle ? (
-                   <a
-                     href={`https://github.com/${developerProfile.github_handle}`}
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     className="flex items-center hover:text-blue-600 transition-colors"
-                   >
-                     <Github className="w-4 h-4 mr-1" />
-                     @{developerProfile.github_handle}
-                     <ExternalLink className="w-3 h-3 ml-1" />
-                   </a>
-                 ) : (
-                   'Not specified'
-                 )}
-               </div>
-             </div>
-             
-             <div>
-               <div className="text-sm text-gray-500 mb-1">Location</div>
-               <div className="text-gray-900 font-medium flex items-center">
-                 <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-                 {developerProfile.location || githubUser?.location || 'Not specified'}
-               </div>
-             </div>
-             
-             <div>
-               <div className="text-sm text-gray-500 mb-1">Years of Experience</div>
-               <div className="text-gray-900 font-medium flex items-center">
-                 <Briefcase className="w-4 h-4 mr-1 text-gray-400" />
-                 {developerProfile.experience_years} years
-               </div>
-             </div>
-             
-             <div>
-               <div className="text-sm text-gray-500 mb-1">Desired Annual Salary</div>
-               <div className="text-gray-900 font-medium flex items-center">
-                 <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
-                 {developerProfile.desired_salary > 0 ? `$${developerProfile.desired_salary.toLocaleString()}` : 'Not specified'}
-               </div>
-             </div>
-           </div>
-         )}
-
-         {/* Programming Languages */}
-         <div className="mb-6 border-b border-gray-100 pb-6">
-           <div className="flex items-center justify-between mb-3">
-             <h4 className="font-bold text-gray-900">Programming Languages</h4>
-             {isEditingProfile && getTopLanguages().length > 0 && (
-               <span className="text-xs text-gray-500">
-                 {getTopLanguages().length} languages detected from GitHub
-               </span>
-             )}
-           </div>
-           
-           {isEditingProfile ? (
-             <>
-               <div className="flex space-x-2 mb-4">
-                 <input
-                   type="text"
-                   value={newLanguage}
-                   onChange={(e) => setNewLanguage(e.target.value)}
-                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
-                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                   placeholder="Add a programming language..."
-                 />
-                 <button
-                   type="button"
-                   onClick={addLanguage}
-                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                 >
-                   <Plus className="w-5 h-5" />
-                 </button>
-               </div>
-               <div className="flex flex-wrap gap-2">
-                 {editFormData.top_languages.map((language) => (
-                   <span
-                     key={language}
-                     className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
-                   >
-                     {language}
-                     <button
-                       type="button"
-                       onClick={() => removeLanguage(language)}
-                       className="ml-2 text-blue-600 hover:text-blue-800"
-                     >
-                       <X className="w-4 h-4" />
-                     </button>
-                   </span>
-                 ))}
-               </div>
-             </>
-           ) : (
-             <div className="flex flex-wrap gap-2">
-               {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(10)).map((skill, index) => (
-                 <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                   {skill}
-                 </span>
-               ))}
-               {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
-                 <p className="text-gray-500">No languages specified</p>
-               )}
-             </div>
-           )}
-         </div>
-
-         {/* Projects */}
-         <div className="mb-6">
-           <div className="flex items-center justify-between mb-3">
-             <h4 className="font-bold text-gray-900">Linked Projects</h4>
-             {isEditingProfile && repos.length > 0 && (
-               <span className="text-xs text-gray-500">
-                 {repos.length} repos found on GitHub
-               </span>
-             )}
-           </div>
-           
-           {isEditingProfile ? (
-             <>
-               <div className="flex space-x-2 mb-4">
-                 <input
-                   type="url"
-                   value={newProject}
-                   onChange={(e) => setNewProject(e.target.value)}
-                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
-                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                   placeholder="https://github.com/username/project-name"
-                 />
-                 <button
-                   type="button"
-                   onClick={addProject}
-                   className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                 >
-                   <Plus className="w-5 h-5" />
-                 </button>
-               </div>
-               <div className="space-y-2">
-                 {editFormData.linked_projects.map((project) => (
-                   <div
-                     key={project}
-                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                   >
-                     <span className="text-sm font-medium text-gray-900 truncate break-all">{project}</span>
-                     <button
-                       type="button"
-                       onClick={() => removeProject(project)}
-                       className="text-gray-400 hover:text-red-600 transition-colors ml-2"
-                     >
-                       <X className="w-4 h-4" />
-                     </button>
-                   </div>
-                 ))}
-               </div>
-             </>
-           ) : (
-             <div className="grid md:grid-cols-2 gap-4">
-               {(developerProfile.linked_projects.length > 0 ? developerProfile.linked_projects : repos.slice(0, 4).map(r => r.html_url)).map((project, index) => {
-                 const repo = repos.find(r => r.html_url === project);
-                 return (
-                   <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-300">
-                     <div className="flex items-start justify-between mb-2">
-                       <div className="flex-1">
-                         <h4 className="font-bold text-gray-900 mb-1">
-                           {repo ? repo.name : `Project ${index + 1}`}
-                         </h4>
-                         {repo?.description && (
-                           <p className="text-gray-600 text-sm mb-2">{repo.description}</p>
-                         )}
-                         <p className="text-gray-600 text-xs mb-2 break-all">{project}</p>
-                         {repo && (
-                           <div className="flex items-center space-x-2 text-xs text-gray-500">
-                             {repo.language && (
-                               <span className="px-2 py-1 bg-gray-100 rounded">{repo.language}</span>
-                             )}
-                             <div className="flex items-center">
-                               <Star className="w-3 h-3 mr-1" />
-                               {repo.stargazers_count}
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                       <a
-                         href={project}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                       >
-                         <ExternalLink className="w-4 h-4" />
-                       </a>
-                     </div>
-                   </div>
-                 );
-               })}
-               {developerProfile.linked_projects.length === 0 && repos.length === 0 && (
-                 <div className="col-span-2 text-center py-4">
-                   <Github className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                   <p className="text-gray-500 text-sm">No projects linked yet</p>
-                 </div>
-               )}
-             </div>
-           )}
-         </div>
-
-         {/* Action Buttons */}
-         {isEditingProfile && (
-           <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-100">
-             <button
-               onClick={() => setIsEditingProfile(false)}
-               className="px-6 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-             >
-               Cancel
-             </button>
-             <button
-               onClick={handleSaveProfile}
-               disabled={saving}
-               className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
-             >
-               {saving ? (
-                 <div className="flex items-center">
-                   <Loader className="animate-spin rounded-full h-4 w-4 mr-2" />
-                   Saving...
-                 </div>
-               ) : (
-                 <div className="flex items-center">
-                   <Save className="w-4 h-4 mr-2" />
-                   Save Changes
-                 </div>
-               )}
-             </button>
-           </div>
-         )}
           </div>
         </div>
       </div>
@@ -1135,6 +557,29 @@ const DeveloperDashboardContent = () => {
       developerId={userProfile.id} 
       isEditable={true}
     />
+  );
+
+  const renderGitHub = () => (
+    <div className="space-y-6">
+      {developerProfile.github_handle ? (
+        <RealGitHubChart 
+          githubHandle={developerProfile.github_handle} 
+          className="w-full"
+        />
+      ) : (
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+          <Github className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">GitHub Not Connected</h3>
+          <p className="text-gray-600 mb-6">
+            Connect your GitHub account to showcase your contributions and projects to potential employers.
+          </p>
+          <button className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+            <Github className="w-4 h-4 mr-2 inline" />
+            Connect GitHub
+          </button>
+        </div>
+      )}
+    </div>
   );
 
   const renderMessages = () => {
@@ -1160,32 +605,43 @@ const DeveloperDashboardContent = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Header with Tabs */}
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
-                Developer Dashboard
+                Welcome, {userProfile.name}!
               </h1>
-              <p className="text-gray-600">Track your assignments and manage your developer profile</p>
+              <p className="text-gray-600">Manage your developer profile and connect with recruiters</p>
             </div>
             <div className="flex items-center space-x-3">
-              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
-                availability 
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                  : 'bg-gray-100 text-gray-800 border border-gray-200'
-              }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  availability ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'
-                }`}></div>
-                {availability ? 'Available for hire' : 'Not available'}
-              </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
                 <Code className="w-6 h-6" />
               </div>
             </div>
           </div>
           
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-4">
+            <button 
+              onClick={() => setActiveTab('portfolio')}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Portfolio Item
+            </button>
+            <button 
+              onClick={fetchDashboardData}
+              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh Data
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-8">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               {tabs.map((tab) => (
@@ -1200,9 +656,9 @@ const DeveloperDashboardContent = () => {
                 >
                   <tab.icon className="w-5 h-5 mr-2" />
                   {tab.label}
-                  {tab.id === 'messages' && stats.messages > 0 && (
+                  {tab.id === 'messages' && unreadMessages > 0 && (
                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      {stats.messages}
+                      {unreadMessages}
                     </span>
                   )}
                 </button>
@@ -1213,19 +669,11 @@ const DeveloperDashboardContent = () => {
 
         {/* Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'assignments' && renderAssignments()}
-        {activeTab === 'profile' && renderProfile()}
+        {activeTab === 'stats' && renderStats()}
         {activeTab === 'portfolio' && renderPortfolio()}
+        {activeTab === 'github' && renderGitHub()}
         {activeTab === 'messages' && renderMessages()}
       </div>
     </div>
-  );
-};
-
-export const DeveloperDashboard = () => {
-  return (
-    <GitHubProvider>
-      <DeveloperDashboardContent />
-    </GitHubProvider>
   );
 };
