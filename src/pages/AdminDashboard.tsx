@@ -57,16 +57,14 @@ export const AdminDashboard = () => {
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [preSelectedDeveloperId, setPreSelectedDeveloperId] = useState<string | undefined>(undefined);
-  const [preSelectedJobId, setPreSelectedJobId] = useState<string | undefined>(undefined);
-  const [filterAssignmentStatus, setFilterAssignmentStatus] = useState('all');
 
   // Data states
   const [stats, setStats] = useState({
     totalDevelopers: 0,
     activeRecruiters: 0,
-    successfulHires: 0,
-    revenue: 0
+    successfulHires: 0, 
+    revenue: 0,
+    pendingApprovals: 0
   });
   const [developers, setDevelopers] = useState<(Developer & { user: User })[]>([]);
   const [recruiters, setRecruiters] = useState<(Recruiter & { user: User })[]>([]);
@@ -111,7 +109,8 @@ export const AdminDashboard = () => {
         totalDevelopers: developersCount || 0,
         activeRecruiters: recruitersCount || 0,
         successfulHires: hiresCount || 0,
-        revenue: (hiresCount || 0) * 15000 // Estimate based on average hire fee
+        revenue: (hiresCount || 0) * 15000, // Estimate based on average hire fee
+        pendingApprovals: 0
       });
 
       // Fetch developers with user data
@@ -150,6 +149,12 @@ export const AdminDashboard = () => {
 
       if (pendingError) throw pendingError;
       setPendingRecruiters(pendingData || []);
+
+      // Update stats with pending approvals count
+      setStats(prev => ({
+        ...prev,
+        pendingApprovals: pendingData?.length || 0
+      }));
 
       // Fetch job roles with recruiter data
       const { data: jobRolesData, error: jobError } = await supabase
@@ -203,16 +208,6 @@ export const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getFilteredAssignments = () => {
-    return assignments.filter(assignment => 
-      (searchTerm === '' || 
-       assignment.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       assignment.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       assignment.recruiter?.name?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterAssignmentStatus === 'all' || assignment.status === filterAssignmentStatus)
-    );
   };
 
   const approveRecruiter = async (userId: string) => {
@@ -303,9 +298,9 @@ export const AdminDashboard = () => {
       color: 'from-blue-500 to-indigo-600',
     },
     {
-      title: 'Active Recruiters',
+      title: 'Recruiters',
       value: stats.activeRecruiters.toString(),
-      change: '+8%',
+      change: stats.pendingApprovals > 0 ? `${stats.pendingApprovals} pending approval` : 'All approved',
       changeType: 'positive',
       icon: Building,
       color: 'from-purple-500 to-pink-600',
@@ -313,7 +308,7 @@ export const AdminDashboard = () => {
     {
       title: 'Successful Hires',
       value: stats.successfulHires.toString(),
-      change: '+23%',
+      change: 'Total hires',
       changeType: 'positive',
       icon: Award,
       color: 'from-emerald-500 to-teal-600',
@@ -321,7 +316,7 @@ export const AdminDashboard = () => {
     {
       title: 'Revenue (Est.)',
       value: `$${Math.round(stats.revenue / 1000)}K`,
-      change: '+18%',
+      change: '15% of hire salaries',
       changeType: 'positive',
       icon: TrendingUp,
       color: 'from-orange-500 to-red-600',
@@ -363,15 +358,14 @@ export const AdminDashboard = () => {
               <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
                 <stat.icon className="w-6 h-6 text-white" />
               </div>
-              <div className={`flex items-center text-sm font-semibold ${
-                stat.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'
-              }`}>
-                <ArrowUpRight className="w-4 h-4 mr-1" />
-                {stat.change}
-              </div>
             </div>
             <div className="text-2xl font-black text-gray-900 mb-1">{stat.value}</div>
-            <div className="text-sm font-medium text-gray-600">{stat.title}</div>
+            <div className="text-sm font-medium text-gray-600 mb-2">{stat.title}</div>
+            <div className={`text-xs ${
+              stat.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'
+            } font-medium`}>
+              {stat.change}
+            </div>
           </div>
         ))}
       </div>
@@ -410,7 +404,7 @@ export const AdminDashboard = () => {
                 <div className="flex-1">
                   <div className="font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
                   <div className="text-sm text-gray-600">{recruiter.company_name || 'Unknown Company'}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 mt-1">
                     {recruiter.user?.email || 'No email'} • Created {new Date(recruiter.user?.created_at || Date.now()).toLocaleDateString()}
                   </div>
                 </div>
@@ -780,41 +774,13 @@ export const AdminDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Assignments</h2>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search assignments..."
-              className="w-full sm:w-auto pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <select
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            value={filterAssignmentStatus}
-            onChange={(e) => setFilterAssignmentStatus(e.target.value)}
-          >
-            <option value="all">All Status</option>
-            <option value="New">New</option>
-            <option value="Contacted">Contacted</option>
-            <option value="Shortlisted">Shortlisted</option>
-            <option value="Hired">Hired</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-          <button 
-            onClick={() => {
-              setPreSelectedDeveloperId(undefined);
-              setPreSelectedJobId(undefined);
-              setShowAssignModal(true);
-            }}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-          >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            New Assignment
-          </button>
-        </div>
+        <button 
+          onClick={() => setShowAssignModal(true)}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+        >
+          <Plus className="w-4 h-4 mr-2 inline" />
+          New Assignment
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -831,50 +797,26 @@ export const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {getFilteredAssignments().map((assignment) => (
+              {assignments.map((assignment) => (
                 <tr key={assignment.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div 
-                        className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3 cursor-pointer"
-                        onClick={() => {
-                          setSelectedDeveloper(assignment.developer_id);
-                          setShowDeveloperDetails(true);
-                        }}
-                      >
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
                         {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                       </div>
-                      <div 
-                        className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
-                        onClick={() => {
-                          setSelectedDeveloper(assignment.developer_id);
-                          setShowDeveloperDetails(true);
-                        }}
-                      >
-                        {assignment.developer?.name || 'Unknown Developer'}
+                      <div className="text-sm font-semibold text-gray-900">
+                        {assignment.developer?.name || 'Unknown'}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div 
-                      className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
-                      onClick={() => {
-                        setSelectedJob(assignment.job_role);
-                        setShowJobDetails(true);
-                      }}
-                    >
-                      {assignment.job_role?.title || 'Unknown Job'}
+                    <div className="text-sm font-semibold text-gray-900">
+                      {assignment.job_role?.title || 'Unknown'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div 
-                      className="text-sm text-gray-900 cursor-pointer hover:text-blue-600"
-                      onClick={() => {
-                        setSelectedRecruiter(assignment.recruiter_id);
-                        setShowRecruiterDetails(true);
-                      }}
-                    >
-                      {assignment.recruiter?.name || 'Unknown Recruiter'}
+                    <div className="text-sm text-gray-900">
+                      {assignment.recruiter?.name || 'Unknown'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -892,10 +834,25 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                        <Eye className="w-4 h-4" />
+                      <button 
+                        onClick={() => setActiveTab('jobs')}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                      >
+                        <Briefcase className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => setSelectedThread({
+                          otherUserId: assignment.developer_id,
+                          otherUserName: assignment.developer?.name || 'Unknown',
+                          otherUserRole: 'developer',
+                          unreadCount: 0,
+                          jobContext: {
+                            id: assignment.job_role_id,
+                            title: assignment.job_role?.title || 'Unknown'
+                          }
+                        })}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                      >
                         <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
@@ -944,7 +901,7 @@ export const AdminDashboard = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
-                          {hire.assignment?.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                          {hire.assignment?.developer?.name?.split(' ').map(n => n?.[0]).join('') || 'U'}
                         </div>
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.name || 'Unknown'}
