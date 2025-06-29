@@ -59,19 +59,16 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           user:users(*)
         `)
         .eq('user_id', developerId)
-      console.log('Fetching developer profile for ID:', developerId);
-        `)
-        .eq('user_id', developerId)
         .single();
-    } catch (err) {
-      console.error('Error in fetchDeveloperProfile:', err);
+
+      if (fetchError) {
         console.error('Error fetching developer profile:', fetchError);
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
       } else {
         console.log('Developer profile fetched successfully:', data);
         setDeveloper(data);
-      setDeveloper(null);
+      }
     } catch (err) {
       console.error('Error in fetchDeveloperProfile:', err);
       setError('Unexpected error loading developer profile');
@@ -85,9 +82,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     return (
       <div className="flex items-center justify-center py-12">
         <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-      console.log('Executing developer profile query with user_id:', developerId);
-
-      // Fetch developer with user data
       </div>
     );
   }
