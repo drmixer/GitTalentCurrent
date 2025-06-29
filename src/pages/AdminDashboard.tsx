@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, REALTIME_LISTEN_TYPES } from '../lib/supabase';
 import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { MessageList } from '../components/Messages/MessageList';
@@ -86,13 +86,64 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (userProfile?.role === 'admin') {
       fetchDashboardData();
+      
+      // Set up real-time subscriptions
+      setupRealtimeSubscriptions();
     }
   }, [userProfile]);
+
+  const setupRealtimeSubscriptions = () => {
+    console.log('Setting up real-time subscriptions for admin dashboard...');
+    
+    // Subscribe to changes in the recruiters table
+    const recruitersSubscription = supabase
+      .channel('recruiters-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'recruiters'
+        },
+        (payload) => {
+          console.log('Recruiters table change detected:', payload);
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+    
+    // Subscribe to changes in the users table
+    const usersSubscription = supabase
+      .channel('users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'users',
+          filter: 'role=eq.recruiter' // Only listen for recruiter role changes
+        },
+        (payload) => {
+          console.log('Users table change detected for recruiters:', payload);
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+    
+    // Clean up subscriptions when component unmounts
+    return () => {
+      console.log('Cleaning up real-time subscriptions...');
+      supabase.removeChannel(recruitersSubscription);
+      supabase.removeChannel(usersSubscription);
+    };
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
+      
+      console.log('Fetching dashboard data...');
 
       // Fetch stats
       const [
@@ -137,7 +188,8 @@ export const AdminDashboard = () => {
       if (recError) throw recError;
       setRecruiters(recruitersData || []);
 
-      // Fetch pending recruiters
+      // Fetch pending recruiters with detailed logging
+      console.log('Fetching pending recruiters...');
       const { data: pendingData, error: pendingError } = await supabase
         .from('recruiters')
         .select(`
@@ -147,7 +199,12 @@ export const AdminDashboard = () => {
         .eq('user.is_approved', false)
         .limit(10);
 
-      if (pendingError) throw pendingError;
+      if (pendingError) {
+        console.error('Error fetching pending recruiters:', pendingError);
+        throw pendingError;
+      }
+      
+      console.log('Pending recruiters data:', pendingData);
       setPendingRecruiters(pendingData || []);
 
       // Update stats with pending approvals count
@@ -214,6 +271,7 @@ export const AdminDashboard = () => {
     try {
       const result = await updateUserApprovalStatus(userId, true);
       if (result) {
+        console.log('Recruiter approved successfully:', userId);
         fetchDashboardData();
       }
     } catch (error: any) {
@@ -226,6 +284,7 @@ export const AdminDashboard = () => {
     try {
       const result = await updateUserApprovalStatus(userId, false);
       if (result) {
+        console.log('Recruiter rejected successfully:', userId);
         // Also delete the recruiter profile
         await supabase.from('recruiters').delete().eq('user_id', userId);
         await supabase.from('users').delete().eq('id', userId);
