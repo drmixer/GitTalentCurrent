@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserProfile(session.user);
@@ -230,6 +231,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
+          console.log('Developer profile found:', devProfileData);
           setDeveloperProfile(devProfileData);
           setNeedsOnboarding(false);
         }
@@ -320,6 +322,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               location: '',
               experience_years: 0,
               desired_salary: 0,
+              skills_categories: {},
+              profile_strength: 0,
+              public_profile_slug: null,
+              notification_preferences: {
+                email: true,
+                in_app: true,
+                assignments: true,
+                messages: true
+              }
             });
 
           if (devError) {
@@ -563,12 +574,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setUserProfile(null);
-    setDeveloperProfile(null);
-    setNeedsOnboarding(false);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear state
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
+      
+      console.log('Successfully signed out');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
+    }
   };
 
   const value = {
