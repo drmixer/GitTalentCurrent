@@ -75,10 +75,12 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
   const handleViewProfile = (developer: Developer & { user: User }) => {
     setSelectedDeveloper(developer);
     setShowFullProfile(false);
+    console.log('Selected developer for profile view:', developer);
   };
 
   const handleViewFullProfile = () => {
     setShowFullProfile(true);
+    console.log('Viewing full profile for developer:', selectedDeveloper?.user_id);
   };
 
   const handleSendMessage = (developer: Developer & { user: User }) => {

@@ -25,10 +25,12 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   onViewFullProfile,
   className = ''
 }) => {
+  console.log('Rendering DeveloperSnapshotCard for:', developer.user_id, developer.user.name);
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('Fetching portfolio items for developer:', developer.user_id);
     fetchFeaturedPortfolioItem();
   }, [developer.user_id]);
 

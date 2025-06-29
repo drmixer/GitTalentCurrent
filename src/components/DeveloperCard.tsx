@@ -22,6 +22,8 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   onViewProfile,
   onSendMessage
 }) => {
+  console.log('Rendering DeveloperCard for:', developer.user_id, developer.user.name);
+  
   // Get display name in format: FirstName (GitHubUsername)
   const displayName = developer.github_handle 
     ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
