@@ -1029,18 +1029,20 @@ const DeveloperDashboardContent = () => {
               <p className="text-gray-600">Track your assignments and manage your developer profile</p>
             </div>
             <div className="flex items-center space-x-3">
-              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
-                availability 
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                  : 'bg-gray-100 text-gray-800 border border-gray-200'
-              }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  availability ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'
-                }`}></div>
-                {availability ? 'Available for hire' : 'Not available'}
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                <Code className="w-6 h-6" />
+              <div className="flex items-center space-x-4">
+                <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
+                  availability 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                    : 'bg-gray-100 text-gray-800 border border-gray-200'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    availability ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'
+                  }`}></div>
+                  {availability ? 'Available for hire' : 'Not available'}
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                  <Code className="w-6 h-6" />
+                </div>
               </div>
             </div>
           </div>
