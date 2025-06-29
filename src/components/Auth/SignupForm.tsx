@@ -15,12 +15,14 @@ export const SignupForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const { signUp, signInWithGitHub } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
@@ -28,17 +30,22 @@ export const SignupForm = () => {
         name: formData.name,
         role: formData.role,
         is_approved: formData.role === 'developer', // Auto-approve developers
+        company_name: formData.role === 'recruiter' ? formData.company_name : undefined,
       };
 
       await signUp(formData.email, formData.password, userData);
       
       if (formData.role === 'recruiter') {
-        alert('Your account has been created and is pending admin approval. You will be notified once approved.');
+        setSuccess('Your account has been created and is pending admin approval. You will be notified once approved.');
+      } else {
+        setSuccess('Account created successfully! You can now sign in.');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       }
-      
-      navigate('/dashboard');
     } catch (error: any) {
-      setError(error.message);
+      console.error('Signup error:', error);
+      setError(error.message || 'An error occurred during signup');
     } finally {
       setLoading(false);
     }
@@ -59,7 +66,8 @@ export const SignupForm = () => {
       await signInWithGitHub();
       // Navigation will be handled by the redirect
     } catch (error: any) {
-      setError(error.message);
+      console.error('GitHub signup error:', error);
+      setError(error.message || 'An error occurred with GitHub signup');
       setGithubLoading(false);
     }
   };
@@ -108,6 +116,15 @@ export const SignupForm = () => {
                 <div className="flex items-center">
                   <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
                   <p className="text-sm font-medium text-red-800">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-green-400 mr-3" />
+                  <p className="text-sm font-medium text-green-800">{success}</p>
                 </div>
               </div>
             )}
@@ -276,6 +293,7 @@ export const SignupForm = () => {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     required
+                    minLength={6}
                     className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
                     placeholder="Create a strong password"
                     value={formData.password}
