@@ -711,7 +711,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       console.log('🔄 Starting sign out process... Current user:', user?.id);
-      setSigningOut(true);
       
       // Clear state immediately for better UX
       console.log('🔄 Clearing local state variables...');
@@ -720,6 +719,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDeveloperProfile(null);
       setNeedsOnboarding(false);
       console.log('✅ Local state variables cleared');
+      
+      // Set signing out flag after clearing state
+      setSigningOut(true);
       
       // Then sign out from Supabase
       console.log('🔄 Calling supabase.auth.signOut()...');
@@ -730,14 +732,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         console.log('✅ Signed out successfully');
       }
-      
-      // Navigate to login page
-      console.log('🔄 Redirecting to login page...');
-      window.location.href = '/login';
+
+      // Force a hard redirect to login page to ensure clean state
+      console.log('🔄 Forcing hard redirect to login page...');
+      window.location.replace('/login');
     } catch (error) {
       console.error('❌ Error in signOut:', error);
       // Even if there's an error, we've cleared the local state
       setSigningOut(false);
+      
+      // Force redirect anyway to ensure user can sign in again
+      window.location.replace('/login');
     }
   };
 

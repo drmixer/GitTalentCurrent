@@ -19,9 +19,40 @@ import {
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperList } from '../components/DeveloperList';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+import { Navigate } from 'react-router-dom';
+import { 
+  Briefcase, 
+  Users, 
+  MessageSquare, 
+  TrendingUp, 
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Mail,
+  Calendar,
+  MapPin,
+  DollarSign,
+  Clock,
+  CheckCircle,
+  UserCheck,
+  Star,
+  Github,
+  Code,
+  Award,
+  Building,
+  Loader,
+  Download,
+  ArrowLeft,
+  Upload
+} from 'lucide-react';
 
 interface JobRole {
   id: string;
@@ -66,21 +97,36 @@ interface MessageThread {
 
 export const RecruiterDashboard: React.FC = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [showJobForm, setShowJobForm] = useState(false);
-  const [selectedJobRole, setSelectedJobRole] = useState<JobRole | null>(null);
-  const [showJobDetails, setShowJobDetails] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('jobs');
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterActive, setFilterActive] = useState<boolean | null>(null);
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
-  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Modal states
+  const [showJobForm, setShowJobForm] = useState(false);
+  const [showJobDetails, setShowJobDetails] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showHireModal, setShowHireModal] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  
+  // Selected item states
+  const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  
+  // Data states
+  const [stats, setStats] = useState({
+    activeJobs: 0,
+    assignedDevelopers: 0,
+    successfulHires: 0,
+    responseRate: 0
+  });
+  const [jobs, setJobs] = useState<JobRole[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [filterActive, setFilterActive] = useState<boolean | null>(null);
+  const [hires, setHires] = useState<(Hire & { assignment: Assignment })[]>([]);
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
 
@@ -90,6 +136,7 @@ export const RecruiterDashboard: React.FC = () => {
       console.log('RecruiterDashboard - Fetching data for recruiter:', userProfile.id);
       fetchJobRoles();
       fetchAssignments();
+      fetchHires();
     }
   }, [userProfile]);
 
@@ -107,7 +154,7 @@ export const RecruiterDashboard: React.FC = () => {
         throw error;
       }
       console.log('Fetched job roles:', data?.length || 0);
-      setJobRoles(data || []);
+      setJobs(data || []);
     } catch (error) {
       console.error('Error fetching job roles:', error);
     } finally {
@@ -135,6 +182,28 @@ export const RecruiterDashboard: React.FC = () => {
     }
   };
 
+  const fetchHires = async () => {
+    try {
+      console.log('Fetching hires for recruiter:', userProfile?.id);
+      const { data, error } = await supabase
+        .from('hires')
+        .select(`
+          *,
+          assignment:assignments(
+            *,
+            developer:users!assignments_developer_id_fkey(*),
+            job_role:job_roles(*)
+          )
+        `)
+        .eq('assignment.recruiter_id', userProfile?.id);
+
+      if (error) throw error;
+      setHires(data || []);
+    } catch (error) {
+      console.error('Error fetching hires:', error);
+    }
+  };
+
   // Handler functions
   const handleJobRoleCreated = () => {
     setShowJobForm(false);
@@ -143,27 +212,27 @@ export const RecruiterDashboard: React.FC = () => {
 
   const handleJobRoleUpdated = () => {
     setShowJobDetails(false);
-    setSelectedJobRole(null);
+    setSelectedJob(null);
     fetchJobRoles();
   };
 
   const handleAssignmentCreated = () => {
     setShowAssignModal(false);
-    setSelectedJobRole(null);
+    setSelectedJob(null);
     fetchAssignments();
   };
 
   const handleViewJobRole = (jobRole: JobRole) => {
-    setSelectedJobRole(jobRole);
+    setSelectedJob(jobRole);
     setShowJobDetails(true);
   };
 
   const handleAssignDeveloper = (jobRole: JobRole) => {
-    setSelectedJobRole(jobRole);
+    setSelectedJob(jobRole);
     setShowAssignModal(true);
   };
 
-  const filteredJobRoles = jobRoles.filter(job => {
+  const filteredJobRoles = jobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          job.tech_stack.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -174,8 +243,8 @@ export const RecruiterDashboard: React.FC = () => {
   });
 
   const stats = {
-    totalJobs: jobRoles.length,
-    activeJobs: jobRoles.filter(job => job.is_active).length,
+    totalJobs: jobs.length,
+    activeJobs: jobs.filter(job => job.is_active).length,
     totalAssignments: assignments.length,
     pendingAssignments: assignments.filter(a => a.status === 'New').length
   };
@@ -627,109 +696,65 @@ export const RecruiterDashboard: React.FC = () => {
 
         {/* Developers Tab - Using DeveloperList component */}
         {activeTab === 'developers' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-black text-gray-900">Assigned Developers</h2>
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Search developers..."
-                    className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <button className="flex items-center px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-                  <Filter className="w-4 h-4 mr-2 text-gray-500" />
-                  Filter
-                </button>
-              </div>
-            </div>
-
-            {assignments && assignments.length > 0 ? (
-              <div className="grid gap-6">
-                {assignments.map((assignment) => (
-                  <div key={assignment.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                          {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-xl font-black text-gray-900">{assignment.developer?.name || 'Unknown Developer'}</h3>
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                            <div className="flex items-center">
-                              <Code className="w-4 h-4 mr-1" />
-                              Developer
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                          assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                          assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {assignment.status}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                      <div className="text-sm font-semibold text-gray-900 mb-1">Assigned to: {assignment.job_role?.title}</div>
-                      <div className="text-xs text-gray-600">Assigned on {new Date(assignment.assigned_at).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assigned Developers</h3>
-                <p className="text-gray-600">Developers will appear here once they are assigned to your job postings.</p>
-              </div>
-            )}
-          </div>
+          <DeveloperList recruiterId={userProfile?.id || ''} />
         )}
 
         {/* Messages Tab - Using MessageList/MessageThread components */}
         {activeTab === 'messages' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-black text-gray-900 mb-6">Messages</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="text-center py-12">
-                <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Messages Yet</h3>
-                <p className="text-gray-600 mb-6">Your messages with developers will appear here.</p>
-              </div>
-            </div>
-          </div>
+          selectedThread ? (
+            <MessageThread
+              otherUserId={selectedThread.otherUserId}
+              otherUserName={selectedThread.otherUserName}
+              otherUserRole={selectedThread.otherUserRole}
+              jobContext={selectedThread.jobContext}
+              onBack={() => setSelectedThread(null)}
+            />
+          ) : (
+            <MessageList
+              onThreadSelect={setSelectedThread}
+            />
+          )
         )}
 
         {/* Job Form Modal */}
         {showJobForm && (
-          <JobRoleForm
-            onClose={() => setShowJobForm(false)}
-            onJobRoleCreated={handleJobRoleCreated}
-          />
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <JobRoleForm
+                jobRole={selectedJob}
+                onSuccess={() => {
+                  setShowJobForm(false);
+                  setSelectedJob(null);
+                  fetchJobRoles();
+                }}
+                onCancel={() => {
+                  setShowJobForm(false);
+                  setSelectedJob(null);
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Job Details Modal */}
-        {showJobDetails && selectedJobRole && (
+        {showJobDetails && selectedJob && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
               <div className="p-6">
                 <JobRoleDetails
-                  jobRole={selectedJobRole}
+                  jobRoleId={selectedJob.id}
                   onClose={() => {
                     setShowJobDetails(false);
-                    setSelectedJobRole(null);
+                    setSelectedJob(null);
                   }}
-                  onJobRoleUpdated={handleJobRoleUpdated}
+                  onEdit={() => {
+                    setShowJobDetails(false);
+                    setShowJobForm(true);
+                  }}
+                  onAssignDeveloper={() => {
+                    setShowJobDetails(false);
+                    setShowAssignModal(true);
+                  }}
                 />
               </div>
             </div>
@@ -737,40 +762,73 @@ export const RecruiterDashboard: React.FC = () => {
         )}
 
         {/* Assign Developer Modal */}
-        {showAssignModal && selectedJobRole && (
+        {showAssignModal && (
           <AssignDeveloperModal
             isOpen={showAssignModal}
             onClose={() => {
               setShowAssignModal(false);
-              setSelectedJobRole(null);
+              setSelectedJob(null);
             }}
-            preSelectedJobId={selectedJobRole.id}
+            preSelectedJobId={selectedJob?.id}
             onSuccess={handleAssignmentCreated}
           />
         )}
 
-        {/* Job Details Component */}
-        {showJobDetails && selectedJobRole && (
-          <JobRoleDetails
-            jobRole={selectedJobRole}
+        {/* CSV Import Modal */}
+        <JobImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {
+            setShowImportModal(false);
+            fetchJobRoles();
+          }}
+        />
+        
+        {/* Hire Modal */}
+        {showHireModal && selectedAssignment && (
+          <MarkAsHiredModal
+            isOpen={showHireModal}
             onClose={() => {
-              setShowJobDetails(false);
-              setSelectedJobRole(null);
+              setShowHireModal(false);
+              setSelectedAssignment(null);
             }}
-            onJobRoleUpdated={handleJobRoleUpdated}
+            assignment={selectedAssignment}
+            onSuccess={() => {
+              setShowHireModal(false);
+              setSelectedAssignment(null);
+              fetchAssignments();
+              fetchHires();
+            }}
           />
         )}
 
-        {/* Assign Developer Component */}
-        {showAssignModal && selectedJobRole && (
-          <AssignDeveloperModal
-            jobRole={selectedJobRole}
-            onClose={() => {
-              setShowAssignModal(false);
-              setSelectedJobRole(null);
-            }}
-            onAssignmentCreated={handleAssignmentCreated}
-          />
+        {/* Developer Profile Modal */}
+        {showDeveloperProfile && selectedDeveloper && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 border-b border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowDeveloperProfile(false);
+                    setSelectedDeveloper(null);
+                  }}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Developers
+                </button>
+              </div>
+              <div className="p-6">
+                <DeveloperProfileDetails
+                  developerId={selectedDeveloper}
+                  onClose={() => {
+                    setShowDeveloperProfile(false);
+                    setSelectedDeveloper(null);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

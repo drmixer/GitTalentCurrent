@@ -35,10 +35,14 @@ export const Header = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log('Header: Initiating sign out process');
       await signOut();
-      navigate('/');
+      // No need to navigate here as signOut will force a redirect
+      console.log('Header: Sign out initiated');
     } catch (error) {
       console.error('Error signing out:', error);
+      // Force navigation to login page if there's an error
+      window.location.replace('/login');
     }
   };
 
