@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, AlertCircle, Eye, EyeOff, GitBranch, Github } from 'lucide-react';
@@ -10,8 +10,16 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
-  const { signIn, signInWithGitHub } = useAuth();
+  const { signIn, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect to dashboard if user is already authenticated and has a profile
+  useEffect(() => {
+    if (!authLoading && user && userProfile) {
+      console.log('User already authenticated, redirecting to dashboard...');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, userProfile, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +28,7 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+      // Navigation will be handled by the useEffect above after profile is loaded
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
@@ -35,13 +43,25 @@ export const LoginForm = () => {
 
     try {
       await signInWithGitHub();
-      // Navigation will be handled by the redirect
+      // Navigation will be handled by the redirect URL
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
       setGithubLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -73,8 +93,8 @@ export const LoginForm = () => {
           {/* GitHub Sign In Button */}
           <button
             onClick={handleGitHubSignIn}
-            disabled={githubLoading}
-            className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-300 rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-300 font-bold mb-6 group"
+            disabled={githubLoading || loading}
+            className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-300 rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-300 font-bold mb-6 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {githubLoading ? (
               <div className="flex items-center">
@@ -122,7 +142,8 @@ export const LoginForm = () => {
                     type="email"
                     autoComplete="email"
                     required
-                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium"
+                    disabled={loading || githubLoading}
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -142,14 +163,16 @@ export const LoginForm = () => {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     required
-                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium"
+                    disabled={loading || githubLoading}
+                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    disabled={loading || githubLoading}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -168,7 +191,8 @@ export const LoginForm = () => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={loading || githubLoading}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm font-medium text-gray-700">
                   Remember me
@@ -185,7 +209,7 @@ export const LoginForm = () => {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || githubLoading}
                 className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
                 {loading ? (

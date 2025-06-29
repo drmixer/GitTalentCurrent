@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         if (event === 'SIGNED_IN') {
+          console.log('User signed in, handling profile setup...');
           // Handle GitHub sign-in with additional profile setup
           await handleGitHubSignIn(session.user);
         }
@@ -101,6 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('Fetching user profile for:', authUser.id);
       
+      // Add a small delay to ensure database operations are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // First, try to fetch user profile with error handling
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
@@ -116,7 +120,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const success = await createUserProfileFromAuth(authUser);
         
         if (success) {
-          // Retry fetching the profile
+          // Add another delay and retry fetching the profile
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
             .select('*')

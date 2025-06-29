@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github, CheckCircle } from 'lucide-react';
@@ -16,8 +16,16 @@ export const SignupForm = () => {
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [success, setSuccess] = useState('');
-  const { signUp, signInWithGitHub } = useAuth();
+  const { signUp, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect to dashboard if user is already authenticated and has a profile
+  useEffect(() => {
+    if (!authLoading && user && userProfile) {
+      console.log('User already authenticated, redirecting to dashboard...');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, userProfile, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,11 +59,12 @@ export const SignupForm = () => {
       
       if (formData.role === 'recruiter') {
         setSuccess('Your account has been created and is pending admin approval. You will be notified once approved.');
-      } else {
-        setSuccess('Account created successfully! You can now sign in.');
         setTimeout(() => {
           navigate('/login');
-        }, 2000);
+        }, 3000);
+      } else {
+        setSuccess('Account created successfully! Redirecting to dashboard...');
+        // For developers, navigation will be handled by the useEffect above
       }
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -92,6 +101,18 @@ export const SignupForm = () => {
       [e.target.name]: e.target.value
     }));
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show GitHub option for developers, but disable if no name
   const showGitHubOption = formData.role === 'developer';
@@ -152,8 +173,9 @@ export const SignupForm = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
+                    disabled={loading || githubLoading}
                     onClick={() => setFormData(prev => ({ ...prev, role: 'developer' }))}
-                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all disabled:opacity-50 ${
                       formData.role === 'developer'
                         ? 'border-blue-500 bg-blue-50 text-blue-700'
                         : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -164,8 +186,9 @@ export const SignupForm = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={loading || githubLoading}
                     onClick={() => setFormData(prev => ({ ...prev, role: 'recruiter' }))}
-                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                    className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all disabled:opacity-50 ${
                       formData.role === 'recruiter'
                         ? 'border-purple-500 bg-purple-50 text-purple-700'
                         : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -188,7 +211,8 @@ export const SignupForm = () => {
                     name="name"
                     type="text"
                     required
-                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    disabled={loading || githubLoading}
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your full name"
                     value={formData.name}
                     onChange={handleChange}
@@ -211,9 +235,9 @@ export const SignupForm = () => {
                   <button
                     type="button"
                     onClick={handleGitHubSignUp}
-                    disabled={githubLoading || isGitHubDisabled}
+                    disabled={githubLoading || isGitHubDisabled || loading}
                     className={`w-full flex items-center justify-center px-6 py-4 border-2 rounded-2xl font-bold transition-all duration-300 group ${
-                      isGitHubDisabled 
+                      isGitHubDisabled || loading
                         ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
                         : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500'
                     }`}
@@ -225,7 +249,7 @@ export const SignupForm = () => {
                       </div>
                     ) : (
                       <>
-                        <Github className={`w-5 h-5 mr-3 transition-transform ${!isGitHubDisabled ? 'group-hover:scale-110' : ''}`} />
+                        <Github className={`w-5 h-5 mr-3 transition-transform ${!isGitHubDisabled && !loading ? 'group-hover:scale-110' : ''}`} />
                         Continue with GitHub
                       </>
                     )}
@@ -237,7 +261,7 @@ export const SignupForm = () => {
                     </p>
                   )}
                   
-                  {!isGitHubDisabled && (
+                  {!isGitHubDisabled && !loading && (
                     <p className="text-xs text-gray-500 text-center">
                       ✨ Automatically imports your GitHub profile and projects
                     </p>
@@ -266,7 +290,8 @@ export const SignupForm = () => {
                     type="email"
                     autoComplete="email"
                     required
-                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    disabled={loading || githubLoading}
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleChange}
@@ -286,7 +311,8 @@ export const SignupForm = () => {
                       name="company_name"
                       type="text"
                       required
-                      className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                      disabled={loading || githubLoading}
+                      className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder="Enter your company name"
                       value={formData.company_name}
                       onChange={handleChange}
@@ -308,14 +334,16 @@ export const SignupForm = () => {
                     autoComplete="new-password"
                     required
                     minLength={6}
-                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    disabled={loading || githubLoading}
+                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Create a strong password (min 6 characters)"
                     value={formData.password}
                     onChange={handleChange}
                   />
                   <button
                     type="button"
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    disabled={loading || githubLoading}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -331,7 +359,7 @@ export const SignupForm = () => {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || githubLoading}
                 className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
                 {loading ? (
