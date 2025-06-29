@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { 
+  MessageSquare,
   Building, 
   Users, 
   Briefcase, 
@@ -18,6 +19,9 @@ import {
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
+import { DeveloperList } from '../components/DeveloperList';
 
 interface JobRole {
   id: string;
@@ -49,16 +53,27 @@ interface Assignment {
   };
 }
 
+interface MessageThread {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  unreadCount: number;
+  jobContext?: {
+    id: string;
+    title: string;
+  };
+}
+
 export const RecruiterDashboard: React.FC = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [selectedJobRole, setSelectedJobRole] = useState<JobRole | null>(null);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('jobs');
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -67,22 +82,31 @@ export const RecruiterDashboard: React.FC = () => {
   const [showHireModal, setShowHireModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
+  console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
+
   useEffect(() => {
-    if (user) {
+    console.log('RecruiterDashboard useEffect - user:', user?.id, 'userProfile:', userProfile?.id);
+    if (userProfile?.role === 'recruiter') {
+      console.log('RecruiterDashboard - Fetching data for recruiter:', userProfile.id);
       fetchJobRoles();
       fetchAssignments();
     }
-  }, [user]);
+  }, [userProfile]);
 
   const fetchJobRoles = async () => {
     try {
+      console.log('Fetching job roles for recruiter:', userProfile?.id);
       const { data, error } = await supabase
         .from('job_roles')
         .select('*')
-        .eq('recruiter_id', user?.id)
+        .eq('recruiter_id', userProfile?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching job roles:', error);
+        throw error;
+      }
+      console.log('Fetched job roles:', data?.length || 0);
       setJobRoles(data || []);
     } catch (error) {
       console.error('Error fetching job roles:', error);
@@ -93,6 +117,7 @@ export const RecruiterDashboard: React.FC = () => {
 
   const fetchAssignments = async () => {
     try {
+      console.log('Fetching assignments for recruiter:', userProfile?.id);
       const { data, error } = await supabase
         .from('assignments')
         .select(`
@@ -100,7 +125,7 @@ export const RecruiterDashboard: React.FC = () => {
           developer:users!assignments_developer_id_fkey(name, email),
           job_role:job_roles(title)
         `)
-        .eq('recruiter_id', user?.id)
+        .eq('recruiter_id', userProfile?.id)
         .order('assigned_at', { ascending: false });
 
       if (error) throw error;
@@ -110,6 +135,7 @@ export const RecruiterDashboard: React.FC = () => {
     }
   };
 
+  // Handler functions
   const handleJobRoleCreated = () => {
     setShowJobForm(false);
     fetchJobRoles();
@@ -154,7 +180,7 @@ export const RecruiterDashboard: React.FC = () => {
     pendingAssignments: assignments.filter(a => a.status === 'New').length
   };
 
-  const tabs = [
+  const tabs: { id: string; label: string; icon: any }[] = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'jobs', label: 'My Jobs', icon: Briefcase },
     { id: 'developers', label: 'Assigned Developers', icon: Users },
@@ -162,9 +188,50 @@ export const RecruiterDashboard: React.FC = () => {
   ];
 
   if (loading) {
+    console.log('RecruiterDashboard - Showing loading state');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+        <div className="text-center">
+          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <p className="text-gray-500 text-sm mt-2">Fetching your recruiter profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!userProfile) {
+    console.log('❌ No user profile, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Redirect if not a recruiter
+  if (userProfile.role !== 'recruiter') {
+    console.log('❌ Not a recruiter role, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Show pending approval message
+  if (!userProfile.is_approved) {
+    console.log('⚠️ Recruiter not approved yet');
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-8 h-8 text-yellow-600" />
+            </div>
+            <h1 className="text-2xl font-black text-gray-900 mb-4">Account Pending Approval</h1>
+            <p className="text-gray-600 mb-6">
+              Your recruiter account is currently under review by our admin team. 
+              You'll receive an email notification once your account is approved and you can access the dashboard.
+            </p>
+            <div className="text-sm text-gray-500">
+              This usually takes 1-2 business days.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -184,6 +251,7 @@ export const RecruiterDashboard: React.FC = () => {
     </div>
   );
 
+  // Job Role Card Component
   const JobRoleCard = ({ job }: { job: JobRole }) => (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all">
       <div className="flex items-start justify-between mb-4">
@@ -246,6 +314,7 @@ export const RecruiterDashboard: React.FC = () => {
     </div>
   );
 
+  // Recent Assignments Component
   const RecentAssignments = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100">
       <div className="p-6 border-b border-gray-100">
@@ -293,6 +362,7 @@ export const RecruiterDashboard: React.FC = () => {
     </div>
   );
 
+  console.log('RecruiterDashboard - Rendering main UI, activeTab:', activeTab);
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -301,7 +371,7 @@ export const RecruiterDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
-                Welcome back, {userProfile?.name}!
+                Welcome back, {userProfile.name}!
               </h1>
               <p className="text-gray-600">Manage your job postings and connect with top developers</p>
             </div>
@@ -312,6 +382,19 @@ export const RecruiterDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-4 mb-8">
+          <button 
+            onClick={() => setShowJobForm(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Post New Job
+          </button>
+        </div>
+
+        {/* Tabs */}
 
         {/* Tabs */}
         <div className="mb-8">
@@ -335,7 +418,7 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Overview Tab */}
         {activeTab === 'overview' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -383,7 +466,7 @@ export const RecruiterDashboard: React.FC = () => {
                 <div className="text-left">
                   <div className="font-bold text-gray-900">Post New Job</div>
                   <div className="text-sm text-gray-600">Create a new job posting</div>
-                </div>
+                </div> 
               </button>
               
               <button 
@@ -419,7 +502,7 @@ export const RecruiterDashboard: React.FC = () => {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-black text-gray-900 mb-6">Recent Job Activity</h3>
               <div className="space-y-4">
-                {jobs.slice(0, 3).map((job) => (
+                {jobRoles.slice(0, 3).map((job) => (
                   <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                     <div>
                       <div className="font-semibold text-gray-900">{job.title}</div>
@@ -432,7 +515,7 @@ export const RecruiterDashboard: React.FC = () => {
                     </span>
                   </div>
                 ))}
-                {jobs.length === 0 && (
+                {jobRoles.length === 0 && (
                   <p className="text-gray-500 text-center py-4">No jobs posted yet</p>
                 )}
               </div>
@@ -471,6 +554,7 @@ export const RecruiterDashboard: React.FC = () => {
         </div>
         )}
 
+        {/* Jobs Tab */}
         {/* Jobs Tab */}
         {activeTab === 'jobs' && (
           <div className="space-y-6">
@@ -541,7 +625,7 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Developers Tab */}
+        {/* Developers Tab - Using DeveloperList component */}
         {activeTab === 'developers' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -562,7 +646,7 @@ export const RecruiterDashboard: React.FC = () => {
               </div>
             </div>
 
-            {assignments.length > 0 ? (
+            {assignments && assignments.length > 0 ? (
               <div className="grid gap-6">
                 {assignments.map((assignment) => (
                   <div key={assignment.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
@@ -612,7 +696,7 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Messages Tab */}
+        {/* Messages Tab - Using MessageList/MessageThread components */}
         {activeTab === 'messages' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-black text-gray-900 mb-6">Messages</h2>
@@ -626,7 +710,7 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Modals */}
+        {/* Job Form Modal */}
         {showJobForm && (
           <JobRoleForm
             onClose={() => setShowJobForm(false)}
@@ -634,6 +718,7 @@ export const RecruiterDashboard: React.FC = () => {
           />
         )}
 
+        {/* Job Details Modal */}
         {showJobDetails && selectedJobRole && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -651,6 +736,7 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* Assign Developer Modal */}
         {showAssignModal && selectedJobRole && (
           <AssignDeveloperModal
             isOpen={showAssignModal}
@@ -663,6 +749,7 @@ export const RecruiterDashboard: React.FC = () => {
           />
         )}
 
+        {/* Job Details Component */}
         {showJobDetails && selectedJobRole && (
           <JobRoleDetails
             jobRole={selectedJobRole}
@@ -674,6 +761,7 @@ export const RecruiterDashboard: React.FC = () => {
           />
         )}
 
+        {/* Assign Developer Component */}
         {showAssignModal && selectedJobRole && (
           <AssignDeveloperModal
             jobRole={selectedJobRole}

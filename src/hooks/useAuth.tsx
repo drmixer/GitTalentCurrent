@@ -710,16 +710,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log('🔄 Starting sign out process...');
+      console.log('🔄 Starting sign out process... Current user:', user?.id);
       setSigningOut(true);
       
       // Clear state immediately for better UX
+      console.log('🔄 Clearing local state variables...');
       setUser(null);
       setUserProfile(null);
       setDeveloperProfile(null);
       setNeedsOnboarding(false);
+      console.log('✅ Local state variables cleared');
       
       // Then sign out from Supabase
+      console.log('🔄 Calling supabase.auth.signOut()...');
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('⚠️ Sign out error:', error);
@@ -729,6 +732,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       // Navigate to login page
+      console.log('🔄 Redirecting to login page...');
       window.location.href = '/login';
     } catch (error) {
       console.error('❌ Error in signOut:', error);
