@@ -49,10 +49,6 @@ export const AdminDashboard = () => {
   const { userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterLanguage, setFilterLanguage] = useState('');
-  const [filterRecruiter, setFilterRecruiter] = useState('');
-  const [filterTechStack, setFilterTechStack] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -63,6 +59,7 @@ export const AdminDashboard = () => {
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [preSelectedDeveloperId, setPreSelectedDeveloperId] = useState<string | undefined>(undefined);
   const [preSelectedJobId, setPreSelectedJobId] = useState<string | undefined>(undefined);
+  const [filterAssignmentStatus, setFilterAssignmentStatus] = useState('all');
 
   // Data states
   const [stats, setStats] = useState({
@@ -89,7 +86,9 @@ export const AdminDashboard = () => {
   const [pendingRecruiters, setPendingRecruiters] = useState<(Recruiter & { user: User })[]>([]);
 
   useEffect(() => {
-    if (userProfile?.role === 'admin') fetchDashboardData();
+    if (userProfile?.role === 'admin') {
+      fetchDashboardData();
+    }
   }, [userProfile]);
 
   const fetchDashboardData = async () => {
@@ -206,6 +205,16 @@ export const AdminDashboard = () => {
     }
   };
 
+  const getFilteredAssignments = () => {
+    return assignments.filter(assignment => 
+      (searchTerm === '' || 
+       assignment.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+       assignment.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       assignment.recruiter?.name?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (filterAssignmentStatus === 'all' || assignment.status === filterAssignmentStatus)
+    );
+  };
+
   const approveRecruiter = async (userId: string) => {
     try {
       const result = await updateUserApprovalStatus(userId, true);
@@ -258,71 +267,6 @@ export const AdminDashboard = () => {
     a.download = `all-hires-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
-
-  // Filter functions
-  const getFilteredRecruiters = () => {
-    return recruiters.filter(recruiter => 
-      (searchTerm === '' || 
-       recruiter.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       recruiter.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       recruiter.user?.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterStatus === 'all' || 
-       (filterStatus === 'approved' && recruiter.user?.is_approved) ||
-       (filterStatus === 'pending' && !recruiter.user?.is_approved))
-    );
-  };
-
-  const getFilteredDevelopers = () => {
-    return developers.filter(dev => 
-      (searchTerm === '' || 
-       dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       dev.user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterLanguage === '' || 
-       dev.top_languages.some(lang => lang.toLowerCase().includes(filterLanguage.toLowerCase())))
-    );
-  };
-
-  const getFilteredJobs = () => {
-    return jobRoles.filter(job => 
-      (searchTerm === '' || 
-       job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       job.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterRecruiter === '' || job.recruiter_id === filterRecruiter) &&
-      (filterTechStack === '' || 
-       job.tech_stack.some(tech => tech.toLowerCase().includes(filterTechStack.toLowerCase())))
-    );
-  };
-
-  const getFilteredAssignments = () => {
-    return assignments.filter(assignment => 
-      searchTerm === '' || 
-      assignment.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      assignment.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.recruiter?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  };
-
-  const getFilteredHires = () => {
-    return hires.filter(hire => 
-      searchTerm === '' || 
-      hire.assignment?.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      hire.assignment?.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      hire.assignment?.recruiter?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  };
-
-  // Get unique languages from all developers
-  const getUniqueLanguages = () => {
-    const allLanguages = developers.flatMap(dev => dev.top_languages);
-    return [...new Set(allLanguages)].sort();
-  };
-
-  // Get unique tech stack items from all jobs
-  const getUniqueTechStack = () => {
-    const allTechStack = jobRoles.flatMap(job => job.tech_stack);
-    return [...new Set(allTechStack)].sort();
   };
 
   if (authLoading || loading) {
@@ -509,28 +453,23 @@ export const AdminDashboard = () => {
 
   const renderRecruiters = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Recruiters</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex items-center space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search recruiters..."
-              className="w-full sm:w-auto pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="all">All Status</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-          </select>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
         </div>
       </div>
 
@@ -547,7 +486,7 @@ export const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {getFilteredRecruiters()
+              {recruiters
                 .filter(rec => 
                   !searchTerm || 
                   rec.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -624,35 +563,25 @@ export const AdminDashboard = () => {
 
   const renderDevelopers = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Developers</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex items-center space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search developers..."
-              className="w-full sm:w-auto pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            value={filterLanguage}
-            onChange={(e) => setFilterLanguage(e.target.value)}
-          >
-            <option value="">All Languages</option>
-            {getUniqueLanguages().map(lang => (
-              <option key={lang} value={lang}>{lang}</option>
-            ))}
-          </select>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
           <button 
-            onClick={() => {
-              setPreSelectedDeveloperId(undefined);
-              setPreSelectedJobId(undefined);
-              setShowAssignModal(true);
-            }}
+            onClick={() => setShowAssignModal(true)}
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
           >
             <Plus className="w-4 h-4 mr-2 inline" />
@@ -675,7 +604,7 @@ export const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {getFilteredDevelopers()
+              {developers
                 .filter(dev => 
                   !searchTerm || 
                   dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -726,25 +655,14 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedDeveloper(developer.user_id);
-                          setShowDeveloperDetails(true); 
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                      >
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <Eye className="w-4 h-4" />
                       </button>
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <MessageSquare className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => {
-                          // Pre-select this developer in the assignment modal
-                          setPreSelectedDeveloperId(developer.user_id);
-                          setPreSelectedJobId(undefined);
-                          setShowAssignModal(true);
-                        }}
+                        onClick={() => setShowAssignModal(true)}
                         className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -762,46 +680,28 @@ export const AdminDashboard = () => {
 
   const renderJobRoles = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Job Roles</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex items-center space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search jobs..."
-              className="w-full sm:w-auto pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            value={filterRecruiter}
-            onChange={(e) => setFilterRecruiter(e.target.value)}
-          >
-            <option value="">All Recruiters</option>
-            {recruiters.map(recruiter => (
-              <option key={recruiter.user_id} value={recruiter.user_id}>
-                {recruiter.user?.name || 'Unknown'} ({recruiter.company_name})
-              </option>
-            ))}
-          </select>
-          <select
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            value={filterTechStack}
-            onChange={(e) => setFilterTechStack(e.target.value)}
-          >
-            <option value="">All Technologies</option>
-            {getUniqueTechStack().map(tech => (
-              <option key={tech} value={tech}>{tech}</option>
-            ))}
-          </select>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
         </div>
       </div>
 
       <div className="grid gap-6">
-        {getFilteredJobs()
+        {jobRoles
           .filter(job => 
             !searchTerm || 
             job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -863,12 +763,7 @@ export const AdminDashboard = () => {
                   View Details
                 </button>
                 <button 
-                  onClick={() => {
-                    // Pre-select this job in the assignment modal
-                    setPreSelectedJobId(job.id);
-                    setPreSelectedDeveloperId(undefined);
-                    setShowAssignModal(true);
-                  }}
+                  onClick={() => setShowAssignModal(true)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                 >
                   Assign Developer
@@ -883,9 +778,9 @@ export const AdminDashboard = () => {
 
   const renderAssignments = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Assignments</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -896,13 +791,25 @@ export const AdminDashboard = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <select
+            className="w-full sm:w-auto px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            value={filterAssignmentStatus}
+            onChange={(e) => setFilterAssignmentStatus(e.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Shortlisted">Shortlisted</option>
+            <option value="Hired">Hired</option>
+            <option value="Rejected">Rejected</option>
+          </select>
           <button 
             onClick={() => {
               setPreSelectedDeveloperId(undefined);
               setPreSelectedJobId(undefined);
               setShowAssignModal(true);
             }}
-            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
           >
             <Plus className="w-4 h-4 mr-2 inline" />
             New Assignment
@@ -928,22 +835,46 @@ export const AdminDashboard = () => {
                 <tr key={assignment.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
+                      <div 
+                        className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3 cursor-pointer"
+                        onClick={() => {
+                          setSelectedDeveloper(assignment.developer_id);
+                          setShowDeveloperDetails(true);
+                        }}
+                      >
                         {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                       </div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {assignment.developer?.name || 'Unknown'}
+                      <div 
+                        className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
+                        onClick={() => {
+                          setSelectedDeveloper(assignment.developer_id);
+                          setShowDeveloperDetails(true);
+                        }}
+                      >
+                        {assignment.developer?.name || 'Unknown Developer'}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900">
-                      {assignment.job_role?.title || 'Unknown'}
+                    <div 
+                      className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
+                      onClick={() => {
+                        setSelectedJob(assignment.job_role);
+                        setShowJobDetails(true);
+                      }}
+                    >
+                      {assignment.job_role?.title || 'Unknown Job'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {assignment.recruiter?.name || 'Unknown'}
+                    <div 
+                      className="text-sm text-gray-900 cursor-pointer hover:text-blue-600"
+                      onClick={() => {
+                        setSelectedRecruiter(assignment.recruiter_id);
+                        setShowRecruiterDetails(true);
+                      }}
+                    >
+                      {assignment.recruiter?.name || 'Unknown Recruiter'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -961,28 +892,10 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedDeveloper(assignment.developer_id);
-                          setShowDeveloperDetails(true);
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                      >
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button 
-                        onClick={() => setSelectedThread({
-                          otherUserId: assignment.developer_id,
-                          otherUserName: assignment.developer?.name || 'Developer',
-                          otherUserRole: 'developer',
-                          unreadCount: 0,
-                          jobContext: {
-                            id: assignment.job_role_id,
-                            title: assignment.job_role?.title || 'Job'
-                          }
-                        })}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                      >
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
@@ -998,29 +911,17 @@ export const AdminDashboard = () => {
 
   const renderHires = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">All Hires</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search hires..."
-              className="w-full sm:w-auto pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          {hires.length > 0 && (
-            <button 
-              onClick={exportHiresToCSV}
-              className="w-full sm:w-auto flex items-center justify-center px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </button>
-          )}
-        </div>
+        {hires.length > 0 && (
+          <button 
+            onClick={exportHiresToCSV}
+            className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </button>
+        )}
       </div>
 
       {hires.length > 0 ? (
@@ -1038,7 +939,7 @@ export const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {getFilteredHires().map((hire) => (
+                {hires.map((hire) => (
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -1159,12 +1060,8 @@ export const AdminDashboard = () => {
       <AssignDeveloperModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        preSelectedDeveloperId={preSelectedDeveloperId}
-        preSelectedJobId={preSelectedJobId}
         onSuccess={() => {
           setShowAssignModal(false);
-          setPreSelectedDeveloperId(undefined);
-          setPreSelectedJobId(undefined);
           fetchDashboardData();
         }}
       />
