@@ -35,6 +35,7 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
   const [selectedDeveloperId, setSelectedDeveloperId] = useState(preSelectedDeveloperId || '');
   const [selectedJobId, setSelectedJobId] = useState(preSelectedJobId || '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [jobSearchTerm, setJobSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -44,6 +45,15 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
       fetchData();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (preSelectedDeveloperId) {
+      setSelectedDeveloperId(preSelectedDeveloperId);
+    }
+    if (preSelectedJobId) {
+      setSelectedJobId(preSelectedJobId);
+    }
+  }, [preSelectedDeveloperId, preSelectedJobId]);
 
   const fetchData = async () => {
     try {
@@ -152,6 +162,12 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
     dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
     dev.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+  
+  const filteredJobs = jobRoles.filter(job =>
+    job.title.toLowerCase().includes(jobSearchTerm.toLowerCase()) ||
+    job.location.toLowerCase().includes(jobSearchTerm.toLowerCase()) ||
+    job.tech_stack.some(tech => tech.toLowerCase().includes(jobSearchTerm.toLowerCase()))
+  );
 
   if (!isOpen) return null;
 
@@ -193,8 +209,21 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
           {/* Job Selection */}
           <div>
             <h3 className="text-lg font-bold text-gray-900 mb-4">Select Job Role</h3>
+            
+            {/* Job Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search job roles..."
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                value={jobSearchTerm}
+                onChange={(e) => setJobSearchTerm(e.target.value)}
+              />
+            </div>
+            
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {jobRoles.map((job) => (
+              {filteredJobs.map((job) => (
                 <div
                   key={job.id}
                   className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
