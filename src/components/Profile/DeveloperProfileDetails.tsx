@@ -44,14 +44,15 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setDeveloper(initialDeveloper);
       setLoading(false);
     } else if (developerId) {
-    console.log('DeveloperProfileDetails useEffect - developerId:', developerId);
+      console.log('DeveloperProfileDetails useEffect - developerId:', developerId);
     
-    if (initialDeveloper) {
-      console.log('Using provided developer data:', initialDeveloper);
-      setDeveloper(initialDeveloper);
-      setLoading(false);
-    } else if (developerId) {
-      fetchDeveloperProfile();
+      if (initialDeveloper) {
+        console.log('Using provided developer data:', initialDeveloper);
+        setDeveloper(initialDeveloper);
+        setLoading(false);
+      } else if (developerId) {
+        fetchDeveloperProfile();
+      }
     }
   }, [developerId, initialDeveloper]);
 
@@ -61,14 +62,15 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setError('');
       
       const { data, error: fetchError } = await supabase
-
-      const { data, error: fetchError } = await supabase
         .from('developers')
         .select(`
           *,
           user:users(*)
-        `)
-      setError(error.message || 'Failed to load developer profile');
+        `);
+
+      if (fetchError) {
+        setError(error.message || 'Failed to load developer profile');
+      }
     } finally {
       setLoading(false);
     }
