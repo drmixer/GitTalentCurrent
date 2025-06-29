@@ -621,6 +621,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const signOut = async () => {
+    try {
+      console.log('🔄 Starting sign out process...');
+      setSigningOut(true);
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('❌ Error signing out:', error);
+        throw error;
+      }
+      
+      console.log('✅ Sign out successful');
+      
+      // Clear all state
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
+      setLoading(false);
+    } catch (error) {
+      console.error('❌ Error in signOut:', error);
+      throw error;
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     console.log('🔄 Signing in with email...');
     const { error } = await supabase.auth.signInWithPassword({
