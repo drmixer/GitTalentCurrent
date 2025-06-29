@@ -14,7 +14,9 @@ import {
   Eye,
   Edit,
   Trash2,
-  UserPlus
+  UserPlus,
+  Clock,
+  ArrowLeft,
 } from 'lucide-react';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
@@ -68,6 +70,13 @@ interface MessageThread {
   };
 }
 
+interface Hire {
+  id: string;
+  assignment_id: string;
+  hired_at: string;
+  assignment: Assignment;
+}
+
 export const RecruiterDashboard: React.FC = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
@@ -100,6 +109,31 @@ export const RecruiterDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [hires, setHires] = useState<(Hire & { assignment: Assignment })[]>([]);
+
+  // Inline Loader component to avoid missing import issues
+  const Loader = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg
+      {...props}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v8z"
+      />
+    </svg>
+  );
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
 
@@ -356,247 +390,175 @@ export const RecruiterDashboard: React.FC = () => {
     </div>
   );
 
-  // Recent Assignments Component
-  const RecentAssignments = () => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-      <div className="p-6 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Assignments</h2>
-      </div>
-      <div className="divide-y divide-gray-100">
-        {assignments.slice(0, 5).map((assignment) => (
-          <div key={assignment.id} className="p-6 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                    {assignment.developer.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{assignment.developer.name}</p>
-                    <p className="text-sm text-gray-500">{assignment.developer.email}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Assigned to: <span className="font-medium">{assignment.job_role.title}</span>
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    assignment.status === 'New' ? 'bg-blue-100 text-blue-800' :
-                    assignment.status === 'Contacted' ? 'bg-yellow-100 text-yellow-800' :
-                    assignment.status === 'Shortlisted' ? 'bg-purple-100 text-purple-800' :
-                    assignment.status === 'Hired' ? 'bg-green-100 text-green-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {assignment.status}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(assignment.assigned_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-              <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                <MoreVertical className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   console.log('RecruiterDashboard - Rendering main UI, activeTab:', activeTab);
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-black text-gray-900 mb-2">
-                Welcome back, {userProfile.name}!
-              </h1>
-              <p className="text-gray-600">Manage your job postings and connect with top developers</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                <Building className="w-6 h-6" />
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-900">Recruiter Dashboard</h1>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-xl shadow-lg transition"
+            >
+              <Plus className="w-5 h-5" />
+              Import Jobs CSV
+            </button>
           </div>
-        </div>
-        
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-4 mb-8">
-          <button 
-            onClick={() => setShowJobForm(true)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Post New Job
-          </button>
         </div>
 
         {/* Tabs */}
-
-        {/* Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5 mr-2" />
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+        <nav className="flex border-b border-gray-200 mb-8 space-x-8">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 pb-4 border-b-2 font-semibold ${
+                activeTab === id
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } transition`}
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </button>
+          ))}
+        </nav>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatsCard
-            icon={Briefcase}
-            title="Total Jobs"
-            value={calculatedStats.totalJobs}
-            subtitle="All time"
-            color="bg-gradient-to-r from-blue-500 to-blue-600"
-          />
-          <StatsCard
-            icon={TrendingUp}
-            title="Active Jobs"
-            value={calculatedStats.activeJobs}
-            subtitle="Currently hiring"
-            color="bg-gradient-to-r from-green-500 to-green-600"
-          />
-          <StatsCard
-            icon={Users}
-            title="Total Assignments"
-            value={calculatedStats.totalAssignments}
-            subtitle="All time"
-            color="bg-gradient-to-r from-purple-500 to-purple-600"
-          />
-          <StatsCard
-            icon={UserPlus}
-            title="Pending"
-            value={calculatedStats.pendingAssignments}
-            subtitle="Awaiting response"
-            color="bg-gradient-to-r from-orange-500 to-orange-600"
-          />
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-6">Quick Actions</h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <button 
-                onClick={() => setShowJobForm(true)}
-                className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 hover:from-blue-100 hover:to-indigo-100 transition-all group"
-              >
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold text-gray-900">Post New Job</div>
-                  <div className="text-sm text-gray-600">Create a new job posting</div>
-                </div> 
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('developers')}
-                className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:from-purple-100 hover:to-pink-100 transition-all group"
-              >
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold text-gray-900">Browse Developers</div>
-                  <div className="text-sm text-gray-600">View assigned talent</div>
-                </div>
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('messages')}
-                className="flex items-center p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all group"
-              >
-                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                  <MessageSquare className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold text-gray-900">Check Messages</div>
-                  <div className="text-sm text-gray-600">View communications</div>
-                </div>
-              </button>
+          <div className="space-y-10">
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              <StatsCard
+                icon={Briefcase}
+                title="Active Jobs"
+                value={calculatedStats.activeJobs}
+                color="bg-purple-600"
+              />
+              <StatsCard
+                icon={Users}
+                title="Assigned Developers"
+                value={calculatedStats.totalAssignments}
+                color="bg-pink-600"
+              />
+              <StatsCard
+                icon={UserPlus}
+                title="Successful Hires"
+                value={hires.length}
+                color="bg-emerald-600"
+              />
+              <StatsCard
+                icon={MessageSquare}
+                title="Response Rate"
+                value={`${stats.responseRate || 0}%`}
+                color="bg-blue-600"
+              />
             </div>
-          </div>
 
-          {/* Recent Activity */}
-          <div className="grid lg:grid-cols-2 gap-8">
+            {/* Quick Actions */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-black text-gray-900 mb-6">Recent Job Activity</h3>
-              <div className="space-y-4">
-                {jobRoles.slice(0, 3).map((job) => (
-                  <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <div>
-                      <div className="font-semibold text-gray-900">{job.title}</div>
-                      <div className="text-sm text-gray-600">Posted {new Date(job.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {job.is_active ? 'Active' : 'Paused'}
-                    </span>
+              <h3 className="text-lg font-black text-gray-900 mb-6">Quick Actions</h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => setShowJobForm(true)}
+                  className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 hover:from-blue-100 hover:to-indigo-100 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                    <Plus className="w-5 h-5 text-white" />
                   </div>
-                ))}
-                {jobRoles.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">No jobs posted yet</p>
-                )}
+                  <div className="text-left">
+                    <div className="font-bold text-gray-900">Post New Job</div>
+                    <div className="text-sm text-gray-600">Create a new job posting</div>
+                  </div> 
+                </button>
+                
+                <button 
+                  onClick={() => setActiveTab('developers')}
+                  className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:from-purple-100 hover:to-pink-100 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold text-gray-900">Browse Developers</div>
+                    <div className="text-sm text-gray-600">View assigned talent</div>
+                  </div>
+                </button>
+                
+                <button 
+                  onClick={() => setActiveTab('messages')}
+                  className="flex items-center p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-all group"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                    <MessageSquare className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold text-gray-900">Check Messages</div>
+                    <div className="text-sm text-gray-600">View communications</div>
+                  </div>
+                </button>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
-              <div className="space-y-4">
-                {assignments.slice(0, 3).map((assignment) => (
-                  <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
-                        {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                      </div>
+            {/* Recent Activity */}
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-black text-gray-900 mb-6">Recent Job Activity</h3>
+                <div className="space-y-4">
+                  {jobs.slice(0, 3).map((job) => (
+                    <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                       <div>
-                        <div className="font-semibold text-gray-900">{assignment.developer?.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-600">{assignment.job_role?.title}</div>
+                        <div className="font-semibold text-gray-900">{job.title}</div>
+                        <div className="text-sm text-gray-600">Posted {new Date(job.created_at).toLocaleDateString()}</div>
                       </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {job.is_active ? 'Active' : 'Paused'}
+                      </span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                      assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                      assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {assignment.status}
-                    </span>
-                  </div>
-                ))}
-                {assignments.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">No assignments yet</p>
-                )}
+                  ))}
+                  {jobs.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No jobs posted yet</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
+                <div className="space-y-4">
+                  {assignments.slice(0, 3).map((assignment) => (
+                    <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
+                          {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">{assignment.developer?.name || 'Unknown'}</div>
+                          <div className="text-sm text-gray-600">{assignment.job_role?.title}</div>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                        assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                        assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {assignment.status}
+                      </span>
+                    </div>
+                  ))}
+                  {assignments.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No assignments yet</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
         )}
 
-        {/* Jobs Tab */}
         {/* Jobs Tab */}
         {activeTab === 'jobs' && (
           <div className="space-y-6">
