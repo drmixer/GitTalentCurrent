@@ -2,10 +2,10 @@ import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
-import { Loader, AlertCircle, RefreshCw, Code, Building, Shield } from 'lucide-react';
+import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut } from 'lucide-react';
 
 export const Dashboard = () => {
-  const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile } = useAuth();
+  const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile, signOut } = useAuth();
 
   console.log('🔍 Dashboard state:', {
     user: !!user,
@@ -19,7 +19,7 @@ export const Dashboard = () => {
   // Show loading state while auth is being determined
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="text-center max-w-md mx-auto px-4">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Loading your profile...</p>
@@ -46,7 +46,7 @@ export const Dashboard = () => {
   if (!userProfile) {
     console.log('❌ User exists but no profile found');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md mx-auto text-center px-4">
           <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -66,15 +66,10 @@ export const Dashboard = () => {
               </button>
               <div className="flex space-x-3">
                 <button
-                  onClick={() => signOut()}
-                  className="w-full px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                >
-                  Sign Out
-                </button>
-                <button
                   onClick={() => window.location.replace('/login')}
-                  className="w-full px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                  className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
                 >
+                  <LogOut className="w-4 h-4 mr-2" />
                   Back to Login
                 </button>
               </div>
@@ -91,7 +86,7 @@ export const Dashboard = () => {
       // If developer needs onboarding, show onboarding
       if (needsOnboarding) {
         console.log('🔄 Developer needs onboarding');
-        return <Navigate to="/onboarding" replace={true} />;
+        return <DeveloperOnboarding />;
       }
       
       // If developer profile exists, redirect to developer dashboard
@@ -103,7 +98,7 @@ export const Dashboard = () => {
       // If no developer profile but not flagged for onboarding, show error
       console.log('❌ Developer role but no profile and no onboarding flag');
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
           <div className="max-w-md mx-auto text-center px-4">
             <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -115,19 +110,10 @@ export const Dashboard = () => {
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={() => window.location.href = '/onboarding'}
+                  onClick={() => window.location.replace('/onboarding')}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
                 >
                   Complete Profile Setup
-                </button>
-                <button
-                  onClick={() => {
-                    setNeedsOnboarding(true);
-                    navigate('/onboarding', { replace: true });
-                  }}
-                  className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                >
-                  Force Onboarding
                 </button>
               </div>
             </div>
@@ -152,7 +138,7 @@ export const Dashboard = () => {
     default:
       console.log('❌ Unknown role:', userProfile.role);
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
           <div className="max-w-md mx-auto text-center px-4">
             <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -164,7 +150,7 @@ export const Dashboard = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={signOut}
+                  onClick={() => window.location.replace('/login')}
                   className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold flex-1"
                 >
                   Sign Out
