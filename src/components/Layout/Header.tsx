@@ -1,13 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
 
 export const Header = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (user && userProfile) {
+      fetchUnreadCount();
+    }
+  }, [user, userProfile]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      if (!userProfile?.id) return;
+
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userProfile.id)
+        .eq('is_read', false);
+
+      setUnreadCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -149,10 +173,15 @@ export const Header = () => {
                 </Link>
                 <Link
                   to="/messages"
-                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>Messages</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] h-5 flex items-center justify-center">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
                 <div className="flex items-center space-x-4">
                   <Link
@@ -193,7 +222,7 @@ export const Header = () => {
               {isPublicPage ? (
                 <>
                   {[
-                    { label: 'Features', id: 'features' },
+                    { label:  'Features', id: 'features' },
                     { label: 'Pricing', id: 'pricing' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
@@ -260,6 +289,11 @@ export const Header = () => {
                     >
                       <MessageSquare className="w-4 h-4" />
                       <span>Messages</span>
+                      {unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                     <Link
                       to="/profile"

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
 import { 
   Users, 
   Briefcase, 
@@ -23,16 +27,35 @@ import {
   Calendar,
   ArrowUpRight,
   Plus,
-  Loader
+  Loader,
+  Download,
+  ArrowLeft
 } from 'lucide-react';
-import { User, Developer, Recruiter, Assignment, Hire } from '../types';
+import { User, Developer, Recruiter, Assignment, Hire, JobRole } from '../types';
+
+interface MessageThread {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  unreadCount: number;
+  jobContext?: {
+    id: string;
+    title: string;
+  };
+}
 
 export const AdminDashboard = () => {
-  const { userProfile, loading: authLoading } = useAuth();
+  const { userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Modal states
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showJobDetails, setShowJobDetails] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
 
   // Data states
   const [stats, setStats] = useState({
@@ -43,7 +66,19 @@ export const AdminDashboard = () => {
   });
   const [developers, setDevelopers] = useState<(Developer & { user: User })[]>([]);
   const [recruiters, setRecruiters] = useState<(Recruiter & { user: User })[]>([]);
-  const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
+  const [jobRoles, setJobRoles] = useState<(JobRole & { recruiter: User })[]>([]);
+  const [assignments, setAssignments] = useState<(Assignment & {
+    developer: User,
+    job_role: JobRole,
+    recruiter: User
+  })[]>([]);
+  const [hires, setHires] = useState<(Hire & { 
+    assignment: Assignment & {
+      developer: User,
+      job_role: JobRole,
+      recruiter: User
+    }
+  })[]>([]);
   const [pendingRecruiters, setPendingRecruiters] = useState<(Recruiter & { user: User })[]>([]);
 
   useEffect(() => {
@@ -82,7 +117,7 @@ export const AdminDashboard = () => {
           *,
           user:users(*)
         `)
-        .limit(10);
+        .limit(50);
 
       if (devError) throw devError;
       setDevelopers(developersData || []);
@@ -94,7 +129,7 @@ export const AdminDashboard = () => {
           *,
           user:users(*)
         `)
-        .limit(10);
+        .limit(50);
 
       if (recError) throw recError;
       setRecruiters(recruitersData || []);
@@ -107,25 +142,56 @@ export const AdminDashboard = () => {
           user:users!inner(*)
         `)
         .eq('user.is_approved', false)
-        .limit(5);
+        .limit(10);
 
       if (pendingError) throw pendingError;
       setPendingRecruiters(pendingData || []);
 
-      // Fetch recent assignments
+      // Fetch job roles with recruiter data
+      const { data: jobRolesData, error: jobError } = await supabase
+        .from('job_roles')
+        .select(`
+          *,
+          recruiter:users!job_roles_recruiter_id_fkey(*)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (jobError) throw jobError;
+      setJobRoles(jobRolesData || []);
+
+      // Fetch assignments
       const { data: assignmentsData, error: assignError } = await supabase
         .from('assignments')
         .select(`
           *,
-          developer:users!assignments_developer_id_fkey(name),
-          job_role:job_roles(title),
-          recruiter:users!assignments_recruiter_id_fkey(name)
+          developer:users!assignments_developer_id_fkey(*),
+          job_role:job_roles(*),
+          recruiter:users!assignments_recruiter_id_fkey(*)
         `)
         .order('assigned_at', { ascending: false })
-        .limit(5);
+        .limit(50);
 
       if (assignError) throw assignError;
-      setRecentAssignments(assignmentsData || []);
+      setAssignments(assignmentsData || []);
+
+      // Fetch hires
+      const { data: hiresData, error: hiresError } = await supabase
+        .from('hires')
+        .select(`
+          *,
+          assignment:assignments(
+            *,
+            developer:users!assignments_developer_id_fkey(*),
+            job_role:job_roles(*),
+            recruiter:users!assignments_recruiter_id_fkey(*)
+          )
+        `)
+        .order('hire_date', { ascending: false })
+        .limit(50);
+
+      if (hiresError) throw hiresError;
+      setHires(hiresData || []);
 
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -137,15 +203,10 @@ export const AdminDashboard = () => {
 
   const approveRecruiter = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ is_approved: true })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      // Refresh data
-      fetchDashboardData();
+      const result = await updateUserApprovalStatus(userId, true);
+      if (result) {
+        fetchDashboardData();
+      }
     } catch (error: any) {
       console.error('Error approving recruiter:', error);
       setError(error.message || 'Failed to approve recruiter');
@@ -154,20 +215,44 @@ export const AdminDashboard = () => {
 
   const rejectRecruiter = async (userId: string) => {
     try {
-      // In a real app, you might want to soft delete or mark as rejected
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      // Refresh data
-      fetchDashboardData();
+      const result = await updateUserApprovalStatus(userId, false);
+      if (result) {
+        // Also delete the recruiter profile
+        await supabase.from('recruiters').delete().eq('user_id', userId);
+        await supabase.from('users').delete().eq('id', userId);
+        fetchDashboardData();
+      }
     } catch (error: any) {
       console.error('Error rejecting recruiter:', error);
       setError(error.message || 'Failed to reject recruiter');
     }
+  };
+
+  const exportHiresToCSV = () => {
+    if (hires.length === 0) return;
+
+    const csvData = hires.map(hire => ({
+      'Developer Name': hire.assignment?.developer?.name || 'Unknown',
+      'Recruiter Name': hire.assignment?.recruiter?.name || 'Unknown',
+      'Job Title': hire.assignment?.job_role?.title || 'Unknown',
+      'Salary': hire.salary,
+      'Hire Date': new Date(hire.hire_date).toLocaleDateString(),
+      'Start Date': hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not specified',
+      'Notes': hire.notes || ''
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all-hires-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (authLoading || loading) {
@@ -222,10 +307,12 @@ export const AdminDashboard = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
-    { id: 'developers', label: 'Developers', icon: Code },
     { id: 'recruiters', label: 'Recruiters', icon: Building },
+    { id: 'developers', label: 'Developers', icon: Code },
+    { id: 'jobs', label: 'Job Roles', icon: Briefcase },
     { id: 'assignments', label: 'Assignments', icon: UserCheck },
     { id: 'hires', label: 'Hires', icon: Award },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
   ];
 
   const renderOverview = () => (
@@ -262,23 +349,22 @@ export const AdminDashboard = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
           <div className="space-y-4">
-            {recentAssignments.length > 0 ? (
-              recentAssignments.map((assignment) => (
-                <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                  <div>
-                    <div className="font-semibold text-gray-900">{assignment.developer?.name}</div>
-                    <div className="text-sm text-gray-600">{assignment.job_role?.title} at {assignment.recruiter?.name}</div>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                    assignment.status === 'Contacted' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {assignment.status}
-                  </span>
+            {assignments.slice(0, 5).map((assignment) => (
+              <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <div className="font-semibold text-gray-900">{assignment.developer?.name}</div>
+                  <div className="text-sm text-gray-600">{assignment.job_role?.title} at {assignment.recruiter?.name}</div>
                 </div>
-              ))
-            ) : (
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                  assignment.status === 'Contacted' ? 'bg-blue-100 text-blue-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {assignment.status}
+                </span>
+              </div>
+            ))}
+            {assignments.length === 0 && (
               <p className="text-gray-500 text-center py-4">No recent assignments</p>
             )}
           </div>
@@ -287,33 +373,142 @@ export const AdminDashboard = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Pending Approvals</h3>
           <div className="space-y-4">
-            {pendingRecruiters.length > 0 ? (
-              pendingRecruiters.map((recruiter) => (
-                <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                  <div>
-                    <div className="font-semibold text-gray-900">{recruiter.user.name}</div>
-                    <div className="text-sm text-gray-600">{recruiter.company_name}</div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => approveRecruiter(recruiter.user_id)}
-                      className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => rejectRecruiter(recruiter.user_id)}
-                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  </div>
+            {pendingRecruiters.slice(0, 5).map((recruiter) => (
+              <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <div className="font-semibold text-gray-900">{recruiter.user.name}</div>
+                  <div className="text-sm text-gray-600">{recruiter.company_name}</div>
                 </div>
-              ))
-            ) : (
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => approveRecruiter(recruiter.user_id)}
+                    className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => rejectRecruiter(recruiter.user_id)}
+                    className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {pendingRecruiters.length === 0 && (
               <p className="text-gray-500 text-center py-4">No pending approvals</p>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderRecruiters = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">Recruiters</h2>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search recruiters..."
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Industry</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {recruiters
+                .filter(rec => 
+                  !searchTerm || 
+                  rec.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  rec.company_name.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((recruiter) => (
+                <tr key={recruiter.user_id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
+                        {recruiter.user.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{recruiter.user.name}</div>
+                        <div className="text-sm text-gray-500">{recruiter.user.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-semibold text-gray-900">{recruiter.company_name}</div>
+                    <div className="text-sm text-gray-500">{recruiter.company_size}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                      recruiter.user.is_approved 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {recruiter.user.is_approved ? (
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                      ) : (
+                        <Clock className="w-3 h-3 mr-1" />
+                      )}
+                      {recruiter.user.is_approved ? 'Approved' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {recruiter.industry || 'Not specified'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      {!recruiter.user.is_approved && (
+                        <>
+                          <button 
+                            onClick={() => approveRecruiter(recruiter.user_id)}
+                            className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => rejectRecruiter(recruiter.user_id)}
+                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -323,32 +518,32 @@ export const AdminDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Developers</h2>
-        <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl">
-          <Plus className="w-4 h-4 mr-2 inline" />
-          Add Developer
-        </button>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search developers..."
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
+          <button 
+            onClick={() => setShowAssignModal(true)}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-4 h-4 mr-2 inline" />
+            Assign Developer
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search developers..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-              <Filter className="w-5 h-5 mr-2 text-gray-500" />
-              Filter
-            </button>
-          </div>
-        </div>
-
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -419,8 +614,11 @@ export const AdminDashboard = () => {
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <MessageSquare className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                        <MoreVertical className="w-4 h-4" />
+                      <button 
+                        onClick={() => setShowAssignModal(true)}
+                        className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -433,103 +631,173 @@ export const AdminDashboard = () => {
     </div>
   );
 
-  const renderRecruiters = () => (
+  const renderJobRoles = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Recruiters</h2>
-        <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl">
+        <h2 className="text-2xl font-black text-gray-900">Job Roles</h2>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search jobs..."
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+            <Filter className="w-5 h-5 mr-2 text-gray-500" />
+            Filter
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-6">
+        {jobRoles
+          .filter(job => 
+            !searchTerm || 
+            job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job.recruiter?.name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+          .map((job) => (
+          <div key={job.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h3 className="text-xl font-black text-gray-900">{job.title}</h3>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {job.is_active ? 'Active' : 'Paused'}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
+                  <div className="flex items-center">
+                    <Building className="w-4 h-4 mr-1" />
+                    {job.recruiter?.name}
+                  </div>
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    Posted {new Date(job.created_at).toLocaleDateString()}
+                  </div>
+                  <div className="flex items-center">
+                    <Users className="w-4 h-4 mr-1" />
+                    {assignments.filter(a => a.job_role_id === job.id).length} assigned
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 mb-4">
+                  {job.tech_stack.slice(0, 4).map((tech, index) => (
+                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed line-clamp-2">
+                  {job.description}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <span>${job.salary_min}k - ${job.salary_max}k</span>
+                <span>{job.location}</span>
+                <span>{job.job_type}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => {
+                    setSelectedJob(job);
+                    setShowJobDetails(true);
+                  }}
+                  className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
+                >
+                  View Details
+                </button>
+                <button 
+                  onClick={() => setShowAssignModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  Assign Developer
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAssignments = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">Assignments</h2>
+        <button 
+          onClick={() => setShowAssignModal(true)}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+        >
           <Plus className="w-4 h-4 mr-2 inline" />
-          Add Recruiter
+          New Assignment
         </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search recruiters..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              />
-            </div>
-            <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-              <Filter className="w-5 h-5 mr-2 text-gray-500" />
-              Filter
-            </button>
-          </div>
-        </div>
-
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Role</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Industry</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {recruiters.map((recruiter) => (
-                <tr key={recruiter.user_id} className="hover:bg-gray-50 transition-colors">
+              {assignments.map((assignment) => (
+                <tr key={assignment.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {recruiter.user.name.split(' ').map(n => n[0]).join('')}
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
+                        {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                       </div>
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">{recruiter.user.name}</div>
-                        <div className="text-sm text-gray-500">{recruiter.user.email}</div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        {assignment.developer?.name || 'Unknown'}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900">{recruiter.company_name}</div>
-                    <div className="text-sm text-gray-500">{recruiter.company_size}</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {assignment.job_role?.title || 'Unknown'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      recruiter.user.is_approved 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-yellow-100 text-yellow-800'
+                    <div className="text-sm text-gray-900">
+                      {assignment.recruiter?.name || 'Unknown'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                      assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                      assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                      'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {recruiter.user.is_approved ? (
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                      ) : (
-                        <Clock className="w-3 h-3 mr-1" />
-                      )}
-                      {recruiter.user.is_approved ? 'Approved' : 'Pending'}
+                      {assignment.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {recruiter.industry || 'Not specified'}
+                    {new Date(assignment.assigned_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {!recruiter.user.is_approved && (
-                        <>
-                          <button 
-                            onClick={() => approveRecruiter(recruiter.user_id)}
-                            className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => rejectRecruiter(recruiter.user_id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <Eye className="w-4 h-4" />
                       </button>
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                        <MoreVertical className="w-4 h-4" />
+                        <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -541,6 +809,107 @@ export const AdminDashboard = () => {
       </div>
     </div>
   );
+
+  const renderHires = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">All Hires</h2>
+        {hires.length > 0 && (
+          <button 
+            onClick={exportHiresToCSV}
+            className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </button>
+        )}
+      </div>
+
+      {hires.length > 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {hires.map((hire) => (
+                  <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
+                          {hire.assignment?.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                        </div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {hire.assignment?.developer?.name || 'Unknown'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {hire.assignment?.job_role?.title || 'Unknown'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {hire.assignment?.recruiter?.name || 'Unknown'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${hire.salary.toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(hire.hire_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-emerald-600">
+                        ${Math.round(hire.salary * 0.15).toLocaleString()}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Hires Yet</h3>
+          <p className="text-gray-600">Successful hires will appear here once recruiters mark developers as hired.</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMessages = () => {
+    if (selectedThread) {
+      return (
+        <MessageThread
+          otherUserId={selectedThread.otherUserId}
+          otherUserName={selectedThread.otherUserName}
+          otherUserRole={selectedThread.otherUserRole}
+          jobContext={selectedThread.jobContext}
+          onBack={() => setSelectedThread(null)}
+        />
+      );
+    }
+
+    return (
+      <MessageList
+        onThreadSelect={setSelectedThread}
+      />
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -567,6 +936,11 @@ export const AdminDashboard = () => {
                 >
                   <tab.icon className="w-5 h-5 mr-2" />
                   {tab.label}
+                  {tab.id === 'recruiters' && pendingRecruiters.length > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {pendingRecruiters.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -575,21 +949,51 @@ export const AdminDashboard = () => {
 
         {/* Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'developers' && renderDevelopers()}
         {activeTab === 'recruiters' && renderRecruiters()}
-        {activeTab === 'assignments' && (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Assignments Management</h3>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        )}
-        {activeTab === 'hires' && (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Hires Management</h3>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        )}
+        {activeTab === 'developers' && renderDevelopers()}
+        {activeTab === 'jobs' && renderJobRoles()}
+        {activeTab === 'assignments' && renderAssignments()}
+        {activeTab === 'hires' && renderHires()}
+        {activeTab === 'messages' && renderMessages()}
       </div>
+
+      {/* Modals */}
+      <AssignDeveloperModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        onSuccess={() => {
+          setShowAssignModal(false);
+          fetchDashboardData();
+        }}
+      />
+
+      {showJobDetails && selectedJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <button
+                onClick={() => {
+                  setShowJobDetails(false);
+                  setSelectedJob(null);
+                }}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Jobs
+              </button>
+            </div>
+            <div className="p-6">
+              <JobRoleDetails
+                jobRoleId={selectedJob.id}
+                onAssignDeveloper={() => {
+                  setShowJobDetails(false);
+                  setShowAssignModal(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

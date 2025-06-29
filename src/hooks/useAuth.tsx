@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User, Developer } from '../types';
+import { User, Developer, JobRole, Assignment, Hire } from '../types';
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -15,6 +15,12 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   createDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
+  updateDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
+  createJobRole: (jobData: Partial<JobRole>) => Promise<boolean>;
+  updateJobRole: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>;
+  createAssignment: (assignmentData: Partial<Assignment>) => Promise<boolean>;
+  createHire: (hireData: Partial<Hire>) => Promise<boolean>;
+  updateUserApprovalStatus: (userId: string, isApproved: boolean) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -308,6 +314,149 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      // Convert empty strings to null for nullable fields
+      const cleanedData = {
+        ...profileData,
+        bio: profileData.bio?.trim() || null,
+        github_handle: profileData.github_handle?.trim() || null,
+        location: profileData.location?.trim() || null,
+        linked_projects: profileData.linked_projects?.filter(p => p.trim()) || [],
+        top_languages: profileData.top_languages?.filter(l => l.trim()) || [],
+      };
+
+      const { error } = await supabase
+        .from('developers')
+        .update(cleanedData)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating developer profile:', error);
+        return false;
+      }
+
+      // Refresh profiles after update
+      await fetchUserProfile(user);
+      return true;
+    } catch (error) {
+      console.error('Error in updateDeveloperProfile:', error);
+      return false;
+    }
+  };
+
+  const createJobRole = async (jobData: Partial<JobRole>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('job_roles')
+        .insert({
+          ...jobData,
+          recruiter_id: user.id,
+        });
+
+      if (error) {
+        console.error('Error creating job role:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in createJobRole:', error);
+      return false;
+    }
+  };
+
+  const updateJobRole = async (jobId: string, jobData: Partial<JobRole>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('job_roles')
+        .update(jobData)
+        .eq('id', jobId)
+        .eq('recruiter_id', user.id); // Ensure user can only update their own jobs
+
+      if (error) {
+        console.error('Error updating job role:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in updateJobRole:', error);
+      return false;
+    }
+  };
+
+  const createAssignment = async (assignmentData: Partial<Assignment>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .insert({
+          ...assignmentData,
+          assigned_by: user.id,
+        });
+
+      if (error) {
+        console.error('Error creating assignment:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in createAssignment:', error);
+      return false;
+    }
+  };
+
+  const createHire = async (hireData: Partial<Hire>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('hires')
+        .insert({
+          ...hireData,
+          marked_by: user.id,
+        });
+
+      if (error) {
+        console.error('Error creating hire:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in createHire:', error);
+      return false;
+    }
+  };
+
+  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: isApproved })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error updating user approval status:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in updateUserApprovalStatus:', error);
+      return false;
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchUserProfile(user);
@@ -381,6 +530,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     refreshProfile,
     createDeveloperProfile,
+    updateDeveloperProfile,
+    createJobRole,
+    updateJobRole,
+    createAssignment,
+    createHire,
+    updateUserApprovalStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

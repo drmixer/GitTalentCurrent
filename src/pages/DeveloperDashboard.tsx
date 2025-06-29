@@ -3,6 +3,8 @@ import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { GitHubChart } from '../components/GitHub/GitHubChart';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
 import { 
   Code, 
   Github, 
@@ -26,16 +28,45 @@ import {
   Activity,
   Users,
   Target,
-  Loader
+  Loader,
+  Save,
+  X
 } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
 
+interface MessageThread {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  unreadCount: number;
+  jobContext?: {
+    id: string;
+    title: string;
+  };
+}
+
 export const DeveloperDashboard = () => {
-  const { userProfile, developerProfile, loading: authLoading } = useAuth();
+  const { userProfile, developerProfile, loading: authLoading, updateDeveloperProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [availability, setAvailability] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+
+  // Profile editing state
+  const [editFormData, setEditFormData] = useState({
+    bio: '',
+    github_handle: '',
+    location: '',
+    experience_years: 0,
+    hourly_rate: 0,
+    top_languages: [] as string[],
+    linked_projects: [] as string[]
+  });
+  const [newLanguage, setNewLanguage] = useState('');
+  const [newProject, setNewProject] = useState('');
 
   // Data states
   const [stats, setStats] = useState({
@@ -52,6 +83,15 @@ export const DeveloperDashboard = () => {
   useEffect(() => {
     if (userProfile?.role === 'developer' && developerProfile) {
       setAvailability(developerProfile.availability);
+      setEditFormData({
+        bio: developerProfile.bio || '',
+        github_handle: developerProfile.github_handle || '',
+        location: developerProfile.location || '',
+        experience_years: developerProfile.experience_years || 0,
+        hourly_rate: developerProfile.hourly_rate || 0,
+        top_languages: [...(developerProfile.top_languages || [])],
+        linked_projects: [...(developerProfile.linked_projects || [])]
+      });
       fetchDashboardData();
     }
   }, [userProfile, developerProfile]);
@@ -82,13 +122,19 @@ export const DeveloperDashboard = () => {
         a.status !== 'Hired' && a.status !== 'Rejected'
       ).length || 0;
 
-      // For now, we'll use placeholder values for profile views and messages
-      // In a real app, you'd track these metrics
+      // Fetch unread messages count
+      const { count: unreadMessagesCount } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userProfile.id)
+        .eq('is_read', false);
+
+      // For now, we'll use placeholder values for profile views and GitHub stars
       setStats({
         activeAssignments: activeAssignmentsCount,
-        profileViews: Math.floor(Math.random() * 200) + 50, // Placeholder
-        messages: Math.floor(Math.random() * 20) + 5, // Placeholder
-        githubStars: Math.floor(Math.random() * 1000) + 100 // Placeholder
+        profileViews: Math.floor(Math.random() * 50) + 20,
+        messages: unreadMessagesCount || 0,
+        githubStars: Math.floor(Math.random() * 500) + 100
       });
 
     } catch (error: any) {
@@ -101,20 +147,67 @@ export const DeveloperDashboard = () => {
 
   const updateAvailability = async (newAvailability: boolean) => {
     try {
-      if (!userProfile?.id) return;
-
-      const { error } = await supabase
-        .from('developers')
-        .update({ availability: newAvailability })
-        .eq('user_id', userProfile.id);
-
-      if (error) throw error;
-
-      setAvailability(newAvailability);
+      const result = await updateDeveloperProfile({ availability: newAvailability });
+      if (result) {
+        setAvailability(newAvailability);
+      }
     } catch (error: any) {
       console.error('Error updating availability:', error);
       setError(error.message || 'Failed to update availability');
     }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      setError('');
+
+      const result = await updateDeveloperProfile(editFormData);
+      if (result) {
+        setIsEditingProfile(false);
+      } else {
+        throw new Error('Failed to update profile');
+      }
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      setError(error.message || 'Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addLanguage = () => {
+    if (newLanguage.trim() && !editFormData.top_languages.includes(newLanguage.trim())) {
+      setEditFormData(prev => ({
+        ...prev,
+        top_languages: [...prev.top_languages, newLanguage.trim()]
+      }));
+      setNewLanguage('');
+    }
+  };
+
+  const removeLanguage = (language: string) => {
+    setEditFormData(prev => ({
+      ...prev,
+      top_languages: prev.top_languages.filter(lang => lang !== language)
+    }));
+  };
+
+  const addProject = () => {
+    if (newProject.trim() && !editFormData.linked_projects.includes(newProject.trim())) {
+      setEditFormData(prev => ({
+        ...prev,
+        linked_projects: [...prev.linked_projects, newProject.trim()]
+      }));
+      setNewProject('');
+    }
+  };
+
+  const removeProject = (project: string) => {
+    setEditFormData(prev => ({
+      ...prev,
+      linked_projects: prev.linked_projects.filter(proj => proj !== project)
+    }));
   };
 
   if (authLoading || loading) {
@@ -140,7 +233,7 @@ export const DeveloperDashboard = () => {
     {
       title: 'Active Assignments',
       value: stats.activeAssignments.toString(),
-      change: '+1 this week',
+      change: stats.activeAssignments > 0 ? '+1 this week' : 'No active assignments',
       icon: Target,
       color: 'from-blue-500 to-indigo-600',
     },
@@ -152,9 +245,9 @@ export const DeveloperDashboard = () => {
       color: 'from-purple-500 to-pink-600',
     },
     {
-      title: 'Messages',
+      title: 'Unread Messages',
       value: stats.messages.toString(),
-      change: '2 unread',
+      change: stats.messages > 0 ? 'New messages' : 'All caught up',
       icon: MessageSquare,
       color: 'from-emerald-500 to-teal-600',
     },
@@ -365,7 +458,19 @@ export const DeveloperDashboard = () => {
                   <Eye className="w-4 h-4 mr-2 inline" />
                   View Details
                 </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                <button 
+                  onClick={() => setSelectedThread({
+                    otherUserId: assignment.recruiter_id,
+                    otherUserName: assignment.recruiter?.name || 'Recruiter',
+                    otherUserRole: 'recruiter',
+                    unreadCount: 0,
+                    jobContext: {
+                      id: assignment.job_role_id,
+                      title: assignment.job_role?.title || 'Job'
+                    }
+                  })}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                >
                   <Mail className="w-4 h-4 mr-2 inline" />
                   Contact Recruiter
                 </button>
@@ -416,9 +521,12 @@ export const DeveloperDashboard = () => {
               </div>
             </div>
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+          <button 
+            onClick={() => setIsEditingProfile(!isEditingProfile)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
             <Edit className="w-4 h-4 mr-2 inline" />
-            Edit Profile
+            {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
           </button>
         </div>
 
@@ -443,23 +551,182 @@ export const DeveloperDashboard = () => {
       </div>
 
       {/* Bio */}
-      {developerProfile.bio && (
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
+        {isEditingProfile ? (
+          <textarea
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+            rows={4}
+            placeholder="Tell us about yourself, your experience, and what you're passionate about..."
+            value={editFormData.bio}
+            onChange={(e) => setEditFormData(prev => ({ ...prev, bio: e.target.value }))}
+          />
+        ) : (
+          <p className="text-gray-600 leading-relaxed">
+            {developerProfile.bio || 'No bio provided yet.'}
+          </p>
+        )}
+      </div>
+
+      {/* Profile Details */}
+      {isEditingProfile && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
-          <p className="text-gray-600 leading-relaxed">{developerProfile.bio}</p>
+          <h3 className="text-lg font-black text-gray-900 mb-6">Edit Profile Details</h3>
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">GitHub Handle</label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="your-github-username"
+                value={editFormData.github_handle}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, github_handle: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Location</label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="San Francisco, CA"
+                value={editFormData.location}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Years of Experience</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                value={editFormData.experience_years}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, experience_years: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Hourly Rate (USD)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="75"
+                value={editFormData.hourly_rate}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, hourly_rate: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+          </div>
+
+          {/* Languages */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-4">Programming Languages</label>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="text"
+                value={newLanguage}
+                onChange={(e) => setNewLanguage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="Add a programming language..."
+              />
+              <button
+                type="button"
+                onClick={addLanguage}
+                className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {editFormData.top_languages.map((language) => (
+                <span
+                  key={language}
+                  className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
+                >
+                  {language}
+                  <button
+                    type="button"
+                    onClick={() => removeLanguage(language)}
+                    className="ml-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Projects */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-4">Linked Projects</label>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="url"
+                value={newProject}
+                onChange={(e) => setNewProject(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="https://github.com/username/project-name"
+              />
+              <button
+                type="button"
+                onClick={addProject}
+                className="px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {editFormData.linked_projects.map((project) => (
+                <div
+                  key={project}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                >
+                  <span className="text-sm font-medium text-gray-900 truncate">{project}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeProject(project)}
+                    className="text-gray-400 hover:text-red-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Save/Cancel Buttons */}
+          <div className="flex items-center justify-end space-x-4">
+            <button
+              onClick={() => setIsEditingProfile(false)}
+              className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveProfile}
+              disabled={saving}
+              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              {saving ? (
+                <div className="flex items-center">
+                  <Loader className="animate-spin rounded-full h-5 w-5 mr-3" />
+                  Saving...
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <Save className="w-5 h-5 mr-3" />
+                  Save Changes
+                </div>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Skills & Technologies */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">Skills & Technologies</h3>
-          <button className="text-blue-600 hover:text-blue-700 font-semibold">
-            <Edit className="w-4 h-4 mr-1 inline" />
-            Edit
-          </button>
-        </div>
-        <div className="grid md:grid-cols-1 gap-6">
+      {/* Skills & Technologies (Read-only when not editing) */}
+      {!isEditingProfile && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
           <div>
             <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
             <div className="flex flex-wrap gap-2">
@@ -474,46 +741,62 @@ export const DeveloperDashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Projects */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">Projects</h3>
-          <button className="text-blue-600 hover:text-blue-700 font-semibold">
-            <Plus className="w-4 h-4 mr-1 inline" />
-            Add Project
-          </button>
-        </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          {developerProfile.linked_projects.map((project, index) => (
-            <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
-                  <p className="text-gray-600 text-sm mb-3">{project}</p>
+      {/* Projects (Read-only when not editing) */}
+      {!isEditingProfile && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-6">Projects</h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            {developerProfile.linked_projects.map((project, index) => (
+              <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
+                    <p className="text-gray-600 text-sm mb-3">{project}</p>
+                  </div>
+                  <a
+                    href={project}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 </div>
-                <a
-                  href={project}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
               </div>
-            </div>
-          ))}
-          {developerProfile.linked_projects.length === 0 && (
-            <div className="col-span-2 text-center py-8">
-              <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No projects linked yet</p>
-            </div>
-          )}
+            ))}
+            {developerProfile.linked_projects.length === 0 && (
+              <div className="col-span-2 text-center py-8">
+                <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No projects linked yet</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
+
+  const renderMessages = () => {
+    if (selectedThread) {
+      return (
+        <MessageThread
+          otherUserId={selectedThread.otherUserId}
+          otherUserName={selectedThread.otherUserName}
+          otherUserRole={selectedThread.otherUserRole}
+          jobContext={selectedThread.jobContext}
+          onBack={() => setSelectedThread(null)}
+        />
+      );
+    }
+
+    return (
+      <MessageList
+        onThreadSelect={setSelectedThread}
+      />
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -561,6 +844,11 @@ export const DeveloperDashboard = () => {
                 >
                   <tab.icon className="w-5 h-5 mr-2" />
                   {tab.label}
+                  {tab.id === 'messages' && stats.messages > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {stats.messages}
+                    </span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -571,13 +859,7 @@ export const DeveloperDashboard = () => {
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'assignments' && renderAssignments()}
         {activeTab === 'profile' && renderProfile()}
-        {activeTab === 'messages' && (
-          <div className="text-center py-12">
-            <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Messages</h3>
-            <p className="text-gray-600">Your message center is coming soon...</p>
-          </div>
-        )}
+        {activeTab === 'messages' && renderMessages()}
       </div>
     </div>
   );
