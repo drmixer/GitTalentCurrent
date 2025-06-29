@@ -100,10 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Prevent auto-redirect if on login/signup pages
       const currentPath = window.location.pathname;
-      if ((currentPath === '/login' || currentPath === '/signup') && event === 'SIGNED_IN') {
-        console.log('🚫 Preventing auto-redirect from auth page');
-        return;
-      }
       
       try {
         setUser(session?.user ?? null);
