@@ -77,6 +77,7 @@ export const Header = () => {
   };
 
   const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentTransparent.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudFRyYW5zcGFyZW50LnBuZyIsImlhdCI6MTc1MTE3MzAyNiwiZXhwIjoxODE0MjQ1MDI2fQ.MYaFFrD9tDFprRRFwD4L-rlAleWAXYbVCpYnWp7c630';
+  const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjI5Mzc4LCJleHAiOjE3ODI3NjUzNzh9.d6zoyw7HdUn4z6mPJiFwIm7RCQYnDBfRXursnPHuGmo';
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
