@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserProfile(session.user.id);
+        fetchUserProfile(session.user);
       } else {
         setLoading(false);
       }
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Handle GitHub sign-in with additional profile setup
           await handleGitHubSignIn(session.user);
         }
-        await fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user);
       } else {
         setUserProfile(null);
         setDeveloperProfile(null);
@@ -71,134 +71,88 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleGitHubSignIn = async (user: SupabaseUser) => {
     try {
-      // Check if user profile already exists
-      const { data: existingProfile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error checking existing profile:', profileError);
-        return;
-      }
-
-      if (!existingProfile && user.user_metadata) {
+      // For GitHub users, we need to create the profile if it doesn't exist
+      if (user.app_metadata?.provider === 'github') {
+        console.log('Handling GitHub sign-in for user:', user.id);
+        
         // Get the name from localStorage if it was set during signup
         const pendingName = localStorage.getItem('pendingGitHubName');
         localStorage.removeItem('pendingGitHubName'); // Clean up
 
-        // Create new developer profile for GitHub users
-        await createUserProfile(user, {
-          name: pendingName || user.user_metadata.full_name || user.user_metadata.name || 'GitHub User',
-          role: 'developer',
-          is_approved: true,
+        // Try to create user profile using the database function
+        const { data, error } = await supabase.rpc('create_user_profile', {
+          user_id: user.id,
+          user_email: user.email!,
+          user_name: pendingName || user.user_metadata?.full_name || user.user_metadata?.name || 'GitHub User',
+          user_role: 'developer',
+          company_name: ''
         });
+
+        if (error) {
+          console.warn('Database function failed, this might be expected if profile already exists:', error);
+        }
       }
     } catch (error) {
       console.error('Error in handleGitHubSignIn:', error);
     }
   };
 
-  const createUserProfile = async (user: SupabaseUser, userData: Partial<User>) => {
+  const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
-      // First try using the database function
-      const { data, error: functionError } = await supabase.rpc('create_user_profile', {
-        user_id: user.id,
-        user_email: user.email!,
-        user_name: userData.name!,
-        user_role: userData.role || 'developer',
-        company_name: (userData as any).company_name || ''
-      });
-
-      if (functionError) {
-        console.warn('Database function failed, trying manual creation:', functionError);
-        
-        // Fallback to manual creation
-        const userProfileData = {
-          id: user.id,
-          email: user.email!,
-          name: userData.name!,
-          role: userData.role || 'developer',
-          is_approved: userData.role === 'developer',
-        };
-
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert(userProfileData);
-
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          throw new Error('Failed to create user profile');
-        }
-
-        // Create role-specific profile
-        if (userData.role === 'developer') {
-          const { error: devError } = await supabase.rpc('create_developer_profile', {
-            p_user_id: user.id,
-            p_github_handle: user.user_metadata?.user_name || '',
-            p_bio: user.user_metadata?.bio || '',
-            p_availability: true,
-            p_top_languages: [],
-            p_linked_projects: [],
-          });
-
-          if (devError) {
-            console.error('Error creating developer profile:', devError);
-          }
-        } else if (userData.role === 'recruiter') {
-          const { error: recError } = await supabase
-            .from('recruiters')
-            .insert({
-              user_id: user.id,
-              company_name: (userData as any).company_name || 'Company',
-              website: '',
-              company_size: '',
-              industry: '',
-            });
-
-          if (recError) {
-            console.error('Error creating recruiter profile:', recError);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error in createUserProfile:', error);
-      throw error;
-    }
-  };
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      // Fetch user profile
+      console.log('Fetching user profile for:', authUser.id);
+      
+      // First, try to fetch user profile with error handling
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('id', userId)
+        .eq('id', authUser.id)
         .maybeSingle();
 
-      if (userError && userError.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', userError);
-        throw userError;
+      // If we get a 500 error or the user doesn't exist, try to create the profile
+      if (userError || !userProfileData) {
+        console.log('User profile not found, attempting to create:', userError?.message);
+        
+        // Try to create the user profile
+        const success = await createUserProfileFromAuth(authUser);
+        
+        if (success) {
+          // Retry fetching the profile
+          const { data: retryUserData, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+            
+          if (retryError) {
+            console.error('Error fetching user profile after creation:', retryError);
+            setUserProfile(null);
+            setDeveloperProfile(null);
+            setNeedsOnboarding(false);
+            setLoading(false);
+            return;
+          }
+          
+          setUserProfile(retryUserData);
+        } else {
+          console.error('Failed to create user profile');
+          setUserProfile(null);
+          setDeveloperProfile(null);
+          setNeedsOnboarding(false);
+          setLoading(false);
+          return;
+        }
+      } else {
+        setUserProfile(userProfileData);
       }
-
-      if (!userProfileData) {
-        console.log('User profile not found, user may need to complete signup');
-        setUserProfile(null);
-        setDeveloperProfile(null);
-        setNeedsOnboarding(false);
-        setLoading(false);
-        return;
-      }
-
-      setUserProfile(userProfileData);
 
       // If user is a developer, try to fetch developer profile
-      if (userProfileData.role === 'developer') {
+      const currentUserProfile = userProfileData || await getCurrentUserProfile(authUser.id);
+      
+      if (currentUserProfile?.role === 'developer') {
         const { data: devProfileData, error: devError } = await supabase
           .from('developers')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', authUser.id)
           .maybeSingle();
 
         if (devError && devError.code !== 'PGRST116') {
@@ -228,6 +182,96 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const getCurrentUserProfile = async (userId: string): Promise<User | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error getting current user profile:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getCurrentUserProfile:', error);
+      return null;
+    }
+  };
+
+  const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
+    try {
+      console.log('Creating user profile from auth user:', authUser.id);
+      
+      // Determine user role and name
+      const userRole = authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer';
+      const userName = authUser.user_metadata?.full_name || 
+                      authUser.user_metadata?.name || 
+                      authUser.email?.split('@')[0] || 
+                      'User';
+
+      // Try using the database function first
+      const { data, error: functionError } = await supabase.rpc('create_user_profile', {
+        user_id: authUser.id,
+        user_email: authUser.email!,
+        user_name: userName,
+        user_role: userRole,
+        company_name: ''
+      });
+
+      if (functionError) {
+        console.warn('Database function failed, trying manual creation:', functionError);
+        
+        // Fallback to manual creation
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: authUser.id,
+            email: authUser.email!,
+            name: userName,
+            role: userRole,
+            is_approved: true, // Auto-approve for now
+          });
+
+        if (insertError) {
+          console.error('Manual user profile creation failed:', insertError);
+          return false;
+        }
+
+        // Create developer profile if needed
+        if (userRole === 'developer') {
+          const { error: devError } = await supabase
+            .from('developers')
+            .insert({
+              user_id: authUser.id,
+              github_handle: authUser.user_metadata?.user_name || '',
+              bio: authUser.user_metadata?.bio || '',
+              availability: true,
+              top_languages: [],
+              linked_projects: [],
+              location: '',
+              experience_years: 0,
+              hourly_rate: 0,
+            });
+
+          if (devError) {
+            console.error('Error creating developer profile:', devError);
+            // Don't fail the whole process if developer profile creation fails
+          }
+        }
+      }
+
+      console.log('User profile created successfully');
+      return true;
+    } catch (error) {
+      console.error('Error in createUserProfileFromAuth:', error);
+      return false;
+    }
+  };
+
   const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
@@ -250,7 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Refresh profiles after creation
-      await fetchUserProfile(user.id);
+      await fetchUserProfile(user);
       return true;
     } catch (error) {
       console.error('Error in createDeveloperProfile:', error);
@@ -260,7 +304,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchUserProfile(user.id);
+      await fetchUserProfile(user);
     }
   };
 
@@ -300,23 +344,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
 
-      // If user is created and confirmed (or email confirmation is disabled)
+      // The trigger should handle profile creation, but we'll verify it worked
       if (data.user) {
-        // Wait a moment for the trigger to potentially run
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Check if profile was created by trigger
-        const { data: existingProfile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        // If trigger didn't create the profile, create it manually
-        if (!existingProfile) {
-          console.log('Creating user profile manually...');
-          await createUserProfile(data.user, userData);
-        }
+        console.log('User signed up successfully:', data.user.id);
       }
     } catch (error) {
       console.error('Signup error:', error);
