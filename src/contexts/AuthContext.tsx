@@ -20,10 +20,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initializeAuth = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) return setLoading(false);
+      if (error) {
+        setLoading(false);
+        return;
+      }
       if (session?.user) {
         setUser(session.user);
         await fetchUserProfile(session.user);
+        setLoading(false); // <-- Fix: stop loading after profile fetch
       } else {
         setUser(null);
         setLoading(false);
@@ -39,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         await handleGitHubSignIn(session!.user);
         await fetchUserProfile(session!.user);
+        setLoading(false); // <-- Fix: stop loading after profile fetch on auth change
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserProfile(null);
