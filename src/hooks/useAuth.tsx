@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         linked_projects: [],
         location: githubMetadata?.location || '',
         experience_years: 0,
-        hourly_rate: 0,
+        desired_salary: 0,
       };
 
       if (existingProfile) {
@@ -319,7 +319,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               linked_projects: [],
               location: '',
               experience_years: 0,
-              hourly_rate: 0,
+              desired_salary: 0,
             });
 
           if (devError) {
@@ -350,7 +350,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_linked_projects: profileData.linked_projects || [],
         p_location: profileData.location || '',
         p_experience_years: profileData.experience_years || 0,
-        p_hourly_rate: profileData.hourly_rate || 0,
+        p_desired_salary: profileData.desired_salary || 0,
       });
 
       if (error) {

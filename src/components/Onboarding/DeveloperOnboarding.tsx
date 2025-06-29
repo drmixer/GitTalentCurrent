@@ -29,7 +29,7 @@ export const DeveloperOnboarding = () => {
     availability: true,
     location: '',
     experience_years: 0,
-    hourly_rate: 0,
+    desired_salary: 0,
     top_languages: [] as string[],
     linked_projects: [] as string[],
   });
@@ -238,21 +238,21 @@ export const DeveloperOnboarding = () => {
               </div>
             </div>
 
-            {/* Hourly Rate */}
+            {/* Desired Salary */}
             <div>
-              <label htmlFor="hourly_rate" className="block text-sm font-bold text-gray-700 mb-2">
-                Hourly Rate (USD) - Optional
+              <label htmlFor="desired_salary" className="block text-sm font-bold text-gray-700 mb-2">
+                Desired Annual Salary (USD) - Optional
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
-                  id="hourly_rate"
-                  name="hourly_rate"
+                  id="desired_salary"
+                  name="desired_salary"
                   type="number"
                   min="0"
                   className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                  placeholder="75"
-                  value={formData.hourly_rate}
+                  placeholder="120000"
+                  value={formData.desired_salary}
                   onChange={handleChange}
                 />
               </div>

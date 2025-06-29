@@ -7,6 +7,20 @@ export interface User {
   created_at: string;
 }
 
+export interface SkillCategory {
+  [category: string]: {
+    skills: string[];
+    proficiency: 'beginner' | 'intermediate' | 'expert';
+  };
+}
+
+export interface NotificationPreferences {
+  email: boolean;
+  in_app: boolean;
+  assignments: boolean;
+  messages: boolean;
+}
+
 export interface Developer {
   user_id: string;
   github_handle: string;
@@ -16,10 +30,29 @@ export interface Developer {
   linked_projects: string[];
   location: string;
   experience_years: number;
-  hourly_rate: number;
+  desired_salary: number;
+  skills_categories: SkillCategory;
+  profile_strength: number;
+  public_profile_slug: string;
+  notification_preferences: NotificationPreferences;
+  resume_url?: string;
   created_at: string;
   updated_at: string;
   user?: User;
+}
+
+export interface PortfolioItem {
+  id: string;
+  developer_id: string;
+  title: string;
+  description?: string;
+  url?: string;
+  image_url?: string;
+  category: 'project' | 'article' | 'certification' | 'other';
+  technologies: string[];
+  featured: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Recruiter {

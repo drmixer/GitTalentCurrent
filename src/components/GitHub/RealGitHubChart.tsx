@@ -234,19 +234,38 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
         </div>
       </div>
 
-      {/* Contribution Graph */}
+      {/* Contribution Graph - Responsive Design */}
       <div className="mb-6">
         <div className="text-sm font-semibold text-gray-700 mb-3">
           {totalContributions} contributions in the last year
         </div>
-        <div className="grid grid-cols-53 gap-1 mb-3">
-          {contributions.map((day, index) => (
-            <div
-              key={index}
-              className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} cursor-pointer transition-all duration-200 hover:scale-110`}
-              title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
-            />
-          ))}
+        
+        {/* Mobile/Small screens: Compact grid */}
+        <div className="block md:hidden">
+          <div className="grid grid-cols-26 gap-1 mb-3">
+            {contributions.map((day, index) => (
+              <div
+                key={index}
+                className={`w-2 h-2 rounded-sm ${getColorClass(day.level)} cursor-pointer transition-all duration-200`}
+                title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
+              />
+            ))}
+          </div>
+        </div>
+        
+        {/* Desktop: Full grid with horizontal scroll */}
+        <div className="hidden md:block">
+          <div className="overflow-x-auto">
+            <div className="grid grid-flow-col grid-rows-7 gap-1 mb-3 min-w-max">
+              {contributions.map((day, index) => (
+                <div
+                  key={index}
+                  className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} cursor-pointer transition-all duration-200 hover:scale-110`}
+                  title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
         
         {/* Legend */}
