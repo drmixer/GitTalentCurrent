@@ -21,14 +21,20 @@ import { JobRole, Assignment, User, Developer } from '../../types';
 
 interface JobRoleDetailsProps {
   jobRoleId: string;
+  jobRole?: JobRole;
   onEdit?: () => void;
   onAssignDeveloper?: () => void;
+  onClose?: () => void;
+  onJobRoleUpdated?: () => void;
 }
 
 export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   jobRoleId,
+  jobRole: initialJobRole,
   onEdit,
-  onAssignDeveloper
+  onAssignDeveloper,
+  onClose,
+  onJobRoleUpdated
 }) => {
   const { userProfile } = useAuth();
   const [jobRole, setJobRole] = useState<JobRole | null>(null);
@@ -39,10 +45,13 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (jobRoleId) {
+    if (initialJobRole) {
+      setJobRole(initialJobRole);
+      setLoading(false);
+    } else if (jobRoleId) {
       fetchJobRoleDetails();
     }
-  }, [jobRoleId]);
+  }, [jobRoleId, initialJobRole]);
 
   const fetchJobRoleDetails = async () => {
     try {
@@ -150,6 +159,19 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
 
   return (
     <div className="space-y-8">
+      {/* Header with close button */}
+      {onClose && (
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-black text-gray-900">Job Details</h2>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+      
       {/* Job Header */}
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
         <div className="flex items-start justify-between mb-6">
