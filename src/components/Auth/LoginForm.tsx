@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, AlertCircle, Eye, EyeOff, GitBranch, Github } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Github } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -10,11 +10,11 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
-  const { signIn, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
+  const { signIn, signInWithGitHub, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
+    console.log('LoginForm useEffect:', { authLoading, user });
     if (!authLoading && user) {
       console.log('✅ User authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
@@ -28,8 +28,11 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      // Navigation will happen automatically via useEffect when user loads
-      console.log('✅ Sign in successful, waiting for auth state change...');
+      console.log('✅ Sign in successful');
+
+      // TEMPORARY: force navigation in case auth state change is slow or not firing
+      navigate('/dashboard', { replace: true });
+
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
@@ -44,7 +47,7 @@ export const LoginForm = () => {
 
     try {
       await signInWithGitHub();
-      // Navigation will happen via redirect URL
+      // Navigation will happen via redirect URL, no need to handle here
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
@@ -52,7 +55,6 @@ export const LoginForm = () => {
     }
   };
 
-  // Show loading state while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
@@ -67,7 +69,6 @@ export const LoginForm = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
             <img 
@@ -81,9 +82,6 @@ export const LoginForm = () => {
                 if (fallback) fallback.style.display = 'flex';
               }}
             />
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg hidden">
-              <GitBranch className="w-7 h-7 text-white" />
-            </div>
             <span className="text-2xl font-black text-gray-900">GitTalent</span>
           </Link>
           <h2 className="text-3xl font-black text-gray-900 mb-3">
@@ -100,9 +98,7 @@ export const LoginForm = () => {
           </p>
         </div>
 
-        {/* Form */}
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-8">
-          {/* GitHub Sign In Button */}
           <button
             onClick={handleGitHubSignIn}
             disabled={githubLoading || loading}
@@ -121,7 +117,6 @@ export const LoginForm = () => {
             )}
           </button>
 
-          {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
@@ -237,7 +232,6 @@ export const LoginForm = () => {
           </form>
         </div>
 
-        {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-600">
             By signing in, you agree to our{' '}
