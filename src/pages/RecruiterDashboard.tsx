@@ -132,7 +132,7 @@ export const RecruiterDashboard = () => {
             .from('developers')
             .select('*')
             .eq('user_id', assignment.developer_id)
-            .single();
+            .maybeSingle();
 
           return {
             ...assignment,
@@ -519,10 +519,6 @@ export const RecruiterDashboard = () => {
               <div className="flex items-center space-x-2">
                 <button 
                   onClick={() => {
-                    setSelectedDeveloper(assignment.developer);
-                    setShowDeveloperProfile(true);
-                  }}
-                  onClick={() => {
                     setSelectedJob(job);
                     setShowJobDetails(true);
                   }}
@@ -652,7 +648,13 @@ export const RecruiterDashboard = () => {
             
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <button className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold">
+                <button 
+                  onClick={() => {
+                    setSelectedDeveloper(assignment.developer);
+                    setShowDeveloperProfile(true);
+                  }}
+                  className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
+                >
                   <Eye className="w-4 h-4 mr-2 inline" />
                   View Profile
                 </button>

@@ -63,21 +63,28 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       
       console.log('Fetching developer profile for ID:', developerId);
 
-      let query = supabase
+      const { data, error: fetchError } = await supabase
         .from('developers')
         .select(`
           *,
           user:users(*)
-        `);
-
-      // Let RLS handle permissions - if the user doesn't have access, the query will return no results
-
-      const { data, error: fetchError } = await query
+        `)
+        .eq('user_id', developerId)
         .maybeSingle();
         .eq('user_id', developerId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error fetching developer profile:', fetchError);
+        throw fetchError;
+      }
+      
+      if (!data) {
+        console.log('No developer profile found or no permission to access');
+        throw new Error('Developer profile not found or you do not have permission to view it');
+      }
+      
+      console.log('Developer profile fetched successfully:', data);
       setDeveloper(data);
     } catch (error: any) {
       console.error('Error fetching developer profile:', error);
