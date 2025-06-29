@@ -32,7 +32,9 @@ import {
   Loader,
   Save,
   X,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Sync
 } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
 
@@ -49,7 +51,19 @@ interface MessageThread {
 
 const DeveloperDashboardContent = () => {
   const { userProfile, developerProfile, loading: authLoading, updateDeveloperProfile } = useAuth();
-  const { user: githubUser, repos, totalStars, getTopLanguages, loading: githubLoading, error: githubError } = useGitHub();
+  const { 
+    user: githubUser, 
+    repos, 
+    totalStars, 
+    getTopLanguages, 
+    getTopRepos,
+    loading: githubLoading, 
+    error: githubError,
+    refreshGitHubData,
+    syncLanguagesToProfile,
+    syncProjectsToProfile
+  } = useGitHub();
+  
   const [activeTab, setActiveTab] = useState('overview');
   const [availability, setAvailability] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -57,6 +71,7 @@ const DeveloperDashboardContent = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   // Profile editing state
   const [editFormData, setEditFormData] = useState({
@@ -174,16 +189,7 @@ const DeveloperDashboardContent = () => {
       setSaving(true);
       setError('');
 
-      // If GitHub handle changed, update with real languages from GitHub
-      let updatedFormData = { ...editFormData };
-      if (editFormData.github_handle !== developerProfile?.github_handle) {
-        const topGitHubLanguages = getTopLanguages(10);
-        if (topGitHubLanguages.length > 0) {
-          updatedFormData.top_languages = topGitHubLanguages;
-        }
-      }
-
-      const result = await updateDeveloperProfile(updatedFormData);
+      const result = await updateDeveloperProfile(editFormData);
       if (result) {
         setIsEditingProfile(false);
       } else {
@@ -194,6 +200,51 @@ const DeveloperDashboardContent = () => {
       setError(error.message || 'Failed to save profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSyncFromGitHub = async () => {
+    try {
+      setSyncing(true);
+      
+      // Sync languages
+      const topLanguages = getTopLanguages(15);
+      if (topLanguages.length > 0) {
+        setEditFormData(prev => ({
+          ...prev,
+          top_languages: topLanguages
+        }));
+      }
+
+      // Sync projects
+      const topRepos = getTopRepos(8).map(repo => repo.html_url);
+      if (topRepos.length > 0) {
+        setEditFormData(prev => ({
+          ...prev,
+          linked_projects: [...new Set([...prev.linked_projects, ...topRepos])]
+        }));
+      }
+
+      // Sync bio and location if not set
+      if (githubUser) {
+        if (!editFormData.bio && githubUser.bio) {
+          setEditFormData(prev => ({
+            ...prev,
+            bio: githubUser.bio || ''
+          }));
+        }
+        if (!editFormData.location && githubUser.location) {
+          setEditFormData(prev => ({
+            ...prev,
+            location: githubUser.location || ''
+          }));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error syncing from GitHub:', error);
+      setError(error.message || 'Failed to sync from GitHub');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -229,30 +280,6 @@ const DeveloperDashboardContent = () => {
       ...prev,
       linked_projects: prev.linked_projects.filter(proj => proj !== project)
     }));
-  };
-
-  const syncGitHubLanguages = () => {
-    const topGitHubLanguages = getTopLanguages(10);
-    if (topGitHubLanguages.length > 0) {
-      setEditFormData(prev => ({
-        ...prev,
-        top_languages: topGitHubLanguages
-      }));
-    }
-  };
-
-  const syncGitHubProjects = () => {
-    const topRepos = repos
-      .filter(repo => repo.stargazers_count > 0 || repo.language)
-      .slice(0, 5)
-      .map(repo => repo.html_url);
-    
-    if (topRepos.length > 0) {
-      setEditFormData(prev => ({
-        ...prev,
-        linked_projects: [...new Set([...prev.linked_projects, ...topRepos])]
-      }));
-    }
   };
 
   if (authLoading || loading) {
@@ -302,10 +329,10 @@ const DeveloperDashboardContent = () => {
       color: 'from-emerald-500 to-teal-600',
     },
     {
-      title: 'GitHub Repos',
-      value: stats.githubRepos.toString(),
+      title: 'GitHub Stars',
+      value: totalStars.toString(),
       change: developerProfile.github_handle ? `@${developerProfile.github_handle}` : 'Add GitHub',
-      icon: Github,
+      icon: Star,
       color: 'from-orange-500 to-red-600',
     },
   ];
@@ -651,13 +678,25 @@ const DeveloperDashboardContent = () => {
               </div>
             </div>
           </div>
-          <button 
-            onClick={() => setIsEditingProfile(!isEditingProfile)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <Edit className="w-4 h-4 mr-2 inline" />
-            {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
-          </button>
+          <div className="flex items-center space-x-2">
+            {developerProfile.github_handle && !isEditingProfile && (
+              <button
+                onClick={refreshGitHubData}
+                disabled={githubLoading}
+                className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 inline ${githubLoading ? 'animate-spin' : ''}`} />
+                Refresh GitHub
+              </button>
+            )}
+            <button 
+              onClick={() => setIsEditingProfile(!isEditingProfile)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Edit className="w-4 h-4 mr-2 inline" />
+              {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
+            </button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-4 gap-6">
@@ -670,8 +709,8 @@ const DeveloperDashboardContent = () => {
             <div className="text-sm font-semibold text-gray-600">Years Experience</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.top_languages.length || getTopLanguages().length}</div>
-            <div className="text-sm font-semibold text-gray-600">Languages</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{githubUser?.public_repos || 0}</div>
+            <div className="text-sm font-semibold text-gray-600">GitHub Repos</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
             <div className="text-2xl font-black text-gray-900 mb-1">{totalStars}</div>
@@ -701,7 +740,19 @@ const DeveloperDashboardContent = () => {
       {/* Profile Details */}
       {isEditingProfile && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Edit Profile Details</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-black text-gray-900">Edit Profile Details</h3>
+            {developerProfile.github_handle && !githubError && (
+              <button
+                onClick={handleSyncFromGitHub}
+                disabled={syncing || githubLoading}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50"
+              >
+                <Sync className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync from GitHub'}
+              </button>
+            )}
+          </div>
           
           {githubError && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
@@ -773,13 +824,9 @@ const DeveloperDashboardContent = () => {
             <div className="flex items-center justify-between mb-4">
               <label className="block text-sm font-bold text-gray-700">Programming Languages</label>
               {getTopLanguages().length > 0 && (
-                <button
-                  type="button"
-                  onClick={syncGitHubLanguages}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
-                >
-                  Sync from GitHub
-                </button>
+                <span className="text-xs text-gray-500">
+                  {getTopLanguages().length} languages detected from GitHub
+                </span>
               )}
             </div>
             <div className="flex space-x-2 mb-4">
@@ -823,13 +870,9 @@ const DeveloperDashboardContent = () => {
             <div className="flex items-center justify-between mb-4">
               <label className="block text-sm font-bold text-gray-700">Linked Projects</label>
               {repos.length > 0 && (
-                <button
-                  type="button"
-                  onClick={syncGitHubProjects}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
-                >
-                  Sync from GitHub
-                </button>
+                <span className="text-xs text-gray-500">
+                  {repos.length} repos found on GitHub
+                </span>
               )}
             </div>
             <div className="flex space-x-2 mb-4">
