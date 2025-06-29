@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { RealGitHubChart } from '../GitHub/RealGitHubChart';
 import { PortfolioManager } from '../Portfolio/PortfolioManager';
@@ -28,6 +29,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   developerId,
   onClose
 }) => {
+  const { userProfile } = useAuth();
   const [developer, setDeveloper] = useState<Developer & { user: UserType } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,13 +46,29 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setLoading(true);
       setError('');
 
-      // Fetch developer with user data
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('developers')
         .select(`
           *,
           user:users(*)
-        `)
+        `);
+
+      // If the current user is a recruiter, we need to check if they have access
+      if (userProfile?.role === 'recruiter') {
+        // Check if this recruiter has any assignments with this developer
+        const { data: assignmentCheck } = await supabase
+          .from('assignments')
+          .select('id')
+          .eq('developer_id', developerId)
+          .eq('recruiter_id', userProfile.id)
+          .limit(1);
+
+        if (!assignmentCheck || assignmentCheck.length === 0) {
+          throw new Error('You do not have permission to view this developer profile');
+        }
+      }
+
+      const { data, error: fetchError } = await query
         .eq('user_id', developerId)
         .single();
 
@@ -142,10 +160,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </a>
                 )}
-                <div className="flex items-center">
-                  <Mail className="w-4 h-4 mr-1" />
-                  {developer.user.email}
-                </div>
+                {(userProfile?.role === 'admin' || userProfile?.id === developer.user_id) && (
+                  <div className="flex items-center">
+                    <Mail className="w-4 h-4 mr-1" />
+                    {developer.user.email}
+                  </div>
+                )}
               </div>
             </div>
           </div>

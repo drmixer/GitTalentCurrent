@@ -8,6 +8,7 @@ import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
 import { 
   Briefcase, 
   Users, 
@@ -59,6 +60,8 @@ export const RecruiterDashboard = () => {
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showHireModal, setShowHireModal] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
@@ -516,6 +519,10 @@ export const RecruiterDashboard = () => {
               <div className="flex items-center space-x-2">
                 <button 
                   onClick={() => {
+                    setSelectedDeveloper(assignment.developer_id);
+                    setShowDeveloperProfile(true);
+                  }}
+                  onClick={() => {
                     setSelectedJob(job);
                     setShowJobDetails(true);
                   }}
@@ -957,6 +964,35 @@ export const RecruiterDashboard = () => {
           fetchDashboardData();
         }}
       />
+
+      {/* Developer Profile Modal */}
+      {showDeveloperProfile && selectedDeveloper && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <button
+                onClick={() => {
+                  setShowDeveloperProfile(false);
+                  setSelectedDeveloper(null);
+                }}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Developers
+              </button>
+            </div>
+            <div className="p-6">
+              <DeveloperProfileDetails
+                developerId={selectedDeveloper}
+                onClose={() => {
+                  setShowDeveloperProfile(false);
+                  setSelectedDeveloper(null);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
