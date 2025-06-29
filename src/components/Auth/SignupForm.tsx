@@ -22,7 +22,7 @@ export const SignupForm = () => {
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
     if (!authLoading && user) {
-      console.log('✅ User already authenticated, redirecting to dashboard...');
+      console.log('✅ User authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);
@@ -58,11 +58,11 @@ export const SignupForm = () => {
       await signUp(formData.email.trim(), formData.password, userData);
       
       if (formData.role === 'recruiter') {
-        setSuccess('Your account has been created and is pending admin approval. Redirecting to dashboard...');
+        setSuccess('Your account has been created and is pending admin approval.');
         // Navigation will happen automatically via useEffect when user loads
       } else {
         setSuccess('Account created successfully! Redirecting to dashboard...');
-        // Navigation will happen automatically via useEffect when profile loads
+        // Navigation will happen automatically via useEffect when user loads
       }
     } catch (error: any) {
       console.error('Signup error:', error);

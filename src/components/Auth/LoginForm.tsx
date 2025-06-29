@@ -16,7 +16,7 @@ export const LoginForm = () => {
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
     if (!authLoading && user) {
-      console.log('✅ User already authenticated, redirecting to dashboard...');
+      console.log('✅ User authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);
@@ -28,8 +28,8 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      // Navigation will happen after profile loads
-      console.log('✅ Sign in successful, waiting for profile...');
+      // Navigation will happen automatically via useEffect when user loads
+      console.log('✅ Sign in successful, waiting for auth state change...');
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
