@@ -19,6 +19,7 @@ interface AuthContextType {
   createJobRole: (jobData: Partial<JobRole>) => Promise<boolean>;
   updateJobRole: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>;
   createAssignment: (assignmentData: Partial<Assignment>) => Promise<boolean>;
+  importJobsFromCSV: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
   createHire: (hireData: Partial<Hire>) => Promise<boolean>;
   updateUserApprovalStatus: (userId: string, isApproved: boolean) => Promise<boolean>;
 }
@@ -579,6 +580,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const importJobsFromCSV = async (jobsData: Partial<JobRole>[]): Promise<{success: number, failed: number}> => {
+    if (!user) return { success: 0, failed: 0 };
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const jobData of jobsData) {
+        try {
+          const result = await createJobRole(jobData);
+          if (result) {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (error) {
+          console.error('❌ Error importing job:', error);
+          failedCount++;
+        }
+      }
+
+      return { success: successCount, failed: failedCount };
+    } catch (error) {
+      console.error('❌ Error in importJobsFromCSV:', error);
+      return { success: successCount, failed: failedCount };
+    }
+  };
+
   const createHire = async (hireData: Partial<Hire>): Promise<boolean> => {
     if (!user) return false;
 
@@ -724,6 +753,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     createJobRole,
     updateJobRole,
     createAssignment,
+    importJobsFromCSV,
     createHire,
     updateUserApprovalStatus,
   };

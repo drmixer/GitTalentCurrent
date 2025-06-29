@@ -83,6 +83,18 @@ export interface JobRole {
   recruiter?: Recruiter;
 }
 
+export interface CSVJobImport {
+  title: string;
+  description: string;
+  location: string;
+  job_type: string;
+  tech_stack: string;
+  salary_min: number | string;
+  salary_max: number | string;
+  experience_required?: string;
+  is_active?: boolean | string;
+}
+
 export interface Assignment {
   id: string;
   developer_id: string;

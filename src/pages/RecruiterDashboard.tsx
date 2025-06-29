@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { 
@@ -31,7 +32,8 @@ import {
   Building,
   Loader,
   Download,
-  ArrowLeft
+  ArrowLeft,
+  Upload
 } from 'lucide-react';
 import { JobRole, Assignment, Developer, User, Hire } from '../types';
 
@@ -55,6 +57,7 @@ export const RecruiterDashboard = () => {
   // Modal states
   const [showJobForm, setShowJobForm] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showHireModal, setShowHireModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
@@ -438,13 +441,22 @@ export const RecruiterDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">My Jobs</h2>
-        <button 
-          onClick={() => setShowJobForm(true)}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-        >
-          <Plus className="w-4 h-4 mr-2 inline" />
-          Post New Job
-        </button>
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center px-4 py-2 border border-purple-200 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-semibold"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import from CSV
+          </button>
+          <button 
+            onClick={() => setShowJobForm(true)}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-4 h-4 mr-2 inline" />
+            Post New Job
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-6">
@@ -809,7 +821,7 @@ export const RecruiterDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
                 Welcome back, {userProfile.name}!
@@ -821,6 +833,24 @@ export const RecruiterDashboard = () => {
                 <Building className="w-6 h-6" />
               </div>
             </div>
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-4">
+            <button 
+              onClick={() => setShowJobForm(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Post New Job
+            </button>
+            <button 
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Jobs from CSV
+            </button>
           </div>
         </div>
 
@@ -917,6 +947,16 @@ export const RecruiterDashboard = () => {
           }}
         />
       )}
+      
+      {/* CSV Import Modal */}
+      <JobImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          setShowImportModal(false);
+          fetchDashboardData();
+        }}
+      />
     </div>
   );
 };
