@@ -70,8 +70,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           user:users(*)
         `)
         .eq('user_id', developerId)
-        .maybeSingle();
-        .eq('user_id', developerId)
         .single();
 
       if (fetchError) {
