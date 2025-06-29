@@ -169,25 +169,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: userData.name,
-          role: userData.role,
-          company_name: userData.role === 'recruiter' ? (userData as any).company_name : undefined,
+    try {
+      // First, sign up the user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            role: userData.role,
+            company_name: userData.role === 'recruiter' ? (userData as any).company_name : undefined,
+          }
+        }
+      });
+      
+      if (error) throw error;
+
+      // If user is created and confirmed (or email confirmation is disabled)
+      if (data.user) {
+        // Wait a moment for the trigger to potentially run
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if profile was created by trigger
+        const { data: existingProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        // If trigger didn't create the profile, create it manually
+        if (!existingProfile) {
+          console.log('Creating user profile manually...');
+          
+          const userProfileData = {
+            id: data.user.id,
+            email: data.user.email!,
+            name: userData.name!,
+            role: userData.role!,
+            is_approved: userData.role === 'developer', // Auto-approve developers
+          };
+
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert(userProfileData);
+
+          if (profileError) {
+            console.error('Error creating user profile:', profileError);
+            throw new Error('Failed to create user profile');
+          }
+
+          // Create role-specific profile
+          if (userData.role === 'developer') {
+            const { error: devError } = await supabase
+              .from('developers')
+              .insert({
+                user_id: data.user.id,
+                github_handle: '',
+                bio: '',
+                availability: true,
+                top_languages: [],
+                linked_projects: [],
+              });
+
+            if (devError) {
+              console.error('Error creating developer profile:', devError);
+            }
+          } else if (userData.role === 'recruiter') {
+            const { error: recError } = await supabase
+              .from('recruiters')
+              .insert({
+                user_id: data.user.id,
+                company_name: (userData as any).company_name || 'Company',
+                website: '',
+                company_size: '',
+                industry: '',
+              });
+
+            if (recError) {
+              console.error('Error creating recruiter profile:', recError);
+            }
+          }
         }
       }
-    });
-    
-    if (error) throw error;
-
-    // The trigger function will handle creating the user profile
-    // But we can also manually create it if needed
-    if (data.user && !data.user.email_confirmed_at) {
-      // For development, we might want to auto-confirm
-      console.log('User created, waiting for email confirmation or trigger to create profile');
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
     }
   };
 

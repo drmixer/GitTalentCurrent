@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github } from 'lucide-react';
+import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github, CheckCircle } from 'lucide-react';
 
 export const SignupForm = () => {
   const [formData, setFormData] = useState({
@@ -26,14 +26,28 @@ export const SignupForm = () => {
     setLoading(true);
 
     try {
+      // Validate form data
+      if (!formData.name.trim()) {
+        throw new Error('Name is required');
+      }
+      if (!formData.email.trim()) {
+        throw new Error('Email is required');
+      }
+      if (formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters');
+      }
+      if (formData.role === 'recruiter' && !formData.company_name.trim()) {
+        throw new Error('Company name is required for recruiters');
+      }
+
       const userData = {
-        name: formData.name,
+        name: formData.name.trim(),
         role: formData.role,
         is_approved: formData.role === 'developer', // Auto-approve developers
-        company_name: formData.role === 'recruiter' ? formData.company_name : undefined,
+        company_name: formData.role === 'recruiter' ? formData.company_name.trim() : undefined,
       };
 
-      await signUp(formData.email, formData.password, userData);
+      await signUp(formData.email.trim(), formData.password, userData);
       
       if (formData.role === 'recruiter') {
         setSuccess('Your account has been created and is pending admin approval. You will be notified once approved.');
@@ -123,7 +137,7 @@ export const SignupForm = () => {
             {success && (
               <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
                 <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-green-400 mr-3" />
+                  <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
                   <p className="text-sm font-medium text-green-800">{success}</p>
                 </div>
               </div>
@@ -165,7 +179,7 @@ export const SignupForm = () => {
 
               <div>
                 <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
-                  Full name
+                  Full name *
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -242,7 +256,7 @@ export const SignupForm = () => {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
-                  Email address
+                  Email address *
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -263,7 +277,7 @@ export const SignupForm = () => {
               {formData.role === 'recruiter' && (
                 <div>
                   <label htmlFor="company_name" className="block text-sm font-bold text-gray-700 mb-2">
-                    Company name
+                    Company name *
                   </label>
                   <div className="relative">
                     <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -283,7 +297,7 @@ export const SignupForm = () => {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
-                  Password
+                  Password *
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -295,7 +309,7 @@ export const SignupForm = () => {
                     required
                     minLength={6}
                     className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                    placeholder="Create a strong password"
+                    placeholder="Create a strong password (min 6 characters)"
                     value={formData.password}
                     onChange={handleChange}
                   />
