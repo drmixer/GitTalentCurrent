@@ -10,6 +10,7 @@ import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
 import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
 import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
+import { Link } from 'react-router-dom';
 
 interface MessageThread {
   otherUserId: string;
@@ -613,92 +614,149 @@ const DeveloperDashboardContent = () => {
   const renderProfile = () => (
     <div className="space-y-6">
       {/* Profile Header */}
-      <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center space-x-6">
-            <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
-              {userProfile.name.split(' ').map(n => n[0]).join('')}
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
-              <p className="text-gray-600 mb-3">
-                {developerProfile.experience_years > 0 
-                  ? `${developerProfile.experience_years} years experience` 
-                  : 'Developer'
-                }
-              </p>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                {developerProfile.github_handle && (
-                  <a
-                    href={`https://github.com/${developerProfile.github_handle}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center hover:text-blue-600 transition-colors"
-                  >
-                    <Github className="w-4 h-4 mr-1" />
-                    @{developerProfile.github_handle}
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                )}
-                {(developerProfile.location || githubUser?.location) && (
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    {developerProfile.location || githubUser?.location}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Profile Card - How Recruiters See You */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 h-24 relative">
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+                <div className="w-24 h-24 bg-white p-1 rounded-2xl">
+                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-black text-2xl">
+                    {userProfile.name.split(' ').map(n => n[0]).join('')}
                   </div>
-                )}
-                <div className="flex items-center">
-                  <Mail className="w-4 h-4 mr-1" />
-                  {userProfile.email}
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {developerProfile.github_handle && !isEditingProfile && (
-              <button
-                onClick={refreshGitHubData}
-                disabled={githubLoading}
-                className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 inline ${githubLoading ? 'animate-spin' : ''}`} />
-                Refresh GitHub
-              </button>
-            )}
-            <button 
-              onClick={() => setIsEditingProfile(!isEditingProfile)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-            >
-              <Edit className="w-4 h-4 mr-2 inline" />
-              {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
-            </button>
+            
+            <div className="pt-16 p-6">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-black text-gray-900 mb-1">{displayName}</h2>
+                <p className="text-gray-600 mb-2">
+                  {developerProfile.experience_years > 0 
+                    ? `${developerProfile.experience_years} years experience` 
+                    : 'Developer'
+                  }
+                </p>
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                  availability 
+                    ? 'bg-emerald-100 text-emerald-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    availability ? 'bg-emerald-500' : 'bg-gray-500'
+                  }`}></div>
+                  {availability ? 'Available for hire' : 'Not available'}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">GitHub</span>
+                  <span className="font-medium text-gray-900">
+                    {developerProfile.github_handle ? (
+                      <a
+                        href={`https://github.com/${developerProfile.github_handle}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center hover:text-blue-600 transition-colors"
+                      >
+                        @{developerProfile.github_handle}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    ) : (
+                      'Not specified'
+                    )}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Location</span>
+                  <span className="font-medium text-gray-900">
+                    {developerProfile.location || githubUser?.location || 'Not specified'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Desired Salary</span>
+                  <span className="font-medium text-gray-900">
+                    {developerProfile.desired_salary > 0 ? `$${developerProfile.desired_salary.toLocaleString()}` : 'Not specified'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Profile Strength</span>
+                  <div className="flex items-center">
+                    <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          developerProfile.profile_strength >= 80 ? 'bg-emerald-500' :
+                          developerProfile.profile_strength >= 60 ? 'bg-blue-500' :
+                          developerProfile.profile_strength >= 40 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${developerProfile.profile_strength}%` }}
+                      ></div>
+                    </div>
+                    <span className="font-medium text-gray-900">{developerProfile.profile_strength}%</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-100 mt-6 pt-6">
+                <h3 className="font-bold text-gray-900 mb-3 text-sm">Top Skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(5)).slice(0, 6).map((lang, index) => (
+                    <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-lg">
+                      {lang}
+                    </span>
+                  ))}
+                  {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
+                    <p className="text-gray-500 text-sm">No languages specified</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-100 mt-6 pt-6">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-lg font-black text-gray-900">{stats.totalAssignments}</div>
+                    <div className="text-xs text-gray-500">Assignments</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-black text-gray-900">{githubUser?.public_repos || 0}</div>
+                    <div className="text-xs text-gray-500">Repos</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-black text-gray-900">{totalStars}</div>
+                    <div className="text-xs text-gray-500">Stars</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6">
+                <button 
+                  onClick={() => updateAvailability(!availability)}
+                  className={`w-full py-2 px-4 rounded-lg font-semibold text-sm ${
+                    availability 
+                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  } transition-colors`}
+                >
+                  {availability ? 'Set as Unavailable' : 'Set as Available'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="grid md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalAssignments}</div>
-            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.experience_years}</div>
-            <div className="text-sm font-semibold text-gray-600">Years Experience</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{githubUser?.public_repos || 0}</div>
-            <div className="text-sm font-semibold text-gray-600">GitHub Repos</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{totalStars}</div>
-            <div className="text-sm font-semibold text-gray-600">GitHub Stars</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bio */}
-      {/* Comprehensive Profile Section */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        
+        {/* Profile Editor */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">Developer Profile</h3>
+          <h3 className="text-lg font-black text-gray-900">
+            {isEditingProfile ? 'Edit Profile' : 'Developer Profile'}
+          </h3>
+          <div className="flex items-center space-x-2">
           {developerProfile.github_handle && !githubError && isEditingProfile && (
             <button
               onClick={handleSyncFromGitHub}
@@ -709,6 +767,24 @@ const DeveloperDashboardContent = () => {
               {syncing ? 'Syncing...' : 'Sync from GitHub'}
             </button>
           )}
+          {developerProfile.github_handle && !isEditingProfile && (
+            <button
+              onClick={refreshGitHubData}
+              disabled={githubLoading}
+              className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 inline ${githubLoading ? 'animate-spin' : ''}`} />
+              Refresh GitHub
+            </button>
+          )}
+          <button 
+            onClick={() => setIsEditingProfile(!isEditingProfile)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
+            <Edit className="w-4 h-4 mr-2 inline" />
+            {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
+          </button>
+          </div>
         </div>
         
         {githubError && isEditingProfile && (
@@ -724,7 +800,7 @@ const DeveloperDashboardContent = () => {
         )}
 
         {/* About / Bio Section */}
-        <div className="mb-6 border-b border-gray-100 pb-6">
+        <div className="mb-6 border-b border-gray-100 pb-6 mt-4">
           <h4 className="font-bold text-gray-900 mb-3">About</h4>
           {isEditingProfile ? (
             <textarea
@@ -741,34 +817,31 @@ const DeveloperDashboardContent = () => {
           )}
         </div>
 
-        {/* Basic Information */}
-        <div className="mb-6 border-b border-gray-100 pb-6">
-          <h4 className="font-bold text-gray-900 mb-3">Basic Information</h4>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-500 mb-1">GitHub Handle</div>
-              {isEditingProfile ? (
+        {isEditingProfile ? (
+          <div className="grid md:grid-cols-2 gap-6 mb-6 border-b border-gray-100 pb-6">
+            {/* GitHub Handle */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-700">GitHub Handle</label>
+              <div className="relative">
+                <Github className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   placeholder="your-github-username"
                   value={editFormData.github_handle}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, github_handle: e.target.value }))}
                 />
-              ) : (
-                <div className="text-gray-900 font-medium">
-                  {developerProfile.github_handle ? `@${developerProfile.github_handle}` : 'Not specified'}
-                </div>
-              )}
+              </div>
             </div>
             
-            <div>
-              <div className="text-sm text-gray-500 mb-1">Location</div>
-              {isEditingProfile ? (
-                <div>
+            {/* Location */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-700">Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     placeholder="San Francisco, CA"
                     value={editFormData.location}
                     onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
@@ -782,247 +855,276 @@ const DeveloperDashboardContent = () => {
                       Use GitHub location: {githubUser.location}
                     </button>
                   )}
-                </div>
-              ) : (
-                <div className="text-gray-900 font-medium">
-                  {developerProfile.location || githubUser?.location || 'Not specified'}
-                </div>
-              )}
+              </div>
             </div>
             
-            <div>
-              <div className="text-sm text-gray-500 mb-1">Years of Experience</div>
-              {isEditingProfile ? (
+            {/* Years of Experience */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-700">Years of Experience</label>
+              <div className="relative">
+                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="number"
                   min="0"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   value={editFormData.experience_years}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, experience_years: parseInt(e.target.value) || 0 }))}
                 />
-              ) : (
-                <div className="text-gray-900 font-medium">
-                  {developerProfile.experience_years} years
-                </div>
-              )}
+              </div>
             </div>
             
-            <div>
-              <div className="text-sm text-gray-500 mb-1">Desired Annual Salary (USD)</div>
-              {isEditingProfile ? (
+            {/* Desired Salary */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-gray-700">Desired Annual Salary (USD)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="number"
                   min="0"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   placeholder="120000"
                   value={editFormData.desired_salary}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, desired_salary: parseInt(e.target.value) || 0 }))}
                 />
-              ) : (
-                <div className="text-gray-900 font-medium">
-                  {developerProfile.desired_salary > 0 ? `$${developerProfile.desired_salary.toLocaleString()}` : 'Not specified'}
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+         ) : (
+           <div className="grid md:grid-cols-2 gap-6 mb-6 border-b border-gray-100 pb-6">
+             <div>
+               <div className="text-sm text-gray-500 mb-1">GitHub Handle</div>
+               <div className="text-gray-900 font-medium">
+                 {developerProfile.github_handle ? (
+                   <a
+                     href={`https://github.com/${developerProfile.github_handle}`}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="flex items-center hover:text-blue-600 transition-colors"
+                   >
+                     <Github className="w-4 h-4 mr-1" />
+                     @{developerProfile.github_handle}
+                     <ExternalLink className="w-3 h-3 ml-1" />
+                   </a>
+                 ) : (
+                   'Not specified'
+                 )}
+               </div>
+             </div>
+             
+             <div>
+               <div className="text-sm text-gray-500 mb-1">Location</div>
+               <div className="text-gray-900 font-medium flex items-center">
+                 <MapPin className="w-4 h-4 mr-1 text-gray-400" />
+                 {developerProfile.location || githubUser?.location || 'Not specified'}
+               </div>
+             </div>
+             
+             <div>
+               <div className="text-sm text-gray-500 mb-1">Years of Experience</div>
+               <div className="text-gray-900 font-medium flex items-center">
+                 <Briefcase className="w-4 h-4 mr-1 text-gray-400" />
+                 {developerProfile.experience_years} years
+               </div>
+             </div>
+             
+             <div>
+               <div className="text-sm text-gray-500 mb-1">Desired Annual Salary</div>
+               <div className="text-gray-900 font-medium flex items-center">
+                 <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
+                 {developerProfile.desired_salary > 0 ? `$${developerProfile.desired_salary.toLocaleString()}` : 'Not specified'}
+               </div>
+             </div>
+           </div>
+         )}
 
-        {/* Programming Languages */}
-        <div className="mb-6 border-b border-gray-100 pb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-bold text-gray-900">Programming Languages</h4>
-            {isEditingProfile && getTopLanguages().length > 0 && (
-              <span className="text-xs text-gray-500">
-                {getTopLanguages().length} languages detected from GitHub
-              </span>
-            )}
+         {/* Programming Languages */}
+         <div className="mb-6 border-b border-gray-100 pb-6">
+           <div className="flex items-center justify-between mb-3">
+             <h4 className="font-bold text-gray-900">Programming Languages</h4>
+             {isEditingProfile && getTopLanguages().length > 0 && (
+               <span className="text-xs text-gray-500">
+                 {getTopLanguages().length} languages detected from GitHub
+               </span>
+             )}
+           </div>
+           
+           {isEditingProfile ? (
+             <>
+               <div className="flex space-x-2 mb-4">
+                 <input
+                   type="text"
+                   value={newLanguage}
+                   onChange={(e) => setNewLanguage(e.target.value)}
+                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
+                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                   placeholder="Add a programming language..."
+                 />
+                 <button
+                   type="button"
+                   onClick={addLanguage}
+                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                 >
+                   <Plus className="w-5 h-5" />
+                 </button>
+               </div>
+               <div className="flex flex-wrap gap-2">
+                 {editFormData.top_languages.map((language) => (
+                   <span
+                     key={language}
+                     className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
+                   >
+                     {language}
+                     <button
+                       type="button"
+                       onClick={() => removeLanguage(language)}
+                       className="ml-2 text-blue-600 hover:text-blue-800"
+                     >
+                       <X className="w-4 h-4" />
+                     </button>
+                   </span>
+                 ))}
+               </div>
+             </>
+           ) : (
+             <div className="flex flex-wrap gap-2">
+               {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(10)).map((skill, index) => (
+                 <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                   {skill}
+                 </span>
+               ))}
+               {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
+                 <p className="text-gray-500">No languages specified</p>
+               )}
+             </div>
+           )}
+         </div>
+
+         {/* Projects */}
+         <div className="mb-6">
+           <div className="flex items-center justify-between mb-3">
+             <h4 className="font-bold text-gray-900">Linked Projects</h4>
+             {isEditingProfile && repos.length > 0 && (
+               <span className="text-xs text-gray-500">
+                 {repos.length} repos found on GitHub
+               </span>
+             )}
+           </div>
+           
+           {isEditingProfile ? (
+             <>
+               <div className="flex space-x-2 mb-4">
+                 <input
+                   type="url"
+                   value={newProject}
+                   onChange={(e) => setNewProject(e.target.value)}
+                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
+                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                   placeholder="https://github.com/username/project-name"
+                 />
+                 <button
+                   type="button"
+                   onClick={addProject}
+                   className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                 >
+                   <Plus className="w-5 h-5" />
+                 </button>
+               </div>
+               <div className="space-y-2">
+                 {editFormData.linked_projects.map((project) => (
+                   <div
+                     key={project}
+                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                   >
+                     <span className="text-sm font-medium text-gray-900 truncate break-all">{project}</span>
+                     <button
+                       type="button"
+                       onClick={() => removeProject(project)}
+                       className="text-gray-400 hover:text-red-600 transition-colors ml-2"
+                     >
+                       <X className="w-4 h-4" />
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             </>
+           ) : (
+             <div className="grid md:grid-cols-2 gap-4">
+               {(developerProfile.linked_projects.length > 0 ? developerProfile.linked_projects : repos.slice(0, 4).map(r => r.html_url)).map((project, index) => {
+                 const repo = repos.find(r => r.html_url === project);
+                 return (
+                   <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-300">
+                     <div className="flex items-start justify-between mb-2">
+                       <div className="flex-1">
+                         <h4 className="font-bold text-gray-900 mb-1">
+                           {repo ? repo.name : `Project ${index + 1}`}
+                         </h4>
+                         {repo?.description && (
+                           <p className="text-gray-600 text-sm mb-2">{repo.description}</p>
+                         )}
+                         <p className="text-gray-600 text-xs mb-2 break-all">{project}</p>
+                         {repo && (
+                           <div className="flex items-center space-x-2 text-xs text-gray-500">
+                             {repo.language && (
+                               <span className="px-2 py-1 bg-gray-100 rounded">{repo.language}</span>
+                             )}
+                             <div className="flex items-center">
+                               <Star className="w-3 h-3 mr-1" />
+                               {repo.stargazers_count}
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                       <a
+                         href={project}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                       >
+                         <ExternalLink className="w-4 h-4" />
+                       </a>
+                     </div>
+                   </div>
+                 );
+               })}
+               {developerProfile.linked_projects.length === 0 && repos.length === 0 && (
+                 <div className="col-span-2 text-center py-4">
+                   <Github className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                   <p className="text-gray-500 text-sm">No projects linked yet</p>
+                 </div>
+               )}
+             </div>
+           )}
+         </div>
+
+         {/* Action Buttons */}
+         {isEditingProfile && (
+           <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-100">
+             <button
+               onClick={() => setIsEditingProfile(false)}
+               className="px-6 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+             >
+               Cancel
+             </button>
+             <button
+               onClick={handleSaveProfile}
+               disabled={saving}
+               className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+             >
+               {saving ? (
+                 <div className="flex items-center">
+                   <Loader className="animate-spin rounded-full h-4 w-4 mr-2" />
+                   Saving...
+                 </div>
+               ) : (
+                 <div className="flex items-center">
+                   <Save className="w-4 h-4 mr-2" />
+                   Save Changes
+                 </div>
+               )}
+             </button>
+           </div>
+         )}
           </div>
-          
-          {isEditingProfile ? (
-            <>
-              <div className="flex space-x-2 mb-4">
-                <input
-                  type="text"
-                  value={newLanguage}
-                  onChange={(e) => setNewLanguage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
-                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="Add a programming language..."
-                />
-                <button
-                  type="button"
-                  onClick={addLanguage}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {editFormData.top_languages.map((language) => (
-                  <span
-                    key={language}
-                    className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
-                  >
-                    {language}
-                    <button
-                      type="button"
-                      onClick={() => removeLanguage(language)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(10)).map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                  {skill}
-                </span>
-              ))}
-              {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
-                <p className="text-gray-500">No languages specified</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Projects */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-bold text-gray-900">Linked Projects</h4>
-            {isEditingProfile && repos.length > 0 && (
-              <span className="text-xs text-gray-500">
-                {repos.length} repos found on GitHub
-              </span>
-            )}
-          </div>
-          
-          {isEditingProfile ? (
-            <>
-              <div className="flex space-x-2 mb-4">
-                <input
-                  type="url"
-                  value={newProject}
-                  onChange={(e) => setNewProject(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
-                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="https://github.com/username/project-name"
-                />
-                <button
-                  type="button"
-                  onClick={addProject}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {editFormData.linked_projects.map((project) => (
-                  <div
-                    key={project}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <span className="text-sm font-medium text-gray-900 truncate break-all">{project}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeProject(project)}
-                      className="text-gray-400 hover:text-red-600 transition-colors ml-2"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-4">
-              {(developerProfile.linked_projects.length > 0 ? developerProfile.linked_projects : repos.slice(0, 4).map(r => r.html_url)).map((project, index) => {
-                const repo = repos.find(r => r.html_url === project);
-                return (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-300">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900 mb-1">
-                          {repo ? repo.name : `Project ${index + 1}`}
-                        </h4>
-                        {repo?.description && (
-                          <p className="text-gray-600 text-sm mb-2">{repo.description}</p>
-                        )}
-                        <p className="text-gray-600 text-xs mb-2 break-all">{project}</p>
-                        {repo && (
-                          <div className="flex items-center space-x-2 text-xs text-gray-500">
-                            {repo.language && (
-                              <span className="px-2 py-1 bg-gray-100 rounded">{repo.language}</span>
-                            )}
-                            <div className="flex items-center">
-                              <Star className="w-3 h-3 mr-1" />
-                              {repo.stargazers_count}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <a
-                        href={project}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-                );
-              })}
-              {developerProfile.linked_projects.length === 0 && repos.length === 0 && (
-                <div className="col-span-2 text-center py-4">
-                  <Github className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">No projects linked yet</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-100">
-          {isEditingProfile ? (
-            <>
-              <button
-                onClick={() => setIsEditingProfile(false)}
-                className="px-6 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
-              >
-                {saving ? (
-                  <div className="flex items-center">
-                    <Loader className="animate-spin rounded-full h-4 w-4 mr-2" />
-                    Saving...
-                  </div>
-                ) : (
-                  <div className="flex items-center">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </div>
-                )}
-              </button>
-            </>
-          ) : (
-            <button 
-              onClick={() => setIsEditingProfile(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-            >
-              <Edit className="w-4 h-4 mr-2 inline" />
-              Edit Profile
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -1058,8 +1160,8 @@ const DeveloperDashboardContent = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Header */}
-        <div className="mb-6">
+        {/* Dashboard Header with Tabs */}
+        <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
@@ -1083,10 +1185,7 @@ const DeveloperDashboardContent = () => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="mb-6">
+          
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               {tabs.map((tab) => (
