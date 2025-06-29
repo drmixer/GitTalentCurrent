@@ -51,22 +51,25 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setLoading(true);
       setError('');
 
+      // Fetch developer with user data
       const { data, error: fetchError } = await supabase
         .from('developers')
         .select(`
           *,
           user:users(*)
         `)
-        .eq('id', developerId)
+        .eq('user_id', developerId)
         .single();
 
       if (fetchError) {
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
       } else {
+        console.log('Developer profile fetched:', data);
         setDeveloper(data);
       }
     } catch (err) {
+      console.error('Error in fetchDeveloperProfile:', err);
       setError('Unexpected error loading developer profile');
       setDeveloper(null);
     } finally {
