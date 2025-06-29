@@ -22,7 +22,8 @@ export const LoginForm = () => {
       await signIn(email, password);
       navigate('/dashboard');
     } catch (error: any) {
-      setError(error.message);
+      console.error('Login error:', error);
+      setError(error.message || 'An error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -36,7 +37,8 @@ export const LoginForm = () => {
       await signInWithGitHub();
       // Navigation will be handled by the redirect
     } catch (error: any) {
-      setError(error.message);
+      console.error('GitHub login error:', error);
+      setError(error.message || 'An error occurred with GitHub login');
       setGithubLoading(false);
     }
   };

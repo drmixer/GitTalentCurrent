@@ -82,41 +82,84 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('pendingGitHubName'); // Clean up
 
         // Create new developer profile for GitHub users
-        const userData = {
-          id: user.id,
-          email: user.email!,
+        await createUserProfile(user, {
           name: pendingName || user.user_metadata.full_name || user.user_metadata.name || 'GitHub User',
-          role: 'developer' as const,
-          is_approved: true, // Auto-approve GitHub developers
-        };
-
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert(userData);
-
-        if (insertError) {
-          console.error('Error creating GitHub user profile:', insertError);
-          return;
-        }
-
-        // Create developer profile with GitHub data
-        const { error: devError } = await supabase
-          .from('developers')
-          .insert({
-            user_id: user.id,
-            github_handle: user.user_metadata.user_name || '',
-            bio: user.user_metadata.bio || '',
-            availability: true,
-            top_languages: [],
-            linked_projects: [],
-          });
-
-        if (devError) {
-          console.error('Error creating developer profile:', devError);
-        }
+          role: 'developer',
+          is_approved: true,
+        });
       }
     } catch (error) {
       console.error('Error in handleGitHubSignIn:', error);
+    }
+  };
+
+  const createUserProfile = async (user: SupabaseUser, userData: Partial<User>) => {
+    try {
+      // First try using the database function
+      const { data, error: functionError } = await supabase.rpc('create_user_profile', {
+        user_id: user.id,
+        user_email: user.email!,
+        user_name: userData.name!,
+        user_role: userData.role || 'developer',
+        company_name: (userData as any).company_name || ''
+      });
+
+      if (functionError) {
+        console.warn('Database function failed, trying manual creation:', functionError);
+        
+        // Fallback to manual creation
+        const userProfileData = {
+          id: user.id,
+          email: user.email!,
+          name: userData.name!,
+          role: userData.role || 'developer',
+          is_approved: userData.role === 'developer',
+        };
+
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert(userProfileData);
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          throw new Error('Failed to create user profile');
+        }
+
+        // Create role-specific profile
+        if (userData.role === 'developer') {
+          const { error: devError } = await supabase
+            .from('developers')
+            .insert({
+              user_id: user.id,
+              github_handle: user.user_metadata?.user_name || '',
+              bio: user.user_metadata?.bio || '',
+              availability: true,
+              top_languages: [],
+              linked_projects: [],
+            });
+
+          if (devError) {
+            console.error('Error creating developer profile:', devError);
+          }
+        } else if (userData.role === 'recruiter') {
+          const { error: recError } = await supabase
+            .from('recruiters')
+            .insert({
+              user_id: user.id,
+              company_name: (userData as any).company_name || 'Company',
+              website: '',
+              company_size: '',
+              industry: '',
+            });
+
+          if (recError) {
+            console.error('Error creating recruiter profile:', recError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in createUserProfile:', error);
+      throw error;
     }
   };
 
@@ -129,14 +172,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
-        throw error;
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, this is expected for new users
+          console.log('User profile not found, user may need to complete signup');
+          setUserProfile(null);
+        } else {
+          console.error('Error fetching user profile:', error);
+          throw error;
+        }
+      } else {
+        setUserProfile(data);
       }
-      
-      setUserProfile(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      // If profile doesn't exist, user might need to complete signup
       setUserProfile(null);
     } finally {
       setLoading(false);
@@ -188,7 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If user is created and confirmed (or email confirmation is disabled)
       if (data.user) {
         // Wait a moment for the trigger to potentially run
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Check if profile was created by trigger
         const { data: existingProfile } = await supabase
@@ -200,55 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // If trigger didn't create the profile, create it manually
         if (!existingProfile) {
           console.log('Creating user profile manually...');
-          
-          const userProfileData = {
-            id: data.user.id,
-            email: data.user.email!,
-            name: userData.name!,
-            role: userData.role!,
-            is_approved: userData.role === 'developer', // Auto-approve developers
-          };
-
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert(userProfileData);
-
-          if (profileError) {
-            console.error('Error creating user profile:', profileError);
-            throw new Error('Failed to create user profile');
-          }
-
-          // Create role-specific profile
-          if (userData.role === 'developer') {
-            const { error: devError } = await supabase
-              .from('developers')
-              .insert({
-                user_id: data.user.id,
-                github_handle: '',
-                bio: '',
-                availability: true,
-                top_languages: [],
-                linked_projects: [],
-              });
-
-            if (devError) {
-              console.error('Error creating developer profile:', devError);
-            }
-          } else if (userData.role === 'recruiter') {
-            const { error: recError } = await supabase
-              .from('recruiters')
-              .insert({
-                user_id: data.user.id,
-                company_name: (userData as any).company_name || 'Company',
-                website: '',
-                company_size: '',
-                industry: '',
-              });
-
-            if (recError) {
-              console.error('Error creating recruiter profile:', recError);
-            }
-          }
+          await createUserProfile(data.user, userData);
         }
       }
     } catch (error) {
