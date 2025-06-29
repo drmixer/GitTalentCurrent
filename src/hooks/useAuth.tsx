@@ -39,6 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +86,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('🔄 Auth state changed:', event, session?.user?.id);
       
+      // Prevent processing during sign out
+      if (signingOut && event === 'SIGNED_OUT') {
+        console.log('🔄 Sign out completed, clearing state...');
+        setUser(null);
+        setUserProfile(null);
+        setDeveloperProfile(null);
+        setNeedsOnboarding(false);
+        setLoading(false);
+        setSigningOut(false);
+        return;
+      }
+
+      // Prevent auto-redirect if on login/signup pages
+      const currentPath = window.location.pathname;
+      if ((currentPath === '/login' || currentPath === '/signup') && event === 'SIGNED_IN') {
+        console.log('🚫 Preventing auto-redirect from auth page');
+        return;
+      }
+      
       try {
         setUser(session?.user ?? null);
         
@@ -94,8 +114,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await handleGitHubSignIn(session.user);
           }
           await fetchUserProfile(session.user);
-        } else {
-          // Clear all state when user signs out
+        } else if (event === 'SIGNED_OUT' && !signingOut) {
+          // Clear all state when user signs out (but not during our manual sign out)
           console.log('🔄 Clearing auth state...');
           setUserProfile(null);
           setDeveloperProfile(null);
@@ -114,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [signingOut]);
 
   const handleGitHubSignIn = async (user: SupabaseUser) => {
     try {
@@ -633,7 +653,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log('🔄 Signing out...');
+      console.log('🔄 Starting sign out process...');
+      setSigningOut(true);
       
       // Clear state immediately for better UX
       setUser(null);
@@ -649,9 +670,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         console.log('✅ Signed out successfully');
       }
+      
+      // Navigate to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('❌ Error in signOut:', error);
       // Even if there's an error, we've cleared the local state
+      setSigningOut(false);
     }
   };
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
-import { Loader, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader, AlertCircle, RefreshCw, Code, Building, Shield } from 'lucide-react';
 
 export const Dashboard = () => {
   const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile } = useAuth();
@@ -92,18 +92,27 @@ export const Dashboard = () => {
           <div className="max-w-md mx-auto text-center">
             <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertCircle className="w-8 h-8 text-yellow-600" />
+                <Code className="w-8 h-8 text-yellow-600" />
               </div>
               <h1 className="text-2xl font-black text-gray-900 mb-4">Profile Setup Required</h1>
               <p className="text-gray-600 mb-6">
                 Your developer profile needs to be completed before you can access the dashboard.
               </p>
-              <button
-                onClick={() => window.location.href = '/onboarding'}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Complete Profile Setup
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => window.location.href = '/onboarding'}
+                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  Complete Profile Setup
+                </button>
+                <button
+                  onClick={refreshProfile}
+                  className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -124,18 +133,26 @@ export const Dashboard = () => {
           <div className="max-w-md mx-auto text-center">
             <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertCircle className="w-8 h-8 text-gray-600" />
+                <Shield className="w-8 h-8 text-gray-600" />
               </div>
               <h1 className="text-2xl font-black text-gray-900 mb-4">Unknown Role</h1>
               <p className="text-gray-600 mb-6">
-                Your account role is not recognized. Please contact support.
+                Your account role ({userProfile.role}) is not recognized. Please contact support for assistance.
               </p>
-              <button
-                onClick={() => window.location.href = '/login'}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Back to Login
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => window.location.href = 'mailto:support@gittalent.dev'}
+                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  Contact Support
+                </button>
+                <button
+                  onClick={() => window.location.href = '/login'}
+                  className="w-full px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                >
+                  Back to Login
+                </button>
+              </div>
             </div>
           </div>
         </div>

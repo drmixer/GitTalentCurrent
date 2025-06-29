@@ -15,11 +15,11 @@ export const LoginForm = () => {
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
-    if (!authLoading && user) {
-      console.log('✅ User already authenticated, redirecting to dashboard...');
+    if (!authLoading && user && userProfile) {
+      console.log('✅ User already authenticated with profile, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, userProfile, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +28,8 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      // Navigation will be handled by the useEffect above
+      // Navigation will happen after profile loads
+      console.log('✅ Sign in successful, waiting for profile...');
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
@@ -43,7 +44,7 @@ export const LoginForm = () => {
 
     try {
       await signInWithGitHub();
-      // Navigation will be handled by the redirect
+      // Navigation will happen via redirect URL
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
