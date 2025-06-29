@@ -256,22 +256,25 @@ const DeveloperDashboardContent = () => {
     }));
   };
 
+  // Show loading while auth is loading
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600">Loading your profile...</p>
         </div>
       </div>
     );
   }
 
+  // Redirect if not a developer
   if (!userProfile || userProfile.role !== 'developer') {
     console.log('Redirecting - userProfile:', userProfile);
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Redirect to onboarding if no developer profile
   if (!developerProfile) {
     console.log('Redirecting to onboarding - no developer profile');
     return <Navigate to="/onboarding" replace />;
@@ -987,6 +990,7 @@ const DeveloperDashboardContent = () => {
     );
   };
 
+  // Show loading for dashboard data
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
