@@ -6,10 +6,8 @@ import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
 import { GitHubProvider, useGitHub } from '../hooks/useGitHub';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
-import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
-import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
-import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync, Upload, FileText } from 'lucide-react';
-import { Assignment, JobRole, Developer, User, SkillCategory } from '../types';
+import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync } from 'lucide-react';
+import { Assignment, JobRole, Developer, User } from '../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -52,18 +50,12 @@ const DeveloperDashboardContent = () => {
     github_handle: '',
     location: '',
     experience_years: 0,
-    desired_salary: 0,
+    hourly_rate: 0,
     top_languages: [] as string[],
-    linked_projects: [] as string[],
-    skills_categories: {} as SkillCategory,
-    resume_url: ''
+    linked_projects: [] as string[]
   });
-
-  // Skills editing state
-  const [newSkill, setNewSkill] = useState('');
-  const [newCategory, setNewCategory] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
+  const [newLanguage, setNewLanguage] = useState('');
+  const [newProject, setNewProject] = useState('');
 
   // Data states
   const [stats, setStats] = useState({
@@ -77,27 +69,6 @@ const DeveloperDashboardContent = () => {
     recruiter: User 
   })[]>([]);
 
-  // Common technologies for autocomplete
-  const commonTechnologies = [
-    'JavaScript', 'TypeScript', 'Python', 'Java', 'Go', 'Rust', 'C++', 'C#', 'PHP', 'Ruby', 'Swift', 'Kotlin',
-    'React', 'Vue.js', 'Angular', 'Svelte', 'Next.js', 'Nuxt.js', 'Express.js', 'FastAPI', 'Django', 'Flask',
-    'Spring Boot', 'Laravel', 'Ruby on Rails', 'ASP.NET', 'Node.js', 'Deno', 'Bun',
-    'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'SQLite', 'Cassandra', 'DynamoDB', 'Elasticsearch',
-    'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'Terraform', 'Ansible', 'Jenkins', 'GitLab CI',
-    'Git', 'GitHub', 'GitLab', 'Bitbucket', 'Jira', 'Confluence', 'Slack', 'Discord',
-    'HTML', 'CSS', 'Sass', 'Less', 'Tailwind CSS', 'Bootstrap', 'Material-UI', 'Chakra UI',
-    'GraphQL', 'REST API', 'gRPC', 'WebSocket', 'Socket.io', 'WebRTC',
-    'Jest', 'Cypress', 'Selenium', 'Playwright', 'Mocha', 'Chai', 'PyTest', 'JUnit',
-    'Webpack', 'Vite', 'Rollup', 'Parcel', 'Babel', 'ESLint', 'Prettier',
-    'Linux', 'macOS', 'Windows', 'Ubuntu', 'CentOS', 'Debian',
-    'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator', 'InVision'
-  ];
-
-  const filteredTechnologies = commonTechnologies.filter(tech =>
-    tech.toLowerCase().includes(newSkill.toLowerCase()) && 
-    !getAllSkills().includes(tech)
-  );
-
   useEffect(() => {
     if (userProfile?.role === 'developer' && developerProfile) {
       setAvailability(developerProfile.availability);
@@ -106,11 +77,9 @@ const DeveloperDashboardContent = () => {
         github_handle: developerProfile.github_handle || '',
         location: developerProfile.location || '',
         experience_years: developerProfile.experience_years || 0,
-        desired_salary: developerProfile.desired_salary || 0,
+        hourly_rate: developerProfile.hourly_rate || 0,
         top_languages: [...(developerProfile.top_languages || [])],
-        linked_projects: [...(developerProfile.linked_projects || [])],
-        skills_categories: { ...(developerProfile.skills_categories || {}) },
-        resume_url: developerProfile.resume_url || ''
+        linked_projects: [...(developerProfile.linked_projects || [])]
       });
       fetchDashboardData();
     }
@@ -209,27 +178,12 @@ const DeveloperDashboardContent = () => {
     try {
       setSyncing(true);
       
-      // Sync languages to skills categories
+      // Sync languages
       const topLanguages = getTopLanguages(15);
       if (topLanguages.length > 0) {
-        const updatedSkillsCategories = { ...editFormData.skills_categories };
-        
-        // Add or update Programming Languages category
-        if (!updatedSkillsCategories['Programming Languages']) {
-          updatedSkillsCategories['Programming Languages'] = {
-            skills: topLanguages,
-            proficiency: 'intermediate'
-          };
-        } else {
-          // Merge with existing skills
-          const existingSkills = updatedSkillsCategories['Programming Languages'].skills;
-          const newSkills = topLanguages.filter(lang => !existingSkills.includes(lang));
-          updatedSkillsCategories['Programming Languages'].skills = [...existingSkills, ...newSkills];
-        }
-
         setEditFormData(prev => ({
           ...prev,
-          skills_categories: updatedSkillsCategories
+          top_languages: topLanguages
         }));
       }
 
@@ -265,72 +219,31 @@ const DeveloperDashboardContent = () => {
     }
   };
 
-  // Skills management functions
-  const getAllSkills = () => {
-    return Object.values(editFormData.skills_categories).flatMap(category => category.skills);
-  };
-
-  const addCategory = () => {
-    if (newCategory.trim() && !editFormData.skills_categories[newCategory.trim()]) {
+  const addLanguage = () => {
+    if (newLanguage.trim() && !editFormData.top_languages.includes(newLanguage.trim())) {
       setEditFormData(prev => ({
         ...prev,
-        skills_categories: {
-          ...prev.skills_categories,
-          [newCategory.trim()]: {
-            skills: [],
-            proficiency: 'intermediate'
-          }
-        }
+        top_languages: [...prev.top_languages, newLanguage.trim()]
       }));
-      setNewCategory('');
+      setNewLanguage('');
     }
   };
 
-  const removeCategory = (categoryName: string) => {
-    const updatedCategories = { ...editFormData.skills_categories };
-    delete updatedCategories[categoryName];
+  const removeLanguage = (language: string) => {
     setEditFormData(prev => ({
       ...prev,
-      skills_categories: updatedCategories
-    }));
-  };
-
-  const addSkillToCategory = (categoryName: string) => {
-    if (newSkill.trim() && selectedCategory === categoryName) {
-      const updatedCategories = { ...editFormData.skills_categories };
-      if (!updatedCategories[categoryName].skills.includes(newSkill.trim())) {
-        updatedCategories[categoryName].skills.push(newSkill.trim());
-        setEditFormData(prev => ({
-          ...prev,
-          skills_categories: updatedCategories
-        }));
-      }
-      setNewSkill('');
-      setSelectedCategory('');
-      setShowSkillSuggestions(false);
-    }
-  };
-
-  const removeSkillFromCategory = (categoryName: string, skill: string) => {
-    const updatedCategories = { ...editFormData.skills_categories };
-    updatedCategories[categoryName].skills = updatedCategories[categoryName].skills.filter(s => s !== skill);
-    setEditFormData(prev => ({
-      ...prev,
-      skills_categories: updatedCategories
-    }));
-  };
-
-  const updateCategoryProficiency = (categoryName: string, proficiency: 'beginner' | 'intermediate' | 'expert') => {
-    const updatedCategories = { ...editFormData.skills_categories };
-    updatedCategories[categoryName].proficiency = proficiency;
-    setEditFormData(prev => ({
-      ...prev,
-      skills_categories: updatedCategories
+      top_languages: prev.top_languages.filter(lang => lang !== language)
     }));
   };
 
   const addProject = () => {
-    // This function is kept for backward compatibility but not used in the new UI
+    if (newProject.trim() && !editFormData.linked_projects.includes(newProject.trim())) {
+      setEditFormData(prev => ({
+        ...prev,
+        linked_projects: [...prev.linked_projects, newProject.trim()]
+      }));
+      setNewProject('');
+    }
   };
 
   const removeProject = (project: string) => {
@@ -465,24 +378,55 @@ const DeveloperDashboardContent = () => {
         ))}
       </div>
 
-      {/* Profile Strength Indicator */}
-      <ProfileStrengthIndicator 
-        strength={developerProfile.profile_strength || 0}
-        suggestions={[
-          !developerProfile.github_handle && 'Add your GitHub handle',
-          !developerProfile.bio && 'Write a professional bio',
-          Object.keys(developerProfile.skills_categories || {}).length === 0 && 'Add your skills and expertise',
-          !developerProfile.resume_url && 'Upload your resume',
-          !developerProfile.desired_salary && 'Set your salary expectations'
-        ].filter(Boolean) as string[]}
-      />
-
       {/* GitHub Activity Chart */}
       {developerProfile.github_handle && (
         <RealGitHubChart 
           githubHandle={developerProfile.github_handle}
           className="col-span-full"
         />
+      )}
+
+      {/* Profile Completion */}
+      {(!developerProfile.github_handle || !developerProfile.bio || developerProfile.top_languages.length === 0) && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+          <div className="flex items-start">
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
+              <CheckCircle className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-black text-gray-900 mb-2">Complete Your Profile</h3>
+              <p className="text-gray-600 mb-4">
+                Add more details to your profile to increase your chances of getting matched with great opportunities.
+              </p>
+              <div className="space-y-2 mb-4">
+                {!developerProfile.github_handle && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Add your GitHub handle to sync real data
+                  </div>
+                )}
+                {!developerProfile.bio && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Write a bio
+                  </div>
+                )}
+                {developerProfile.top_languages.length === 0 && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Add your programming languages
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors font-semibold"
+              >
+                Complete Profile
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Recent Activity */}
@@ -522,56 +466,37 @@ const DeveloperDashboardContent = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Your Skills</h3>
           <div className="space-y-4">
-            {Object.keys(developerProfile.skills_categories || {}).length > 0 ? (
-              Object.entries(developerProfile.skills_categories || {}).slice(0, 2).map(([category, data]) => (
-                <div key={category}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold text-gray-900 text-sm">{category}</h4>
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                      data.proficiency === 'expert' ? 'bg-emerald-100 text-emerald-800' :
-                      data.proficiency === 'intermediate' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {data.proficiency}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {data.skills.slice(0, 5).map((skill, index) => (
-                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
-                        {skill}
-                      </span>
-                    ))}
-                    {data.skills.length > 5 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">
-                        +{data.skills.length - 5} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-4">
-                <Code className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">No skills added yet</p>
-                <button
-                  onClick={() => setActiveTab('profile')}
-                  className="text-blue-600 hover:text-blue-700 text-sm font-semibold mt-2"
-                >
-                  Add your skills
-                </button>
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3 text-sm">Programming Languages</h4>
+              <div className="flex flex-wrap gap-2">
+                {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(5)).map((lang, index) => (
+                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                    {lang}
+                  </span>
+                ))}
+                {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
+                  <p className="text-gray-500 text-sm">No languages specified</p>
+                )}
               </div>
-            )}
+            </div>
             
-            <div className="pt-4 border-t border-gray-100">
-              <div className="flex items-center justify-between text-sm text-gray-600">
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3 text-sm">Experience & Location</h4>
+              <div className="space-y-2 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Briefcase className="w-4 h-4 mr-2" />
                   {developerProfile.experience_years} years of experience
                 </div>
-                {developerProfile.desired_salary > 0 && (
+                {(developerProfile.location || githubUser?.location) && (
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    {developerProfile.location || githubUser?.location}
+                  </div>
+                )}
+                {developerProfile.hourly_rate > 0 && (
                   <div className="flex items-center">
                     <DollarSign className="w-4 h-4 mr-2" />
-                    ${developerProfile.desired_salary.toLocaleString()}/year
+                    ${developerProfile.hourly_rate}/hour
                   </div>
                 )}
               </div>
@@ -853,173 +778,90 @@ const DeveloperDashboardContent = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Desired Annual Salary (USD)</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Hourly Rate (USD)</label>
               <input
                 type="number"
                 min="0"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="120000"
-                value={editFormData.desired_salary}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, desired_salary: parseInt(e.target.value) || 0 }))}
+                placeholder="75"
+                value={editFormData.hourly_rate}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, hourly_rate: parseInt(e.target.value) || 0 }))}
               />
             </div>
           </div>
 
-          {/* Resume URL */}
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Resume URL</label>
-            <div className="relative">
-              <FileText className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="url"
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="https://example.com/resume.pdf"
-                value={editFormData.resume_url}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, resume_url: e.target.value }))}
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Link to your resume (PDF, Google Drive, Dropbox, etc.)
-            </p>
-          </div>
-
-          {/* Skills & Expertise */}
+          {/* Languages */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <label className="block text-sm font-bold text-gray-700">Skills & Expertise</label>
-              <span className="text-xs text-gray-500">
-                Organize your skills by category and proficiency level
-              </span>
+              <label className="block text-sm font-bold text-gray-700">Programming Languages</label>
+              {getTopLanguages().length > 0 && (
+                <span className="text-xs text-gray-500">
+                  {getTopLanguages().length} languages detected from GitHub
+                </span>
+              )}
             </div>
-
-            {/* Add New Category */}
-            <div className="flex space-x-2 mb-6">
+            <div className="flex space-x-2 mb-4">
               <input
                 type="text"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCategory())}
+                value={newLanguage}
+                onChange={(e) => setNewLanguage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
                 className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="Add a skill category (e.g., Frontend, Backend, DevOps)..."
+                placeholder="Add a programming language..."
               />
               <button
                 type="button"
-                onClick={addCategory}
-                className="px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                onClick={addLanguage}
+                className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Skill Categories */}
-            <div className="space-y-6">
-              {Object.entries(editFormData.skills_categories).map(([categoryName, categoryData]) => (
-                <div key={categoryName} className="border border-gray-200 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-bold text-gray-900">{categoryName}</h4>
-                    <div className="flex items-center space-x-2">
-                      {/* Proficiency selector */}
-                      <select
-                        value={categoryData.proficiency}
-                        onChange={(e) => updateCategoryProficiency(categoryName, e.target.value as any)}
-                        className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="beginner">Beginner</option>
-                        <option value="intermediate">Intermediate</option>
-                        <option value="expert">Expert</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => removeCategory(categoryName)}
-                        className="p-1 text-red-600 hover:text-red-700 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Add skill to category */}
-                  <div className="relative mb-4">
-                    <input
-                      type="text"
-                      value={selectedCategory === categoryName ? newSkill : ''}
-                      onChange={(e) => {
-                        setNewSkill(e.target.value);
-                        setSelectedCategory(categoryName);
-                        setShowSkillSuggestions(e.target.value.length > 0);
-                      }}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkillToCategory(categoryName))}
-                      onFocus={() => {
-                        setSelectedCategory(categoryName);
-                        setShowSkillSuggestions(newSkill.length > 0);
-                      }}
-                      onBlur={() => {
-                        setTimeout(() => setShowSkillSuggestions(false), 200);
-                      }}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      placeholder={`Add a skill to ${categoryName}...`}
-                    />
-                    
-                    {/* Autocomplete suggestions */}
-                    {showSkillSuggestions && selectedCategory === categoryName && filteredTechnologies.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                        {filteredTechnologies.slice(0, 8).map((tech) => (
-                          <button
-                            key={tech}
-                            type="button"
-                            onClick={() => {
-                              setNewSkill(tech);
-                              addSkillToCategory(categoryName);
-                            }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors"
-                          >
-                            {tech}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Skills in category */}
-                  <div className="flex flex-wrap gap-2">
-                    {categoryData.skills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
-                      >
-                        {skill}
-                        <button
-                          type="button"
-                          onClick={() => removeSkillFromCategory(categoryName, skill)}
-                          className="ml-2 text-blue-600 hover:text-blue-800"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
+            <div className="flex flex-wrap gap-2">
+              {editFormData.top_languages.map((language) => (
+                <span
+                  key={language}
+                  className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg"
+                >
+                  {language}
+                  <button
+                    type="button"
+                    onClick={() => removeLanguage(language)}
+                    className="ml-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </span>
               ))}
             </div>
-
-            {Object.keys(editFormData.skills_categories).length === 0 && (
-              <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
-                <Code className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">No skill categories yet</p>
-                <p className="text-sm text-gray-400">Add categories like "Frontend", "Backend", "DevOps" to organize your skills</p>
-              </div>
-            )}
           </div>
 
-          {/* GitHub Projects */}
+          {/* Projects */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <label className="block text-sm font-bold text-gray-700">GitHub Projects</label>
+              <label className="block text-sm font-bold text-gray-700">Linked Projects</label>
               {repos.length > 0 && (
                 <span className="text-xs text-gray-500">
                   {repos.length} repos found on GitHub
                 </span>
               )}
+            </div>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="url"
+                value={newProject}
+                onChange={(e) => setNewProject(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="https://github.com/username/project-name"
+              />
+              <button
+                type="button"
+                onClick={addProject}
+                className="px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
             <div className="space-y-2">
               {editFormData.linked_projects.map((project) => (
@@ -1073,97 +915,28 @@ const DeveloperDashboardContent = () => {
       {!isEditingProfile && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
-          {Object.keys(developerProfile.skills_categories || {}).length > 0 ? (
-            <div className="space-y-6">
-              {Object.entries(developerProfile.skills_categories || {}).map(([category, data]) => (
-                <div key={category}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-bold text-gray-900">{category}</h4>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      data.proficiency === 'expert' ? 'bg-emerald-100 text-emerald-800' :
-                      data.proficiency === 'intermediate' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {data.proficiency}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {data.skills.map((skill, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+          <div>
+            <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
+            <div className="flex flex-wrap gap-2">
+              {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(10)).map((skill, index) => (
+                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                  {skill}
+                </span>
               ))}
+              {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
+                <p className="text-gray-500">No languages specified</p>
+              )}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <Code className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No skills specified</p>
-              <button
-                onClick={() => setIsEditingProfile(true)}
-                className="text-blue-600 hover:text-blue-700 text-sm font-semibold mt-2"
-              >
-                Add your skills
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Resume */}
-      {(developerProfile.resume_url || isEditingProfile) && (
+      {/* Projects (Read-only when not editing) */}
+      {!isEditingProfile && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-4">Resume</h3>
-          {developerProfile.resume_url ? (
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center">
-                <FileText className="w-8 h-8 text-blue-600 mr-3" />
-                <div>
-                  <div className="font-semibold text-gray-900">Resume</div>
-                  <div className="text-sm text-gray-600">Click to view or download</div>
-                </div>
-              </div>
-              <a
-                href={developerProfile.resume_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View Resume
-              </a>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No resume uploaded</p>
-              <button
-                onClick={() => setIsEditingProfile(true)}
-                className="text-blue-600 hover:text-blue-700 text-sm font-semibold mt-2"
-              >
-                Add your resume
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Portfolio */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <PortfolioManager 
-          developerId={developerProfile.user_id}
-          isEditable={true}
-        />
-      </div>
-
-      {/* GitHub Projects (Read-only when not editing) */}
-      {!isEditingProfile && developerProfile.linked_projects.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">GitHub Projects</h3>
+          <h3 className="text-lg font-black text-gray-900 mb-6">Projects</h3>
           <div className="grid md:grid-cols-2 gap-6">
-            {developerProfile.linked_projects.map((project, index) => {
+            {(developerProfile.linked_projects.length > 0 ? developerProfile.linked_projects : repos.slice(0, 4).map(r => r.html_url)).map((project, index) => {
               const repo = repos.find(r => r.html_url === project);
               return (
                 <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
@@ -1200,6 +973,12 @@ const DeveloperDashboardContent = () => {
                 </div>
               );
             })}
+            {developerProfile.linked_projects.length === 0 && repos.length === 0 && (
+              <div className="col-span-2 text-center py-8">
+                <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No projects linked yet</p>
+              </div>
+            )}
           </div>
         </div>
       )}
