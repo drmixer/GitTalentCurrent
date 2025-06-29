@@ -44,8 +44,9 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
     if (userProfile) {
       fetchMessageThreads();
       fetchAvailableContacts();
+      fetchAvailableContacts();
     }
-  }, [userProfile]);
+  }, [userProfile, onThreadSelect]);
 
   const fetchMessageThreads = async () => {
     try {
@@ -122,13 +123,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
       if (!userProfile?.id) return;
 
       let contacts: UserType[] = [];
+      console.log('Fetching available contacts for role:', userProfile.role);
 
       if (userProfile.role === 'developer') {
-        // Developers can only message admin and recruiters who have assigned them
+        // Developers can message admin and recruiters who have assigned them
         const { data: adminUsers } = await supabase
           .from('users')
           .select('*')
           .eq('role', 'admin');
+        
+        console.log('Admin users for developer:', adminUsers);
 
         const { data: assignments } = await supabase
           .from('assignments')
@@ -143,7 +147,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           ...(assignments?.map(a => a.recruiter).filter(Boolean) || [])
         ];
       } else if (userProfile.role === 'recruiter') {
-        // Recruiters can message assigned developers
+        // Recruiters can message assigned developers and admins
+        const { data: adminUsers } = await supabase
+          .from('users')
+          .select('*')
+          .eq('role', 'admin');
+
         const { data: assignments } = await supabase
           .from('assignments')
           .select(`
@@ -152,7 +161,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           `)
           .eq('recruiter_id', userProfile.id);
 
-        contacts = assignments?.map(a => a.developer).filter(Boolean) || [];
+        contacts = [
+          ...(adminUsers || []),
+          ...(assignments?.map(a => a.developer).filter(Boolean) || [])
+        ];
+        
+        console.log('Contacts for recruiter:', contacts);
       } else if (userProfile.role === 'admin') {
         // Admins can message anyone
         const { data: allUsers } = await supabase
@@ -162,6 +176,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
 
         contacts = allUsers || [];
       }
+
+      // Remove duplicates based on id
+      contacts = contacts.filter((contact, index, self) => 
+        index === self.findIndex(c => c.id === contact.id)
+      );
 
       setAvailableContacts(contacts);
     } catch (error) {

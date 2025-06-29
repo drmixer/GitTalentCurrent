@@ -23,11 +23,13 @@ import { Developer, User as UserType } from '../../types';
 interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
+  developer?: Developer & { user: UserType };
   onClose?: () => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
+  developer: initialDeveloper,
   developer: initialDeveloper,
   onClose
 }) => {
@@ -38,7 +40,15 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
+    console.log('DeveloperProfileDetails useEffect - initialDeveloper:', initialDeveloper);
+    console.log('DeveloperProfileDetails useEffect - developerId:', developerId);
+    
     if (initialDeveloper) {
+      console.log('Using provided developer data:', initialDeveloper);
+      setDeveloper(initialDeveloper);
+      setLoading(false);
+    } else if (developerId) {
+      console.log('Fetching developer profile for ID:', developerId);
       setDeveloper(initialDeveloper);
       setLoading(false);
     } else if (developerId) {
@@ -50,6 +60,8 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     try {
       setLoading(true);
       setError('');
+      
+      console.log('Fetching developer profile for ID:', developerId);
 
       let query = supabase
         .from('developers')
@@ -58,22 +70,10 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           user:users(*)
         `);
 
-      // If the current user is a recruiter, we need to check if they have access
-      if (userProfile?.role === 'recruiter') {
-        // Check if this recruiter has any assignments with this developer
-        const { data: assignmentCheck } = await supabase
-          .from('assignments')
-          .select('id')
-          .eq('developer_id', developerId)
-          .eq('recruiter_id', userProfile.id)
-          .limit(1);
-
-        if (!assignmentCheck || assignmentCheck.length === 0) {
-          throw new Error('You do not have permission to view this developer profile');
-        }
-      }
+      // Let RLS handle permissions - if the user doesn't have access, the query will return no results
 
       const { data, error: fetchError } = await query
+        .maybeSingle();
         .eq('user_id', developerId)
         .single();
 
