@@ -23,13 +23,11 @@ import { Developer, User as UserType } from '../../types';
 interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
-  developer?: Developer & { user: UserType };
   onClose?: () => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
-  developer: initialDeveloper,
   developer: initialDeveloper,
   onClose
 }) => {
@@ -45,10 +43,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     
     if (initialDeveloper) {
       console.log('Using provided developer data:', initialDeveloper);
-      setDeveloper(initialDeveloper);
-      setLoading(false);
-    } else if (developerId) {
-      console.log('Fetching developer profile for ID:', developerId);
       setDeveloper(initialDeveloper);
       setLoading(false);
     } else if (developerId) {
