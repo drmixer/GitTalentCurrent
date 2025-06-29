@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { 
   Users, 
   Briefcase, 
@@ -21,18 +22,161 @@ import {
   Phone,
   Calendar,
   ArrowUpRight,
-  Plus
+  Plus,
+  Loader
 } from 'lucide-react';
+import { User, Developer, Recruiter, Assignment, Hire } from '../types';
 
 export const AdminDashboard = () => {
-  const { userProfile, loading } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  if (loading) {
+  // Data states
+  const [stats, setStats] = useState({
+    totalDevelopers: 0,
+    activeRecruiters: 0,
+    successfulHires: 0,
+    revenue: 0
+  });
+  const [developers, setDevelopers] = useState<(Developer & { user: User })[]>([]);
+  const [recruiters, setRecruiters] = useState<(Recruiter & { user: User })[]>([]);
+  const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
+  const [pendingRecruiters, setPendingRecruiters] = useState<(Recruiter & { user: User })[]>([]);
+
+  useEffect(() => {
+    if (userProfile?.role === 'admin') {
+      fetchDashboardData();
+    }
+  }, [userProfile]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Fetch stats
+      const [
+        { count: developersCount },
+        { count: recruitersCount },
+        { count: hiresCount }
+      ] = await Promise.all([
+        supabase.from('developers').select('*', { count: 'exact', head: true }),
+        supabase.from('recruiters').select('*', { count: 'exact', head: true }),
+        supabase.from('hires').select('*', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        totalDevelopers: developersCount || 0,
+        activeRecruiters: recruitersCount || 0,
+        successfulHires: hiresCount || 0,
+        revenue: (hiresCount || 0) * 15000 // Estimate based on average hire fee
+      });
+
+      // Fetch developers with user data
+      const { data: developersData, error: devError } = await supabase
+        .from('developers')
+        .select(`
+          *,
+          user:users(*)
+        `)
+        .limit(10);
+
+      if (devError) throw devError;
+      setDevelopers(developersData || []);
+
+      // Fetch recruiters with user data
+      const { data: recruitersData, error: recError } = await supabase
+        .from('recruiters')
+        .select(`
+          *,
+          user:users(*)
+        `)
+        .limit(10);
+
+      if (recError) throw recError;
+      setRecruiters(recruitersData || []);
+
+      // Fetch pending recruiters
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('recruiters')
+        .select(`
+          *,
+          user:users!inner(*)
+        `)
+        .eq('user.is_approved', false)
+        .limit(5);
+
+      if (pendingError) throw pendingError;
+      setPendingRecruiters(pendingData || []);
+
+      // Fetch recent assignments
+      const { data: assignmentsData, error: assignError } = await supabase
+        .from('assignments')
+        .select(`
+          *,
+          developer:users!assignments_developer_id_fkey(name),
+          job_role:job_roles(title),
+          recruiter:users!assignments_recruiter_id_fkey(name)
+        `)
+        .order('assigned_at', { ascending: false })
+        .limit(5);
+
+      if (assignError) throw assignError;
+      setRecentAssignments(assignmentsData || []);
+
+    } catch (error: any) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveRecruiter = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: true })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Refresh data
+      fetchDashboardData();
+    } catch (error: any) {
+      console.error('Error approving recruiter:', error);
+      setError(error.message || 'Failed to approve recruiter');
+    }
+  };
+
+  const rejectRecruiter = async (userId: string) => {
+    try {
+      // In a real app, you might want to soft delete or mark as rejected
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Refresh data
+      fetchDashboardData();
+    } catch (error: any) {
+      console.error('Error rejecting recruiter:', error);
+      setError(error.message || 'Failed to reject recruiter');
+    }
+  };
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -41,10 +185,10 @@ export const AdminDashboard = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const stats = [
+  const statsCards = [
     {
       title: 'Total Developers',
-      value: '2,847',
+      value: stats.totalDevelopers.toString(),
       change: '+12%',
       changeType: 'positive',
       icon: Code,
@@ -52,7 +196,7 @@ export const AdminDashboard = () => {
     },
     {
       title: 'Active Recruiters',
-      value: '456',
+      value: stats.activeRecruiters.toString(),
       change: '+8%',
       changeType: 'positive',
       icon: Building,
@@ -60,15 +204,15 @@ export const AdminDashboard = () => {
     },
     {
       title: 'Successful Hires',
-      value: '1,234',
+      value: stats.successfulHires.toString(),
       change: '+23%',
       changeType: 'positive',
       icon: Award,
       color: 'from-emerald-500 to-teal-600',
     },
     {
-      title: 'Revenue (MTD)',
-      value: '$847K',
+      title: 'Revenue (Est.)',
+      value: `$${Math.round(stats.revenue / 1000)}K`,
       change: '+18%',
       changeType: 'positive',
       icon: TrendingUp,
@@ -84,80 +228,17 @@ export const AdminDashboard = () => {
     { id: 'hires', label: 'Hires', icon: Award },
   ];
 
-  const mockDevelopers = [
-    {
-      id: 1,
-      name: 'Sarah Chen',
-      email: 'sarah@example.com',
-      github: 'sarahchen',
-      languages: ['TypeScript', 'React', 'Node.js'],
-      availability: true,
-      joinDate: '2024-01-15',
-      assignments: 3,
-      hires: 1,
-    },
-    {
-      id: 2,
-      name: 'Marcus Johnson',
-      email: 'marcus@example.com',
-      github: 'marcusj',
-      languages: ['Python', 'Django', 'PostgreSQL'],
-      availability: false,
-      joinDate: '2024-02-03',
-      assignments: 5,
-      hires: 2,
-    },
-    {
-      id: 3,
-      name: 'Elena Rodriguez',
-      email: 'elena@example.com',
-      github: 'elenarodriguez',
-      languages: ['Go', 'Kubernetes', 'Docker'],
-      availability: true,
-      joinDate: '2024-01-28',
-      assignments: 2,
-      hires: 0,
-    },
-  ];
-
-  const mockRecruiters = [
-    {
-      id: 1,
-      name: 'John Smith',
-      email: 'john@techcorp.com',
-      company: 'TechCorp Inc.',
-      status: 'approved',
-      joinDate: '2024-01-10',
-      activeJobs: 8,
-      totalHires: 12,
-    },
-    {
-      id: 2,
-      name: 'Lisa Wang',
-      email: 'lisa@startup.io',
-      company: 'StartupIO',
-      status: 'pending',
-      joinDate: '2024-03-01',
-      activeJobs: 3,
-      totalHires: 0,
-    },
-    {
-      id: 3,
-      name: 'David Brown',
-      email: 'david@enterprise.com',
-      company: 'Enterprise Solutions',
-      status: 'approved',
-      joinDate: '2023-11-15',
-      activeJobs: 15,
-      totalHires: 28,
-    },
-  ];
-
   const renderOverview = () => (
     <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
@@ -181,51 +262,57 @@ export const AdminDashboard = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
           <div className="space-y-4">
-            {[
-              { dev: 'Sarah Chen', job: 'Senior React Developer', company: 'TechCorp', status: 'new' },
-              { dev: 'Marcus Johnson', job: 'Python Backend Engineer', company: 'StartupIO', status: 'contacted' },
-              { dev: 'Elena Rodriguez', job: 'DevOps Engineer', company: 'Enterprise', status: 'hired' },
-            ].map((assignment, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="font-semibold text-gray-900">{assignment.dev}</div>
-                  <div className="text-sm text-gray-600">{assignment.job} at {assignment.company}</div>
+            {recentAssignments.length > 0 ? (
+              recentAssignments.map((assignment) => (
+                <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <div className="font-semibold text-gray-900">{assignment.developer?.name}</div>
+                    <div className="text-sm text-gray-600">{assignment.job_role?.title} at {assignment.recruiter?.name}</div>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                    assignment.status === 'Contacted' ? 'bg-blue-100 text-blue-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {assignment.status}
+                  </span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  assignment.status === 'hired' ? 'bg-emerald-100 text-emerald-800' :
-                  assignment.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {assignment.status}
-                </span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No recent assignments</p>
+            )}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Pending Approvals</h3>
           <div className="space-y-4">
-            {[
-              { name: 'Lisa Wang', company: 'StartupIO', type: 'recruiter' },
-              { name: 'Alex Kim', company: 'InnovateTech', type: 'recruiter' },
-              { name: 'Mike Davis', company: 'CloudSoft', type: 'recruiter' },
-            ].map((approval, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="font-semibold text-gray-900">{approval.name}</div>
-                  <div className="text-sm text-gray-600">{approval.company}</div>
+            {pendingRecruiters.length > 0 ? (
+              pendingRecruiters.map((recruiter) => (
+                <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <div className="font-semibold text-gray-900">{recruiter.user.name}</div>
+                    <div className="text-sm text-gray-600">{recruiter.company_name}</div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => approveRecruiter(recruiter.user_id)}
+                      className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => rejectRecruiter(recruiter.user_id)}
+                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors">
-                    <CheckCircle className="w-4 h-4" />
-                  </button>
-                  <button className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors">
-                    <XCircle className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No pending approvals</p>
+            )}
           </div>
         </div>
       </div>
@@ -269,29 +356,37 @@ export const AdminDashboard = () => {
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Skills</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Assignments</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hires</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Experience</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockDevelopers.map((developer) => (
-                <tr key={developer.id} className="hover:bg-gray-50 transition-colors">
+              {developers
+                .filter(dev => 
+                  !searchTerm || 
+                  dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((developer) => (
+                <tr key={developer.user_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {developer.name.split(' ').map(n => n[0]).join('')}
+                        {developer.user.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">{developer.name}</div>
-                        <div className="text-sm text-gray-500">{developer.email}</div>
-                        <div className="text-xs text-gray-400">@{developer.github}</div>
+                        <div className="text-sm font-semibold text-gray-900">{developer.user.name}</div>
+                        <div className="text-sm text-gray-500">{developer.user.email}</div>
+                        {developer.github_handle && (
+                          <div className="text-xs text-gray-400">@{developer.github_handle}</div>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {developer.languages.slice(0, 3).map((lang, index) => (
+                      {developer.top_languages.slice(0, 3).map((lang, index) => (
                         <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-lg">
                           {lang}
                         </span>
@@ -311,10 +406,10 @@ export const AdminDashboard = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {developer.assignments}
+                    {developer.experience_years} years
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {developer.hires}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {developer.location || 'Not specified'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
@@ -373,56 +468,59 @@ export const AdminDashboard = () => {
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Active Jobs</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Hires</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Industry</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {mockRecruiters.map((recruiter) => (
-                <tr key={recruiter.id} className="hover:bg-gray-50 transition-colors">
+              {recruiters.map((recruiter) => (
+                <tr key={recruiter.user_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {recruiter.name.split(' ').map(n => n[0]).join('')}
+                        {recruiter.user.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">{recruiter.name}</div>
-                        <div className="text-sm text-gray-500">{recruiter.email}</div>
+                        <div className="text-sm font-semibold text-gray-900">{recruiter.user.name}</div>
+                        <div className="text-sm text-gray-500">{recruiter.user.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900">{recruiter.company}</div>
+                    <div className="text-sm font-semibold text-gray-900">{recruiter.company_name}</div>
+                    <div className="text-sm text-gray-500">{recruiter.company_size}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      recruiter.status === 'approved' 
+                      recruiter.user.is_approved 
                         ? 'bg-emerald-100 text-emerald-800' 
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {recruiter.status === 'approved' ? (
+                      {recruiter.user.is_approved ? (
                         <CheckCircle className="w-3 h-3 mr-1" />
                       ) : (
                         <Clock className="w-3 h-3 mr-1" />
                       )}
-                      {recruiter.status}
+                      {recruiter.user.is_approved ? 'Approved' : 'Pending'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {recruiter.activeJobs}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {recruiter.totalHires}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {recruiter.industry || 'Not specified'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {recruiter.status === 'pending' && (
+                      {!recruiter.user.is_approved && (
                         <>
-                          <button className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors">
+                          <button 
+                            onClick={() => approveRecruiter(recruiter.user_id)}
+                            className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                          >
                             <CheckCircle className="w-4 h-4" />
                           </button>
-                          <button className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors">
+                          <button 
+                            onClick={() => rejectRecruiter(recruiter.user_id)}
+                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                          >
                             <XCircle className="w-4 h-4" />
                           </button>
                         </>

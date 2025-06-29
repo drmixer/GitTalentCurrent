@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { GitHubChart } from '../components/GitHub/GitHubChart';
 import { 
   Code, 
   Github, 
@@ -23,18 +25,105 @@ import {
   ExternalLink,
   Activity,
   Users,
-  Target
+  Target,
+  Loader
 } from 'lucide-react';
+import { Assignment, JobRole, Developer, User } from '../types';
 
 export const DeveloperDashboard = () => {
-  const { userProfile, loading } = useAuth();
+  const { userProfile, developerProfile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [availability, setAvailability] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  if (loading) {
+  // Data states
+  const [stats, setStats] = useState({
+    activeAssignments: 0,
+    profileViews: 0,
+    messages: 0,
+    githubStars: 0
+  });
+  const [assignments, setAssignments] = useState<(Assignment & { 
+    job_role: JobRole,
+    recruiter: User 
+  })[]>([]);
+
+  useEffect(() => {
+    if (userProfile?.role === 'developer' && developerProfile) {
+      setAvailability(developerProfile.availability);
+      fetchDashboardData();
+    }
+  }, [userProfile, developerProfile]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      if (!userProfile?.id) return;
+
+      // Fetch assignments with job and recruiter data
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select(`
+          *,
+          job_role:job_roles(*),
+          recruiter:users!assignments_recruiter_id_fkey(*)
+        `)
+        .eq('developer_id', userProfile.id)
+        .order('assigned_at', { ascending: false });
+
+      if (assignmentsError) throw assignmentsError;
+      setAssignments(assignmentsData || []);
+
+      // Calculate stats
+      const activeAssignmentsCount = assignmentsData?.filter(a => 
+        a.status !== 'Hired' && a.status !== 'Rejected'
+      ).length || 0;
+
+      // For now, we'll use placeholder values for profile views and messages
+      // In a real app, you'd track these metrics
+      setStats({
+        activeAssignments: activeAssignmentsCount,
+        profileViews: Math.floor(Math.random() * 200) + 50, // Placeholder
+        messages: Math.floor(Math.random() * 20) + 5, // Placeholder
+        githubStars: Math.floor(Math.random() * 1000) + 100 // Placeholder
+      });
+
+    } catch (error: any) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateAvailability = async (newAvailability: boolean) => {
+    try {
+      if (!userProfile?.id) return;
+
+      const { error } = await supabase
+        .from('developers')
+        .update({ availability: newAvailability })
+        .eq('user_id', userProfile.id);
+
+      if (error) throw error;
+
+      setAvailability(newAvailability);
+    } catch (error: any) {
+      console.error('Error updating availability:', error);
+      setError(error.message || 'Failed to update availability');
+    }
+  };
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -43,106 +132,38 @@ export const DeveloperDashboard = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const stats = [
+  if (!developerProfile) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  const statsCards = [
     {
       title: 'Active Assignments',
-      value: '3',
+      value: stats.activeAssignments.toString(),
       change: '+1 this week',
       icon: Target,
       color: 'from-blue-500 to-indigo-600',
     },
     {
       title: 'Profile Views',
-      value: '127',
+      value: stats.profileViews.toString(),
       change: '+23 this week',
       icon: Eye,
       color: 'from-purple-500 to-pink-600',
     },
     {
       title: 'Messages',
-      value: '8',
+      value: stats.messages.toString(),
       change: '2 unread',
       icon: MessageSquare,
       color: 'from-emerald-500 to-teal-600',
     },
     {
       title: 'GitHub Stars',
-      value: '892',
+      value: stats.githubStars.toString(),
       change: '+47 this month',
       icon: Star,
       color: 'from-orange-500 to-red-600',
-    },
-  ];
-
-  const mockAssignments = [
-    {
-      id: 1,
-      jobTitle: 'Senior React Developer',
-      company: 'TechCorp Inc.',
-      recruiter: 'John Smith',
-      location: 'Remote',
-      salary: '$120k - $150k',
-      status: 'new',
-      assignedDate: '2024-03-15',
-      techStack: ['React', 'TypeScript', 'Node.js'],
-      description: 'We are looking for a senior React developer to join our growing team...',
-    },
-    {
-      id: 2,
-      jobTitle: 'Full-Stack Engineer',
-      company: 'StartupIO',
-      recruiter: 'Lisa Wang',
-      location: 'San Francisco, CA',
-      salary: '$110k - $140k',
-      status: 'contacted',
-      assignedDate: '2024-03-12',
-      techStack: ['React', 'Python', 'PostgreSQL'],
-      description: 'Join our innovative startup as a full-stack engineer...',
-    },
-    {
-      id: 3,
-      jobTitle: 'Frontend Lead',
-      company: 'Enterprise Solutions',
-      recruiter: 'David Brown',
-      location: 'New York, NY',
-      salary: '$140k - $170k',
-      status: 'shortlisted',
-      assignedDate: '2024-03-08',
-      techStack: ['Vue.js', 'TypeScript', 'GraphQL'],
-      description: 'Lead our frontend team in building next-generation applications...',
-    },
-  ];
-
-  const mockProjects = [
-    {
-      id: 1,
-      name: 'E-commerce Platform',
-      description: 'Full-stack e-commerce solution with React and Node.js',
-      stars: 234,
-      forks: 67,
-      language: 'TypeScript',
-      updated: '2 days ago',
-      url: 'https://github.com/user/ecommerce-platform',
-    },
-    {
-      id: 2,
-      name: 'Task Management App',
-      description: 'React-based task management with real-time collaboration',
-      stars: 156,
-      forks: 43,
-      language: 'JavaScript',
-      updated: '1 week ago',
-      url: 'https://github.com/user/task-manager',
-    },
-    {
-      id: 3,
-      name: 'API Gateway',
-      description: 'Microservices API gateway built with Node.js and Express',
-      stars: 89,
-      forks: 23,
-      language: 'JavaScript',
-      updated: '3 days ago',
-      url: 'https://github.com/user/api-gateway',
     },
   ];
 
@@ -155,9 +176,15 @@ export const DeveloperDashboard = () => {
 
   const renderOverview = () => (
     <div className="space-y-8">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
@@ -183,7 +210,7 @@ export const DeveloperDashboard = () => {
               {availability ? 'Available for hire' : 'Not available'}
             </span>
             <button
-              onClick={() => setAvailability(!availability)}
+              onClick={() => updateAvailability(!availability)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 availability ? 'bg-emerald-600' : 'bg-gray-200'
               }`}
@@ -198,50 +225,72 @@ export const DeveloperDashboard = () => {
         </div>
       </div>
 
+      {/* GitHub Activity Chart */}
+      {developerProfile.github_handle && (
+        <GitHubChart 
+          githubHandle={developerProfile.github_handle}
+          className="col-span-full"
+        />
+      )}
+
       {/* Recent Activity */}
       <div className="grid lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
           <div className="space-y-4">
-            {mockAssignments.slice(0, 3).map((assignment) => (
+            {assignments.slice(0, 3).map((assignment) => (
               <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
-                  <div className="font-semibold text-gray-900">{assignment.jobTitle}</div>
-                  <div className="text-sm text-gray-600">{assignment.company}</div>
+                  <div className="font-semibold text-gray-900">{assignment.job_role?.title}</div>
+                  <div className="text-sm text-gray-600">{assignment.recruiter?.name}</div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  assignment.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
-                  assignment.status === 'contacted' ? 'bg-purple-100 text-purple-800' :
+                  assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                  assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
                   {assignment.status}
                 </span>
               </div>
             ))}
+            {assignments.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No assignments yet</p>
+            )}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Top Projects</h3>
+          <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Languages</h3>
           <div className="space-y-4">
-            {mockProjects.slice(0, 3).map((project) => (
-              <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900">{project.name}</div>
-                  <div className="text-sm text-gray-600">{project.language}</div>
-                </div>
-                <div className="flex items-center space-x-3 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <Star className="w-4 h-4 mr-1 text-yellow-500" />
-                    {project.stars}
-                  </div>
-                  <div className="flex items-center">
-                    <GitFork className="w-4 h-4 mr-1" />
-                    {project.forks}
-                  </div>
-                </div>
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3 text-sm">Programming Languages</h4>
+              <div className="flex flex-wrap gap-2">
+                {developerProfile.top_languages.map((lang, index) => (
+                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                    {lang}
+                  </span>
+                ))}
+                {developerProfile.top_languages.length === 0 && (
+                  <p className="text-gray-500 text-sm">No languages specified</p>
+                )}
               </div>
-            ))}
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-gray-900 mb-3 text-sm">Experience</h4>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <Briefcase className="w-4 h-4 mr-1" />
+                  {developerProfile.experience_years} years
+                </div>
+                {developerProfile.location && (
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {developerProfile.location}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -253,20 +302,21 @@ export const DeveloperDashboard = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Job Assignments</h2>
         <div className="text-sm text-gray-600">
-          {mockAssignments.length} active assignments
+          {assignments.length} total assignments
         </div>
       </div>
 
       <div className="grid gap-6">
-        {mockAssignments.map((assignment) => (
+        {assignments.map((assignment) => (
           <div key={assignment.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-xl font-black text-gray-900">{assignment.jobTitle}</h3>
+                  <h3 className="text-xl font-black text-gray-900">{assignment.job_role?.title}</h3>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    assignment.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
-                    assignment.status === 'contacted' ? 'bg-purple-100 text-purple-800' :
+                    assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                    assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                    assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
                     'bg-yellow-100 text-yellow-800'
                   }`}>
                     {assignment.status}
@@ -275,26 +325,26 @@ export const DeveloperDashboard = () => {
                 <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
                   <div className="flex items-center">
                     <Building className="w-4 h-4 mr-1" />
-                    {assignment.company}
+                    {assignment.recruiter?.name}
                   </div>
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1" />
-                    {assignment.location}
+                    {assignment.job_role?.location}
                   </div>
                   <div className="flex items-center">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {assignment.salary}
+                    ${assignment.job_role?.salary_min}k - ${assignment.job_role?.salary_max}k
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 mb-4">
-                  {assignment.techStack.map((tech, index) => (
+                  {assignment.job_role?.tech_stack?.map((tech, index) => (
                     <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
                       {tech}
                     </span>
                   ))}
                 </div>
-                <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                  {assignment.description}
+                <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
+                  {assignment.job_role?.description}
                 </p>
               </div>
             </div>
@@ -303,11 +353,11 @@ export const DeveloperDashboard = () => {
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  Assigned {assignment.assignedDate}
+                  Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
                 </div>
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
-                  Recruiter: {assignment.recruiter}
+                  Recruiter: {assignment.recruiter?.name}
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -323,6 +373,13 @@ export const DeveloperDashboard = () => {
             </div>
           </div>
         ))}
+        {assignments.length === 0 && (
+          <div className="text-center py-12">
+            <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assignments Yet</h3>
+            <p className="text-gray-600">Job assignments will appear here when recruiters assign you to positions.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -340,14 +397,18 @@ export const DeveloperDashboard = () => {
               <h2 className="text-2xl font-black text-gray-900 mb-2">{userProfile.name}</h2>
               <p className="text-gray-600 mb-3">Full-Stack Developer</p>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <Github className="w-4 h-4 mr-1" />
-                  @sarahchen
-                </div>
-                <div className="flex items-center">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  San Francisco, CA
-                </div>
+                {developerProfile.github_handle && (
+                  <div className="flex items-center">
+                    <Github className="w-4 h-4 mr-1" />
+                    @{developerProfile.github_handle}
+                  </div>
+                )}
+                {developerProfile.location && (
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {developerProfile.location}
+                  </div>
+                )}
                 <div className="flex items-center">
                   <Mail className="w-4 h-4 mr-1" />
                   {userProfile.email}
@@ -363,23 +424,31 @@ export const DeveloperDashboard = () => {
 
         <div className="grid md:grid-cols-4 gap-6">
           <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">892</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{stats.githubStars}</div>
             <div className="text-sm font-semibold text-gray-600">GitHub Stars</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">3.2k</div>
-            <div className="text-sm font-semibold text-gray-600">Contributions</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.experience_years}</div>
+            <div className="text-sm font-semibold text-gray-600">Years Experience</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">47</div>
-            <div className="text-sm font-semibold text-gray-600">Repositories</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{assignments.length}</div>
+            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">5+</div>
-            <div className="text-sm font-semibold text-gray-600">Years Exp</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.hourly_rate ? `$${developerProfile.hourly_rate}` : 'N/A'}</div>
+            <div className="text-sm font-semibold text-gray-600">Hourly Rate</div>
           </div>
         </div>
       </div>
+
+      {/* Bio */}
+      {developerProfile.bio && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
+          <p className="text-gray-600 leading-relaxed">{developerProfile.bio}</p>
+        </div>
+      )}
 
       {/* Skills & Technologies */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -390,73 +459,42 @@ export const DeveloperDashboard = () => {
             Edit
           </button>
         </div>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-1 gap-6">
           <div>
-            <h4 className="font-bold text-gray-900 mb-3">Frontend</h4>
+            <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
             <div className="flex flex-wrap gap-2">
-              {['React', 'TypeScript', 'Vue.js', 'Tailwind CSS', 'Next.js'].map((skill, index) => (
+              {developerProfile.top_languages.map((skill, index) => (
                 <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
                   {skill}
                 </span>
               ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-bold text-gray-900 mb-3">Backend</h4>
-            <div className="flex flex-wrap gap-2">
-              {['Node.js', 'Python', 'PostgreSQL', 'MongoDB', 'GraphQL'].map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-semibold rounded-lg">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-bold text-gray-900 mb-3">Tools & DevOps</h4>
-            <div className="flex flex-wrap gap-2">
-              {['Docker', 'AWS', 'Git', 'CI/CD', 'Kubernetes'].map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-emerald-100 text-emerald-800 text-sm font-semibold rounded-lg">
-                  {skill}
-                </span>
-              ))}
+              {developerProfile.top_languages.length === 0 && (
+                <p className="text-gray-500">No languages specified</p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Featured Projects */}
+      {/* Projects */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">Featured Projects</h3>
+          <h3 className="text-lg font-black text-gray-900">Projects</h3>
           <button className="text-blue-600 hover:text-blue-700 font-semibold">
             <Plus className="w-4 h-4 mr-1 inline" />
             Add Project
           </button>
         </div>
         <div className="grid md:grid-cols-2 gap-6">
-          {mockProjects.map((project) => (
-            <div key={project.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+          {developerProfile.linked_projects.map((project, index) => (
+            <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 mb-2">{project.name}</h4>
-                  <p className="text-gray-600 text-sm mb-3">{project.description}</p>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                      {project.language}
-                    </div>
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 mr-1 text-yellow-500" />
-                      {project.stars}
-                    </div>
-                    <div className="flex items-center">
-                      <GitFork className="w-4 h-4 mr-1" />
-                      {project.forks}
-                    </div>
-                  </div>
+                  <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
+                  <p className="text-gray-600 text-sm mb-3">{project}</p>
                 </div>
                 <a
-                  href={project.url}
+                  href={project}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
@@ -464,9 +502,14 @@ export const DeveloperDashboard = () => {
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
-              <div className="text-xs text-gray-500">Updated {project.updated}</div>
             </div>
           ))}
+          {developerProfile.linked_projects.length === 0 && (
+            <div className="col-span-2 text-center py-8">
+              <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No projects linked yet</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
