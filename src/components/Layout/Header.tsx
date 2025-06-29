@@ -84,9 +84,9 @@ export const Header = () => {
         <div className="flex justify-between items-center h-48">
           {/* Logo */}
           <Link to="/" className="flex items-center group py-8">
-            <div className="h-40 w-auto flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+            <div className="h-32 w-auto flex items-center justify-center group-hover:scale-105 transition-all duration-300">
               <img 
-                src={logoUrl} 
+                src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/NewGitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL05ld0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMTkzODg3LCJleHAiOjE3ODI3Mjk4ODd9.y4U-a2vt_6yWmD28DZHTOdgzA4ht8u1eX-pqjZgn2sw" 
                 alt="GitTalent Logo" 
                 className="h-full w-auto object-contain"
                 onError={(e) => {
