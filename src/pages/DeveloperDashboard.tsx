@@ -129,12 +129,14 @@ export const DeveloperDashboard = () => {
         .eq('receiver_id', userProfile.id)
         .eq('is_read', false);
 
-      // For now, we'll use placeholder values for profile views and GitHub stars
+      // Calculate profile views (placeholder for now)
+      const profileViews = Math.floor(Math.random() * 50) + 20;
+
       setStats({
         activeAssignments: activeAssignmentsCount,
-        profileViews: Math.floor(Math.random() * 50) + 20,
+        profileViews: profileViews,
         messages: unreadMessagesCount || 0,
-        githubStars: Math.floor(Math.random() * 500) + 100
+        githubStars: 0 // Will be updated by GitHub chart
       });
 
     } catch (error: any) {
@@ -233,14 +235,14 @@ export const DeveloperDashboard = () => {
     {
       title: 'Active Assignments',
       value: stats.activeAssignments.toString(),
-      change: stats.activeAssignments > 0 ? '+1 this week' : 'No active assignments',
+      change: stats.activeAssignments > 0 ? `${stats.activeAssignments} active` : 'No active assignments',
       icon: Target,
       color: 'from-blue-500 to-indigo-600',
     },
     {
       title: 'Profile Views',
       value: stats.profileViews.toString(),
-      change: '+23 this week',
+      change: 'This week',
       icon: Eye,
       color: 'from-purple-500 to-pink-600',
     },
@@ -252,10 +254,10 @@ export const DeveloperDashboard = () => {
       color: 'from-emerald-500 to-teal-600',
     },
     {
-      title: 'GitHub Stars',
-      value: stats.githubStars.toString(),
-      change: '+47 this month',
-      icon: Star,
+      title: 'GitHub Activity',
+      value: developerProfile.github_handle ? 'Active' : 'Not linked',
+      change: developerProfile.github_handle ? '@' + developerProfile.github_handle : 'Add GitHub',
+      icon: Github,
       color: 'from-orange-500 to-red-600',
     },
   ];
@@ -275,6 +277,42 @@ export const DeveloperDashboard = () => {
         </div>
       )}
 
+      {/* Welcome Message */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black mb-2">Welcome back, {userProfile.name}!</h2>
+            <p className="text-blue-100 mb-4">
+              {developerProfile.github_handle 
+                ? `Connected as @${developerProfile.github_handle}` 
+                : 'Complete your profile to get started'
+              }
+            </p>
+            <div className="flex items-center space-x-4">
+              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
+                availability 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-gray-500 text-white'
+              }`}>
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  availability ? 'bg-emerald-200 animate-pulse' : 'bg-gray-300'
+                }`}></div>
+                {availability ? 'Available for hire' : 'Not available'}
+              </div>
+              <button
+                onClick={() => updateAvailability(!availability)}
+                className="text-blue-100 hover:text-white transition-colors text-sm font-semibold"
+              >
+                Change status
+              </button>
+            </div>
+          </div>
+          <div className="w-20 h-20 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center">
+            <Code className="w-10 h-10 text-white" />
+          </div>
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => (
@@ -286,36 +324,9 @@ export const DeveloperDashboard = () => {
             </div>
             <div className="text-2xl font-black text-gray-900 mb-1">{stat.value}</div>
             <div className="text-sm font-medium text-gray-600 mb-2">{stat.title}</div>
-            <div className="text-xs text-emerald-600 font-semibold">{stat.change}</div>
+            <div className="text-xs text-gray-500 font-medium">{stat.change}</div>
           </div>
         ))}
-      </div>
-
-      {/* Availability Toggle */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-black text-gray-900 mb-2">Availability Status</h3>
-            <p className="text-gray-600">Let recruiters know if you're open to new opportunities</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className={`text-sm font-semibold ${availability ? 'text-emerald-600' : 'text-gray-500'}`}>
-              {availability ? 'Available for hire' : 'Not available'}
-            </span>
-            <button
-              onClick={() => updateAvailability(!availability)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                availability ? 'bg-emerald-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  availability ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* GitHub Activity Chart */}
@@ -324,6 +335,49 @@ export const DeveloperDashboard = () => {
           githubHandle={developerProfile.github_handle}
           className="col-span-full"
         />
+      )}
+
+      {/* Profile Completion */}
+      {(!developerProfile.github_handle || !developerProfile.bio || developerProfile.top_languages.length === 0) && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+          <div className="flex items-start">
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
+              <CheckCircle className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-black text-gray-900 mb-2">Complete Your Profile</h3>
+              <p className="text-gray-600 mb-4">
+                Add more details to your profile to increase your chances of getting matched with great opportunities.
+              </p>
+              <div className="space-y-2 mb-4">
+                {!developerProfile.github_handle && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Add your GitHub handle
+                  </div>
+                )}
+                {!developerProfile.bio && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Write a bio
+                  </div>
+                )}
+                {developerProfile.top_languages.length === 0 && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    Add your programming languages
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors font-semibold"
+              >
+                Complete Profile
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Recent Activity */}
@@ -336,10 +390,14 @@ export const DeveloperDashboard = () => {
                 <div>
                   <div className="font-semibold text-gray-900">{assignment.job_role?.title}</div>
                   <div className="text-sm text-gray-600">{assignment.recruiter?.name}</div>
+                  <div className="text-xs text-gray-500">
+                    Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
+                  </div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                   assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
                   assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
                   {assignment.status}
@@ -347,13 +405,17 @@ export const DeveloperDashboard = () => {
               </div>
             ))}
             {assignments.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No assignments yet</p>
+              <div className="text-center py-8">
+                <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No assignments yet</p>
+                <p className="text-sm text-gray-400">Job assignments will appear here when recruiters assign you to positions.</p>
+              </div>
             )}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Languages</h3>
+          <h3 className="text-lg font-black text-gray-900 mb-6">Your Skills</h3>
           <div className="space-y-4">
             <div>
               <h4 className="font-bold text-gray-900 mb-3 text-sm">Programming Languages</h4>
@@ -370,16 +432,22 @@ export const DeveloperDashboard = () => {
             </div>
             
             <div>
-              <h4 className="font-bold text-gray-900 mb-3 text-sm">Experience</h4>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <h4 className="font-bold text-gray-900 mb-3 text-sm">Experience & Location</h4>
+              <div className="space-y-2 text-sm text-gray-600">
                 <div className="flex items-center">
-                  <Briefcase className="w-4 h-4 mr-1" />
-                  {developerProfile.experience_years} years
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  {developerProfile.experience_years} years of experience
                 </div>
                 {developerProfile.location && (
                   <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
+                    <MapPin className="w-4 h-4 mr-2" />
                     {developerProfile.location}
+                  </div>
+                )}
+                {developerProfile.hourly_rate > 0 && (
+                  <div className="flex items-center">
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    ${developerProfile.hourly_rate}/hour
                   </div>
                 )}
               </div>
@@ -500,7 +568,12 @@ export const DeveloperDashboard = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">{userProfile.name}</h2>
-              <p className="text-gray-600 mb-3">Full-Stack Developer</p>
+              <p className="text-gray-600 mb-3">
+                {developerProfile.experience_years > 0 
+                  ? `${developerProfile.experience_years} years experience` 
+                  : 'Developer'
+                }
+              </p>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 {developerProfile.github_handle && (
                   <div className="flex items-center">
@@ -532,16 +605,16 @@ export const DeveloperDashboard = () => {
 
         <div className="grid md:grid-cols-4 gap-6">
           <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{stats.githubStars}</div>
-            <div className="text-sm font-semibold text-gray-600">GitHub Stars</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{assignments.length}</div>
+            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
             <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.experience_years}</div>
             <div className="text-sm font-semibold text-gray-600">Years Experience</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{assignments.length}</div>
-            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.top_languages.length}</div>
+            <div className="text-sm font-semibold text-gray-600">Languages</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
             <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.hourly_rate ? `$${developerProfile.hourly_rate}` : 'N/A'}</div>
@@ -753,7 +826,7 @@ export const DeveloperDashboard = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
-                    <p className="text-gray-600 text-sm mb-3">{project}</p>
+                    <p className="text-gray-600 text-sm mb-3 break-all">{project}</p>
                   </div>
                   <a
                     href={project}
@@ -806,7 +879,7 @@ export const DeveloperDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
-                Welcome back, {userProfile.name}!
+                Developer Dashboard
               </h1>
               <p className="text-gray-600">Track your assignments and manage your developer profile</p>
             </div>

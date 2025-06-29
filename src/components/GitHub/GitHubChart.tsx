@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, GitCommit, Star } from 'lucide-react';
+import { Calendar, TrendingUp, GitCommit, Star, Github } from 'lucide-react';
 
 interface GitHubChartProps {
   githubHandle: string;
@@ -41,11 +41,11 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
       setLoading(true);
       setError('');
 
-      // Since we can't directly access GitHub's contribution graph API without authentication,
-      // we'll generate realistic-looking data based on the GitHub handle
-      // In a real implementation, you would use GitHub's GraphQL API or a service like GitHub's contribution graph
+      // For now, we'll generate realistic-looking data based on the GitHub handle
+      // In a real implementation, you would use GitHub's GraphQL API or a service
+      // that provides contribution data
       
-      const contributionData = generateRealisticContributions();
+      const contributionData = generateRealisticContributions(githubHandle);
       setContributions(contributionData);
       
       const calculatedStats = calculateStats(contributionData);
@@ -59,10 +59,19 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
     }
   };
 
-  const generateRealisticContributions = (): ContributionDay[] => {
+  const generateRealisticContributions = (handle: string): ContributionDay[] => {
     const contributions: ContributionDay[] = [];
     const today = new Date();
     const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+    
+    // Use the handle to seed the random number generator for consistent data
+    const seed = handle.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    let random = seed;
+    
+    const seededRandom = () => {
+      random = (random * 9301 + 49297) % 233280;
+      return random / 233280;
+    };
     
     // Generate 365 days of contribution data
     for (let i = 0; i < 365; i++) {
@@ -72,25 +81,25 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
       // Create realistic patterns - more activity on weekdays, some breaks
       const dayOfWeek = date.getDay();
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const isHoliday = Math.random() < 0.05; // 5% chance of being a "holiday"
+      const isHoliday = seededRandom() < 0.05; // 5% chance of being a "holiday"
       
       let baseActivity = isWeekend ? 0.3 : 0.7;
       if (isHoliday) baseActivity *= 0.1;
       
       // Add some randomness and streaks
-      const random = Math.random();
+      const randomValue = seededRandom();
       let count = 0;
       let level: 0 | 1 | 2 | 3 | 4 = 0;
       
-      if (random < baseActivity) {
-        if (random < baseActivity * 0.1) {
-          count = Math.floor(Math.random() * 3) + 8; // High activity
+      if (randomValue < baseActivity) {
+        if (randomValue < baseActivity * 0.1) {
+          count = Math.floor(seededRandom() * 3) + 8; // High activity
           level = 4;
-        } else if (random < baseActivity * 0.3) {
-          count = Math.floor(Math.random() * 3) + 5; // Medium-high activity
+        } else if (randomValue < baseActivity * 0.3) {
+          count = Math.floor(seededRandom() * 3) + 5; // Medium-high activity
           level = 3;
-        } else if (random < baseActivity * 0.6) {
-          count = Math.floor(Math.random() * 3) + 2; // Medium activity
+        } else if (randomValue < baseActivity * 0.6) {
+          count = Math.floor(seededRandom() * 3) + 2; // Medium activity
           level = 2;
         } else {
           count = 1; // Low activity
@@ -173,6 +182,17 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
     }
   };
 
+  if (!githubHandle) {
+    return (
+      <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
+        <div className="text-center text-gray-500">
+          <Github className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Add your GitHub handle to see your contribution activity</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
@@ -203,23 +223,22 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
     );
   }
 
-  // Group contributions by week for display
-  const weeks: ContributionDay[][] = [];
-  for (let i = 0; i < contributions.length; i += 7) {
-    weeks.push(contributions.slice(i, i + 7));
-  }
-
   return (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-2">
-          <Calendar className="w-5 h-5 text-gray-600" />
+          <Github className="w-5 h-5 text-gray-600" />
           <h3 className="text-lg font-black text-gray-900">GitHub Activity</h3>
         </div>
-        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-lg font-medium">
-          Last 12 months
-        </span>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-lg font-medium">
+            @{githubHandle}
+          </span>
+          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-lg font-medium">
+            Last 12 months
+          </span>
+        </div>
       </div>
 
       {/* Contribution Graph */}
@@ -271,7 +290,7 @@ export const GitHubChart: React.FC<GitHubChartProps> = ({ githubHandle, classNam
       {/* Additional Info */}
       <div className="mt-4 text-center">
         <p className="text-xs text-gray-500">
-          Data represents contribution activity for <span className="font-semibold">@{githubHandle}</span>
+          Contribution data is generated based on your GitHub handle for demonstration purposes.
         </p>
       </div>
     </div>
