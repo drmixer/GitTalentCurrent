@@ -1,30 +1,8 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User, Developer, JobRole, Assignment, Hire } from '../types';
-
-interface AuthContextType {
-  user: SupabaseUser | null;
-  userProfile: User | null;
-  developerProfile: Developer | null;
-  loading: boolean;
-  needsOnboarding: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signInWithGitHub: () => Promise<void>;
-  signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
-  signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  createDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
-  updateDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
-  createJobRole: (jobData: Partial<JobRole>) => Promise<boolean>;
-  updateJobRole: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>;
-  createAssignment: (assignmentData: Partial<Assignment>) => Promise<boolean>;
-  importJobsFromCSV: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
-  createHire: (hireData: Partial<Hire>) => Promise<boolean>;
-  updateUserApprovalStatus: (userId: string, isApproved: boolean) => Promise<boolean>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types';
+import { AuthContext } from '../contexts/AuthContext';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
