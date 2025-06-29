@@ -4,6 +4,8 @@ import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { 
@@ -55,7 +57,11 @@ export const AdminDashboard = () => {
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
+  const [showDeveloperDetails, setShowDeveloperDetails] = useState(false);
+  const [showRecruiterDetails, setShowRecruiterDetails] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
+  const [selectedRecruiter, setSelectedRecruiter] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
 
   // Data states
@@ -114,10 +120,7 @@ export const AdminDashboard = () => {
       // Fetch developers with user data
       const { data: developersData, error: devError } = await supabase
         .from('developers')
-        .select(`
-          *,
-          user:users(*)
-        `)
+        .select(`*, user:users(*)`)
         .limit(50);
 
       if (devError) throw devError;
@@ -126,10 +129,7 @@ export const AdminDashboard = () => {
       // Fetch recruiters with user data
       const { data: recruitersData, error: recError } = await supabase
         .from('recruiters')
-        .select(`
-          *,
-          user:users(*)
-        `)
+        .select(`*, user:users(*)`)
         .limit(50);
 
       if (recError) throw recError;
@@ -138,10 +138,7 @@ export const AdminDashboard = () => {
       // Fetch pending recruiters
       const { data: pendingData, error: pendingError } = await supabase
         .from('recruiters')
-        .select(`
-          *,
-          user:users!inner(*)
-        `)
+        .select(`*, user:users(*)`)
         .eq('user.is_approved', false)
         .limit(10);
 
@@ -151,10 +148,7 @@ export const AdminDashboard = () => {
       // Fetch job roles with recruiter data
       const { data: jobRolesData, error: jobError } = await supabase
         .from('job_roles')
-        .select(`
-          *,
-          recruiter:users!job_roles_recruiter_id_fkey(*)
-        `)
+        .select(`*, recruiter:users!job_roles_recruiter_id_fkey(*)`)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -164,12 +158,7 @@ export const AdminDashboard = () => {
       // Fetch assignments
       const { data: assignmentsData, error: assignError } = await supabase
         .from('assignments')
-        .select(`
-          *,
-          developer:users!assignments_developer_id_fkey(*),
-          job_role:job_roles(*),
-          recruiter:users!assignments_recruiter_id_fkey(*)
-        `)
+        .select(`*, developer:users!assignments_developer_id_fkey(*), job_role:job_roles(*), recruiter:users!assignments_recruiter_id_fkey(*)`)
         .order('assigned_at', { ascending: false })
         .limit(50);
 
@@ -179,14 +168,7 @@ export const AdminDashboard = () => {
       // Fetch hires
       const { data: hiresData, error: hiresError } = await supabase
         .from('hires')
-        .select(`
-          *,
-          assignment:assignments(
-            *,
-            developer:users!assignments_developer_id_fkey(*),
-            job_role:job_roles(*),
-            recruiter:users!assignments_recruiter_id_fkey(*)
-          )
+        .select(`*, assignment:assignments(*, developer:users!assignments_developer_id_fkey(*), job_role:job_roles(*), recruiter:users!assignments_recruiter_id_fkey(*)
         `)
         .order('hire_date', { ascending: false })
         .limit(50);
@@ -205,9 +187,7 @@ export const AdminDashboard = () => {
   const approveRecruiter = async (userId: string) => {
     try {
       const result = await updateUserApprovalStatus(userId, true);
-      if (result) {
-        fetchDashboardData();
-      }
+      if (result) fetchDashboardData();
     } catch (error: any) {
       console.error('Error approving recruiter:', error);
       setError(error.message || 'Failed to approve recruiter');
@@ -217,12 +197,7 @@ export const AdminDashboard = () => {
   const rejectRecruiter = async (userId: string) => {
     try {
       const result = await updateUserApprovalStatus(userId, false);
-      if (result) {
-        // Also delete the recruiter profile
-        await supabase.from('recruiters').delete().eq('user_id', userId);
-        await supabase.from('users').delete().eq('id', userId);
-        fetchDashboardData();
-      }
+      if (result) fetchDashboardData();
     } catch (error: any) {
       console.error('Error rejecting recruiter:', error);
       setError(error.message || 'Failed to reject recruiter');
@@ -486,9 +461,9 @@ export const AdminDashboard = () => {
                       <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
                         {recruiter.user?.name?.split(' ').map(n => n[0]).join('') || 'R'}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{recruiter.user?.email || 'No email'}</div>
+                        <div className="text-sm text-gray-500 truncate">{recruiter.user?.email || 'No email'}</div>
                       </div>
                     </div>
                   </td>
@@ -532,7 +507,13 @@ export const AdminDashboard = () => {
                         </>
                       )}
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                        <Eye className="w-4 h-4" />
+                        <Eye 
+                          className="w-4 h-4" 
+                          onClick={() => {
+                            setSelectedRecruiter(recruiter.user_id);
+                            setShowRecruiterDetails(true);
+                          }}
+                        />
                       </button>
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <MoreVertical className="w-4 h-4" />
@@ -604,9 +585,9 @@ export const AdminDashboard = () => {
                       <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
                         {developer.user.name.split(' ').map(n => n[0]).join('')}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm font-semibold text-gray-900">{developer.user.name}</div>
-                        <div className="text-sm text-gray-500">{developer.user.email}</div>
+                        <div className="text-sm text-gray-500 truncate">{developer.user.email}</div>
                         {developer.github_handle && (
                           <div className="text-xs text-gray-400">@{developer.github_handle}</div>
                         )}
@@ -642,7 +623,13 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => {
+                          setSelectedDeveloper(developer.user_id);
+                          setShowDeveloperDetails(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
@@ -1025,6 +1012,36 @@ export const AdminDashboard = () => {
                 }}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Developer Profile Details Modal */}
+      {showDeveloperDetails && selectedDeveloper && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DeveloperProfileDetails
+              developerId={selectedDeveloper}
+              onClose={() => {
+                setShowDeveloperDetails(false);
+                setSelectedDeveloper(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Recruiter Profile Details Modal */}
+      {showRecruiterDetails && selectedRecruiter && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+            <RecruiterProfileDetails
+              recruiterId={selectedRecruiter}
+              onClose={() => {
+                setShowRecruiterDetails(false);
+                setSelectedRecruiter(null);
+              }}
+            />
           </div>
         </div>
       )}
