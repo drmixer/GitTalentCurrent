@@ -58,7 +58,6 @@ export const RecruiterDashboard: React.FC = () => {
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
