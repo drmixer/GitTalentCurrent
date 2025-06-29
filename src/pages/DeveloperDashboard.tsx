@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { GitHubChart } from '../components/GitHub/GitHubChart';
+import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
+import { GitHubProvider, useGitHub } from '../hooks/useGitHub';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { 
@@ -30,7 +31,8 @@ import {
   Target,
   Loader,
   Save,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
 
@@ -45,8 +47,9 @@ interface MessageThread {
   };
 }
 
-export const DeveloperDashboard = () => {
+const DeveloperDashboardContent = () => {
   const { userProfile, developerProfile, loading: authLoading, updateDeveloperProfile } = useAuth();
+  const { user: githubUser, repos, totalStars, getTopLanguages, loading: githubLoading, error: githubError } = useGitHub();
   const [activeTab, setActiveTab] = useState('overview');
   const [availability, setAvailability] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -71,9 +74,9 @@ export const DeveloperDashboard = () => {
   // Data states
   const [stats, setStats] = useState({
     activeAssignments: 0,
-    profileViews: 0,
+    totalAssignments: 0,
     messages: 0,
-    githubStars: 0
+    githubRepos: 0
   });
   const [assignments, setAssignments] = useState<(Assignment & { 
     job_role: JobRole,
@@ -95,6 +98,16 @@ export const DeveloperDashboard = () => {
       fetchDashboardData();
     }
   }, [userProfile, developerProfile]);
+
+  // Update stats when GitHub data loads
+  useEffect(() => {
+    if (githubUser && repos) {
+      setStats(prev => ({
+        ...prev,
+        githubRepos: githubUser.public_repos || repos.length
+      }));
+    }
+  }, [githubUser, repos]);
 
   const fetchDashboardData = async () => {
     try {
@@ -129,15 +142,12 @@ export const DeveloperDashboard = () => {
         .eq('receiver_id', userProfile.id)
         .eq('is_read', false);
 
-      // Calculate profile views (placeholder for now)
-      const profileViews = Math.floor(Math.random() * 50) + 20;
-
-      setStats({
+      setStats(prev => ({
+        ...prev,
         activeAssignments: activeAssignmentsCount,
-        profileViews: profileViews,
-        messages: unreadMessagesCount || 0,
-        githubStars: 0 // Will be updated by GitHub chart
-      });
+        totalAssignments: assignmentsData?.length || 0,
+        messages: unreadMessagesCount || 0
+      }));
 
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -164,7 +174,16 @@ export const DeveloperDashboard = () => {
       setSaving(true);
       setError('');
 
-      const result = await updateDeveloperProfile(editFormData);
+      // If GitHub handle changed, update with real languages from GitHub
+      let updatedFormData = { ...editFormData };
+      if (editFormData.github_handle !== developerProfile?.github_handle) {
+        const topGitHubLanguages = getTopLanguages(10);
+        if (topGitHubLanguages.length > 0) {
+          updatedFormData.top_languages = topGitHubLanguages;
+        }
+      }
+
+      const result = await updateDeveloperProfile(updatedFormData);
       if (result) {
         setIsEditingProfile(false);
       } else {
@@ -212,6 +231,30 @@ export const DeveloperDashboard = () => {
     }));
   };
 
+  const syncGitHubLanguages = () => {
+    const topGitHubLanguages = getTopLanguages(10);
+    if (topGitHubLanguages.length > 0) {
+      setEditFormData(prev => ({
+        ...prev,
+        top_languages: topGitHubLanguages
+      }));
+    }
+  };
+
+  const syncGitHubProjects = () => {
+    const topRepos = repos
+      .filter(repo => repo.stargazers_count > 0 || repo.language)
+      .slice(0, 5)
+      .map(repo => repo.html_url);
+    
+    if (topRepos.length > 0) {
+      setEditFormData(prev => ({
+        ...prev,
+        linked_projects: [...new Set([...prev.linked_projects, ...topRepos])]
+      }));
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -231,6 +274,11 @@ export const DeveloperDashboard = () => {
     return <Navigate to="/onboarding" replace />;
   }
 
+  // Get display name in format: FirstName (GitHubUsername)
+  const displayName = developerProfile.github_handle 
+    ? `${userProfile.name.split(' ')[0]} (${developerProfile.github_handle})`
+    : userProfile.name;
+
   const statsCards = [
     {
       title: 'Active Assignments',
@@ -240,10 +288,10 @@ export const DeveloperDashboard = () => {
       color: 'from-blue-500 to-indigo-600',
     },
     {
-      title: 'Profile Views',
-      value: stats.profileViews.toString(),
-      change: 'This week',
-      icon: Eye,
+      title: 'Total Assignments',
+      value: stats.totalAssignments.toString(),
+      change: 'All time',
+      icon: Briefcase,
       color: 'from-purple-500 to-pink-600',
     },
     {
@@ -254,9 +302,9 @@ export const DeveloperDashboard = () => {
       color: 'from-emerald-500 to-teal-600',
     },
     {
-      title: 'GitHub Activity',
-      value: developerProfile.github_handle ? 'Active' : 'Not linked',
-      change: developerProfile.github_handle ? '@' + developerProfile.github_handle : 'Add GitHub',
+      title: 'GitHub Repos',
+      value: stats.githubRepos.toString(),
+      change: developerProfile.github_handle ? `@${developerProfile.github_handle}` : 'Add GitHub',
       icon: Github,
       color: 'from-orange-500 to-red-600',
     },
@@ -273,7 +321,10 @@ export const DeveloperDashboard = () => {
     <div className="space-y-8">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-800">{error}</p>
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
         </div>
       )}
 
@@ -281,10 +332,10 @@ export const DeveloperDashboard = () => {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-black mb-2">Welcome back, {userProfile.name}!</h2>
+            <h2 className="text-2xl font-black mb-2">Welcome back, {displayName}!</h2>
             <p className="text-blue-100 mb-4">
               {developerProfile.github_handle 
-                ? `Connected as @${developerProfile.github_handle}` 
+                ? `Connected to GitHub • ${githubUser?.public_repos || 0} public repos • ${totalStars} stars earned` 
                 : 'Complete your profile to get started'
               }
             </p>
@@ -331,7 +382,7 @@ export const DeveloperDashboard = () => {
 
       {/* GitHub Activity Chart */}
       {developerProfile.github_handle && (
-        <GitHubChart 
+        <RealGitHubChart 
           githubHandle={developerProfile.github_handle}
           className="col-span-full"
         />
@@ -353,7 +404,7 @@ export const DeveloperDashboard = () => {
                 {!developerProfile.github_handle && (
                   <div className="flex items-center text-sm text-gray-600">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                    Add your GitHub handle
+                    Add your GitHub handle to sync real data
                   </div>
                 )}
                 {!developerProfile.bio && (
@@ -420,12 +471,12 @@ export const DeveloperDashboard = () => {
             <div>
               <h4 className="font-bold text-gray-900 mb-3 text-sm">Programming Languages</h4>
               <div className="flex flex-wrap gap-2">
-                {developerProfile.top_languages.map((lang, index) => (
+                {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(5)).map((lang, index) => (
                   <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
                     {lang}
                   </span>
                 ))}
-                {developerProfile.top_languages.length === 0 && (
+                {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
                   <p className="text-gray-500 text-sm">No languages specified</p>
                 )}
               </div>
@@ -438,10 +489,10 @@ export const DeveloperDashboard = () => {
                   <Briefcase className="w-4 h-4 mr-2" />
                   {developerProfile.experience_years} years of experience
                 </div>
-                {developerProfile.location && (
+                {(developerProfile.location || githubUser?.location) && (
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-2" />
-                    {developerProfile.location}
+                    {developerProfile.location || githubUser?.location}
                   </div>
                 )}
                 {developerProfile.hourly_rate > 0 && (
@@ -567,7 +618,7 @@ export const DeveloperDashboard = () => {
               {userProfile.name.split(' ').map(n => n[0]).join('')}
             </div>
             <div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">{userProfile.name}</h2>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
               <p className="text-gray-600 mb-3">
                 {developerProfile.experience_years > 0 
                   ? `${developerProfile.experience_years} years experience` 
@@ -576,15 +627,21 @@ export const DeveloperDashboard = () => {
               </p>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 {developerProfile.github_handle && (
-                  <div className="flex items-center">
+                  <a
+                    href={`https://github.com/${developerProfile.github_handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center hover:text-blue-600 transition-colors"
+                  >
                     <Github className="w-4 h-4 mr-1" />
                     @{developerProfile.github_handle}
-                  </div>
+                    <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
                 )}
-                {developerProfile.location && (
+                {(developerProfile.location || githubUser?.location) && (
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1" />
-                    {developerProfile.location}
+                    {developerProfile.location || githubUser?.location}
                   </div>
                 )}
                 <div className="flex items-center">
@@ -605,7 +662,7 @@ export const DeveloperDashboard = () => {
 
         <div className="grid md:grid-cols-4 gap-6">
           <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{assignments.length}</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalAssignments}</div>
             <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
@@ -613,12 +670,12 @@ export const DeveloperDashboard = () => {
             <div className="text-sm font-semibold text-gray-600">Years Experience</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.top_languages.length}</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.top_languages.length || getTopLanguages().length}</div>
             <div className="text-sm font-semibold text-gray-600">Languages</div>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
-            <div className="text-2xl font-black text-gray-900 mb-1">{developerProfile.hourly_rate ? `$${developerProfile.hourly_rate}` : 'N/A'}</div>
-            <div className="text-sm font-semibold text-gray-600">Hourly Rate</div>
+            <div className="text-2xl font-black text-gray-900 mb-1">{totalStars}</div>
+            <div className="text-sm font-semibold text-gray-600">GitHub Stars</div>
           </div>
         </div>
       </div>
@@ -636,7 +693,7 @@ export const DeveloperDashboard = () => {
           />
         ) : (
           <p className="text-gray-600 leading-relaxed">
-            {developerProfile.bio || 'No bio provided yet.'}
+            {developerProfile.bio || githubUser?.bio || 'No bio provided yet.'}
           </p>
         )}
       </div>
@@ -645,6 +702,19 @@ export const DeveloperDashboard = () => {
       {isEditingProfile && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Edit Profile Details</h3>
+          
+          {githubError && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-yellow-400 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">GitHub sync unavailable</p>
+                  <p className="text-sm text-yellow-700">{githubError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">GitHub Handle</label>
@@ -665,6 +735,15 @@ export const DeveloperDashboard = () => {
                 value={editFormData.location}
                 onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
               />
+              {githubUser?.location && editFormData.location !== githubUser.location && (
+                <button
+                  type="button"
+                  onClick={() => setEditFormData(prev => ({ ...prev, location: githubUser.location || '' }))}
+                  className="text-xs text-blue-600 hover:text-blue-700 mt-1"
+                >
+                  Use GitHub location: {githubUser.location}
+                </button>
+              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Years of Experience</label>
@@ -691,7 +770,18 @@ export const DeveloperDashboard = () => {
 
           {/* Languages */}
           <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-4">Programming Languages</label>
+            <div className="flex items-center justify-between mb-4">
+              <label className="block text-sm font-bold text-gray-700">Programming Languages</label>
+              {getTopLanguages().length > 0 && (
+                <button
+                  type="button"
+                  onClick={syncGitHubLanguages}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                >
+                  Sync from GitHub
+                </button>
+              )}
+            </div>
             <div className="flex space-x-2 mb-4">
               <input
                 type="text"
@@ -730,7 +820,18 @@ export const DeveloperDashboard = () => {
 
           {/* Projects */}
           <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-4">Linked Projects</label>
+            <div className="flex items-center justify-between mb-4">
+              <label className="block text-sm font-bold text-gray-700">Linked Projects</label>
+              {repos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={syncGitHubProjects}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                >
+                  Sync from GitHub
+                </button>
+              )}
+            </div>
             <div className="flex space-x-2 mb-4">
               <input
                 type="url"
@@ -754,11 +855,11 @@ export const DeveloperDashboard = () => {
                   key={project}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
                 >
-                  <span className="text-sm font-medium text-gray-900 truncate">{project}</span>
+                  <span className="text-sm font-medium text-gray-900 truncate break-all">{project}</span>
                   <button
                     type="button"
                     onClick={() => removeProject(project)}
-                    className="text-gray-400 hover:text-red-600 transition-colors"
+                    className="text-gray-400 hover:text-red-600 transition-colors ml-2"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -803,12 +904,12 @@ export const DeveloperDashboard = () => {
           <div>
             <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
             <div className="flex flex-wrap gap-2">
-              {developerProfile.top_languages.map((skill, index) => (
+              {(developerProfile.top_languages.length > 0 ? developerProfile.top_languages : getTopLanguages(10)).map((skill, index) => (
                 <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
                   {skill}
                 </span>
               ))}
-              {developerProfile.top_languages.length === 0 && (
+              {developerProfile.top_languages.length === 0 && getTopLanguages().length === 0 && (
                 <p className="text-gray-500">No languages specified</p>
               )}
             </div>
@@ -821,25 +922,44 @@ export const DeveloperDashboard = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Projects</h3>
           <div className="grid md:grid-cols-2 gap-6">
-            {developerProfile.linked_projects.map((project, index) => (
-              <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
-                    <p className="text-gray-600 text-sm mb-3 break-all">{project}</p>
+            {(developerProfile.linked_projects.length > 0 ? developerProfile.linked_projects : repos.slice(0, 4).map(r => r.html_url)).map((project, index) => {
+              const repo = repos.find(r => r.html_url === project);
+              return (
+                <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-900 mb-2">
+                        {repo ? repo.name : `Project ${index + 1}`}
+                      </h4>
+                      {repo?.description && (
+                        <p className="text-gray-600 text-sm mb-3">{repo.description}</p>
+                      )}
+                      <p className="text-gray-600 text-sm mb-3 break-all">{project}</p>
+                      {repo && (
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          {repo.language && (
+                            <span className="px-2 py-1 bg-gray-100 rounded">{repo.language}</span>
+                          )}
+                          <div className="flex items-center">
+                            <Star className="w-3 h-3 mr-1" />
+                            {repo.stargazers_count}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <a
+                      href={project}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </div>
-                  <a
-                    href={project}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
                 </div>
-              </div>
-            ))}
-            {developerProfile.linked_projects.length === 0 && (
+              );
+            })}
+            {developerProfile.linked_projects.length === 0 && repos.length === 0 && (
               <div className="col-span-2 text-center py-8">
                 <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No projects linked yet</p>
@@ -935,5 +1055,13 @@ export const DeveloperDashboard = () => {
         {activeTab === 'messages' && renderMessages()}
       </div>
     </div>
+  );
+};
+
+export const DeveloperDashboard = () => {
+  return (
+    <GitHubProvider>
+      <DeveloperDashboardContent />
+    </GitHubProvider>
   );
 };
