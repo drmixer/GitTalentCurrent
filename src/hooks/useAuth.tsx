@@ -134,35 +134,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleGitHubSignIn = async (user: SupabaseUser) => {
     try {
-      // For GitHub users, we need to create the profile if it doesn't exist
-      if (user.app_metadata?.provider === 'github') {
-        console.log('🔄 Handling GitHub sign-in for user:', user.id);
-        
-        // Get the name from localStorage if it was set during signup
-        const pendingName = localStorage.getItem('pendingGitHubName');
-        localStorage.removeItem('pendingGitHubName'); // Clean up
+      console.log('🔄 Handling GitHub sign-in for user:', user.id);
+      console.log('🔄 GitHub user metadata:', user.user_metadata);
+      
+      // Get the name from localStorage if it was set during signup
+      const pendingName = localStorage.getItem('pendingGitHubName');
+      localStorage.removeItem('pendingGitHubName'); // Clean up
 
-        // Extract GitHub username from user metadata
-        const githubUsername = user.user_metadata?.user_name || user.user_metadata?.preferred_username;
-        const fullName = pendingName || user.user_metadata?.full_name || user.user_metadata?.name || 'GitHub User';
+      // Extract GitHub username from user metadata
+      const githubUsername = user.user_metadata?.user_name || user.user_metadata?.preferred_username;
+      const fullName = pendingName || user.user_metadata?.full_name || user.user_metadata?.name || 'GitHub User';
 
-        // Try to create user profile using the database function
-        const { data, error } = await supabase.rpc('create_user_profile', {
-          user_id: user.id,
-          user_email: user.email!,
-          user_name: fullName,
-          user_role: 'developer',
-          company_name: ''
-        });
+      // Determine the role - GitHub users are typically developers
+      const userRole = user.user_metadata?.role || 'developer';
+      console.log('🔄 Determined role for GitHub user:', userRole);
 
-        if (error) {
-          console.warn('⚠️ Database function failed, this might be expected if profile already exists:', error);
-        }
+      // Try to create user profile using the database function
+      const { data, error } = await supabase.rpc('create_user_profile', {
+        user_id: user.id,
+        user_email: user.email!,
+        user_name: fullName,
+        user_role: userRole,
+        company_name: ''
+      });
 
-        // If this is a GitHub user, also try to create/update developer profile with GitHub data
-        if (githubUsername) {
-          await createOrUpdateGitHubDeveloperProfile(user.id, githubUsername, user.user_metadata);
-        }
+      if (error) {
+        console.warn('⚠️ Database function failed, this might be expected if profile already exists:', error);
+      }
+
+      // If this is a GitHub user, also try to create/update developer profile with GitHub data
+      if (githubUsername && userRole === 'developer') {
+        await createOrUpdateGitHubDeveloperProfile(user.id, githubUsername, user.user_metadata);
       }
     } catch (error) {
       console.error('❌ Error in handleGitHubSignIn:', error);
@@ -218,6 +220,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Fetching user profile for:', authUser.id);
+      console.log('🔄 Auth user metadata:', authUser.user_metadata);
+      console.log('🔄 Auth user app_metadata:', authUser.app_metadata);
       
       // Add a small delay to ensure database operations are complete
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -232,6 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If we get a 500 error or the user doesn't exist, try to create the profile
       if (userError || !userProfileData) {
         console.log('⚠️ User profile not found, attempting to create:', userError?.message);
+        console.log('🔄 Auth user metadata for profile creation:', authUser.user_metadata);
         
         // Try to create the user profile
         const success = await createUserProfileFromAuth(authUser);
@@ -344,9 +349,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 Creating user profile from auth user:', authUser.id);
+      console.log('🔄 Auth user metadata:', authUser.user_metadata);
+      console.log('🔄 Auth user app_metadata:', authUser.app_metadata);
       
-      // Determine user role and name
-      const userRole = authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer';
+      // Determine user role from metadata or default to developer
+      const userRole = authUser.user_metadata?.role || 
+                      (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
+      console.log('🔄 Determined user role:', userRole);
+      
       const userName = authUser.user_metadata?.full_name || 
                       authUser.user_metadata?.name || 
                       authUser.email?.split('@')[0] || 
@@ -357,7 +367,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: authUser.id,
         user_email: authUser.email!,
         user_name: userName,
-        user_role: userRole,
+        user_role: userRole === 'recruiter' ? 'recruiter' : 'developer', // Ensure recruiter role is preserved
         company_name: ''
       });
 
@@ -371,8 +381,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: authUser.id,
             email: authUser.email!,
             name: userName,
-            role: userRole,
-            is_approved: true, // Auto-approve for now
+            role: userRole === 'recruiter' ? 'recruiter' : 'developer',
+            is_approved: userRole === 'recruiter' ? false : true, // Only auto-approve developers
           });
 
         if (insertError) {
@@ -381,7 +391,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // Create developer profile if needed
-        if (userRole === 'developer') {
+        if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
           const { error: devError } = await supabase
             .from('developers')
             .insert({
@@ -399,6 +409,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (devError) {
             console.error('❌ Error creating developer profile:', devError);
             // Don't fail the whole process if developer profile creation fails
+          } else {
+            console.log('✅ Developer profile created successfully');
+          }
+        } else if (userRole === 'recruiter') {
+          // Create recruiter profile
+          const companyName = authUser.user_metadata?.company_name || 'Company';
+          const { error: recError } = await supabase
+            .from('recruiters')
+            .insert({
+              user_id: authUser.id,
+              company_name: companyName,
+              website: '',
+              company_size: '',
+              industry: ''
+            });
+            
+          if (recError) {
+            console.error('❌ Error creating recruiter profile:', recError);
+            // Don't fail the whole process if recruiter profile creation fails
+          } else {
+            console.log('✅ Recruiter profile created successfully');
           }
         }
       }
@@ -621,6 +652,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
       console.log('🔄 Signing up user...');
+      console.log('🔄 User data for signup:', userData);
       
       // First, sign up the user
       const { data, error } = await supabase.auth.signUp({
@@ -638,8 +670,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       // The trigger should handle profile creation, but we'll verify it worked
-      if (data.user) {
-        console.log('✅ User signed up successfully:', data.user.id);
+      if (data?.user) {
+        console.log('✅ User signed up successfully:', data.user.id, 'with role:', userData.role);
       }
     } catch (error) {
       console.error('❌ Signup error:', error);
