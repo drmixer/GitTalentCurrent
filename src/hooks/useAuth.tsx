@@ -41,39 +41,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (mounted) {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchUserProfile(session.user);
+          } else {
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       console.log('Auth state changed:', event, session?.user?.id);
-      setUser(session?.user ?? null);
       
-      if (session?.user) {
-        if (event === 'SIGNED_IN') {
-          console.log('User signed in, handling profile setup...');
-          // Handle GitHub sign-in with additional profile setup
-          await handleGitHubSignIn(session.user);
+      try {
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          if (event === 'SIGNED_IN') {
+            console.log('User signed in, handling profile setup...');
+            await handleGitHubSignIn(session.user);
+          }
+          await fetchUserProfile(session.user);
+        } else {
+          // Clear all state when user signs out
+          setUserProfile(null);
+          setDeveloperProfile(null);
+          setNeedsOnboarding(false);
+          setLoading(false);
         }
-        await fetchUserProfile(session.user);
-      } else {
-        setUserProfile(null);
-        setDeveloperProfile(null);
-        setNeedsOnboarding(false);
-        setLoading(false);
+      } catch (error) {
+        console.error('Error in auth state change:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleGitHubSignIn = async (user: SupabaseUser) => {
@@ -563,12 +599,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setUserProfile(null);
-    setDeveloperProfile(null);
-    setNeedsOnboarding(false);
+    try {
+      // Clear state immediately for better UX
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+        // Don't throw error here as we've already cleared the state
+      }
+    } catch (error) {
+      console.error('Error in signOut:', error);
+      // Even if there's an error, we've cleared the local state
+    }
   };
 
   const value = {

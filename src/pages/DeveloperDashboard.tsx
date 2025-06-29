@@ -6,6 +6,8 @@ import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
 import { GitHubProvider, useGitHub } from '../hooks/useGitHub';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
+import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
+import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
 import { Code, Github, Star, GitFork, MessageSquare, Briefcase, TrendingUp, Calendar, MapPin, DollarSign, Clock, CheckCircle, Eye, Edit, Plus, Award, Building, Mail, ExternalLink, Activity, Users, Target, Loader, Save, X, AlertCircle, RefreshCw, FolderSync as Sync } from 'lucide-react';
 import { Assignment, JobRole, Developer, User } from '../types';
 
@@ -50,7 +52,7 @@ const DeveloperDashboardContent = () => {
     github_handle: '',
     location: '',
     experience_years: 0,
-    hourly_rate: 0,
+    desired_salary: 0,
     top_languages: [] as string[],
     linked_projects: [] as string[]
   });
@@ -77,7 +79,7 @@ const DeveloperDashboardContent = () => {
         github_handle: developerProfile.github_handle || '',
         location: developerProfile.location || '',
         experience_years: developerProfile.experience_years || 0,
-        hourly_rate: developerProfile.hourly_rate || 0,
+        desired_salary: developerProfile.desired_salary || 0,
         top_languages: [...(developerProfile.top_languages || [])],
         linked_projects: [...(developerProfile.linked_projects || [])]
       });
@@ -253,23 +255,52 @@ const DeveloperDashboardContent = () => {
     }));
   };
 
-  if (authLoading || loading) {
+  // Generate profile strength suggestions
+  const getProfileSuggestions = () => {
+    const suggestions = [];
+    if (!developerProfile?.github_handle) suggestions.push('Connect your GitHub account');
+    if (!developerProfile?.bio) suggestions.push('Add a bio to tell your story');
+    if (!developerProfile?.top_languages?.length) suggestions.push('Add your programming languages');
+    if (!developerProfile?.linked_projects?.length) suggestions.push('Showcase your projects');
+    if (!developerProfile?.location) suggestions.push('Add your location');
+    if (!developerProfile?.desired_salary) suggestions.push('Set your salary expectations');
+    return suggestions;
+  };
+
+  // Show loading state while auth is loading
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
+  // Redirect if not authenticated or not a developer
   if (!userProfile || userProfile.role !== 'developer') {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Redirect to onboarding if no developer profile
   if (!developerProfile) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Show loading state while dashboard data is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+            <span className="text-gray-600">Loading dashboard data...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Get display name in format: FirstName (GitHubUsername)
@@ -312,6 +343,7 @@ const DeveloperDashboardContent = () => {
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'assignments', label: 'Job Assignments', icon: Briefcase },
     { id: 'profile', label: 'My Profile', icon: Code },
+    { id: 'portfolio', label: 'Portfolio', icon: Award },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
   ];
 
@@ -378,55 +410,18 @@ const DeveloperDashboardContent = () => {
         ))}
       </div>
 
+      {/* Profile Strength */}
+      <ProfileStrengthIndicator
+        strength={developerProfile.profile_strength || 0}
+        suggestions={getProfileSuggestions()}
+      />
+
       {/* GitHub Activity Chart */}
       {developerProfile.github_handle && (
         <RealGitHubChart 
           githubHandle={developerProfile.github_handle}
-          className="col-span-full"
+          className="w-full"
         />
-      )}
-
-      {/* Profile Completion */}
-      {(!developerProfile.github_handle || !developerProfile.bio || developerProfile.top_languages.length === 0) && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
-          <div className="flex items-start">
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
-              <CheckCircle className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-black text-gray-900 mb-2">Complete Your Profile</h3>
-              <p className="text-gray-600 mb-4">
-                Add more details to your profile to increase your chances of getting matched with great opportunities.
-              </p>
-              <div className="space-y-2 mb-4">
-                {!developerProfile.github_handle && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                    Add your GitHub handle to sync real data
-                  </div>
-                )}
-                {!developerProfile.bio && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                    Write a bio
-                  </div>
-                )}
-                {developerProfile.top_languages.length === 0 && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-                    Add your programming languages
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => setActiveTab('profile')}
-                className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors font-semibold"
-              >
-                Complete Profile
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Recent Activity */}
@@ -493,10 +488,10 @@ const DeveloperDashboardContent = () => {
                     {developerProfile.location || githubUser?.location}
                   </div>
                 )}
-                {developerProfile.hourly_rate > 0 && (
+                {developerProfile.desired_salary > 0 && (
                   <div className="flex items-center">
                     <DollarSign className="w-4 h-4 mr-2" />
-                    ${developerProfile.hourly_rate}/hour
+                    ${developerProfile.desired_salary.toLocaleString()}/year
                   </div>
                 )}
               </div>
@@ -778,14 +773,14 @@ const DeveloperDashboardContent = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Hourly Rate (USD)</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Desired Annual Salary (USD)</label>
               <input
                 type="number"
                 min="0"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="75"
-                value={editFormData.hourly_rate}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, hourly_rate: parseInt(e.target.value) || 0 }))}
+                placeholder="120000"
+                value={editFormData.desired_salary}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, desired_salary: parseInt(e.target.value) || 0 }))}
               />
             </div>
           </div>
@@ -985,6 +980,13 @@ const DeveloperDashboardContent = () => {
     </div>
   );
 
+  const renderPortfolio = () => (
+    <PortfolioManager 
+      developerId={userProfile.id} 
+      isEditable={true}
+    />
+  );
+
   const renderMessages = () => {
     if (selectedThread) {
       return (
@@ -1066,6 +1068,7 @@ const DeveloperDashboardContent = () => {
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'assignments' && renderAssignments()}
         {activeTab === 'profile' && renderProfile()}
+        {activeTab === 'portfolio' && renderPortfolio()}
         {activeTab === 'messages' && renderMessages()}
       </div>
     </div>
