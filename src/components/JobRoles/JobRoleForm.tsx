@@ -19,7 +19,6 @@ interface JobRoleFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   onClose?: () => void;
-  onCancel?: () => void;
 }
 
 export const JobRoleForm: React.FC<JobRoleFormProps> = ({
@@ -27,7 +26,6 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
   onSuccess,
   onCancel,
   onClose
-  onCancel
 }) => {
   const { createJobRole, updateJobRole } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -439,6 +437,13 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
                 <Loader className="animate-spin rounded-full h-5 w-5 mr-3" />
                 {jobRole ? 'Updating...' : 'Creating...'}
               </div>
+            ) : (
+              <div className="flex items-center">
+                <Save className="h-5 w-5 mr-2" />
+                {jobRole ? 'Update Job' : 'Create Job'}
+              </div>
+            )}
+          </button>
           {(onCancel || onClose) && (
             <button
               type="button"
