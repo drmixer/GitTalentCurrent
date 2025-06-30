@@ -6,6 +6,8 @@ import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperM
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
 import { 
   Users, 
   Briefcase, 
@@ -55,7 +57,13 @@ export const AdminDashboard = () => {
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
+  
+  // Selected item states
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
+  const [selectedRecruiterId, setSelectedRecruiterId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
 
   // Data states
@@ -586,22 +594,43 @@ export const AdminDashboard = () => {
                           <button 
                             onClick={() => approveRecruiter(recruiter.user_id)}
                             className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                            title="Approve Recruiter"
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => rejectRecruiter(recruiter.user_id)}
                             className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                            title="Reject Recruiter"
                           >
                             <XCircle className="w-4 h-4" />
                           </button>
                         </>
                       )}
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => {
+                          setSelectedRecruiterId(recruiter.user_id);
+                          setShowRecruiterProfile(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                        title="View Profile"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
-                        <MoreVertical className="w-4 h-4" />
+                      <button 
+                        onClick={() => {
+                          setSelectedThread({
+                            otherUserId: recruiter.user_id,
+                            otherUserName: recruiter.user.name,
+                            otherUserRole: 'recruiter',
+                            unreadCount: 0
+                          });
+                          setActiveTab('messages');
+                        }}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                        title="Message"
+                      >
+                        <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -661,7 +690,8 @@ export const AdminDashboard = () => {
                 .filter(dev => 
                   !searchTerm || 
                   dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase())
+                  (dev.github_handle && dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                  (dev.top_languages && dev.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase())))
                 )
                 .map((developer) => (
                 <tr key={developer.user_id} className="hover:bg-gray-50 transition-colors">
@@ -681,11 +711,16 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {developer.top_languages.slice(0, 3).map((lang, index) => (
+                      {developer.top_languages && developer.top_languages.slice(0, 3).map((lang, index) => (
                         <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-lg">
                           {lang}
                         </span>
                       ))}
+                      {developer.top_languages && developer.top_languages.length > 3 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg">
+                          +{developer.top_languages.length - 3} more
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -708,15 +743,38 @@ export const AdminDashboard = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => {
+                          setSelectedDeveloperId(developer.user_id);
+                          setShowDeveloperProfile(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                        title="View Profile"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => {
+                          setSelectedThread({
+                            otherUserId: developer.user_id,
+                            otherUserName: developer.user.name,
+                            otherUserRole: 'developer',
+                            unreadCount: 0
+                          });
+                          setActiveTab('messages');
+                        }}
+                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                        title="Message"
+                      >
                         <MessageSquare className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => setShowAssignModal(true)}
+                        onClick={() => {
+                          setSelectedDeveloperId(developer.user_id);
+                          setShowAssignModal(true);
+                        }}
                         className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                        title="Assign to Job"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -816,7 +874,10 @@ export const AdminDashboard = () => {
                   View Details
                 </button>
                 <button 
-                  onClick={() => setShowAssignModal(true)}
+                  onClick={() => {
+                    setSelectedJob(job);
+                    setShowAssignModal(true);
+                  }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                 >
                   Assign Developer
@@ -894,23 +955,31 @@ export const AdminDashboard = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       <button 
-                        onClick={() => setActiveTab('jobs')}
+                        onClick={() => {
+                          setSelectedJob(assignment.job_role);
+                          setShowJobDetails(true);
+                        }}
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                        title="View Job"
                       >
                         <Briefcase className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => setSelectedThread({
-                          otherUserId: assignment.developer_id,
-                          otherUserName: assignment.developer?.name || 'Unknown',
-                          otherUserRole: 'developer',
-                          unreadCount: 0,
-                          jobContext: {
-                            id: assignment.job_role_id,
-                            title: assignment.job_role?.title || 'Unknown'
-                          }
-                        })}
+                        onClick={() => {
+                          setSelectedThread({
+                            otherUserId: assignment.developer_id,
+                            otherUserName: assignment.developer?.name || 'Unknown',
+                            otherUserRole: 'developer',
+                            unreadCount: 0,
+                            jobContext: {
+                              id: assignment.job_role_id,
+                              title: assignment.job_role?.title || 'Unknown'
+                            }
+                          });
+                          setActiveTab('messages');
+                        }}
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                        title="Message Developer"
                       >
                         <MessageSquare className="w-4 h-4" />
                       </button>
@@ -1075,13 +1144,22 @@ export const AdminDashboard = () => {
       {/* Modals */}
       <AssignDeveloperModal
         isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
+        onClose={() => {
+          setShowAssignModal(false);
+          setSelectedDeveloperId(null);
+          setSelectedJob(null);
+        }}
+        preSelectedJobId={selectedJob?.id}
+        preSelectedDeveloperId={selectedDeveloperId || undefined}
         onSuccess={() => {
           setShowAssignModal(false);
+          setSelectedDeveloperId(null);
+          setSelectedJob(null);
           fetchDashboardData();
         }}
       />
 
+      {/* Job Details Modal */}
       {showJobDetails && selectedJob && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1100,9 +1178,72 @@ export const AdminDashboard = () => {
             <div className="p-6">
               <JobRoleDetails
                 jobRoleId={selectedJob.id}
+                jobRole={selectedJob}
                 onAssignDeveloper={() => {
                   setShowJobDetails(false);
                   setShowAssignModal(true);
+                }}
+                onClose={() => {
+                  setShowJobDetails(false);
+                  setSelectedJob(null);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Developer Profile Modal */}
+      {showDeveloperProfile && selectedDeveloperId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <button
+                onClick={() => {
+                  setShowDeveloperProfile(false);
+                  setSelectedDeveloperId(null);
+                }}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Developers
+              </button>
+            </div>
+            <div className="p-6">
+              <DeveloperProfileDetails
+                developerId={selectedDeveloperId}
+                onClose={() => {
+                  setShowDeveloperProfile(false);
+                  setSelectedDeveloperId(null);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recruiter Profile Modal */}
+      {showRecruiterProfile && selectedRecruiterId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <button
+                onClick={() => {
+                  setShowRecruiterProfile(false);
+                  setSelectedRecruiterId(null);
+                }}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Recruiters
+              </button>
+            </div>
+            <div className="p-6">
+              <RecruiterProfileDetails
+                recruiterId={selectedRecruiterId}
+                onClose={() => {
+                  setShowRecruiterProfile(false);
+                  setSelectedRecruiterId(null);
                 }}
               />
             </div>
