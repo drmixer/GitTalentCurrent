@@ -26,6 +26,13 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   });
 
   useEffect(() => {
+    if (githubHandle) {
+      console.log('RealGitHubChart - Fetching data for handle:', githubHandle);
+      refreshGitHubData(githubHandle);
+    }
+  }, [githubHandle, refreshGitHubData]);
+
+  useEffect(() => {
     if (githubHandle && repos.length > 0) {
       console.log('RealGitHubChart - Generating contributions from repos');
       generateContributionsFromRepos();

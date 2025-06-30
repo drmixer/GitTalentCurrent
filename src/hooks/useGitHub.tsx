@@ -44,7 +44,7 @@ interface GitHubData {
 }
 
 interface GitHubContextType extends GitHubData {
-  refreshGitHubData: () => Promise<void>;
+  refreshGitHubData: (handle?: string) => Promise<void>;
   getTopLanguages: (limit?: number) => string[];
   getTopRepos: (limit?: number) => GitHubRepo[];
   syncLanguagesToProfile: () => Promise<void>;
@@ -71,6 +71,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     loading: false,
     error: ''
   });
+  const [currentHandle, setCurrentHandle] = useState<string | null>(null);
 
   useEffect(() => {
     if (developerProfile?.github_handle) {
@@ -80,7 +81,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         handle: developerProfile.github_handle,
         languages: developerProfile.top_languages?.length || 0
       });
-      refreshGitHubData();
+      refreshGitHubData(developerProfile.github_handle);
     } else {
       console.log('useGitHub - No GitHub handle found in developer profile');
       // Clear data if no GitHub handle
@@ -95,31 +96,36 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [developerProfile?.github_handle]);
 
-  const refreshGitHubData = async () => {
-    if (!developerProfile?.github_handle) {
-      console.log('refreshGitHubData - No GitHub handle provided');
-      setGitHubData(prev => ({ ...prev, error: 'No GitHub handle provided' }));
+  const refreshGitHubDataInternal = async (handle: string) => {
+    if (!handle) {
+      console.log('refreshGitHubDataInternal - No GitHub handle provided');
+      setGitHubData(prev => ({ 
+        ...prev, 
+        loading: false,
+        error: 'No GitHub handle provided' 
+      }));
       return;
     }
 
     try {
-      console.log('refreshGitHubData - Fetching data for:', developerProfile.github_handle);
-      console.log('refreshGitHubData - Starting GitHub API calls');
+      console.log('refreshGitHubDataInternal - Fetching data for:', handle);
+      console.log('refreshGitHubDataInternal - Starting GitHub API calls');
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
+      setCurrentHandle(handle);
 
       // Fetch GitHub user data
-      const userResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}`, {
+      const userResponse = await fetch(`https://api.github.com/users/${handle}`, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'GitTalent-App'
         }
       });
-      console.log('refreshGitHubData - User API response status:', userResponse.status);
+      console.log('refreshGitHubDataInternal - User API response status:', userResponse.status);
       
       if (!userResponse.ok) {
         if (userResponse.status === 404) {
-          console.error(`GitHub user '${developerProfile.github_handle}' not found`);
-          throw new Error(`GitHub user '${developerProfile.github_handle}' not found`);
+          console.error(`GitHub user '${handle}' not found`);
+          throw new Error(`GitHub user '${handle}' not found`);
         } else if (userResponse.status === 403) {
           console.error('GitHub API rate limit exceeded');
           throw new Error('GitHub API rate limit exceeded. Please try again later.');
@@ -130,16 +136,16 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const userData: GitHubUser = await userResponse.json();
-      console.log('refreshGitHubData - User data fetched:', userData.login);
+      console.log('refreshGitHubDataInternal - User data fetched:', userData.login);
 
       // Fetch user's repositories (public only)
-      const reposResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}/repos?sort=updated&per_page=100&type=public`, {
+      const reposResponse = await fetch(`https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'GitTalent-App'
         }
       });
-      console.log('refreshGitHubData - Repos API response status:', reposResponse.status);
+      console.log('refreshGitHubDataInternal - Repos API response status:', reposResponse.status);
       
       if (!reposResponse.ok) {
         console.error(`Failed to fetch repositories: ${reposResponse.status}`);
@@ -147,7 +153,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const reposData: GitHubRepo[] = await reposResponse.json();
-      console.log('refreshGitHubData - Repos fetched:', reposData.length);
+      console.log('refreshGitHubDataInternal - Repos fetched:', reposData.length);
 
       // Filter out forks unless they have significant stars
       const filteredRepos = reposData.filter(repo => 
@@ -156,7 +162,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       // Calculate total stars
       const totalStars = filteredRepos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
-      console.log('refreshGitHubData - Total stars:', totalStars);
+      console.log('refreshGitHubDataInternal - Total stars:', totalStars);
 
       // Aggregate languages from repositories
       const languageStats: GitHubLanguages = {};
@@ -164,7 +170,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       // For each repo with a language, fetch detailed language stats
       for (const repo of filteredRepos.slice(0, 20)) { // Limit to avoid rate limiting
         if (repo.language) {
-          console.log('refreshGitHubData - Processing repo language:', repo.language);
+          console.log('refreshGitHubDataInternal - Processing repo language:', repo.language);
           try {
             const langResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/languages`, {
               headers: {
@@ -172,7 +178,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
                 'User-Agent': 'GitTalent-App'
               }
             });
-            console.log('refreshGitHubData - Language API response status:', langResponse.status);
+            console.log('refreshGitHubDataInternal - Language API response status:', langResponse.status);
             
             if (langResponse.ok) {
               const langData = await langResponse.json();
@@ -180,7 +186,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
                 languageStats[lang] = (languageStats[lang] || 0) + (bytes as number);
               });
             } else {
-              console.log('refreshGitHubData - Falling back to primary language count');
+              console.log('refreshGitHubDataInternal - Falling back to primary language count');
               // Fallback to just counting repos by primary language
               languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
             }
@@ -192,7 +198,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      console.log('refreshGitHubData - Languages processed:', Object.keys(languageStats).length);
+      console.log('refreshGitHubDataInternal - Languages processed:', Object.keys(languageStats).length);
       setGitHubData({
         user: userData,
         repos: filteredRepos,
@@ -203,17 +209,30 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
 
       // Automatically sync data to profile
-      await syncLanguagesToProfile();
-      await syncProjectsToProfile();
+      if (handle === developerProfile?.github_handle) {
+        await syncLanguagesToProfile();
+        await syncProjectsToProfile();
+      }
 
     } catch (error: any) {
-      console.error('Error in refreshGitHubData:', error.message || error);
+      console.error('Error in refreshGitHubDataInternal:', error.message || error);
       setGitHubData(prev => ({
         ...prev,
         loading: false,
         error: error.message || 'Failed to fetch GitHub data'
       }));
     }
+  };
+
+  const refreshGitHubData = async (handle?: string) => {
+    const handleToUse = handle || developerProfile?.github_handle;
+    if (!handleToUse) {
+      console.log('refreshGitHubData - No GitHub handle provided');
+      setGitHubData(prev => ({ ...prev, error: 'No GitHub handle provided' }));
+      return;
+    }
+    
+    await refreshGitHubDataInternal(handleToUse);
   };
 
   const getTopLanguages = (limit: number = 10): string[] => {
@@ -233,7 +252,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const syncLanguagesToProfile = async () => {
-    if (!developerProfile || githubData.loading) {
+    if (!developerProfile || githubData.loading || currentHandle !== developerProfile.github_handle) {
       console.log('syncLanguagesToProfile - Skipping, profile missing or loading');
       return;
     }
@@ -254,7 +273,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const syncProjectsToProfile = async () => {
-    if (!developerProfile || githubData.loading) {
+    if (!developerProfile || githubData.loading || currentHandle !== developerProfile.github_handle) {
       console.log('syncProjectsToProfile - Skipping, profile missing or loading');
       return;
     }
