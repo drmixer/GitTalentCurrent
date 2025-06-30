@@ -29,6 +29,62 @@ interface JobRoleDetailsProps {
   jobRoleId: string;
   jobRole?: JobRole;
   onEdit?: () => void;
+  onSendMessage?: (developerId: string, developerName: string, jobRoleId: string, jobRoleTitle: string) => void;
+  onViewDeveloper?: (developerId: string) => void;
+  onClose?: () => void;
+  onAssignDeveloper?: () => void;
+  isDeveloperView?: boolean;
+}
+
+export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
+  jobRoleId,
+  jobRole: initialJobRole,
+  onEdit,
+  onSendMessage,
+  onViewDeveloper,
+  onClose,
+  onAssignDeveloper,
+  isDeveloperView = false
+}) => {
+  const { user, userProfile } = useAuth();
+  const [jobRole, setJobRole] = useState<JobRole | null>(initialJobRole || null);
+  const [loading, setLoading] = useState(!initialJobRole);
+  const [error, setError] = useState<string | null>(null);
+  const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialJobRole) {
+      fetchJobRole();
+    }
+  }, [jobRoleId, initialJobRole]);
+
+  const fetchJobRole = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select(`
+          *,
+          recruiter:users!job_roles_recruiter_id_fkey(
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('id', jobRoleId)
+        .single();
+
+      if (error) throw error;
+      setJobRole(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch job role');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSendMessage = (developerId: string, developerName: string) => {
     if (onSendMessage && jobRole) {
       onSendMessage(developerId, developerName, jobRole.id, jobRole.title);
@@ -228,6 +284,7 @@ interface JobRoleDetailsProps {
             <p className="text-gray-600">{jobRole.experience_required}</p>
           </div>
         )}
+      </div>
     </div>
   );
 };
