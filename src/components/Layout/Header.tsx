@@ -38,10 +38,11 @@ export const Header = () => {
       console.log('Header: Initiating sign out process...');
       await signOut();
       console.log('Header: Sign out completed, redirecting...');
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error signing out:', error);
       // Force navigation to login page if there's an error with sign out
-      window.location.href = '/login';
+      navigate('/login', { replace: true });
     }
   };
 

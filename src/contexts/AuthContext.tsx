@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_email: authUser.email!,
         user_name: fullName,
         user_role: userRole,
-        company_name: ''
+        company_name: authUser.user_metadata?.company_name || ''
       });
 
       if (error) {
@@ -198,8 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDeveloperProfile(null);
       setNeedsOnboarding(false);
       
-      // Force a page reload to clear any cached state
-      window.location.href = '/login';
+      // No longer forcing page reload - let the component handle navigation
       
     } catch (error) {
       console.error('❌ Error in signOut:', error);

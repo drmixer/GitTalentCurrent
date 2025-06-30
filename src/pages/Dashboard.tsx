@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
 import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut } from 'lucide-react';
 
 export const Dashboard = () => {
   const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile, signOut } = useAuth();
+  const navigate = useNavigate();
 
   console.log('🔍 Dashboard state:', {
     user: !!user,
@@ -78,8 +79,10 @@ export const Dashboard = () => {
                 <button
                   onClick={() => {
                     console.log('Signing out from error state...');
-                    signOut().catch(() => {
-                      window.location.href = '/login';
+                    signOut().then(() => {
+                      navigate('/login', { replace: true });
+                    }).catch(() => {
+                      navigate('/login', { replace: true });
                     });
                   }}
                   className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
@@ -125,7 +128,7 @@ export const Dashboard = () => {
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={() => window.location.replace('/onboarding')}
+                  onClick={() => navigate('/onboarding', { replace: true })}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
                 >
                   Complete Profile Setup
@@ -165,7 +168,13 @@ export const Dashboard = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => window.location.replace('/login')}
+                  onClick={() => {
+                    signOut().then(() => {
+                      navigate('/login', { replace: true });
+                    }).catch(() => {
+                      navigate('/login', { replace: true });
+                    });
+                  }}
                   className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold flex-1"
                 >
                   Sign Out
