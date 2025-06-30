@@ -290,6 +290,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { error: devError } = await supabase
             .from('developers')
             .upsert({ // Use upsert to handle potential duplicates
+            }
+            )
             .insert({
               user_id: authUser.id,
               github_handle: authUser.user_metadata?.user_name || '',
@@ -314,6 +316,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { error: recError } = await supabase
             .from('recruiters')
             .upsert({ // Use upsert to handle potential duplicates
+            }
+            )
             .insert({
               user_id: authUser.id,
               company_name: companyName,
