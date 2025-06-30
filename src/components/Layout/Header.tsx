@@ -36,9 +36,9 @@ export const Header = () => {
   const handleSignOut = async () => {
     try {
       console.log('Header: Initiating sign out process');
-      await signOut();
-      // No need to navigate here as signOut will force a redirect
-      console.log('Header: Sign out initiated');
+      await signOut(); 
+      console.log('Header: Sign out completed');
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
       // Force navigation to login page if there's an error
@@ -47,7 +47,7 @@ export const Header = () => {
   };
 
   const getDashboardPath = () => {
-    if (!userProfile) return '/dashboard';
+    if (!userProfile) return '/login';
     switch (userProfile.role) {
       case 'admin':
         return '/admin';
@@ -153,7 +153,7 @@ export const Header = () => {
                 <div className="flex items-center space-x-4">
                   <Link
                     to="/login"
-                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200"
+                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200 px-4 py-2"
                   >
                     Login
                   </Link>
@@ -186,9 +186,10 @@ export const Header = () => {
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4 mr-1" />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               </nav>
@@ -240,8 +241,9 @@ export const Header = () => {
                       </Link>
                       <button
                         onClick={handleSignOut}
-                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2"
+                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2 flex items-center"
                       >
+                        <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                       </button>
                     </div>
