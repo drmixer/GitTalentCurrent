@@ -21,7 +21,8 @@ import {
   AlertCircle,
   CheckCircle,
   Download,
-  ExternalLink
+  ExternalLink,
+  Star
 } from 'lucide-react';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
@@ -120,6 +121,8 @@ export const RecruiterDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [hires, setHires] = useState<(Hire & { assignment: Assignment })[]>([]);
+  const [allDevelopers, setAllDevelopers] = useState([]);
+  const [showAllDevelopers, setShowAllDevelopers] = useState(false);
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
 
@@ -131,6 +134,7 @@ export const RecruiterDashboard: React.FC = () => {
       fetchAssignments();
       fetchHires();
       fetchUnreadMessageCount();
+      fetchAllDevelopers();
       
       // Set up real-time subscription for new messages
       const subscription = supabase
@@ -243,6 +247,25 @@ export const RecruiterDashboard: React.FC = () => {
     }
   };
 
+  const fetchAllDevelopers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('developers')
+        .select(`
+          *,
+          user:users(*)
+        `)
+        .eq('availability', true)
+        .order('profile_strength', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setAllDevelopers(data || []);
+    } catch (error) {
+      console.error('Error fetching all developers:', error);
+    }
+  };
+
   // Handler functions
   const handleJobRoleCreated = () => {
     setShowJobForm(false);
@@ -271,6 +294,14 @@ export const RecruiterDashboard: React.FC = () => {
   const handleViewJobRole = (jobRole: JobRole) => {
     setSelectedJob(jobRole);
     setShowJobDetails(true);
+  };
+
+  const handleViewJobDetails = (jobRoleId: string) => {
+    const job = jobs.find(j => j.id === jobRoleId);
+    if (job) {
+      setSelectedJob(job);
+      setShowJobDetails(true);
+    }
   };
 
   const handleEditJobRole = (jobRole: JobRole) => {
@@ -346,14 +377,6 @@ export const RecruiterDashboard: React.FC = () => {
     setActiveTab('messages');
   };
 
-  const handleViewJobDetails = (jobRoleId: string) => {
-    const job = jobs.find(j => j.id === jobRoleId);
-    if (job) {
-      setSelectedJob(job);
-      setShowJobDetails(true);
-    }
-  };
-
   const filteredJobRoles = jobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -376,7 +399,7 @@ export const RecruiterDashboard: React.FC = () => {
   const tabs: { id: string; label: string; icon: any }[] = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'jobs', label: 'My Jobs', icon: Briefcase },
-    { id: 'developers', label: 'Assigned Developers', icon: Users },
+    { id: 'developers', label: 'Developers', icon: Users },
     { id: 'assignments', label: 'Assignments', icon: UserPlus },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
   ];
@@ -591,7 +614,10 @@ export const RecruiterDashboard: React.FC = () => {
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+                setShowAllDevelopers(false);
+              }}
               className={`flex items-center gap-2 pb-4 border-b-2 font-semibold ${
                 activeTab === id
                   ? 'border-purple-600 text-purple-600'
@@ -640,6 +666,112 @@ export const RecruiterDashboard: React.FC = () => {
               />
             </div>
 
+            {/* AI-Powered Developer Recommendations */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black text-gray-900">AI-Powered Developer Recommendations</h3>
+                <button
+                  onClick={() => {
+                    setActiveTab('developers');
+                    setShowAllDevelopers(true);
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                >
+                  View All Developers
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              </div>
+              
+              {allDevelopers.length > 0 ? (
+                <div className="space-y-4">
+                  {allDevelopers.slice(0, 3).map((developer: any) => (
+                    <div key={developer.user_id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          {developer.profile_pic_url ? (
+                            <img 
+                              src={developer.profile_pic_url} 
+                              alt={developer.user.name}
+                              className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                              onError={(e) => {
+                                // Fallback to initials if image fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const fallback = document.createElement('div');
+                                  fallback.className = "w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
+                                  fallback.textContent = developer.user.name.split(' ').map((n: string) => n[0]).join('');
+                                  parent.appendChild(fallback);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                              {developer.user.name.split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center">
+                              <h4 className="font-bold text-gray-900">
+                                {developer.github_handle 
+                                  ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
+                                  : developer.user.name}
+                              </h4>
+                              <span className="ml-2 px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full">
+                                Available
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-3 text-sm text-gray-600 mt-1">
+                              <span>{developer.experience_years} years exp</span>
+                              {developer.location && <span>{developer.location}</span>}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {developer.top_languages.slice(0, 3).map((lang: string, i: number) => (
+                                <span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                                  {lang}
+                                </span>
+                              ))}
+                              {developer.top_languages.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                                  +{developer.top_languages.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => {
+                              setSelectedDeveloper(developer.user_id);
+                              setShowDeveloperProfile(true);
+                            }}
+                            className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                          >
+                            View Profile
+                          </button>
+                          <button
+                            onClick={() => handleSendMessage(developer.user_id, developer.user.name)}
+                            className="px-3 py-1 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors text-sm font-medium"
+                          >
+                            Message
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-xl">
+                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">No developer recommendations yet</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Create job postings to get matched with relevant developers
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Quick Actions */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-black text-gray-900 mb-6">Quick Actions</h3>
@@ -661,7 +793,10 @@ export const RecruiterDashboard: React.FC = () => {
                 </button>
                 
                 <button 
-                  onClick={() => setActiveTab('developers')}
+                  onClick={() => {
+                    setActiveTab('developers');
+                    setShowAllDevelopers(true);
+                  }}
                   className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 hover:from-purple-100 hover:to-pink-100 transition-all group"
                 >
                   <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
@@ -669,7 +804,7 @@ export const RecruiterDashboard: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <div className="font-bold text-gray-900">Browse Developers</div>
-                    <div className="text-sm text-gray-600">View assigned talent</div>
+                    <div className="text-sm text-gray-600">Find talent for your roles</div>
                   </div>
                 </button>
                 
@@ -843,12 +978,135 @@ export const RecruiterDashboard: React.FC = () => {
 
         {/* Developers Tab - Using DeveloperList component */}
         {activeTab === 'developers' && (
-          <DeveloperList 
-            recruiterId={userProfile?.id || ''} 
-            onSendMessage={(developerId, developerName) => {
-              handleSendMessage(developerId, developerName);
-            }}
-          />
+          <div>
+            {showAllDevelopers ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">All Available Developers</h2>
+                  <button
+                    onClick={() => setShowAllDevelopers(false)}
+                    className="px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    View Assigned Developers
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {allDevelopers.map((developer: any) => (
+                    <div key={developer.user_id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4">
+                          {developer.profile_pic_url ? (
+                            <img 
+                              src={developer.profile_pic_url} 
+                              alt={developer.user.name}
+                              className="w-16 h-16 rounded-xl object-cover shadow-lg"
+                              onError={(e) => {
+                                // Fallback to initials if image fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const fallback = document.createElement('div');
+                                  fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
+                                  fallback.textContent = developer.user.name.split(' ').map((n: string) => n[0]).join('');
+                                  parent.appendChild(fallback);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                              {developer.user.name.split(' ').map((n: string) => n[0]).join('')}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="text-xl font-bold text-gray-900">
+                                {developer.github_handle 
+                                  ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
+                                  : developer.user.name}
+                              </h3>
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                <div className="w-2 h-2 rounded-full mr-2 bg-emerald-500"></div>
+                                Available
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                              <div className="flex items-center">
+                                <Briefcase className="w-4 h-4 mr-1" />
+                                {developer.experience_years} years
+                              </div>
+                              {developer.location && (
+                                <div className="flex items-center">
+                                  <MapPin className="w-4 h-4 mr-1" />
+                                  {developer.location}
+                                </div>
+                              )}
+                              {developer.github_handle && (
+                                <div className="flex items-center">
+                                  <Github className="w-4 h-4 mr-1" />
+                                  <a 
+                                    href={`https://github.com/${developer.github_handle}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    @{developer.github_handle}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              {developer.top_languages.slice(0, 5).map((lang: string, index: number) => (
+                                <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
+                                  {lang}
+                                </span>
+                              ))}
+                              {developer.top_languages.length > 5 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg">
+                                  +{developer.top_languages.length - 5} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => {
+                              setSelectedDeveloper(developer.user_id);
+                              setShowDeveloperProfile(true);
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Profile
+                          </button>
+                          <button
+                            onClick={() => handleSendMessage(developer.user_id, developer.user.name)}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Message
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <DeveloperList 
+                recruiterId={userProfile?.id || ''} 
+                onSendMessage={(developerId, developerName) => {
+                  handleSendMessage(developerId, developerName);
+                }}
+              />
+            )}
+          </div>
         )}
 
         {/* Assignments Tab - Using AssignmentList component */}

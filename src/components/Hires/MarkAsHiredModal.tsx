@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
 import { 
   X, 
   Calendar, 
@@ -7,7 +8,9 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
-  Loader
+  Loader,
+  FileCheck,
+  Info
 } from 'lucide-react';
 import { Assignment } from '../../types';
 
@@ -28,6 +31,8 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showAgreement, setShowAgreement] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   const [formData, setFormData] = useState({
     salary: 0,
@@ -59,6 +64,27 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         throw new Error('Hire date is required');
       }
 
+      // Show the digital agreement before proceeding
+      setShowAgreement(true);
+      setLoading(false);
+      return;
+    } catch (error: any) {
+      console.error('Error validating hire form:', error);
+      setError(error.message || 'Failed to validate hire data');
+      setLoading(false);
+    }
+  };
+
+  const completeHireProcess = async () => {
+    if (!agreementAccepted) {
+      setError('You must accept the agreement to proceed');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
       const hireData = {
         assignment_id: assignment.id,
         salary: formData.salary,
@@ -67,7 +93,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         notes: formData.notes.trim() || ''
       };
 
-      const result = await createHire(hireData);
+      const result = await createHire?.(hireData);
 
       if (result) {
         // Also update the assignment status to "Hired"
@@ -89,7 +115,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
       } else {
         throw new Error('Failed to record hire');
       }
-
     } catch (error: any) {
       console.error('Error recording hire:', error);
       setError(error.message || 'Failed to record hire');
@@ -107,6 +132,8 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
     });
     setError('');
     setSuccess('');
+    setShowAgreement(false);
+    setAgreementAccepted(false);
   };
 
   if (!isOpen) return null;
@@ -154,119 +181,204 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Salary */}
-          <div>
-            <label htmlFor="salary" className="block text-sm font-bold text-gray-700 mb-2">
-              Annual Salary (USD) *
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="salary"
-                name="salary"
-                type="number"
-                min="1"
-                required
-                className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                placeholder="120000"
-                value={formData.salary}
-                onChange={handleChange}
-              />
+        {!showAgreement ? (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Salary */}
+            <div>
+              <label htmlFor="salary" className="block text-sm font-bold text-gray-700 mb-2">
+                Annual Salary (USD) *
+              </label>
+              <div className="relative">
+                <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="salary"
+                  name="salary"
+                  type="number"
+                  min="1"
+                  required
+                  className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                  placeholder="120000"
+                  value={formData.salary}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Hire Date */}
-          <div>
-            <label htmlFor="hire_date" className="block text-sm font-bold text-gray-700 mb-2">
-              Hire Date *
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="hire_date"
-                name="hire_date"
-                type="date"
-                required
-                className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                value={formData.hire_date}
-                onChange={handleChange}
-              />
+            {/* Hire Date */}
+            <div>
+              <label htmlFor="hire_date" className="block text-sm font-bold text-gray-700 mb-2">
+                Hire Date *
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="hire_date"
+                  name="hire_date"
+                  type="date"
+                  required
+                  className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                  value={formData.hire_date}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Start Date */}
-          <div>
-            <label htmlFor="start_date" className="block text-sm font-bold text-gray-700 mb-2">
-              Start Date (Optional)
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="start_date"
-                name="start_date"
-                type="date"
-                className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                value={formData.start_date}
-                onChange={handleChange}
-              />
+            {/* Start Date */}
+            <div>
+              <label htmlFor="start_date" className="block text-sm font-bold text-gray-700 mb-2">
+                Start Date (Optional)
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="start_date"
+                  name="start_date"
+                  type="date"
+                  className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                  value={formData.start_date}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Notes */}
-          <div>
-            <label htmlFor="notes" className="block text-sm font-bold text-gray-700 mb-2">
-              Notes (Optional)
-            </label>
-            <div className="relative">
-              <FileText className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
-              <textarea
-                id="notes"
-                name="notes"
-                rows={4}
-                className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium resize-none"
-                placeholder="Additional notes about the hire..."
-                value={formData.notes}
-                onChange={handleChange}
-              />
+            {/* Notes */}
+            <div>
+              <label htmlFor="notes" className="block text-sm font-bold text-gray-700 mb-2">
+                Notes (Optional)
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
+                <textarea
+                  id="notes"
+                  name="notes"
+                  rows={4}
+                  className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium resize-none"
+                  placeholder="Additional notes about the hire..."
+                  value={formData.notes}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                resetForm();
-              }}
-              className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <Loader className="animate-spin rounded-full h-5 w-5 mr-3" />
-                  Recording...
+            {/* Actions */}
+            <div className="flex items-center justify-end space-x-4 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  resetForm();
+                }}
+                className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader className="animate-spin rounded-full h-5 w-5 mr-3" />
+                    Processing...
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-3" />
+                    Continue
+                  </div>
+                )}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 text-blue-500 mr-3 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">
+                    You're about to confirm a successful hire. This will trigger a 15% fee based on the annual salary.
+                  </p>
                 </div>
-              ) : (
-                <div className="flex items-center">
-                  <CheckCircle className="w-5 h-5 mr-3" />
-                  Record Hire
+              </div>
+            </div>
+
+            {/* Digital Agreement */}
+            <div className="border border-gray-200 rounded-xl p-6 bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                <FileCheck className="w-5 h-5 mr-2 text-blue-600" />
+                Digital Hiring Agreement
+              </h3>
+              
+              <div className="space-y-4 text-sm text-gray-700">
+                <p>This agreement is made between:</p>
+                <p><strong>Recruiter:</strong> {userProfile?.name} (representing {assignment.recruiter?.name})</p>
+                <p><strong>Platform:</strong> GitTalent</p>
+                
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="font-semibold mb-2">Terms:</p>
+                  <ol className="list-decimal pl-5 space-y-2">
+                    <li>The recruiter confirms they have hired {assignment.developer?.name} for the position of {assignment.job_role?.title}.</li>
+                    <li>The annual salary for this position is ${formData.salary.toLocaleString()} USD.</li>
+                    <li>The recruiter agrees to pay a one-time fee of ${Math.round(formData.salary * 0.15).toLocaleString()} USD (15% of annual salary).</li>
+                    <li>This fee will be invoiced separately and is due within 30 days of this agreement.</li>
+                    <li>The hire date is recorded as {new Date(formData.hire_date).toLocaleDateString()}.</li>
+                  </ol>
                 </div>
-              )}
-            </button>
+                
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p>By accepting this agreement, you confirm that all information provided is accurate and you agree to the terms stated above.</p>
+                </div>
+              </div>
+              
+              <div className="mt-6">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={agreementAccepted}
+                    onChange={(e) => setAgreementAccepted(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    I accept the terms of this agreement and confirm the hire
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end space-x-4 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAgreement(false);
+                }}
+                className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+              >
+                Back
+              </button>
+              <button
+                onClick={completeHireProcess}
+                disabled={!agreementAccepted || loading}
+                className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader className="animate-spin rounded-full h-5 w-5 mr-3" />
+                    Processing...
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-3" />
+                    Confirm Hire
+                  </div>
+                )}
+              </button>
+            </div>
           </div>
-        </form>
+        )}
       </div>
     </div>
   );
 };
-
-// Add the missing import
-import { supabase } from '../../lib/supabase';

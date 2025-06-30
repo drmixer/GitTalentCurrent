@@ -10,6 +10,7 @@ import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperProfileForm } from '../components/Profile/DeveloperProfileForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { JobSearchList } from '../components/JobRoles/JobSearchList';
 import { useGitHub } from '../hooks/useGitHub';
 import { 
   User, 
@@ -30,7 +31,8 @@ import {
   GitBranch,
   FileText,
   ArrowLeft,
-  ExternalLink
+  ExternalLink,
+  Search
 } from 'lucide-react';
 import { Assignment, JobRole } from '../types';
 
@@ -68,6 +70,7 @@ export const DeveloperDashboard = () => {
   const [showEditProfileForm, setShowEditProfileForm] = useState(false);
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
+  const [showJobSearch, setShowJobSearch] = useState(false);
 
   // Stats data
   const [stats, setStats] = useState({
@@ -78,10 +81,12 @@ export const DeveloperDashboard = () => {
   });
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
 
   useEffect(() => {
     if (userProfile?.role === 'developer' && developerProfile) {
       fetchDashboardData();
+      fetchRecommendedJobs();
     }
   }, [userProfile, developerProfile]);
 
@@ -155,6 +160,54 @@ export const DeveloperDashboard = () => {
     }
   };
 
+  const fetchRecommendedJobs = async () => {
+    try {
+      if (!developerProfile?.top_languages?.length) return;
+
+      // Get jobs that match the developer's top languages
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('job_roles')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (jobsError) throw jobsError;
+
+      // Simple recommendation algorithm - match jobs with developer's languages
+      // In a real app, this would be more sophisticated, possibly using an AI service
+      const jobs = jobsData || [];
+      const scoredJobs = jobs.map(job => {
+        let score = 0;
+        // Score based on matching tech stack
+        developerProfile.top_languages.forEach(lang => {
+          if (job.tech_stack.includes(lang)) {
+            score += 10;
+          }
+        });
+        
+        // Score based on salary match
+        if (developerProfile.desired_salary > 0) {
+          if (job.salary_min <= developerProfile.desired_salary && 
+              job.salary_max >= developerProfile.desired_salary) {
+            score += 5;
+          }
+        }
+        
+        return { ...job, score };
+      });
+
+      // Sort by score and take top 3
+      const recommended = scoredJobs
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      setRecommendedJobs(recommended);
+    } catch (error: any) {
+      console.error('Error fetching recommended jobs:', error);
+    }
+  };
+
   const handleProfileUpdateSuccess = () => {
     setShowEditProfileForm(false);
     fetchDashboardData();
@@ -168,6 +221,7 @@ export const DeveloperDashboard = () => {
   const handleViewJobDetails = (jobRoleId: string) => {
     setSelectedJobForDetails(jobRoleId);
     setShowJobDetailsModal(true);
+    setShowJobSearch(false);
   };
 
   const handleCloseJobDetails = () => {
@@ -190,6 +244,12 @@ export const DeveloperDashboard = () => {
     });
     
     setActiveTab('messages');
+  };
+
+  const handleExpressInterest = (jobRoleId: string) => {
+    // In a real implementation, this would record the developer's interest
+    // For now, we'll just show the job details
+    handleViewJobDetails(jobRoleId);
   };
 
   // Generate dynamic profile strength suggestions based on profile data
@@ -282,7 +342,7 @@ export const DeveloperDashboard = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
-    { id: 'stats', label: 'Stats', icon: Star },
+    { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'github', label: 'GitHub', icon: Github },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
@@ -347,6 +407,71 @@ export const DeveloperDashboard = () => {
           <div className="text-sm font-medium text-gray-600 mb-2">Skills Showcased</div>
           <div className="text-xs text-emerald-600 font-medium">Highlight your expertise</div>
         </div>
+      </div>
+
+      {/* AI-Matched Job Recommendations */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-black text-gray-900">AI-Matched Job Recommendations</h3>
+          <button
+            onClick={() => setActiveTab('jobs')}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+          >
+            View All Jobs
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </button>
+        </div>
+        
+        {recommendedJobs.length > 0 ? (
+          <div className="space-y-4">
+            {recommendedJobs.map(job => (
+              <div key={job.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900 mb-1">{job.title}</h4>
+                    <div className="flex items-center space-x-3 text-sm text-gray-600 mb-2">
+                      <span>{job.location}</span>
+                      <span>{job.job_type}</span>
+                      <span>${job.salary_min}k - ${job.salary_max}k</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {job.tech_stack.slice(0, 4).map((tech, i) => (
+                        <span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                          {tech}
+                        </span>
+                      ))}
+                      {job.tech_stack.length > 4 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                          +{job.tech_stack.length - 4}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleViewJobDetails(job.id)}
+                    className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-gray-50 rounded-xl">
+            <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 font-medium">No job recommendations yet</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Complete your profile to get personalized job recommendations
+            </p>
+            <button
+              onClick={() => setActiveTab('jobs')}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Browse All Jobs
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Recent Activity */}
@@ -518,331 +643,198 @@ export const DeveloperDashboard = () => {
     </div>
   );
 
-  const renderStats = () => (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Your Stats</h2>
-        <button
-          onClick={() => setShowEditProfileForm(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Profile
-        </button>
-      </div>
-
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Eye className="w-8 h-8 text-white" />
-            </div>
-            <div className="text-3xl font-black text-gray-900 mb-2">{stats.profileViews}</div>
-            <div className="text-sm font-medium text-gray-600">Profile Views</div>
-            <div className="mt-4 text-xs text-emerald-600 font-medium flex items-center justify-center">
-              <ArrowUpRight className="w-3 h-3 mr-1" />
-              12% increase this week
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Briefcase className="w-8 h-8 text-white" />
-            </div>
-            <div className="text-3xl font-black text-gray-900 mb-2">{stats.assignmentCount}</div>
-            <div className="text-sm font-medium text-gray-600">Job Assignments</div>
-            <div className="mt-4 text-xs text-gray-500 font-medium">
-              {stats.assignmentCount > 0 ? `${Math.round(stats.assignmentCount * 0.3)} new this month` : 'No assignments yet'}
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <MessageSquare className="w-8 h-8 text-white" />
-            </div>
-            <div className="text-3xl font-black text-gray-900 mb-2">{stats.messageCount}</div>
-            <div className="text-sm font-medium text-gray-600">Unread Messages</div>
-            <div className="mt-4">
-              {stats.messageCount > 0 ? (
-                <button 
-                  onClick={() => setActiveTab('messages')}
-                  className="text-xs text-blue-600 font-medium hover:text-blue-800 transition-colors"
-                >
-                  View Messages
-                </button>
-              ) : (
-                <span className="text-xs text-gray-500 font-medium">No new messages</span>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Star className="w-8 h-8 text-white" />
-            </div>
-            <div className="text-3xl font-black text-gray-900 mb-2">{stats.profileStrength}%</div>
-            <div className="text-sm font-medium text-gray-600">Profile Strength</div>
-            <div className="mt-4">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${
-                    stats.profileStrength >= 80 ? 'bg-emerald-500' :
-                    stats.profileStrength >= 50 ? 'bg-blue-500' :
-                    'bg-orange-500'
-                  }`}
-                  style={{ width: `${stats.profileStrength}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* GitHub Stats */}
-      {developerProfile.github_handle && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">GitHub Stats</h3>
-          
-          <div className="grid md:grid-cols-4 gap-6 mb-6">
-            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">
-                {githubUser?.public_repos || 0}
-              </div>
-              <div className="text-sm font-semibold text-gray-600">Repositories</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">
-                {totalStars || 0}
-              </div>
-              <div className="text-sm font-semibold text-gray-600">Total Stars</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">
-                {githubUser?.followers || 0}
-              </div>
-              <div className="text-sm font-semibold text-gray-600">Followers</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">
-                {getTopLanguages().length}
-              </div>
-              <div className="text-sm font-semibold text-gray-600">Languages</div>
-            </div>
+  const renderJobs = () => {
+    if (showJobSearch) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center">
+            <button
+              onClick={() => setShowJobSearch(false)}
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mr-4"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back
+            </button>
+            <h2 className="text-2xl font-black text-gray-900">Browse All Jobs</h2>
           </div>
           
-          {/* Top Languages */}
-          <div className="mb-6">
-            <h4 className="font-bold text-gray-900 mb-3">Top Languages</h4>
-            <div className="space-y-3">
-              {getTopLanguages(5).map((language, index) => {
-                const percentage = Math.round(100 / (index + 2));
-                return (
-                  <div key={language} className="flex items-center text-sm">
-                    <div className={`w-3 h-3 rounded-full mr-3 bg-${
-                      ['blue', 'green', 'purple', 'yellow', 'red'][index % 5]
-                    }-500`}></div>
-                    <span className="text-gray-700 flex-1 font-medium">{language}</span>
-                    <span className="text-gray-900 font-bold">{percentage}%</span>
+          <JobSearchList 
+            onViewJobDetails={handleViewJobDetails}
+            onExpressInterest={handleExpressInterest}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-gray-900">Job Opportunities</h2>
+          <button
+            onClick={() => setShowJobSearch(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            Browse All Jobs
+          </button>
+        </div>
+
+        {/* AI-Matched Job Recommendations */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center mb-6">
+            <Star className="w-6 h-6 text-yellow-500 mr-3" />
+            <h3 className="text-lg font-black text-gray-900">AI-Matched Job Recommendations</h3>
+          </div>
+          
+          {recommendedJobs.length > 0 ? (
+            <div className="space-y-6">
+              {recommendedJobs.map(job => (
+                <div key={job.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">{job.title}</h4>
+                      <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          {job.location}
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {job.job_type}
+                        </div>
+                        <div className="flex items-center">
+                          <DollarSign className="w-4 h-4 mr-1" />
+                          ${job.salary_min}k - ${job.salary_max}k
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {job.tech_stack.map((tech, index) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-gray-600 line-clamp-2 mb-4">{job.description}</p>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-          
-          {/* Top Repositories */}
-          <div>
-            <h4 className="font-bold text-gray-900 mb-3">Top Repositories</h4>
-            <div className="space-y-2">
-              {getTopRepos(3).map(repo => (
-                <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <a
-                      href={repo.html_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate flex items-center"
+                  
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => handleViewJobDetails(job.id)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                     >
-                      {repo.name}
-                      <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
-                    </a>
-                    {repo.description && (
-                      <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center text-xs text-gray-500 ml-2">
-                    <Star className="w-3 h-3 mr-1" />
-                    {repo.stargazers_count}
+                      View Details
+                    </button>
+                    <button
+                      onClick={() => handleExpressInterest(job.id)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                    >
+                      Express Interest
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-xl">
+              <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No job recommendations yet</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Complete your profile to get personalized job recommendations
+              </p>
+              <button
+                onClick={() => setShowJobSearch(true)}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Browse All Jobs
+              </button>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Activity Stats */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-black text-gray-900 mb-6">Activity Overview</h3>
-        
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-900">Profile Completion</div>
-              <div className="text-sm font-bold text-gray-900">{stats.profileStrength}%</div>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div
-                className="h-2 rounded-full bg-blue-500"
-                style={{ width: `${stats.profileStrength}%` }}
-              />
-            </div>
-            <div className="text-xs text-gray-500">
-              Complete your profile to increase visibility to recruiters
-            </div>
-          </div>
+        {/* Recent Assignments */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-6">Your Job Assignments</h3>
           
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-900">Response Rate</div>
-              <div className="text-sm font-bold text-gray-900">
-                {stats.messageCount > 0 ? '85%' : 'N/A'}
-              </div>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div
-                className="h-2 rounded-full bg-emerald-500"
-                style={{ width: stats.messageCount > 0 ? '85%' : '0%' }}
-              />
-            </div>
-            <div className="text-xs text-gray-500">
-              {stats.messageCount > 0 
-                ? 'You respond quickly to recruiter messages' 
-                : 'No messages to respond to yet'}
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-semibold text-gray-900">GitHub Activity</div>
-              <div className="text-sm font-bold text-gray-900">
-                {developerProfile.github_handle ? 'Active' : 'Not Connected'}
-              </div>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div
-                className="h-2 rounded-full bg-purple-500"
-                style={{ width: developerProfile.github_handle ? '90%' : '0%' }}
-              />
-            </div>
-            <div className="text-xs text-gray-500">
-              {developerProfile.github_handle 
-                ? 'Your GitHub activity is visible to recruiters' 
-                : 'Connect GitHub to show your coding activity'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Assignment Stats */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-black text-gray-900 mb-6">Assignment Status</h3>
-        
-        <div className="grid md:grid-cols-4 gap-6">
-          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {assignments.length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">Total Assignments</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {assignments.filter(a => a.status === 'New').length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">New</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {assignments.filter(a => a.status === 'Contacted' || a.status === 'Shortlisted').length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">In Progress</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {assignments.filter(a => a.status === 'Hired').length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">Hired</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Profile Visibility */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-black text-gray-900">Profile Visibility</h3>
-          <button 
-            onClick={() => setShowEditProfileForm(true)}
-            className="text-sm text-blue-600 font-medium hover:text-blue-800 transition-colors">
-            <Edit className="w-4 h-4 mr-1 inline" />
-            Edit Settings
-          </button>
-        </div>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                <User className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-gray-900">Availability Status</div>
-                <div className="text-sm text-gray-600">
-                  {developerProfile.availability ? 'Available for hire' : 'Not available'}
+          {assignments.length > 0 ? (
+            <div className="space-y-4">
+              {assignments.map((assignment) => (
+                <div key={assignment.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <button 
+                          onClick={() => handleViewJobDetails(assignment.job_role_id)}
+                          className="font-bold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                        >
+                          {assignment.job_role?.title || 'Unknown Job'}
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </button>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                          assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                          assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                          assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {assignment.status}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center">
+                          <Building className="w-4 h-4 mr-1" />
+                          {assignment.recruiter?.name || 'Unknown Recruiter'}
+                        </div>
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      
+                      {assignment.has_recruiter_contact && (
+                        <p className="text-sm text-gray-600 mb-3">
+                          {assignment.status === 'New' && 'The recruiter has assigned you to this job.'}
+                          {assignment.status === 'Contacted' && 'The recruiter has reviewed your profile and is interested.'}
+                          {assignment.status === 'Shortlisted' && 'Congratulations! You have been shortlisted for this position.'}
+                          {assignment.status === 'Hired' && 'Congratulations! You have been hired for this position.'}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {assignment.has_recruiter_contact && (
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleMessageRecruiter(assignment)}
+                          className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                        >
+                          <MessageSquare className="w-3 h-3 mr-1 inline" />
+                          Message
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">
-                {developerProfile.availability 
-                  ? 'Recruiters can see you are open to opportunities' 
-                  : 'Your profile is visible but marked as not available'}
-              </span>
-              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                developerProfile.availability ? 'bg-emerald-600' : 'bg-gray-200'
-              }`}>
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  developerProfile.availability ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-xl">
+              <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No job assignments yet</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Recruiters will assign you to jobs that match your skills
+              </p>
+              <button
+                onClick={() => setShowJobSearch(true)}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Browse Available Jobs
+              </button>
             </div>
-          </div>
-          
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                <Eye className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-gray-900">Profile Visibility</div>
-                <div className="text-sm text-gray-600">
-                  Visible to assigned recruiters
-                </div>
-              </div>
-            </div>
-            <div className="text-xs text-gray-500">
-              Your profile is visible to recruiters who have been assigned to you by our admin team
-            </div>
-          </div>
+          )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderPortfolio = () => (
     <PortfolioManager 
@@ -902,7 +894,7 @@ export const DeveloperDashboard = () => {
                         className="text-blue-600 hover:text-blue-800 font-semibold flex items-center"
                       >
                         {repo.name}
-                        <ExternalLink className="w-3 h-3 ml-1" />
+                        <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
                       </a>
                       <div className="flex items-center text-xs text-gray-500">
                         <Star className="w-3 h-3 mr-1" />
@@ -1056,7 +1048,7 @@ export const DeveloperDashboard = () => {
 
         {/* Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'stats' && renderStats()}
+        {activeTab === 'jobs' && renderJobs()}
         {activeTab === 'portfolio' && renderPortfolio()}
         {activeTab === 'github' && renderGitHub()}
         {activeTab === 'messages' && renderMessages()}
