@@ -13,9 +13,10 @@ import {
   Code,
   Loader,
   AlertCircle,
-  X
+  X,
+  Lock
 } from 'lucide-react';
-import { Message, User as UserType } from '../types';
+import { Message, User as UserType } from '../../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -41,6 +42,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [availableContacts, setAvailableContacts] = useState<UserType[]>([]);
+  const [canInitiateContacts, setCanInitiateContacts] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     if (userProfile) {
@@ -170,6 +172,24 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           ...(adminUsers || []),
           ...(assignments?.map(a => a.recruiter).filter(Boolean) || [])
         ];
+        
+        // For each recruiter, check if they've messaged the developer
+        const canInitiate: {[key: string]: boolean} = {};
+        for (const contact of contacts) {
+          if (contact.role === 'admin') {
+            canInitiate[contact.id] = true;
+          } else if (contact.role === 'recruiter') {
+            const { count } = await supabase
+              .from('messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('sender_id', contact.id)
+              .eq('receiver_id', userProfile.id);
+            
+            canInitiate[contact.id] = count ? count > 0 : false;
+          }
+        }
+        setCanInitiateContacts(canInitiate);
+        
       } else if (userProfile.role === 'recruiter') {
         // Recruiters can message assigned developers and admins
         const { data: adminUsers } = await supabase
@@ -190,6 +210,13 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           ...(assignments?.map(a => a.developer).filter(Boolean) || [])
         ];
         
+        // Recruiters can always initiate contact with developers they're assigned to
+        const canInitiate: {[key: string]: boolean} = {};
+        for (const contact of contacts) {
+          canInitiate[contact.id] = true;
+        }
+        setCanInitiateContacts(canInitiate);
+        
         console.log('Contacts for recruiter:', contacts);
       } else if (userProfile.role === 'admin') {
         // Admins can message anyone
@@ -199,6 +226,13 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           .neq('id', userProfile.id);
 
         contacts = allUsers || [];
+        
+        // Admins can always initiate contact with anyone
+        const canInitiate: {[key: string]: boolean} = {};
+        for (const contact of contacts) {
+          canInitiate[contact.id] = true;
+        }
+        setCanInitiateContacts(canInitiate);
       }
 
       // Remove duplicates based on id
@@ -386,30 +420,46 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
             
             {availableContacts.length > 0 ? (
               <div className="space-y-4">
-                {availableContacts.map((contact) => (
-                  <button
-                    key={contact.id}
-                    className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
-                    onClick={() => {
-                      onThreadSelect?.({
-                        otherUserId: contact.id,
-                        otherUserName: contact.name,
-                        otherUserRole: contact.role,
-                        lastMessage: {} as Message,
-                        unreadCount: 0
-                      });
-                      setShowNewMessageModal(false);
-                    }}
-                  >
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
-                      {contact.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900">{contact.name}</div>
-                      <div className="text-sm text-gray-600 capitalize">{contact.role}</div>
-                    </div>
-                  </button>
-                ))}
+                {availableContacts.map((contact) => {
+                  const canInitiate = canInitiateContacts[contact.id] || false;
+                  return (
+                    <button
+                      key={contact.id}
+                      className={`w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left ${
+                        !canInitiate && userProfile?.role === 'developer' && contact.role === 'recruiter' 
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : ''
+                      }`}
+                      onClick={() => {
+                        if (canInitiate || userProfile?.role !== 'developer' || contact.role !== 'recruiter') {
+                          onThreadSelect?.({
+                            otherUserId: contact.id,
+                            otherUserName: contact.name,
+                            otherUserRole: contact.role,
+                            lastMessage: {} as Message,
+                            unreadCount: 0
+                          });
+                          setShowNewMessageModal(false);
+                        }
+                      }}
+                      disabled={!canInitiate && userProfile?.role === 'developer' && contact.role === 'recruiter'}
+                    >
+                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
+                        {contact.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">{contact.name}</div>
+                        <div className="text-sm text-gray-600 capitalize">{contact.role}</div>
+                        {!canInitiate && userProfile?.role === 'developer' && contact.role === 'recruiter' && (
+                          <div className="text-xs text-amber-600 flex items-center mt-1">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Wait for recruiter to contact you first
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8">

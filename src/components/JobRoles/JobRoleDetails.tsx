@@ -17,7 +17,8 @@ import {
   Star,
   Loader,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { JobRole, Assignment, User, Developer } from '../../types';
 
@@ -49,6 +50,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hasRecruiterContact, setHasRecruiterContact] = useState(false);
 
   useEffect(() => {
     if (initialJobRole) {
@@ -109,6 +111,20 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
       );
 
       setAssignments(assignmentsWithDevProfiles);
+
+      // If this is a developer view, check if the recruiter has contacted the developer
+      if (isDeveloperView && userProfile) {
+        const { count, error: messagesError } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('sender_id', jobData.recruiter_id)
+          .eq('receiver_id', userProfile.id)
+          .eq('job_role_id', jobRoleId);
+          
+        if (messagesError) throw messagesError;
+        
+        setHasRecruiterContact(count ? count > 0 : false);
+      }
 
     } catch (error: any) {
       console.error('Error fetching job role details:', error);
@@ -177,6 +193,9 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
     hired: filteredAssignments.filter(a => a.status === 'Hired').length,
   };
 
+  // Determine if we should show limited info for developer view
+  const showLimitedInfo = isDeveloperView && !hasRecruiterContact;
+
   return (
     <div className="space-y-8">
       {/* Header with close button */}
@@ -196,41 +215,63 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
         <div className="flex items-start justify-between mb-6">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-4">
-              <h1 className="text-3xl font-black text-gray-900">{jobRole.title}</h1>
-              <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                jobRole.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {jobRole.is_active ? 'Active' : 'Paused'}
-              </span>
-            </div>
-            
-            <div className="grid md:grid-cols-4 gap-6 mb-6">
-              <div className="flex items-center text-gray-600">
-                <MapPin className="w-5 h-5 mr-2" />
-                <span className="font-medium">{jobRole.location}</span>
-              </div>
-              <div className="flex items-center text-gray-600">
-                <Clock className="w-5 h-5 mr-2" />
-                <span className="font-medium">{jobRole.job_type}</span>
-              </div>
-              <div className="flex items-center text-gray-600">
-                <DollarSign className="w-5 h-5 mr-2" />
-                <span className="font-medium">${jobRole.salary_min}k - ${jobRole.salary_max}k</span>
-              </div>
-              <div className="flex items-center text-gray-600">
-                <Calendar className="w-5 h-5 mr-2" />
-                <span className="font-medium">Posted {new Date(jobRole.created_at).toLocaleDateString()}</span>
-              </div>
-            </div>
+            {showLimitedInfo ? (
+              <>
+                <div className="flex items-center space-x-3 mb-4">
+                  <h1 className="text-3xl font-black text-gray-900">New Job Opportunity</h1>
+                  <span className="px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
+                    Pending Contact
+                  </span>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-center">
+                    <Lock className="w-5 h-5 text-blue-500 mr-3" />
+                    <div>
+                      <p className="text-blue-800 font-medium">Job details will be visible after the recruiter contacts you</p>
+                      <p className="text-blue-600 text-sm mt-1">The recruiter will reach out if they're interested in your profile for this role</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center space-x-3 mb-4">
+                  <h1 className="text-3xl font-black text-gray-900">{jobRole.title}</h1>
+                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                    jobRole.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {jobRole.is_active ? 'Active' : 'Paused'}
+                  </span>
+                </div>
+                
+                <div className="grid md:grid-cols-4 gap-6 mb-6">
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="w-5 h-5 mr-2" />
+                    <span className="font-medium">{jobRole.location}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Clock className="w-5 h-5 mr-2" />
+                    <span className="font-medium">{jobRole.job_type}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    <span className="font-medium">${jobRole.salary_min}k - ${jobRole.salary_max}k</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Calendar className="w-5 h-5 mr-2" />
+                    <span className="font-medium">Posted {new Date(jobRole.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
 
-            <div className="flex items-center space-x-2 mb-6">
-              {jobRole.tech_stack.map((tech, index) => (
-                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                  {tech}
-                </span>
-              ))}
-            </div>
+                <div className="flex items-center space-x-2 mb-6">
+                  {jobRole.tech_stack.map((tech, index) => (
+                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {!isDeveloperView && (
@@ -264,7 +305,11 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
               <Building className="w-5 h-5 text-gray-500 mr-3" />
               <div>
                 <h3 className="font-bold text-gray-900">Posted by</h3>
-                <p className="text-gray-600">{jobRole.recruiter.name}</p>
+                {showLimitedInfo ? (
+                  <p className="text-gray-600">Recruiter details will be visible after they contact you</p>
+                ) : (
+                  <p className="text-gray-600">{jobRole.recruiter.name}</p>
+                )}
               </div>
             </div>
           </div>
@@ -297,12 +342,14 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
         )}
 
         {/* Description */}
-        <div>
-          <h3 className="text-lg font-black text-gray-900 mb-3">Job Description</h3>
-          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{jobRole.description}</p>
-        </div>
+        {!showLimitedInfo && (
+          <div>
+            <h3 className="text-lg font-black text-gray-900 mb-3">Job Description</h3>
+            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{jobRole.description}</p>
+          </div>
+        )}
 
-        {jobRole.experience_required && (
+        {!showLimitedInfo && jobRole.experience_required && (
           <div className="mt-6">
             <h3 className="text-lg font-black text-gray-900 mb-3">Experience Required</h3>
             <p className="text-gray-600">{jobRole.experience_required}</p>
@@ -473,16 +520,18 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                     </p>
                   </div>
                   
-                  <button 
-                    onClick={() => handleSendMessage(
-                      assignment.recruiter_id, 
-                      jobRole.recruiter?.name || 'Recruiter'
-                    )}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2 inline" />
-                    Message Recruiter
-                  </button>
+                  {!showLimitedInfo && (
+                    <button 
+                      onClick={() => handleSendMessage(
+                        assignment.recruiter_id, 
+                        jobRole.recruiter?.name || 'Recruiter'
+                      )}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2 inline" />
+                      Message Recruiter
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

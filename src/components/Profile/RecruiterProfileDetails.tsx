@@ -14,9 +14,11 @@ import {
   CheckCircle,
   Loader,
   AlertCircle,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import { Recruiter, User as UserType, JobRole, Assignment, Hire } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface RecruiterProfileDetailsProps {
   recruiterId: string;
@@ -27,6 +29,7 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
   recruiterId,
   onClose
 }) => {
+  const { userProfile } = useAuth();
   const [recruiter, setRecruiter] = useState<Recruiter & { user: UserType } | null>(null);
   const [jobs, setJobs] = useState<JobRole[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -34,6 +37,7 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('profile');
+  const [hasRecruiterContact, setHasRecruiterContact] = useState(false);
 
   useEffect(() => {
     if (recruiterId) {
@@ -58,6 +62,22 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
 
       if (recruiterError) throw recruiterError;
       setRecruiter(recruiterData);
+
+      // Check if the current user (if developer) has been contacted by this recruiter
+      if (userProfile?.role === 'developer') {
+        const { count, error: messagesError } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('sender_id', recruiterId)
+          .eq('receiver_id', userProfile.id);
+          
+        if (messagesError) throw messagesError;
+        
+        setHasRecruiterContact(count ? count > 0 : false);
+      } else {
+        // Admin or recruiter viewing - always show full profile
+        setHasRecruiterContact(true);
+      }
 
       // Fetch job roles
       const { data: jobsData, error: jobsError } = await supabase
@@ -137,6 +157,9 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
     );
   }
 
+  // Determine if we should show limited info (for developers who haven't been contacted)
+  const showLimitedInfo = userProfile?.role === 'developer' && !hasRecruiterContact;
+
   const tabs = [
     { id: 'profile', label: 'Profile' },
     { id: 'jobs', label: 'Jobs' },
@@ -178,14 +201,18 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
             <div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">{recruiter.user.name}</h2>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <Building className="w-4 h-4 mr-1" />
-                  {recruiter.company_name}
-                </div>
-                <div className="flex items-center">
-                  <Mail className="w-4 h-4 mr-1" />
-                  {recruiter.user.email}
-                </div>
+                {!showLimitedInfo && (
+                  <div className="flex items-center">
+                    <Building className="w-4 h-4 mr-1" />
+                    {recruiter.company_name}
+                  </div>
+                )}
+                {(userProfile?.role === 'admin' || hasRecruiterContact) && (
+                  <div className="flex items-center">
+                    <Mail className="w-4 h-4 mr-1" />
+                    {recruiter.user.email}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -233,96 +260,112 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
       {activeTab === 'profile' && (
         <div className="space-y-8">
           {/* Profile Stats */}
-          <div className="grid md:grid-cols-5 gap-6">
-            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalJobs}</div>
-              <div className="text-sm font-semibold text-gray-600">Total Jobs</div>
+          {!showLimitedInfo && (
+            <div className="grid md:grid-cols-5 gap-6">
+              <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalJobs}</div>
+                <div className="text-sm font-semibold text-gray-600">Total Jobs</div>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+                <div className="text-2xl font-black text-gray-900 mb-1">{stats.activeJobs}</div>
+                <div className="text-sm font-semibold text-gray-600">Active Jobs</div>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+                <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalAssignments}</div>
+                <div className="text-sm font-semibold text-gray-600">Assignments</div>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
+                <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalHires}</div>
+                <div className="text-sm font-semibold text-gray-600">Hires</div>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-100">
+                <div className="text-2xl font-black text-gray-900 mb-1">${stats.totalRevenue.toLocaleString()}</div>
+                <div className="text-sm font-semibold text-gray-600">Est. Revenue</div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{stats.activeJobs}</div>
-              <div className="text-sm font-semibold text-gray-600">Active Jobs</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalAssignments}</div>
-              <div className="text-sm font-semibold text-gray-600">Assignments</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalHires}</div>
-              <div className="text-sm font-semibold text-gray-600">Hires</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">${stats.totalRevenue.toLocaleString()}</div>
-              <div className="text-sm font-semibold text-gray-600">Est. Revenue</div>
-            </div>
-          </div>
+          )}
 
           {/* Company Info */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Company Information</h3>
-            <div className="space-y-4 text-gray-600">
-              <div className="flex items-center">
-                <Building className="w-5 h-5 mr-3 text-gray-400" />
-                <span className="font-medium">Company: </span>
-                <span className="ml-2">{recruiter.company_name}</span>
+            {showLimitedInfo ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <Lock className="w-5 h-5 text-blue-500 mr-3" />
+                  <div>
+                    <p className="text-blue-800 font-medium">Company details will be visible after the recruiter contacts you</p>
+                    <p className="text-blue-600 text-sm mt-1">The recruiter will reach out if they're interested in your profile</p>
+                  </div>
+                </div>
               </div>
-              {recruiter.website && (
+            ) : (
+              <div className="space-y-4 text-gray-600">
                 <div className="flex items-center">
-                  <Globe className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">Website: </span>
-                  <a 
-                    href={recruiter.website.startsWith('http') ? recruiter.website : `https://${recruiter.website}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
-                  >
-                    {recruiter.website}
-                  </a>
+                  <Building className="w-5 h-5 mr-3 text-gray-400" />
+                  <span className="font-medium">Company: </span>
+                  <span className="ml-2">{recruiter.company_name}</span>
                 </div>
-              )}
-              {recruiter.company_size && (
-                <div className="flex items-center">
-                  <Users className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">Company Size: </span>
-                  <span className="ml-2">{recruiter.company_size}</span>
-                </div>
-              )}
-              {recruiter.industry && (
-                <div className="flex items-center">
-                  <Briefcase className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">Industry: </span>
-                  <span className="ml-2">{recruiter.industry}</span>
-                </div>
-              )}
-            </div>
+                {recruiter.website && (
+                  <div className="flex items-center">
+                    <Globe className="w-5 h-5 mr-3 text-gray-400" />
+                    <span className="font-medium">Website: </span>
+                    <a 
+                      href={recruiter.website.startsWith('http') ? recruiter.website : `https://${recruiter.website}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      {recruiter.website}
+                    </a>
+                  </div>
+                )}
+                {recruiter.company_size && (
+                  <div className="flex items-center">
+                    <Users className="w-5 h-5 mr-3 text-gray-400" />
+                    <span className="font-medium">Company Size: </span>
+                    <span className="ml-2">{recruiter.company_size}</span>
+                  </div>
+                )}
+                {recruiter.industry && (
+                  <div className="flex items-center">
+                    <Briefcase className="w-5 h-5 mr-3 text-gray-400" />
+                    <span className="font-medium">Industry: </span>
+                    <span className="ml-2">{recruiter.industry}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Account Info */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-6">Account Information</h3>
-            <div className="space-y-4 text-gray-600">
-              <div className="flex items-center">
-                <Mail className="w-5 h-5 mr-3 text-gray-400" />
-                <span className="font-medium">Email: </span>
-                <span className="ml-2">{recruiter.user.email}</span>
-              </div>
-              <div className="flex items-center">
-                <Calendar className="w-5 h-5 mr-3 text-gray-400" />
-                <span className="font-medium">Account Created: </span>
-                <span className="ml-2">{new Date(recruiter.created_at).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 mr-3 text-gray-400" />
-                <span className="font-medium">Account Status: </span>
-                <span className={`ml-2 ${recruiter.user.is_approved ? 'text-emerald-600' : 'text-yellow-600'}`}>
-                  {recruiter.user.is_approved ? 'Approved' : 'Pending Approval'}
-                </span>
+          {!showLimitedInfo && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-lg font-black text-gray-900 mb-6">Account Information</h3>
+              <div className="space-y-4 text-gray-600">
+                <div className="flex items-center">
+                  <Mail className="w-5 h-5 mr-3 text-gray-400" />
+                  <span className="font-medium">Email: </span>
+                  <span className="ml-2">{recruiter.user.email}</span>
+                </div>
+                <div className="flex items-center">
+                  <Calendar className="w-5 h-5 mr-3 text-gray-400" />
+                  <span className="font-medium">Account Created: </span>
+                  <span className="ml-2">{new Date(recruiter.user.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckCircle className="w-5 h-5 mr-3 text-gray-400" />
+                  <span className="font-medium">Account Status: </span>
+                  <span className={`ml-2 ${recruiter.user.is_approved ? 'text-emerald-600' : 'text-yellow-600'}`}>
+                    {recruiter.user.is_approved ? 'Approved' : 'Pending Approval'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {activeTab === 'jobs' && (
+      {activeTab === 'jobs' && !showLimitedInfo && (
         <div className="space-y-6">
           <h3 className="text-lg font-black text-gray-900 mb-4">Posted Jobs</h3>
           
@@ -380,7 +423,7 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
         </div>
       )}
 
-      {activeTab === 'assignments' && (
+      {activeTab === 'assignments' && !showLimitedInfo && (
         <div className="space-y-6">
           <h3 className="text-lg font-black text-gray-900 mb-4">Developer Assignments</h3>
           
@@ -441,7 +484,7 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
         </div>
       )}
 
-      {activeTab === 'hires' && (
+      {activeTab === 'hires' && !showLimitedInfo && (
         <div className="space-y-6">
           <h3 className="text-lg font-black text-gray-900 mb-4">Successful Hires</h3>
           

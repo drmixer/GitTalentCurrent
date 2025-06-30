@@ -39,11 +39,13 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [subject, setSubject] = useState('');
   const [hasInitiatedContact, setHasInitiatedContact] = useState(false);
+  const [canSendMessage, setCanSendMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (userProfile && otherUserId) {
       fetchMessages();
+      checkCanSendMessage();
       
       // Set up real-time subscription for new messages
       const subscription = supabase
@@ -74,6 +76,33 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     scrollToBottom();
   }, [messages]);
 
+  const checkCanSendMessage = async () => {
+    if (!userProfile?.id || !otherUserId) return;
+
+    try {
+      // Check if the current user is a developer and the other user is a recruiter
+      if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
+        // Check if there are any messages from the recruiter to the developer
+        const { count, error } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('sender_id', otherUserId)
+          .eq('receiver_id', userProfile.id);
+          
+        if (error) throw error;
+        
+        // Developer can only send messages if the recruiter has messaged first
+        setCanSendMessage(count ? count > 0 : false);
+      } else {
+        // Admin can always send messages, and recruiters can always message assigned developers
+        setCanSendMessage(true);
+      }
+    } catch (error) {
+      console.error('Error checking message permissions:', error);
+      setCanSendMessage(false);
+    }
+  };
+
   const fetchNewMessage = async (messageId: string) => {
     try {
       const { data, error } = await supabase
@@ -97,6 +126,11 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .from('messages')
           .update({ is_read: true, read_at: new Date().toISOString() })
           .eq('id', messageId);
+          
+        // If this is the first message from the recruiter, update canSendMessage
+        if (data.sender_id === otherUserId && userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
+          setCanSendMessage(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching new message:', error);
@@ -137,6 +171,15 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       const hasInitiated = data?.some(msg => msg.sender_id === userProfile.id) || false;
       setHasInitiatedContact(hasInitiated);
 
+      // Check if there are any messages from the other user to the current user
+      // This determines if the developer can reply to a recruiter
+      if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
+        const hasReceivedMessage = data?.some(msg => msg.sender_id === otherUserId) || false;
+        setCanSendMessage(hasReceivedMessage);
+      } else {
+        setCanSendMessage(true);
+      }
+
       // Mark messages as read
       await markMessagesAsRead();
 
@@ -171,7 +214,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !userProfile?.id || sending) return;
+    if (!newMessage.trim() || !userProfile?.id || sending || !canSendMessage) return;
 
     try {
       setSending(true);
@@ -372,22 +415,23 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              disabled={!canSendMessage}
             />
           </div>
         )}
         <div className="flex space-x-4">
           <textarea
-            placeholder="Type your message..."
+            placeholder={canSendMessage ? "Type your message..." : "You can reply after the recruiter contacts you first"}
             className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
             rows={3}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            disabled={sending}
+            disabled={sending || !canSendMessage}
           />
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim() || sending}
+            disabled={!newMessage.trim() || sending || !canSendMessage}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
           >
             {sending ? (
@@ -397,6 +441,12 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             )}
           </button>
         </div>
+        {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
+          <div className="mt-2 text-xs text-amber-600 font-medium">
+            <Lock className="w-3 h-3 inline mr-1" />
+            You can reply after the recruiter contacts you first
+          </div>
+        )}
       </div>
     </div>
   );
