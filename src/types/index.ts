@@ -21,6 +21,39 @@ export interface NotificationPreferences {
   messages: boolean;
 }
 
+export interface GitHubUser {
+  login: string;
+  name: string | null;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  following: number;
+  location: string | null;
+  blog: string | null;
+  company: string | null;
+  avatar_url: string;
+  created_at: string;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  stargazers_count: number;
+  language: string | null;
+  topics: string[];
+  updated_at: string;
+  created_at: string;
+  fork: boolean;
+  private: boolean;
+}
+
+export interface GitHubLanguages {
+  [key: string]: number;
+}
+
 export interface AuthContextType {
   user: SupabaseUser | null;
   userProfile: User | null;
@@ -40,6 +73,7 @@ export interface AuthContextType {
   importJobsFromCSV: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
   createHire: (hireData: Partial<Hire>) => Promise<boolean>;
   updateUserApprovalStatus: (userId: string, isApproved: boolean) => Promise<boolean>;
+  syncGitHubData: () => Promise<void>; // New method to sync GitHub data to user profile
 }
 
 export interface Developer {
@@ -60,6 +94,7 @@ export interface Developer {
   created_at: string;
   updated_at: string;
   user?: User;
+  github_profile?: GitHubUser;  // Adding GitHub profile data
 }
 
 export interface PortfolioItem {
