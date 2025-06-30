@@ -55,6 +55,8 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const [error, setError] = useState('');
   const [hasRecruiterContact, setHasRecruiterContact] = useState(false);
   const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialJobRole) {
@@ -105,6 +107,9 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const handleViewRecruiterProfile = () => {
     if (jobRole?.recruiter_id) {
       setShowRecruiterProfile(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
