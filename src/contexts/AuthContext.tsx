@@ -1,19 +1,17 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import {
-  User, Developer, JobRole, Assignment, Hire, AuthContextType,
-} from '../types';
+import { User, Developer, AuthContextType } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
@@ -80,8 +78,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Clear all state when user signs out
           console.log('🔄 Clearing auth state...');
           setUserProfile(null);
-          setDeveloperProfile(null);
-          setNeedsOnboarding(false);
           setLoading(false);
         }
       } catch (error) {
@@ -167,30 +163,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Fetching user profile for:', authUser.id);
-      console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
-      // Add a small delay to ensure database operations are complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // First, try to fetch user profile with error handling
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
 
-      // If we get a 500 error or the user doesn't exist, try to create the profile
       if (userError || !userProfileData) {
-        console.log('⚠️ User profile not found, attempting to create:', userError?.message || 'No data');
-        console.log('🔄 Auth user metadata for profile creation:', JSON.stringify(authUser.user_metadata));
-        
-        // Try to create the user profile
+        console.log('⚠️ User profile not found, attempting to create');
         const success = await createUserProfileFromAuth(authUser, true);
-        
         if (success) {
-          // Add another delay and retry fetching the profile
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
             .select('*')
@@ -200,57 +183,103 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (retryError) {
             console.error('❌ Error fetching user profile after creation:', retryError);
             setUserProfile(null);
-            setDeveloperProfile(null);
             setLoading(false);
             return;
           }
-          console.log('✅ User profile created and fetched successfully:', retryUserData);
-          
           setUserProfile(retryUserData);
           await checkForRoleSpecificProfile(retryUserData, authUser.id);
-        } else {
-          console.error('❌ Failed to create user profile');
-          setUserProfile(null);
-          setDeveloperProfile(null);
-          setLoading(false);
-          return;
         }
       } else {
-        console.log('✅ User profile found:', userProfileData.role);
         setUserProfile(userProfileData);
         await checkForRoleSpecificProfile(userProfileData, authUser.id);
       }
     } catch (error) {
       console.error('❌ Error fetching profiles:', error);
       setUserProfile(null);
-      console.log('⚠️ Setting needsOnboarding to true due to profile fetch error');
-      setDeveloperProfile(null);
       setLoading(false);
     }
   };
 
-  // Existing logic for checking role-specific profiles (no changes here)
-  // ... 
+  const createUserProfileFromAuth = async (authUser: SupabaseUser, isRetry = false): Promise<boolean> => {
+    try {
+      const userRole = authUser.user_metadata?.role || 'developer';
+      const userName = authUser.user_metadata?.full_name || 'User';
+      
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: authUser.id,
+          email: authUser.email || 'unknown@example.com',
+          name: userName,
+          role: userRole,
+        });
+
+      if (insertError) {
+        console.error('❌ Manual user profile creation failed:', insertError);
+        return false; 
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error in createUserProfileFromAuth:', error);
+      return false;
+    }
+  };
+
+  const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
+    try {
+      if (userProfile?.role === 'developer') {
+        const { data: devProfileData, error: devError } = await supabase
+          .from('developers')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (devError) {
+          console.error('❌ Error fetching developer profile:', devError);
+        }
+        
+        if (!devProfileData) {
+          setDeveloperProfile(null);
+        } else {
+          setDeveloperProfile(devProfileData);
+        }
+      } else if (userProfile?.role === 'recruiter') {
+        const { data: recProfileData, error: recError } = await supabase
+          .from('recruiters')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (recError) {
+          console.error('❌ Error fetching recruiter profile:', recError);
+        }
+
+        if (!recProfileData) {
+          setNeedsOnboarding(true);
+        } else {
+          setNeedsOnboarding(false);
+        }
+      } else {
+        setDeveloperProfile(null);
+      }
+    } catch (error) {
+      console.error('❌ Error checking role-specific profile:', error);
+      setNeedsOnboarding(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const value: AuthContextType = {
     user,
     userProfile,
-    developerProfile,
     loading,
-    needsOnboarding,
     signIn,
     signInWithGitHub,
     signUp,
     signOut,
-    refreshProfile,
-    createDeveloperProfile,
-    updateDeveloperProfile,
-    createJobRole,
-    updateJobRole,
-    createAssignment,
-    importJobsFromCSV,
-    createHire,
-    updateUserApprovalStatus,
+    fetchUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
