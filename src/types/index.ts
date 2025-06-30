@@ -133,6 +133,7 @@ export interface JobRole {
   salary_max: number;
   experience_required: string;
   is_active: boolean;
+  is_featured?: boolean;
   created_at: string;
   updated_at: string;
   recruiter?: Recruiter;

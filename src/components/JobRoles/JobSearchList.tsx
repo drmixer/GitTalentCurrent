@@ -46,7 +46,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
       setLoading(true);
       setError('');
 
-      // Fetch all active job roles
+      // Fetch all active job roles - now visible to all users
       const { data, error } = await supabase
         .from('job_roles')
         .select(`
