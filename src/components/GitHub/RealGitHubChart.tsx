@@ -253,98 +253,99 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           {totalContributions} contributions in the last year
         </div>
 
-      <div className="mb-4">
-        <div className="text-sm font-semibold text-gray-700 mb-3">
-          {totalContributions} contributions in the last year
-        </div>
-        
-        <div className="grid grid-cols-12 gap-1 mb-3">
-          {contributions.map((day, index) => (
-            <div
-              key={index}
-              className={`w-2.5 h-2.5 rounded-sm ${getColorClass(day.level)} hover:ring-1 hover:ring-emerald-400 cursor-pointer transition-all duration-200`}
-              title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
-            />
-          ))}
-        </div>
-        
-        {/* Legend */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="font-medium">Less</span>
-          <div className="flex items-center space-x-1">
-            <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+        <div className="mb-4">
+          <div className="text-sm font-semibold text-gray-700 mb-3">
+            {totalContributions} contributions in the last year
           </div>
-          <span className="font-medium">More</span>
+          
+          <div className="grid grid-cols-12 gap-1 mb-3">
+            {contributions.map((day, index) => (
+              <div
+                key={index}
+                className={`w-2.5 h-2.5 rounded-sm ${getColorClass(day.level)} hover:ring-1 hover:ring-emerald-400 cursor-pointer transition-all duration-200`}
+                title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
+              />
+            ))}
+          </div>
+          
+          {/* Legend */}
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span className="font-medium">Less</span>
+            <div className="flex items-center space-x-1">
+              <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+            </div>
+            <span className="font-medium">More</span>
+          </div>
         </div>
-      </div>
 
-      {/* Additional Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4 text-center">
-        <div className="p-2 bg-gray-50 rounded-lg">
-          <div className="text-base font-bold text-gray-900">{totalContributions}</div>
-          <div className="text-xs text-gray-600">Total Contributions</div>
+        {/* Additional Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-4 text-center">
+          <div className="p-2 bg-gray-50 rounded-lg">
+            <div className="text-base font-bold text-gray-900">{totalContributions}</div>
+            <div className="text-xs text-gray-600">Total Contributions</div>
+          </div>
+          <div className="p-2 bg-gray-50 rounded-lg">
+            <div className="text-base font-bold text-gray-900">{longestStreak}</div>
+            <div className="text-xs text-gray-600">Longest Streak</div>
+          </div>
+          <div className="p-2 bg-gray-50 rounded-lg">
+            <div className="text-base font-bold text-gray-900">{Math.round(totalContributions / 365 * 10) / 10}</div>
+            <div className="text-xs text-gray-600">Avg per Day</div>
+          </div>
         </div>
-        <div className="p-2 bg-gray-50 rounded-lg">
-          <div className="text-base font-bold text-gray-900">{longestStreak}</div>
-          <div className="text-xs text-gray-600">Longest Streak</div>
-        </div>
-        <div className="p-2 bg-gray-50 rounded-lg">
-          <div className="text-base font-bold text-gray-900">{Math.round(totalContributions / 365 * 10) / 10}</div>
-          <div className="text-xs text-gray-600">Avg per Day</div>
-        </div>
-      </div>
 
-      {/* Top Repositories */}
-      {repos.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-xs font-bold text-gray-700 mb-2">Top Repositories</h4>
-          <div className="space-y-1.5">
-            {repos
-              .filter(repo => !repo.fork && repo.stargazers_count >= 0)
-              .sort((a, b) => b.stargazers_count - a.stargazers_count)
-              .slice(0, 3)
-              .map((repo) => (
-                <div key={repo.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <a
-                        href={repo.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate"
-                      >
-                        {repo.name}
-                      </a>
-                      {repo.language && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                          {repo.language}
-                        </span>
+        {/* Top Repositories */}
+        {repos.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-xs font-bold text-gray-700 mb-2">Top Repositories</h4>
+            <div className="space-y-1.5">
+              {repos
+                .filter(repo => !repo.fork && repo.stargazers_count >= 0)
+                .sort((a, b) => b.stargazers_count - a.stargazers_count)
+                .slice(0, 3)
+                .map((repo) => (
+                  <div key={repo.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <a
+                          href={repo.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate"
+                        >
+                          {repo.name}
+                        </a>
+                        {repo.language && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                            {repo.language}
+                          </span>
+                        )}
+                      </div>
+                      {repo.description && (
+                        <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
                       )}
                     </div>
-                    {repo.description && (
-                      <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
-                    )}
+                    <div className="flex items-center text-xs text-gray-500 ml-2">
+                      <Star className="w-3 h-3 mr-1" />
+                      {repo.stargazers_count}
+                    </div>
                   </div>
-                  <div className="flex items-center text-xs text-gray-500 ml-2">
-                    <Star className="w-3 h-3 mr-1" />
-                    {repo.stargazers_count}
-                  </div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Profile Info */}
-      {githubUser?.bio && (
-        <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-          <p className="text-xs text-gray-700">{githubUser.bio}</p>
-        </div>
-      )}
+        {/* Profile Info */}
+        {githubUser?.bio && (
+          <div className="mt-3 p-2 bg-blue-50 rounded-lg">
+            <p className="text-xs text-gray-700">{githubUser.bio}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
