@@ -9,7 +9,8 @@ import {
   Filter, 
   Users, 
   ArrowLeft,
-  Loader
+  Loader,
+  AlertCircle
 } from 'lucide-react';
 import { Developer, User } from '../types';
 
@@ -25,6 +26,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer & { user: User } | null>(null);
   const [showFullProfile, setShowFullProfile] = useState(false);
   const [showMessageThread, setShowMessageThread] = useState(false);
+  const [filterAvailability, setFilterAvailability] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchAssignedDevelopers();
@@ -98,18 +100,35 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
     setShowMessageThread(false);
   };
 
-  const filteredDevelopers = developers.filter(dev => 
-    !searchTerm || 
-    dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dev.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredDevelopers = developers.filter(dev => {
+    // Filter by search term
+    const matchesSearch = !searchTerm || 
+      dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dev.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Filter by availability
+    const matchesAvailability = filterAvailability === null || dev.availability === filterAvailability;
+    
+    return matchesSearch && matchesAvailability;
+  });
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
         <span className="text-gray-600 font-medium">Loading developers...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
+        <div className="flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
+          <p className="text-red-700 font-medium">{error}</p>
+        </div>
       </div>
     );
   }
@@ -189,18 +208,20 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-            <Filter className="w-4 h-4 mr-2 text-gray-500" />
-            Filter
-          </button>
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-gray-400" />
+            <select
+              value={filterAvailability === null ? 'all' : filterAvailability.toString()}
+              onChange={(e) => setFilterAvailability(e.target.value === 'all' ? null : e.target.value === 'true')}
+              className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            >
+              <option value="all">All Developers</option>
+              <option value="true">Available Only</option>
+              <option value="false">Unavailable Only</option>
+            </select>
+          </div>
         </div>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
 
       {filteredDevelopers.length > 0 ? (
         <div className="grid gap-6">
@@ -214,14 +235,29 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
           ))}
         </div>
       ) : (
-        <div className="text-center py-12">
+        <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
           <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Developers Found</h3>
           <p className="text-gray-600">
-            {searchTerm 
+            {searchTerm || filterAvailability !== null
               ? "No developers match your search criteria" 
               : "You don't have any assigned developers yet"}
           </p>
+          {searchTerm || filterAvailability !== null ? (
+            <button 
+              onClick={() => {
+                setSearchTerm('');
+                setFilterAvailability(null);
+              }}
+              className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+            >
+              Clear Filters
+            </button>
+          ) : (
+            <p className="mt-4 text-sm text-gray-500">
+              Developers will be assigned to your job listings by the admin team.
+            </p>
+          )}
         </div>
       )}
     </div>

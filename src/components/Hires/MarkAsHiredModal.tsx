@@ -70,6 +70,16 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
       const result = await createHire(hireData);
 
       if (result) {
+        // Also update the assignment status to "Hired"
+        const { error: updateError } = await supabase
+          .from('assignments')
+          .update({ status: 'Hired' })
+          .eq('id', assignment.id);
+          
+        if (updateError) {
+          console.error('Error updating assignment status:', updateError);
+        }
+        
         setSuccess('Hire recorded successfully!');
         setTimeout(() => {
           onSuccess?.();
@@ -139,7 +149,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         <div className="bg-gray-50 rounded-xl p-4 mb-6">
           <h3 className="font-bold text-gray-900 mb-2">Assignment Details</h3>
           <div className="text-sm text-gray-600">
-            <div><strong>Developer:</strong> {assignment.developer?.user?.name || 'Unknown'}</div>
+            <div><strong>Developer:</strong> {assignment.developer?.name || 'Unknown'}</div>
             <div><strong>Job:</strong> {assignment.job_role?.title || 'Unknown'}</div>
           </div>
         </div>
@@ -257,3 +267,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
     </div>
   );
 };
+
+// Add the missing import
+import { supabase } from '../../lib/supabase';
