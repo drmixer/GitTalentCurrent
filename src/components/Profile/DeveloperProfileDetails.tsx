@@ -474,10 +474,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       )}
 
       {activeTab === 'portfolio' && (
-        <PortfolioManager 
-          developerId={developer.user_id}  
-          isEditable={false}
-        />
+        <div>
+          <RealGitHubChart  
+            githubHandle={developer.github_handle || ''} 
+            className="w-full"
+          />
+        </div>
       )}
 
       {activeTab === 'github' && (

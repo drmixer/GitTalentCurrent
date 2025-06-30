@@ -12,11 +12,21 @@ import {
   RealGitHubChart
 } from '../components';
 import { 
+  DeveloperProfileForm,
+  PortfolioManager,
+  MessageList,
+  MessageThread,
+  JobSearchList,
+  JobRoleDetails,
+  ProfileStrengthIndicator,
+  RealGitHubChart
+} from '../components';
+import { 
   User, 
   Briefcase, 
   MessageSquare, 
   Search, 
-  Settings, 
+  Github,
   Star,
   TrendingUp,
   Calendar,
@@ -253,20 +263,6 @@ export const DeveloperDashboard: React.FC = () => {
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Profile Strength */}
-      {developer && (
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Strength</h3>
-          <ProfileStrengthIndicator 
-            strength={developer.profile_strength} 
-            showDetails={true}
-          />
-        </div>
-      )}
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
               <MessageSquare className="w-6 h-6 text-green-600" />
             </div>
@@ -304,39 +300,11 @@ export const DeveloperDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Recommended Jobs */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Recommended Jobs</h3>
-          <button
-            onClick={() => setShowJobSearch(true)}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-          >
-            Browse All
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recommendedJobs.slice(0, 4).map((job) => (
-            <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-gray-900 text-sm">{job.title}</h4>
-                {job.is_featured && (
-                  <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                )}
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{job.recruiter.company_name}</p>
-              <div className="flex items-center text-xs text-gray-500 mb-2">
-                <MapPin className="w-3 h-3 mr-1" />
-                {job.location}
-                <span className="mx-2">•</span>
-                {job.job_type}
-              </div>
-              {job.salary_min > 0 && (
-                <div className="flex items-center text-xs text-gray-500 mb-3">
-                  <DollarSign className="w-3 h-3 mr-1" />
-                  ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Briefcase className="w-6 h-6 text-blue-600" />
                 </div>
               )}
               <button
@@ -391,7 +359,7 @@ export const DeveloperDashboard: React.FC = () => {
               { id: 'overview', name: 'Overview', icon: TrendingUp },
               { id: 'profile', name: 'Profile', icon: User },
               { id: 'github', name: 'GitHub Activity', icon: Github },
-              { id: 'portfolio', name: 'Portfolio', icon: Briefcase },
+              { id: 'github', name: 'GitHub Activity', icon: Github },
               { id: 'messages', name: 'Messages', icon: MessageSquare },
               { id: 'jobs', name: 'Job Search', icon: Search },
             ].map((tab) => {
@@ -427,6 +395,10 @@ export const DeveloperDashboard: React.FC = () => {
           {activeTab === 'profile' && <DeveloperProfileForm />}
           {activeTab === 'github' && developer?.github_handle && (
             <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
+          )}
+          {activeTab === 'portfolio' && developer && (
+            <PortfolioManager developerId={developer.user_id} isEditable={true} />
+          )}
           )}
           {activeTab === 'portfolio' && developer && (
             <PortfolioManager developerId={developer.user_id} isEditable={true} />
@@ -467,8 +439,14 @@ export const DeveloperDashboard: React.FC = () => {
                 <JobSearchList onViewDetails={handleViewJobDetails} />
               </div>
             </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Job Interests</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {recommendedJobs.length > 0 ? recommendedJobs.length : '--'}
+              </p>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
