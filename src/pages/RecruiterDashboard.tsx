@@ -367,6 +367,17 @@ export const RecruiterDashboard = () => {
     setActiveTab('messages');
   };
 
+  const handleHireSuccess = async () => {
+    // Refresh hires data
+    await fetchHires();
+    await fetchStats();
+    
+    setSuccess('Developer hired successfully!');
+    setTimeout(() => {
+      setSuccess('');
+    }, 3000);
+  };
+
   // Filter jobs based on search term
   const filteredJobs = jobRoles.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -378,6 +389,487 @@ export const RecruiterDashboard = () => {
   const filteredHires = hires.filter(hire => 
     hire.assignment?.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     hire.assignment?.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const renderOverview = () => (
+    <div className="space-y-8">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Briefcase className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalJobs}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Total Job Listings</div>
+          <div className="text-xs text-emerald-600 font-medium">{stats.activeJobs} active jobs</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Star className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.featuredJobs}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Featured Jobs</div>
+          <div className="text-xs text-emerald-600 font-medium">Higher visibility to developers</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+              <MessageSquare className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.unreadMessages}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Unread Messages</div>
+          <div className="text-xs text-emerald-600 font-medium">{stats.totalMessages} total messages</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalHires}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Successful Hires</div>
+          <div className="text-xs text-emerald-600 font-medium">${stats.totalRevenue.toLocaleString()} in fees</div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          <button
+            onClick={() => {
+              setEditingJob(null);
+              setShowJobForm(true);
+            }}
+            className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
+          >
+            <Briefcase className="w-8 h-8 text-blue-600 mb-3" />
+            <span className="font-semibold text-gray-900">Post New Job</span>
+            <span className="text-sm text-gray-600 mt-1">Create a new job listing</span>
+          </button>
+          
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
+          >
+            <Plus className="w-8 h-8 text-purple-600 mb-3" />
+            <span className="font-semibold text-gray-900">Bulk Import Jobs</span>
+            <span className="text-sm text-gray-600 mt-1">Import multiple jobs via CSV</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('search-devs')}
+            className="flex flex-col items-center justify-center p-6 bg-emerald-50 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
+          >
+            <Search className="w-8 h-8 text-emerald-600 mb-3" />
+            <span className="font-semibold text-gray-900">Search Developers</span>
+            <span className="text-sm text-gray-600 mt-1">Find talent for your roles</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
+        
+        {/* Recent Jobs */}
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Job Listings</h3>
+          {jobRoles.length > 0 ? (
+            <div className="space-y-4">
+              {jobRoles.slice(0, 3).map(job => (
+                <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{job.title}</h4>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Posted {new Date(job.created_at).toLocaleDateString()} • 
+                      {jobInterestCounts[job.id] || 0} interested developers
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleViewJobDetails(job.id)}
+                    className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm"
+                  >
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">No job listings yet. Create your first job posting!</p>
+          )}
+          
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setActiveTab('my-jobs')}
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View All Job Listings
+            </button>
+          </div>
+        </div>
+        
+        {/* Recent Hires */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Hires</h3>
+          {hires.length > 0 ? (
+            <div className="space-y-4">
+              {hires.slice(0, 3).map(hire => (
+                <div key={hire.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">
+                      {hire.assignment?.developer?.name || 'Unknown Developer'}
+                    </h4>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} • 
+                      ${hire.salary.toLocaleString()} annual salary
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold text-emerald-600">
+                    ${Math.round(hire.salary * 0.15).toLocaleString()} fee
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">No hires recorded yet.</p>
+          )}
+          
+          {hires.length > 0 && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setActiveTab('hires')}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                View All Hires
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMyJobListings = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">My Job Listings</h2>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-4 py-2 text-purple-600 border border-purple-200 rounded-xl hover:bg-purple-50 transition-colors font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2 inline" />
+            Import Jobs
+          </button>
+          <button
+            onClick={() => {
+              setEditingJob(null);
+              setShowJobForm(true);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2 inline" />
+            Post New Job
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <input
+          type="text"
+          placeholder="Search job listings..."
+          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Job Listings */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+          <span className="text-gray-600 font-medium">Loading job listings...</span>
+        </div>
+      ) : filteredJobs.length > 0 ? (
+        <div className="space-y-6">
+          {filteredJobs.map((job) => (
+            <div key={job.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900">{job.title}</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {job.is_active ? 'Active' : 'Paused'}
+                    </span>
+                    {job.is_featured && (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
+                        Featured
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {job.location}
+                    </div>
+                    <div className="flex items-center">
+                      <Clock className="w-4 h-4 mr-1" />
+                      {job.job_type}
+                    </div>
+                    <div className="flex items-center">
+                      <DollarSign className="w-4 h-4 mr-1" />
+                      ${job.salary_min}k - ${job.salary_max}k
+                    </div>
+                    <div className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      Posted {new Date(job.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {job.tech_stack.map((tech, index) => (
+                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">
+                      <MessageSquare className="w-4 h-4 inline mr-1" />
+                      {jobInterestCounts[job.id] || 0} interested developers
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleToggleFeatureJob(job.id, !!job.is_featured)}
+                    className={`p-2 rounded-lg ${
+                      job.is_featured 
+                        ? 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50' 
+                        : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                    }`}
+                    title={job.is_featured ? "Unfeature Job" : "Feature Job"}
+                  >
+                    <Star className="w-5 h-5" fill={job.is_featured ? "currentColor" : "none"} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingJob(job);
+                      setShowJobForm(true);
+                    }}
+                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
+                    title="Edit Job"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteJob(job.id)}
+                    className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                    title="Delete Job"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => handleViewJobDetails(job.id)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  <Eye className="w-4 h-4 mr-2 inline" />
+                  View Details
+                </button>
+                <button
+                  onClick={() => handleToggleJobStatus(job.id, job.is_active)}
+                  className={`px-4 py-2 ${
+                    job.is_active 
+                      ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                      : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                  } rounded-lg transition-colors font-semibold`}
+                >
+                  {job.is_active ? 'Pause Listing' : 'Activate Listing'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+          <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Job Listings Found</h3>
+          <p className="text-gray-600 mb-6">
+            {searchTerm ? "No jobs match your search criteria" : "You haven't created any job listings yet"}
+          </p>
+          <button
+            onClick={() => {
+              setEditingJob(null);
+              setShowJobForm(true);
+            }}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2 inline" />
+            Post Your First Job
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSearchDevelopers = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
+      
+      <DeveloperList 
+        fetchType="all"
+        onSendMessage={handleMessageDeveloper}
+      />
+    </div>
+  );
+
+  const renderMessages = () => {
+    if (selectedThread) {
+      return (
+        <div className="space-y-6">
+          <button
+            onClick={() => setSelectedThread(null)}
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to Messages
+          </button>
+          
+          <MessageThread
+            otherUserId={selectedThread.otherUserId}
+            otherUserName={selectedThread.otherUserName}
+            otherUserRole={selectedThread.otherUserRole}
+            otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+            jobContext={selectedThread.jobContext}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-black text-gray-900">Messages</h2>
+        
+        <MessageList
+          onThreadSelect={setSelectedThread}
+        />
+      </div>
+    );
+  };
+
+  const renderHires = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-black text-gray-900">Successful Hires</h2>
+      
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <input
+          type="text"
+          placeholder="Search hires..."
+          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      
+      {/* Hires List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+          <span className="text-gray-600 font-medium">Loading hires...</span>
+        </div>
+      ) : filteredHires.length > 0 ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Platform Fee</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredHires.map((hire) => (
+                  <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
+                          {hire.assignment?.developer?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                        </div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {hire.assignment?.developer?.name || 'Unknown'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {hire.assignment?.job_role?.title || 'Unknown'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-gray-900">
+                        ${hire.salary.toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-emerald-600">
+                        ${Math.round(hire.salary * 0.15).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {new Date(hire.hire_date).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not set'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+          <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Hires Found</h3>
+          <p className="text-gray-600">
+            {searchTerm ? "No hires match your search criteria" : "You haven't recorded any successful hires yet"}
+          </p>
+          <p className="text-sm text-gray-500 mt-4">
+            When you successfully hire a developer, record it here to track your platform fees.
+          </p>
+        </div>
+      )}
+    </div>
   );
 
   if (authLoading) {

@@ -81,7 +81,7 @@ export const Header = () => {
   };
 
   const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentTransparent.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudFRyYW5zcGFyZW50LnBuZyIsImlhdCI6MTc1MTE3MzAyNiwiZXhwIjoxODE0MjQ1MDI2fQ.MYaFFrD9tDFprRRFwD4L-rlAleWAXYbVCpYnWp7c630';
-  const customLogoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjI5Mzc4LCJleHAiOjE3ODI3NjUzNzh9.d6zoyw7HdUn4z6mPJiFwIm7RCQYnDBfRXursnPHuGmo';
+  const customLogoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjc3NDA0LCJleHAiOjE3ODI4MTM0MDR9.ecwYI2CisfiBgLKL_CLo3Y7TV2LFY9E-vvYGOxAQ-w8';
 
   // Format display name for developers
   const getDisplayName = () => {
