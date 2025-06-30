@@ -55,8 +55,6 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const [error, setError] = useState('');
   const [hasRecruiterContact, setHasRecruiterContact] = useState(false);
   const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
-  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
-  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialJobRole) {
@@ -85,75 +83,11 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
       if (jobError) throw jobError;
       setJobRole(jobData);
 
-      // Fetch assignments for this job
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          developer:users!assignments_developer_id_fkey(*)
-        `)
-        .eq('job_role_id', jobRoleId)
-        .order('assigned_at', { ascending: false });
-
-      if (assignmentsError) throw assignmentsError;
-
-      // Fetch developer profiles for assignments
-      const assignmentsWithDevProfiles = await Promise.all(
-        (assignmentsData || []).map(async (assignment) => {
-          const { data: devProfile } = await supabase
-            .from('developers')
-            .select('*')
-            .eq('user_id', assignment.developer_id)
-            .single();
-
-          return {
-            ...assignment,
-            developer: {
-              ...devProfile,
-              user: assignment.developer
-            }
-          };
-        })
-      );
-
-      setAssignments(assignmentsWithDevProfiles);
-
-      // If this is a developer view, check if the recruiter has contacted the developer
-      if (isDeveloperView && userProfile) {
-        const { count, error: messagesError } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('sender_id', jobData.recruiter_id)
-          .eq('receiver_id', userProfile.id)
-          .eq('job_role_id', jobRoleId);
-          
-        if (messagesError) throw messagesError;
-        
-        setHasRecruiterContact(count ? count > 0 : false);
-      }
-
     } catch (error: any) {
       console.error('Error fetching job role details:', error);
       setError(error.message || 'Failed to load job details');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateAssignmentStatus = async (assignmentId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('assignments')
-        .update({ status: newStatus })
-        .eq('id', assignmentId);
-
-      if (error) throw error;
-
-      // Refresh assignments
-      fetchJobRoleDetails();
-    } catch (error: any) {
-      console.error('Error updating assignment status:', error);
-      setError(error.message || 'Failed to update assignment status');
     }
   };
 
@@ -171,9 +105,6 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const handleViewRecruiterProfile = () => {
     if (jobRole?.recruiter_id) {
       setShowRecruiterProfile(true);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -365,17 +296,13 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
               <Building className="w-5 h-5 text-gray-500 mr-3" />
               <div>
                 <h3 className="font-bold text-gray-900">Posted by</h3>
-                {showLimitedInfo ? (
-                  <p className="text-gray-600">Recruiter details will be visible after they contact you</p>
-                ) : (
-                  <button 
-                    onClick={handleViewRecruiterProfile}
-                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
-                  >
-                    {jobRole.recruiter.name}
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </button>
-                )}
+                <button 
+                  onClick={handleViewRecruiterProfile}
+                  className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                >
+                  {jobRole.recruiter.name}
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </button>
               </div>
             </div>
           </div>
@@ -408,14 +335,12 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
         )}
 
         {/* Description */}
-        {!showLimitedInfo && (
-          <div>
-            <h3 className="text-lg font-black text-gray-900 mb-3">Job Description</h3>
-            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{jobRole.description}</p>
-          </div>
-        )}
+        <div>
+          <h3 className="text-lg font-black text-gray-900 mb-3">Job Description</h3>
+          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{jobRole.description}</p>
+        </div>
 
-        {!showLimitedInfo && jobRole.experience_required && (
+        {jobRole.experience_required && (
           <div className="mt-6">
             <h3 className="text-lg font-black text-gray-900 mb-3">Experience Required</h3>
             <p className="text-gray-600">{jobRole.experience_required}</p>
@@ -593,18 +518,16 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                     </p>
                   </div>
                   
-                  {!showLimitedInfo && (
-                    <button 
-                      onClick={() => handleSendMessage(
-                        assignment.recruiter_id, 
-                        jobRole.recruiter?.name || 'Recruiter'
-                      )}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
-                    >
-                      <MessageSquare className="w-4 h-4 mr-2 inline" />
-                      Message Recruiter
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => handleSendMessage(
+                      assignment.recruiter_id, 
+                      jobRole.recruiter?.name || 'Recruiter'
+                    )}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2 inline" />
+                    Message Recruiter
+                  </button>
                 </div>
               </div>
             </div>

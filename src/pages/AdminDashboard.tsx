@@ -5,7 +5,8 @@ import { Navigate } from 'react-router-dom';
 import { 
   Users, 
   Briefcase, 
-  Building, 
+  Building,
+  Code,
   CheckCircle, 
   XCircle, 
   Loader, 
@@ -13,11 +14,16 @@ import {
   Search,
   Filter,
   Clock,
-  User,
   Calendar,
   Mail,
-  Shield
+  Shield,
+  Star,
+  DollarSign,
+  Eye,
+  Trash2,
+  Edit
 } from 'lucide-react';
+import { Developer, JobRole, Hire } from '../types';
 
 interface PendingRecruiter {
   user_id: string;
@@ -30,6 +36,9 @@ interface PendingRecruiter {
 export const AdminDashboard = () => {
   const { user, userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
   const [activeTab, setActiveTab] = useState('recruiters');
+  const [developers, setDevelopers] = useState<(Developer & { user: any })[]>([]);
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+  const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [pendingRecruiters, setPendingRecruiters] = useState<PendingRecruiter[]>([]);
   const [approvedRecruiters, setApprovedRecruiters] = useState<PendingRecruiter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +50,15 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (userProfile?.role === 'admin') {
       fetchRecruiters();
+      if (activeTab === 'developers') {
+        fetchDevelopers();
+      } else if (activeTab === 'jobs') {
+        fetchJobs();
+      } else if (activeTab === 'hires') {
+        fetchHires();
+      }
     }
-  }, [userProfile]);
+  }, [userProfile, activeTab]);
 
   const fetchRecruiters = async () => {
     try {
@@ -108,6 +124,80 @@ export const AdminDashboard = () => {
     }
   };
 
+  const fetchDevelopers = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data, error } = await supabase
+        .from('developers')
+        .select(`
+          *,
+          user:users(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDevelopers(data || []);
+    } catch (error: any) {
+      console.error('Error fetching developers:', error);
+      setError(error.message || 'Failed to load developers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select(`
+          *,
+          recruiter:users(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setJobRoles(data || []);
+    } catch (error: any) {
+      console.error('Error fetching jobs:', error);
+      setError(error.message || 'Failed to load jobs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchHires = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data, error } = await supabase
+        .from('hires')
+        .select(`
+          *,
+          assignment:assignments(
+            *,
+            developer:users!assignments_developer_id_fkey(*),
+            job_role:job_roles(*),
+            recruiter:users!assignments_recruiter_id_fkey(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setHires(data || []);
+    } catch (error: any) {
+      console.error('Error fetching hires:', error);
+      setError(error.message || 'Failed to load hires');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApprove = async (userId: string) => {
     try {
       setProcessingIds(prev => [...prev, userId]);
@@ -166,6 +256,30 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
+    try {
+      setError('');
+      
+      const { error } = await supabase
+        .from('job_roles')
+        .update({ is_featured: !isFeatured })
+        .eq('id', jobId);
+      
+      if (error) throw error;
+      
+      // Refresh jobs
+      fetchJobs();
+      
+      setSuccessMessage(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully`);
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error featuring job:', error);
+      setError(error.message || 'Failed to feature job');
+    }
+  };
+
   const filteredPendingRecruiters = pendingRecruiters.filter(recruiter => 
     recruiter.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     recruiter.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -176,6 +290,20 @@ export const AdminDashboard = () => {
     recruiter.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     recruiter.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     recruiter.company_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDevelopers = developers.filter(developer => 
+    developer.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    developer.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    developer.github_handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    developer.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const filteredJobs = jobRoles.filter(job => 
+    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    job.tech_stack.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    job.recruiter?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (authLoading) {
@@ -251,7 +379,7 @@ export const AdminDashboard = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <Code className="w-5 h-5 mr-2" />
+                <Users className="w-5 h-5 mr-2" />
                 Developers
               </button>
               <button
@@ -268,13 +396,13 @@ export const AdminDashboard = () => {
               <button
                 onClick={() => setActiveTab('assignments')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'assignments'
+                  activeTab === 'hires'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <Users className="w-5 h-5 mr-2" />
-                Assignments
+                <DollarSign className="w-5 h-5 mr-2" />
+                Hires
               </button>
             </nav>
           </div>
@@ -486,58 +614,356 @@ export const AdminDashboard = () => {
 
         {/* Developers Tab Placeholder */}
         {activeTab === 'developers' && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center mb-6">
-              <Code className="w-6 h-6 text-blue-500 mr-3" />
-              <h2 className="text-xl font-black text-gray-900">Developers Management</h2>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black text-gray-900">Developers</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search developers..."
+                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="text-center py-12">
-              <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Developer Management Coming Soon</h3>
-              <p className="text-gray-600">
-                This section will allow you to manage developer accounts and profiles.
-              </p>
-            </div>
+            
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+                <span className="text-gray-600 font-medium">Loading developers...</span>
+              </div>
+            ) : filteredDevelopers.length > 0 ? (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">GitHub</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Skills</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Experience</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredDevelopers.map((developer) => (
+                        <tr key={developer.user_id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
+                                {developer.user.name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">{developer.user.name}</div>
+                                <div className="text-sm text-gray-500">{developer.user.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {developer.github_handle ? (
+                                <a 
+                                  href={`https://github.com/${developer.github_handle}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  @{developer.github_handle}
+                                </a>
+                              ) : (
+                                <span className="text-gray-500">Not provided</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1">
+                              {developer.top_languages.slice(0, 3).map((lang, index) => (
+                                <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                                  {lang}
+                                </span>
+                              ))}
+                              {developer.top_languages.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                                  +{developer.top_languages.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {developer.location || 'Not specified'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {developer.experience_years} years
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              developer.availability 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {developer.availability ? 'Available' : 'Unavailable'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              className="text-blue-600 hover:text-blue-900"
+                              title="View Profile"
+                            >
+                              <Eye className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <Code className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Developers Found</h3>
+                <p className="text-gray-600">
+                  {searchTerm ? "No developers match your search criteria" : "There are no developers registered yet"}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Jobs Tab Placeholder */}
         {activeTab === 'jobs' && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center mb-6">
-              <Briefcase className="w-6 h-6 text-purple-500 mr-3" />
-              <h2 className="text-xl font-black text-gray-900">Jobs Management</h2>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black text-gray-900">Job Listings</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search jobs..."
+                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="text-center py-12">
-              <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Job Management Coming Soon</h3>
-              <p className="text-gray-600">
-                This section will allow you to manage job postings across the platform.
-              </p>
-            </div>
+            
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+                <span className="text-gray-600 font-medium">Loading jobs...</span>
+              </div>
+            ) : filteredJobs.length > 0 ? (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Posted</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredJobs.map((job) => (
+                        <tr key={job.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-900">{job.title}</div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {job.tech_stack.slice(0, 2).map((tech, index) => (
+                                <span key={index} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                                  {tech}
+                                </span>
+                              ))}
+                              {job.tech_stack.length > 2 && (
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                                  +{job.tech_stack.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{job.recruiter?.name || 'Unknown'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{job.location}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">${job.salary_min}k - ${job.salary_max}k</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              job.is_active 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {job.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            {job.is_featured && (
+                              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
+                                Featured
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {new Date(job.created_at).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleFeatureJob(job.id, !!job.is_featured)}
+                                className={`p-1 rounded-lg ${
+                                  job.is_featured 
+                                    ? 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50' 
+                                    : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                                }`}
+                                title={job.is_featured ? "Unfeature Job" : "Feature Job"}
+                              >
+                                <Star className="w-5 h-5" fill={job.is_featured ? "currentColor" : "none"} />
+                              </button>
+                              <button
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
+                                title="Edit Job"
+                              >
+                                <Edit className="w-5 h-5" />
+                              </button>
+                              <button
+                                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                                title="Delete Job"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Jobs Found</h3>
+                <p className="text-gray-600">
+                  {searchTerm ? "No jobs match your search criteria" : "There are no job postings yet"}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Assignments Tab Placeholder */}
-        {activeTab === 'assignments' && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center mb-6">
-              <Users className="w-6 h-6 text-emerald-500 mr-3" />
-              <h2 className="text-xl font-black text-gray-900">Assignments Management</h2>
+        {/* Hires Tab */}
+        {activeTab === 'hires' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black text-gray-900">Hires Report</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search hires..."
+                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="text-center py-12">
-              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Assignment Management Coming Soon</h3>
-              <p className="text-gray-600">
-                This section will allow you to create and manage developer-job assignments.
-              </p>
-            </div>
+            
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+                <span className="text-gray-600 font-medium">Loading hires...</span>
+              </div>
+            ) : hires.length > 0 ? (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Platform Fee</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {hires.map((hire) => (
+                        <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
+                                {hire.assignment?.developer?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                              </div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {hire.assignment?.developer?.name || 'Unknown'}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {hire.assignment?.job_role?.title || 'Unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {hire.assignment?.recruiter?.name || 'Unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">
+                              ${hire.salary.toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-emerald-600">
+                              ${Math.round(hire.salary * 0.15).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {new Date(hire.hire_date).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not set'}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Hires Found</h3>
+                <p className="text-gray-600">
+                  {searchTerm ? "No hires match your search criteria" : "There are no successful hires recorded yet"}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 };
-
-// Import the Code icon
-import { Code } from 'lucide-react';

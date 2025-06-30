@@ -16,12 +16,14 @@ import {
 import { Developer, User } from '../types';
 
 interface DeveloperListProps {
-  recruiterId: string;
+  recruiterId?: string;
+  fetchType?: 'assigned' | 'all';
   onSendMessage?: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
 }
 
 export const DeveloperList: React.FC<DeveloperListProps> = ({ 
   recruiterId,
+  fetchType = 'assigned',
   onSendMessage
 }) => {
   const { userProfile } = useAuth();
@@ -35,49 +37,69 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
   const [filterAvailability, setFilterAvailability] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetchAssignedDevelopers();
-  }, [recruiterId]);
+    if (recruiterId || fetchType === 'all') {
+      fetchDevelopers();
+    }
+  }, [recruiterId, fetchType]);
 
-  const fetchAssignedDevelopers = async () => {
+  const fetchDevelopers = async () => {
     try {
       setLoading(true);
-      console.log('DeveloperList: Fetching assigned developers for recruiter:', recruiterId);
+      console.log('DeveloperList: Fetching developers, type:', fetchType);
       setError('');
 
-      // Fetch assignments for this recruiter
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select('developer_id')
-        .eq('recruiter_id', recruiterId);
+      let developersData;
+      
+      if (fetchType === 'assigned' && recruiterId) {
+        // Fetch assignments for this recruiter
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select('developer_id')
+          .eq('recruiter_id', recruiterId);
 
-      if (assignmentsError) throw assignmentsError;
+        if (assignmentsError) throw assignmentsError;
 
-      if (!assignments || assignments.length === 0) {
-        console.log('DeveloperList: No assignments found for recruiter');
-        setDevelopers([]);
-        setLoading(false);
-        return;
+        if (!assignments || assignments.length === 0) {
+          console.log('DeveloperList: No assignments found for recruiter');
+          setDevelopers([]);
+          setLoading(false);
+          return;
+        }
+
+        // Get unique developer IDs
+        const developerIds = [...new Set(assignments.map(a => a.developer_id))];
+
+        console.log('DeveloperList: Found developer IDs:', developerIds);
+        // Fetch developer profiles with user data
+        const { data, error: developersError } = await supabase
+          .from('developers')
+          .select(`
+            *,
+            user:users(*)
+          `)
+          .in('user_id', developerIds);
+          
+        if (developersError) throw developersError;
+        developersData = data;
+      } else {
+        // Fetch all developers
+        const { data, error: developersError } = await supabase
+          .from('developers')
+          .select(`
+            *,
+            user:users(*)
+          `)
+          .eq('user.is_approved', true);
+          
+        if (developersError) throw developersError;
+        developersData = data;
       }
 
-      // Get unique developer IDs
-      const developerIds = [...new Set(assignments.map(a => a.developer_id))];
-
-      console.log('DeveloperList: Found developer IDs:', developerIds);
-      // Fetch developer profiles with user data
-      const { data: developersData, error: developersError } = await supabase
-        .from('developers')
-        .select(`
-          *,
-          user:users(*)
-        `)
-        .in('user_id', developerIds);
-
-      if (developersError) throw developersError;
       console.log('DeveloperList: Fetched developers:', developersData?.length || 0);
       setDevelopers(developersData || []);
 
     } catch (error: any) {
-      console.error('Error fetching assigned developers:', error);
+      console.error('Error fetching developers:', error);
       setError(error.message || 'Failed to load developers');
     } finally {
       setLoading(false);
@@ -260,7 +282,9 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
           <p className="text-gray-600">
             {searchTerm || filterAvailability !== null
               ? "No developers match your search criteria" 
-              : "You don't have any assigned developers yet"}
+              : fetchType === 'assigned' 
+                ? "You don't have any assigned developers yet"
+                : "No developers found"}
           </p>
           {searchTerm || filterAvailability !== null ? (
             <button 
@@ -274,7 +298,9 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
             </button>
           ) : (
             <p className="mt-4 text-sm text-gray-500">
-              Developers will be assigned to your job listings by the admin team.
+              {fetchType === 'assigned'
+                ? "Developers will appear here when they're assigned to your job listings."
+                : "No developers match your search criteria."}
             </p>
           )}
         </div>

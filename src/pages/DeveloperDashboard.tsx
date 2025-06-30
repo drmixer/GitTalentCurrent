@@ -253,9 +253,48 @@ export const DeveloperDashboard = () => {
   };
 
   const handleExpressInterest = (jobRoleId: string) => {
-    // In a real implementation, this would record the developer's interest
-    // For now, we'll just show the job details
-    handleViewJobDetails(jobRoleId);
+    // Get the job details
+    const job = recommendedJobs.find(j => j.id === jobRoleId);
+    if (!job) return;
+    
+    // Send a message to the recruiter expressing interest
+    sendInterestMessage(job);
+  };
+
+  const sendInterestMessage = async (job: JobRole) => {
+    try {
+      if (!userProfile?.id) return;
+      
+      // Create a message to the recruiter
+      const messageData = {
+        sender_id: userProfile.id,
+        receiver_id: job.recruiter_id,
+        subject: `Interest in: ${job.title}`,
+        body: `I'm interested in the ${job.title} position. Please review my profile and let me know if you'd like to discuss further.`,
+        job_role_id: job.id,
+        is_read: false
+      };
+
+      const { error } = await supabase
+        .from('messages')
+        .insert(messageData);
+
+      if (error) {
+        if (error.code === '42501') {
+          // Policy violation - likely the developer can't message this recruiter yet
+          setError('You cannot express interest until the recruiter contacts you first.');
+        } else {
+          throw error;
+        }
+      } else {
+        // Show success message and view job details
+        alert('Interest expressed successfully! The recruiter will be notified.');
+        handleViewJobDetails(job.id);
+      }
+    } catch (error: any) {
+      console.error('Error expressing interest:', error);
+      setError(error.message || 'Failed to express interest');
+    }
   };
 
   // Generate dynamic profile strength suggestions based on profile data
@@ -1085,40 +1124,40 @@ export const DeveloperDashboard = () => {
 
         {/* Job Details Modal */}
         {showJobDetailsModal && selectedJobForDetails && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
-              <div className="p-6 border-b border-gray-200">
-                <button
-                  onClick={handleCloseJobDetails}
-                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
-                  Back to Dashboard
-                </button>
-              </div>
-              <div className="p-6">
-                <JobRoleDetails
-                  jobRoleId={selectedJobForDetails}
-                  isDeveloperView={true}
-                  onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
-                    setSelectedThread({
-                      otherUserId: developerId,
-                      otherUserName: developerName,
-                      otherUserRole: 'recruiter',
-                      unreadCount: 0,
-                      jobContext: {
-                        id: jobRoleId,
-                        title: jobRoleTitle
-                      }
-                    });
-                    setShowJobDetailsModal(false);
-                    setActiveTab('messages');
-                  }}
-                />
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <button
+                onClick={handleCloseJobDetails}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Dashboard
+              </button>
+            </div>
+            <div className="p-6">
+              <JobRoleDetails
+                jobRoleId={selectedJobForDetails}
+                isDeveloperView={true}
+                onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
+                  setSelectedThread({
+                    otherUserId: developerId,
+                    otherUserName: developerName,
+                    otherUserRole: 'recruiter',
+                    unreadCount: 0,
+                    jobContext: {
+                      id: jobRoleId,
+                      title: jobRoleTitle
+                    }
+                  });
+                  setShowJobDetailsModal(false);
+                  setActiveTab('messages');
+                }}
+              />
             </div>
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );
