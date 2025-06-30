@@ -1,5 +1,5 @@
-import React, { useContext, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useContext, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './contexts/AuthContext.tsx';
 import { Header } from './components/Layout/Header';
 import { LandingPage } from './pages/LandingPage';
@@ -10,26 +10,31 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
-import { Navigate } from 'react-router-dom';
 
 function App() {
   const { user, userProfile, loading } = useContext(AuthContext);
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && userProfile) {
-      // Redirect user based on role if logged in
+    if (!loading && user && userProfile) {
       if (userProfile.role === 'admin') {
-        // Redirect to Admin dashboard
-        return <Navigate to="/admin" />;
+        setRedirectPath('/admin');
       } else if (userProfile.role === 'recruiter') {
-        // Redirect to Recruiter dashboard
-        return <Navigate to="/recruiter" />;
+        setRedirectPath('/recruiter');
       } else if (userProfile.role === 'developer') {
-        // Redirect to Developer dashboard
-        return <Navigate to="/developer" />;
+        setRedirectPath('/developer');
       }
     }
-  }, [user, userProfile]);
+  }, [user, userProfile, loading]);
+
+  if (loading) {
+    // You can add a loading spinner or a similar UI
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (redirectPath) {
+    return <Navigate to={redirectPath} />;
+  }
 
   return (
     <AuthProvider>
