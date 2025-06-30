@@ -20,6 +20,9 @@ interface AssignDeveloperModalProps {
   preSelectedJobId?: string;
   preSelectedDeveloperId?: string;
   onSuccess?: () => void;
+  jobRoleId?: string;
+  onAssign?: () => void;
+  onCancel?: () => void;
 }
 
 export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
@@ -27,7 +30,10 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
   onClose,
   preSelectedJobId,
   preSelectedDeveloperId,
-  onSuccess
+  onSuccess,
+  jobRoleId,
+  onAssign,
+  onCancel
 }) => {
   const { createAssignment } = useAuth();
   const [developers, setDevelopers] = useState<(Developer & { user: UserType })[]>([]);
@@ -43,8 +49,13 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchData();
+      
+      // If jobRoleId is provided, preselect it
+      if (jobRoleId) {
+        setSelectedJobId(jobRoleId);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, jobRoleId]);
 
   useEffect(() => {
     if (preSelectedDeveloperId) {
@@ -134,6 +145,7 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
         setSuccess('Developer assigned successfully!');
         setTimeout(() => {
           onSuccess?.();
+          onAssign?.();
           onClose();
           resetForm();
         }, 1500);
@@ -354,6 +366,7 @@ export const AssignDeveloperModal: React.FC<AssignDeveloperModalProps> = ({
           <button
             onClick={() => {
               onClose();
+              onCancel?.();
               resetForm();
             }}
             className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"

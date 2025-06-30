@@ -41,7 +41,8 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
     salary_min: 0,
     salary_max: 0,
     experience_required: '',
-    is_active: true
+    is_active: true,
+    is_featured: false
   });
 
   const [newTech, setNewTech] = useState('');
@@ -57,7 +58,8 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
         salary_min: jobRole.salary_min,
         salary_max: jobRole.salary_max,
         experience_required: jobRole.experience_required,
-        is_active: jobRole.is_active
+        is_active: jobRole.is_active,
+        is_featured: jobRole.is_featured || false
       });
     }
   }, [jobRole]);
@@ -409,6 +411,34 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Featured toggle */}
+        <div className="bg-gray-50 rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 mb-2">Featured Job</h3>
+              <p className="text-gray-600">Feature this job for higher visibility to developers</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className={`text-sm font-semibold ${formData.is_featured ? 'text-yellow-600' : 'text-gray-500'}`}>
+                {formData.is_featured ? 'Featured' : 'Not Featured'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, is_featured: !prev.is_featured }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.is_featured ? 'bg-yellow-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.is_featured ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
