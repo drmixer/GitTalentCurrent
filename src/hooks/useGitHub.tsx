@@ -202,6 +202,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         error: ''
       });
 
+      // Automatically sync data to profile
+      await syncLanguagesToProfile();
+      await syncProjectsToProfile();
+
     } catch (error: any) {
       console.error('Error in refreshGitHubData:', error.message || error);
       setGitHubData(prev => ({
@@ -237,9 +241,15 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     const topLanguages = getTopLanguages(15);
     console.log('syncLanguagesToProfile - Top languages:', topLanguages);
     if (topLanguages.length > 0) {
-      await updateDeveloperProfile({
-        top_languages: topLanguages
+      // Merge with existing languages, removing duplicates
+      const existingLanguages = developerProfile.top_languages || [];
+      const mergedLanguages = [...new Set([...existingLanguages, ...topLanguages])];
+      
+      await updateDeveloperProfile?.({
+        top_languages: mergedLanguages
       });
+      
+      console.log('syncLanguagesToProfile - Updated profile with languages:', mergedLanguages.length);
     }
   };
 
@@ -255,9 +265,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const existingProjects = developerProfile.linked_projects || [];
       const uniqueProjects = [...new Set([...existingProjects, ...topRepos])];
       
-      await updateDeveloperProfile({
+      await updateDeveloperProfile?.({
         linked_projects: uniqueProjects
       });
+      
+      console.log('syncProjectsToProfile - Updated profile with projects:', uniqueProjects.length);
     }
   };
 

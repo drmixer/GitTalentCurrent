@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { GitHubChart } from '../components/GitHub/GitHubChart';
 import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
@@ -9,6 +8,7 @@ import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthI
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperProfileForm } from '../components/Profile/DeveloperProfileForm';
+import { useGitHub } from '../hooks/useGitHub';
 import { 
   User, 
   Code, 
@@ -41,6 +41,19 @@ interface MessageThread {
 
 export const DeveloperDashboard = () => {
   const { userProfile, developerProfile, loading: authLoading } = useAuth();
+  const { 
+    user: githubUser, 
+    repos: githubRepos, 
+    totalStars, 
+    loading: githubLoading, 
+    error: githubError, 
+    refreshGitHubData,
+    getTopLanguages,
+    getTopRepos,
+    syncLanguagesToProfile,
+    syncProjectsToProfile
+  } = useGitHub();
+  
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -136,6 +149,11 @@ export const DeveloperDashboard = () => {
   const handleProfileUpdateSuccess = () => {
     setShowEditProfileForm(false);
     fetchDashboardData();
+    
+    // If GitHub handle was updated, refresh GitHub data
+    if (developerProfile?.github_handle) {
+      refreshGitHubData();
+    }
   };
 
   if (authLoading || loading) {
@@ -449,6 +467,87 @@ export const DeveloperDashboard = () => {
         </div>
       </div>
 
+      {/* GitHub Stats */}
+      {developerProfile.github_handle && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-6">GitHub Stats</h3>
+          
+          <div className="grid md:grid-cols-4 gap-6 mb-6">
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+              <div className="text-2xl font-black text-gray-900 mb-1">
+                {githubUser?.public_repos || 0}
+              </div>
+              <div className="text-sm font-semibold text-gray-600">Repositories</div>
+            </div>
+            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+              <div className="text-2xl font-black text-gray-900 mb-1">
+                {totalStars || 0}
+              </div>
+              <div className="text-sm font-semibold text-gray-600">Total Stars</div>
+            </div>
+            <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+              <div className="text-2xl font-black text-gray-900 mb-1">
+                {githubUser?.followers || 0}
+              </div>
+              <div className="text-sm font-semibold text-gray-600">Followers</div>
+            </div>
+            <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
+              <div className="text-2xl font-black text-gray-900 mb-1">
+                {getTopLanguages().length}
+              </div>
+              <div className="text-sm font-semibold text-gray-600">Languages</div>
+            </div>
+          </div>
+          
+          {/* Top Languages */}
+          <div className="mb-6">
+            <h4 className="font-bold text-gray-900 mb-3">Top Languages</h4>
+            <div className="space-y-3">
+              {getTopLanguages(5).map((language, index) => {
+                const percentage = Math.round(100 / (index + 2));
+                return (
+                  <div key={language} className="flex items-center text-sm">
+                    <div className={`w-3 h-3 rounded-full mr-3 bg-${
+                      ['blue', 'green', 'purple', 'yellow', 'red'][index % 5]
+                    }-500`}></div>
+                    <span className="text-gray-700 flex-1 font-medium">{language}</span>
+                    <span className="text-gray-900 font-bold">{percentage}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Top Repositories */}
+          <div>
+            <h4 className="font-bold text-gray-900 mb-3">Top Repositories</h4>
+            <div className="space-y-2">
+              {getTopRepos(3).map(repo => (
+                <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={repo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate"
+                    >
+                      {repo.name}
+                    </a>
+                    {repo.description && (
+                      <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 ml-2">
+                    <Star className="w-3 h-3 mr-1" />
+                    {repo.stargazers_count}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Activity Stats */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <h3 className="text-lg font-black text-gray-900 mb-6">Activity Overview</h3>
@@ -616,10 +715,74 @@ export const DeveloperDashboard = () => {
   const renderGitHub = () => (
     <div className="space-y-6">
       {developerProfile.github_handle ? (
-        <RealGitHubChart 
-          githubHandle={developerProfile.github_handle} 
-          className="w-full"
-        />
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-black text-gray-900">GitHub Activity</h2>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={syncLanguagesToProfile}
+                className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium text-sm"
+              >
+                <Code className="w-4 h-4 mr-1 inline" />
+                Sync Languages
+              </button>
+              <button
+                onClick={syncProjectsToProfile}
+                className="px-4 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors font-medium text-sm"
+              >
+                <GitBranch className="w-4 h-4 mr-1 inline" />
+                Sync Projects
+              </button>
+              <button
+                onClick={refreshGitHubData}
+                className="px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+              >
+                <RefreshCw className="w-4 h-4 mr-1 inline" />
+                Refresh
+              </button>
+            </div>
+          </div>
+          
+          <RealGitHubChart 
+            githubHandle={developerProfile.github_handle} 
+            className="w-full"
+          />
+          
+          {/* Top Repositories */}
+          {!githubLoading && githubRepos.length > 0 && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-lg font-black text-gray-900 mb-4">Top Repositories</h3>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getTopRepos(6).map(repo => (
+                  <div key={repo.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                    <div className="flex items-start justify-between mb-2">
+                      <a
+                        href={repo.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 font-semibold"
+                      >
+                        {repo.name}
+                      </a>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Star className="w-3 h-3 mr-1" />
+                        {repo.stargazers_count}
+                      </div>
+                    </div>
+                    {repo.description && (
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{repo.description}</p>
+                    )}
+                    {repo.language && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                        {repo.language}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
           <Github className="w-16 h-16 text-gray-400 mx-auto mb-4" />
