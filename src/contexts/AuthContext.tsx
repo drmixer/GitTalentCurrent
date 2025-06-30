@@ -117,14 +117,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const { error } = await supabase.auth.signOut();
       if (error) {
-    } catch (error) {
+          } catch (error) {
       console.error('❌ Error in signOut:', error);
       throw error;
     } finally {
       setLoading(false);
       setSigningOut(false);
     }
-  };
+      };
+  }
 
   const signIn = async (email: string, password: string) => {
     console.log('🔄 Signing in with email...');
@@ -446,6 +447,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         console.log('🔄 Developer profile fetch result:', data ? 'found' : 'not found');
         if (error && error.code !== 'PGRST116') {
+        }
         if (!data) {
           // Developer profile doesn't exist, needs onboarding
           console.log('⚠️ Developer profile not found, needs onboarding');
@@ -477,13 +479,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         if (!data) {
-      } else {
+              } else {
         // Admin or other role
         console.log('ℹ️ Admin or other role, no specific profile needed');
         setDeveloperProfile(null);
         setNeedsOnboarding(false);
       }
-    } catch (error) {
+          } catch (error) {
       console.error('❌ Error in checkForRoleSpecificProfile:', error);
       console.error('❌ Error checking role-specific profile:', error);
       setDeveloperProfile(null);
@@ -491,7 +493,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+      };
+  }
 
   const refreshProfile = async () => {
     if (user) {
