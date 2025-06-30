@@ -475,30 +475,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('🔄 Recruiter profile fetch result:', data ? 'found' : 'not found');
         if (error && error.code !== 'PGRST116') {
           console.error('❌ Error fetching recruiter profile:', error);
+          setNeedsOnboarding(true);
+        }
+        
+        if (!data) {
           console.log('⚠️ Recruiter profile not found, needs onboarding');
           setNeedsOnboarding(true);
         } else {
           console.log('✅ Recruiter profile found');
           setNeedsOnboarding(false);
         }
-        
-        if (!data) {
-              } else {
+      } else {
         // Admin or other role
         console.log('ℹ️ Admin or other role, no specific profile needed');
         setDeveloperProfile(null);
         setNeedsOnboarding(false);
       }
-          } catch (error) {
+    } catch (error) {
       console.error('❌ Error in checkForRoleSpecificProfile:', error);
       console.error('❌ Error checking role-specific profile:', error);
-      setDeveloperProfile(null);
       setNeedsOnboarding(false);
     } finally {
       setLoading(false);
     }
-      };
-  }
+    }
+  };
 
   const refreshProfile = async () => {
     if (user) {
