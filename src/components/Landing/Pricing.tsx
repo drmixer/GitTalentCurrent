@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ArrowRight, Star, Zap, Shield, DollarSign, Sparkles, Brain } from 'lucide-react';
+import { Check, ArrowRight, Star, Zap, Shield, DollarSign, Sparkles, Brain, Code } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const Pricing = () => {
