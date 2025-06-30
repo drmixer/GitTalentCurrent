@@ -9,7 +9,8 @@ import {
   Code,
   Clock,
   CheckCircle,
-  Loader
+  Loader,
+  Lock
 } from 'lucide-react';
 import { Message } from '../../types';
 
@@ -37,6 +38,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [subject, setSubject] = useState('');
+  const [hasInitiatedContact, setHasInitiatedContact] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,6 +79,11 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       if (error) throw error;
 
       setMessages(data || []);
+
+      // Check if there are any messages from the current user to the other user
+      // This determines if contact has been initiated
+      const hasInitiated = data?.some(msg => msg.sender_id === userProfile.id) || false;
+      setHasInitiatedContact(hasInitiated);
 
       // Mark messages as read
       await markMessagesAsRead();
@@ -135,6 +142,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
       setNewMessage('');
       setSubject('');
+      setHasInitiatedContact(true);
       await fetchMessages();
 
     } catch (error: any) {
@@ -190,6 +198,19 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   };
 
+  // Determine if we should show limited info for the other user
+  const shouldShowLimitedInfo = () => {
+    // If the current user is a developer and the other user is a recruiter
+    if (userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
+      // Check if there are any messages from the recruiter
+      const hasRecruiterSentMessage = messages.some(msg => msg.sender_id === otherUserId);
+      return !hasRecruiterSentMessage && !hasInitiatedContact;
+    }
+    return false;
+  };
+
+  const showLimitedInfo = shouldShowLimitedInfo();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -212,11 +233,17 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             </button>
           )}
           <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-            {otherUserName.split(' ').map(n => n[0]).join('')}
+            {showLimitedInfo ? (
+              <Lock className="w-6 h-6" />
+            ) : (
+              otherUserName.split(' ').map(n => n[0]).join('')
+            )}
           </div>
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-black text-gray-900">{otherUserName}</h2>
+              <h2 className="text-xl font-black text-gray-900">
+                {showLimitedInfo ? "Recruiter" : otherUserName}
+              </h2>
               <div className="flex items-center text-gray-500">
                 {getRoleIcon(otherUserRole)}
                 <span className="ml-1 text-sm capitalize">{otherUserRole}</span>
@@ -225,6 +252,12 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             {jobContext && (
               <p className="text-sm text-blue-600 font-medium">
                 Re: {jobContext.title}
+              </p>
+            )}
+            {showLimitedInfo && (
+              <p className="text-xs text-gray-500 mt-1">
+                <Lock className="w-3 h-3 inline mr-1" />
+                Full details will be visible after the recruiter contacts you
               </p>
             )}
           </div>
@@ -268,7 +301,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Start a conversation</h3>
             <p className="text-gray-600">
-              Send a message to {otherUserName} to get started.
+              {showLimitedInfo 
+                ? "Send a message to introduce yourself to the recruiter" 
+                : `Send a message to ${otherUserName} to get started.`}
             </p>
           </div>
         )}

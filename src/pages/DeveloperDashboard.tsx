@@ -82,7 +82,29 @@ export const DeveloperDashboard = () => {
         .order('assigned_at', { ascending: false });
 
       if (assignmentsError) throw assignmentsError;
-      setAssignments(assignmentsData || []);
+
+      // For each assignment, check if there are any messages from the recruiter
+      const enhancedAssignments = await Promise.all((assignmentsData || []).map(async (assignment) => {
+        // Check if there are any messages from the recruiter to the developer for this job
+        const { count, error: messagesError } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('sender_id', assignment.recruiter_id)
+          .eq('receiver_id', userProfile.id)
+          .eq('job_role_id', assignment.job_role_id);
+        
+        if (messagesError) {
+          console.error('Error checking recruiter messages:', messagesError);
+          return { ...assignment, has_recruiter_contact: false };
+        }
+
+        return { 
+          ...assignment, 
+          has_recruiter_contact: count ? count > 0 : false 
+        };
+      }));
+
+      setAssignments(enhancedAssignments);
 
       // Fetch unread messages count
       const { count: unreadCount, error: messagesError } = await supabase
@@ -96,7 +118,7 @@ export const DeveloperDashboard = () => {
       // Set stats
       setStats({
         profileViews: Math.floor(Math.random() * 20) + 5, // Simulated data
-        assignmentCount: assignmentsData?.length || 0,
+        assignmentCount: enhancedAssignments?.length || 0,
         messageCount: unreadCount || 0,
         profileStrength: developerProfile?.profile_strength || 0
       });
@@ -228,8 +250,17 @@ export const DeveloperDashboard = () => {
             {assignments.slice(0, 3).map((assignment) => (
               <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
-                  <div className="font-semibold text-gray-900">{assignment.job_role?.title || 'Unknown Job'}</div>
-                  <div className="text-sm text-gray-600">{assignment.recruiter?.name || 'Unknown Recruiter'}</div>
+                  {assignment.has_recruiter_contact ? (
+                    <>
+                      <div className="font-semibold text-gray-900">{assignment.job_role?.title || 'Unknown Job'}</div>
+                      <div className="text-sm text-gray-600">{assignment.recruiter?.name || 'Unknown Recruiter'}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-semibold text-gray-900">New Job Opportunity</div>
+                      <div className="text-sm text-gray-600">Details available after recruiter contact</div>
+                    </>
+                  )}
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                   assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
@@ -699,6 +730,13 @@ export const DeveloperDashboard = () => {
           </div>
         </div>
 
+        {/* Content */}
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'stats' && renderStats()}
+        {activeTab === 'portfolio' && renderPortfolio()}
+        {activeTab === 'github' && renderGitHub()}
+        {activeTab === 'messages' && renderMessages()}
+
         {/* Edit Profile Modal */}
         {showEditProfileForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -722,13 +760,6 @@ export const DeveloperDashboard = () => {
             </div>
           </div>
         )}
-
-        {/* Content */}
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'stats' && renderStats()}
-        {activeTab === 'portfolio' && renderPortfolio()}
-        {activeTab === 'github' && renderGitHub()}
-        {activeTab === 'messages' && renderMessages()}
       </div>
     </div>
   );

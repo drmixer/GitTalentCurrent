@@ -159,6 +159,7 @@ export interface Assignment {
   assigned_at: string;
   updated_at: string;
   notes: string;
+  has_recruiter_contact?: boolean;
   developer?: Developer;
   job_role?: JobRole;
   recruiter?: Recruiter;

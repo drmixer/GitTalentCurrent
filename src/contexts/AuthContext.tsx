@@ -57,7 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
       
-      // If we're in the process of signing out, ignore auth state changes
       if (signingOut) { 
         console.log('🔄 Still in signing out process, ignoring auth change');
         return;
@@ -65,17 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const newUser = session?.user ?? null;
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('🔄 User signed out, clearing auth state...');
-          setUser(null);
-          setUserProfile(null);
-          setDeveloperProfile(null);
-          setNeedsOnboarding(false);
-          setLoading(false);
-          return;
-        }
-        
         setUser(newUser);
         
         if (newUser) {
@@ -89,6 +77,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             await fetchUserProfile(newUser);
           }
+        } else if (event === 'SIGNED_OUT') {
+          console.log('🔄 User signed out, clearing auth state...');
+          setUserProfile(null);
+          setDeveloperProfile(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error('❌ Error in auth state change:', error);
@@ -488,6 +481,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log('✅ Developer profile created successfully');
+      
+      // Calculate and update profile strength
+      await updateProfileStrength();
+      
       // Refresh profiles after creation 
       await fetchUserProfile(user);
       return true;
@@ -524,12 +521,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log('✅ Developer profile updated successfully');
+      
+      // Calculate and update profile strength
+      await updateProfileStrength();
+      
       // Refresh profiles after update 
       await fetchUserProfile(user);
       return true;
     } catch (error) {
       console.error('❌ Error in updateDeveloperProfile:', error);
       return false;
+    }
+  };
+
+  const updateProfileStrength = async (): Promise<void> => {
+    if (!user) return;
+    
+    try {
+      console.log('🔄 Updating profile strength for:', user.id);
+      
+      const { data, error } = await supabase.rpc('calculate_profile_strength_rpc', {
+        p_user_id: user.id
+      });
+      
+      if (error) {
+        console.error('❌ Error updating profile strength:', error);
+        return;
+      }
+      
+      console.log('✅ Profile strength updated to:', data);
+    } catch (error) {
+      console.error('❌ Error in updateProfileStrength:', error);
     }
   };
 
