@@ -67,7 +67,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (newUser) {
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') { 
             console.log('✅ User signed in or token refreshed, handling profile setup...');
-            await handleGitHubSignIn(newUser);
           }
           await fetchUserProfile(newUser);
         } else if (event === 'SIGNED_OUT') {
