@@ -18,13 +18,11 @@ import { Developer, User } from '../types';
 interface DeveloperListProps {
   recruiterId?: string;
   fetchType?: 'assigned' | 'all';
-  fetchType?: 'assigned' | 'all';
   onSendMessage?: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
 }
 
 export const DeveloperList: React.FC<DeveloperListProps> = ({ 
   recruiterId,
-  fetchType = 'assigned',
   fetchType = 'assigned',
   onSendMessage
 }) => {
@@ -43,8 +41,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
       fetchDevelopers();
     }
   }, [recruiterId, fetchType]);
-    }
-  }, [recruiterId, fetchType]);
 
   const fetchDevelopers = async () => {
     try {
@@ -57,9 +53,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
       if (fetchType === 'assigned' && recruiterId) {
         // Fetch assignments for this recruiter
         const { data: assignments, error: assignmentsError } = await supabase
-          .from('assignments')
-          .select('developer_id')
-          .eq('recruiter_id', recruiterId);
           .from('assignments')
           .select('developer_id')
           .eq('recruiter_id', recruiterId);
@@ -88,21 +81,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
           
         if (developersError) throw developersError;
         developersData = data;
-        // Get unique developer IDs
-        const developerIds = [...new Set(assignments.map(a => a.developer_id))];
-        const { data, error: developersError } = await supabase
-        console.log('DeveloperList: Found developer IDs:', developerIds);
-        // Fetch developer profiles with user data
-        const { data, error: developersError } = await supabase
-          .from('developers')
-          .select(`
-            *,
-            user:users(*)
-          `)
-          .in('user_id', developerIds);
-          
-        if (developersError) throw developersError;
-        developersData = data;
       } else {
         // Fetch all developers
         const { data, error: developersError } = await supabase
@@ -116,7 +94,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
         if (developersError) throw developersError;
         developersData = data;
       }
-        }
       console.log('DeveloperList: Fetched developers:', developersData?.length || 0);
       setDevelopers(developersData || []);
 
@@ -307,8 +284,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
               : fetchType === 'assigned' 
                 ? "You don't have any assigned developers yet"
                 : "No developers found"}
-                ? "You don't have any assigned developers yet"
-                : "No developers found"}
           </p>
           {searchTerm || filterAvailability !== null ? (
             <button 
@@ -323,9 +298,6 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
           ) : (
             <p className="mt-4 text-sm text-gray-500">
               {fetchType === 'assigned'
-                ? "Developers will appear here when they're assigned to your job listings."
-                : "No developers match your search criteria."
-              }
                 ? "Developers will appear here when they're assigned to your job listings."
                 : "No developers match your search criteria."}
             </p>
