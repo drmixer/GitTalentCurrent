@@ -263,7 +263,6 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
             />
           ))}
         </div>
-        </div>
         
         {/* Legend */}
         <div className="flex items-center justify-between text-xs text-gray-500">
