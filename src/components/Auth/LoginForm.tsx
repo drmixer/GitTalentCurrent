@@ -12,7 +12,6 @@ export const LoginForm = () => {
   const [githubLoading, setGithubLoading] = useState(false);
   const { signIn, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-
   useEffect(() => {
     if (!authLoading && user) {
       console.log('✅ User authenticated, redirecting to dashboard...');
@@ -65,7 +64,6 @@ export const LoginForm = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
             <img 
@@ -76,9 +74,6 @@ export const LoginForm = () => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'flex';
-              }}
-            />
             <span className="text-2xl font-black text-gray-900">GitTalent</span>
           </Link>
           <h2 className="text-3xl font-black text-gray-900 mb-3">
@@ -93,9 +88,7 @@ export const LoginForm = () => {
               Sign up for free
             </Link>
           </p>
-        </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-8">
           <button
             onClick={handleGitHubSignIn}
             disabled={githubLoading || loading}
@@ -113,7 +106,6 @@ export const LoginForm = () => {
               </>
             )}
           </button>
-
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
