@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { DeveloperCard } from './DeveloperCard';
 import { DeveloperSnapshotCard } from './Profile/DeveloperSnapshotCard';
@@ -16,15 +17,20 @@ import { Developer, User } from '../types';
 
 interface DeveloperListProps {
   recruiterId: string;
+  onSendMessage?: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
 }
 
-export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => {
+export const DeveloperList: React.FC<DeveloperListProps> = ({ 
+  recruiterId,
+  onSendMessage
+}) => {
+  const { userProfile } = useAuth();
   const [developers, setDevelopers] = useState<(Developer & { user: User })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer & { user: User } | null>(null);
-  const [showFullProfile, setShowFullProfile] = useState(false);
+  const [showFullProfile, setShowFullProfile] = useState(true);
   const [showMessageThread, setShowMessageThread] = useState(false);
   const [filterAvailability, setFilterAvailability] = useState<boolean | null>(null);
 
@@ -80,7 +86,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
 
   const handleViewProfile = (developer: Developer & { user: User }) => {
     setSelectedDeveloper(developer);
-    setShowFullProfile(false);
+    setShowFullProfile(true);
     console.log('Selected developer for profile view:', developer);
   };
 
@@ -90,8 +96,12 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
   };
 
   const handleSendMessage = (developer: Developer & { user: User }) => {
-    setSelectedDeveloper(developer);
-    setShowMessageThread(true);
+    if (onSendMessage) {
+      onSendMessage(developer.user_id, developer.user.name);
+    } else {
+      setSelectedDeveloper(developer);
+      setShowMessageThread(true);
+    }
   };
 
   const handleBackToList = () => {
@@ -159,16 +169,24 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
       return (
         <div className="space-y-6">
           <button
-            onClick={() => setShowFullProfile(false)}
+            onClick={handleBackToList}
             className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Developer Card
+            Back to Developers
           </button>
           
           <DeveloperProfileDetails
             developer={selectedDeveloper}
-            onClose={() => setSelectedDeveloper(null)}
+            onClose={handleBackToList}
+            onSendMessage={(developerId, developerName) => {
+              if (onSendMessage) {
+                onSendMessage(developerId, developerName);
+                handleBackToList();
+              } else {
+                setShowMessageThread(true);
+              }
+            }}
           />
         </div>
       );
