@@ -57,6 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
       
+      // If we're in the process of signing out, ignore auth state changes
       if (signingOut) { 
         console.log('🔄 Still in signing out process, ignoring auth change');
         return;
@@ -64,21 +65,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const newUser = session?.user ?? null;
+        
+        if (event === 'SIGNED_OUT') {
+          console.log('🔄 User signed out, clearing auth state...');
+          setUser(null);
+          setUserProfile(null);
+          setDeveloperProfile(null);
+          setNeedsOnboarding(false);
+          setLoading(false);
+          return;
+        }
+        
         setUser(newUser);
         
         if (newUser) {
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') { 
             console.log('✅ User signed in, handling profile setup...');
-            await handleGitHubSignIn(newUser);
-            await fetchUserProfile(newUser);
+            // Add a small delay to ensure database operations are complete
+            setTimeout(async () => {
+              await handleGitHubSignIn(newUser);
+              await fetchUserProfile(newUser);
+            }, 500);
           } else {
             await fetchUserProfile(newUser);
           }
-        } else if (event === 'SIGNED_OUT') {
-          console.log('🔄 User signed out, clearing auth state...');
-          setUserProfile(null);
-          setDeveloperProfile(null);
-          setLoading(false);
         }
       } catch (error) {
         console.error('❌ Error in auth state change:', error);
@@ -184,6 +194,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSigningOut(true);
       console.log('🔄 Starting sign out process...'); 
       
+      // Immediately clear all state
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('❌ Error during sign out:', error);
@@ -191,12 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       console.log('✅ Sign out API call successful');
-      
-      // Clear all state
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
       
     } catch (error) {
       console.error('❌ Error in signOut:', error);
@@ -338,6 +348,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const userRole = authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
       const userName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User';
+      const companyName = authUser.user_metadata?.company_name || 'Company';
       
       const { error: insertError } = await supabase
         .from('users') 
@@ -346,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: authUser.email || 'unknown@example.com',
           name: userName || authUser.email?.split('@')[0] || 'User',
           role: userRole,
+          is_approved: userRole === 'developer' || userRole === 'admin'
         });
 
       if (insertError) {
@@ -364,7 +376,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             availability: true,
             top_languages: [],
             linked_projects: [],
-            location: '',
+            location: authUser.user_metadata?.location || '',
             experience_years: 0,
             desired_salary: 0,
           });
@@ -374,6 +386,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Don't fail the whole process if developer profile creation fails
         } else {
           console.log('✅ Developer profile created successfully');
+        }
+      } else if (userRole === 'recruiter') {
+        const { error: recError } = await supabase
+          .from('recruiters')
+          .insert({
+            user_id: authUser.id,
+            company_name: companyName
+          });
+          
+        if (recError) {
+          console.error('❌ Error creating recruiter profile:', recError);
+        } else {
+          console.log('✅ Recruiter profile created successfully');
         }
       }
       
@@ -404,7 +429,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
-          console.log('✅ Developer profile found'); setDeveloperProfile(devProfileData);
+          console.log('✅ Developer profile found'); 
+          setDeveloperProfile(devProfileData);
           setNeedsOnboarding(false);
         }
       } else if (userProfile?.role === 'recruiter') {
