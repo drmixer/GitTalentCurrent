@@ -96,43 +96,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [signingOut]);
 
-  const signOut = async () => {
-    try {
-      console.log('🔄 Starting sign out process');
-      setSigningOut(true); // Set flag to prevent auth state change handler from running
-      
-      // Clear all state before signing out from Supabase
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
-      
-      // Clear all state before signing out from Supabase
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
-      
-      // Clear all state before signing out
-      setUser(null);
-      setUserProfile(null);
-      setDeveloperProfile(null);
-      setNeedsOnboarding(false);
-      
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('❌ Error signing out:', error);
-        throw error;
-      }
-      
-      console.log('✅ Sign out successful');
-    } catch (error) {
-        throw error;
-      }
-      
-      console.log('✅ Successfully signed out');
     } catch (error) {
       console.error('❌ Error in signOut:', error);
       throw error;
@@ -449,8 +415,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       console.log('🔄 Checking for role-specific profile:', userProfile.role);
-      console.log('🔄 User ID:', userId);
-
+      console.log('🔄 User ID:', userId); 
       
       if (userProfile?.role === 'developer') {
         // Check for developer profile
@@ -473,10 +438,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.log('✅ Developer profile found:', devProfileData);
           console.log('🔄 GitHub handle from profile:', devProfileData.github_handle || 'none');
-          setDeveloperProfile(devProfileData);
           setNeedsOnboarding(false);
         }
-      } else if (userProfile.role === 'recruiter') {
+      } else if (userProfile?.role === 'recruiter') {
         // Check for recruiter profile
         const { data: recProfileData, error: recError } = await supabase
           .from('recruiters')
@@ -501,10 +465,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Admin or other role
         console.log('ℹ️ Admin or other role, no specific profile needed');
         setDeveloperProfile(null);
-        setNeedsOnboarding(false);
-      }
-    } catch (error: any) {
-      console.error('❌ Error checking role-specific profile:', error.message || error);
+      } 
+    } catch (error) {
+      console.error('❌ Error checking role-specific profile:', error);
       setNeedsOnboarding(false);
     } finally {
       setLoading(false);
