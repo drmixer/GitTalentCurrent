@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase';
+import { supabase, REALTIME_LISTEN_TYPES } from '../../lib/supabase';
 import { 
   Send, 
   ArrowLeft, 
@@ -44,12 +44,64 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   useEffect(() => {
     if (userProfile && otherUserId) {
       fetchMessages();
+      
+      // Set up real-time subscription for new messages
+      const subscription = supabase
+        .channel('messages-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: REALTIME_LISTEN_TYPES.INSERT,
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${otherUserId},receiver_id=eq.${userProfile.id}`
+          },
+          (payload) => {
+            console.log('New message received:', payload);
+            // Fetch the complete message with sender/receiver info
+            fetchNewMessage(payload.new.id);
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     }
   }, [userProfile, otherUserId, jobContext]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const fetchNewMessage = async (messageId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:users!messages_sender_id_fkey(*),
+          receiver:users!messages_receiver_id_fkey(*)
+        `)
+        .eq('id', messageId)
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        // Add the new message to the state
+        setMessages(prev => [...prev, data]);
+        
+        // Mark the message as read
+        await supabase
+          .from('messages')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq('id', messageId);
+      }
+    } catch (error) {
+      console.error('Error fetching new message:', error);
+    }
+  };
 
   const fetchMessages = async () => {
     try {

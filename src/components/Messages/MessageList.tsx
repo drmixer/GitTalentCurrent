@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase';
+import { supabase, REALTIME_LISTEN_TYPES } from '../../lib/supabase';
 import { 
   MessageSquare, 
   Plus, 
@@ -11,9 +11,11 @@ import {
   MailOpen,
   Building,
   Code,
-  Loader
+  Loader,
+  AlertCircle,
+  X
 } from 'lucide-react';
-import { Message, User as UserType } from '../../types';
+import { Message, User as UserType } from '../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -44,7 +46,29 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
     if (userProfile) {
       fetchMessageThreads();
       fetchAvailableContacts();
-      fetchAvailableContacts();
+      
+      // Set up real-time subscription for new messages
+      const subscription = supabase
+        .channel('new-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: REALTIME_LISTEN_TYPES.INSERT,
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${userProfile.id}`
+          },
+          (payload) => {
+            console.log('New message received:', payload);
+            // Refresh threads when a new message is received
+            fetchMessageThreads();
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     }
   }, [userProfile, onThreadSelect]);
 
@@ -190,7 +214,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
 
   const filteredThreads = threads.filter(thread =>
     thread.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    thread.jobContext?.title.toLowerCase().includes(searchTerm.toLowerCase())
+    (thread.jobContext?.title && thread.jobContext.title.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const formatTime = (dateString: string) => {
@@ -235,6 +259,17 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+        <div className="flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
+          <p className="text-red-700 font-medium">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -250,12 +285,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           </button>
         )}
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
 
       {/* Search */}
       <div className="relative">
@@ -345,33 +374,53 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
       {showNewMessageModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-black text-gray-900 mb-4">New Message</h3>
-            <div className="space-y-4">
-              {availableContacts.map((contact) => (
-                <button
-                  key={contact.id}
-                  className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
-                  onClick={() => {
-                    onThreadSelect?.({
-                      otherUserId: contact.id,
-                      otherUserName: contact.name,
-                      otherUserRole: contact.role,
-                      lastMessage: {} as Message,
-                      unreadCount: 0
-                    });
-                    setShowNewMessageModal(false);
-                  }}
-                >
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
-                    {contact.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{contact.name}</div>
-                    <div className="text-sm text-gray-600 capitalize">{contact.role}</div>
-                  </div>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-gray-900">New Message</h3>
+              <button
+                onClick={() => setShowNewMessageModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
+            
+            {availableContacts.length > 0 ? (
+              <div className="space-y-4">
+                {availableContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+                    onClick={() => {
+                      onThreadSelect?.({
+                        otherUserId: contact.id,
+                        otherUserName: contact.name,
+                        otherUserRole: contact.role,
+                        lastMessage: {} as Message,
+                        unreadCount: 0
+                      });
+                      setShowNewMessageModal(false);
+                    }}
+                  >
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
+                      {contact.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">{contact.name}</div>
+                      <div className="text-sm text-gray-600 capitalize">{contact.role}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No contacts available</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  You'll be able to message recruiters once you're assigned to their job postings.
+                </p>
+              </div>
+            )}
+            
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setShowNewMessageModal(false)}

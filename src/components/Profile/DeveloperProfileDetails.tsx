@@ -19,7 +19,8 @@ import {
   X,
   FileText,
   Bell,
-  Link
+  Link,
+  MessageSquare
 } from 'lucide-react';
 import { Developer, User as UserType } from '../../types';
 
@@ -27,12 +28,14 @@ interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
   onClose?: () => void;
+  onSendMessage?: (developerId: string, developerName: string) => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
   developer: initialDeveloper,
-  onClose
+  onClose,
+  onSendMessage
 }) => {
   const { userProfile } = useAuth();
   const [developer, setDeveloper] = useState<Developer & { user: UserType } | null>(initialDeveloper || null);
@@ -86,6 +89,53 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     }
   };
 
+  const handleSendMessage = () => {
+    if (developer && onSendMessage) {
+      onSendMessage(developer.user_id, developer.user.name);
+    }
+  };
+
+  // Generate profile strength suggestions based on missing data
+  const generateProfileSuggestions = (): string[] => {
+    const suggestions: string[] = [];
+    
+    if (!developer) return suggestions;
+    
+    if (!developer.github_handle) {
+      suggestions.push('Add your GitHub handle to showcase your coding activity');
+    }
+    
+    if (!developer.bio || developer.bio.length < 50) {
+      suggestions.push('Complete your bio with at least 50 characters');
+    }
+    
+    if (!developer.location) {
+      suggestions.push('Add your location to receive location-specific opportunities');
+    }
+    
+    if (developer.experience_years === 0) {
+      suggestions.push('Specify your years of experience');
+    }
+    
+    if (developer.desired_salary === 0) {
+      suggestions.push('Set your desired salary to help match with appropriate roles');
+    }
+    
+    if (!developer.top_languages || developer.top_languages.length < 3) {
+      suggestions.push('Add at least 3 programming languages to your profile');
+    }
+    
+    if (!developer.linked_projects || developer.linked_projects.length < 2) {
+      suggestions.push('Link at least 2 projects to demonstrate your work');
+    }
+    
+    if (!developer.resume_url) {
+      suggestions.push('Add a link to your resume for recruiters to review');
+    }
+    
+    return suggestions;
+  };
+
   if (loading) { 
     return (
       <div className="flex items-center justify-center py-12">
@@ -125,45 +175,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     { id: 'portfolio', label: 'Portfolio' },
     { id: 'github', label: 'GitHub Activity' },
   ]; 
-
-  // Generate profile strength suggestions based on missing data
-  const generateProfileSuggestions = (): string[] => {
-    const suggestions: string[] = [];
-    
-    if (!developer.github_handle) {
-      suggestions.push('Add your GitHub handle to showcase your coding activity');
-    }
-    
-    if (!developer.bio || developer.bio.length < 50) {
-      suggestions.push('Complete your bio with at least 50 characters');
-    }
-    
-    if (!developer.location) {
-      suggestions.push('Add your location to receive location-specific opportunities');
-    }
-    
-    if (developer.experience_years === 0) {
-      suggestions.push('Specify your years of experience');
-    }
-    
-    if (developer.desired_salary === 0) {
-      suggestions.push('Set your desired salary to help match with appropriate roles');
-    }
-    
-    if (!developer.top_languages || developer.top_languages.length < 3) {
-      suggestions.push('Add at least 3 programming languages to your profile');
-    }
-    
-    if (!developer.linked_projects || developer.linked_projects.length < 2) {
-      suggestions.push('Link at least 2 projects to demonstrate your work');
-    }
-    
-    if (!developer.resume_url) {
-      suggestions.push('Add a link to your resume for recruiters to review');
-    }
-    
-    return suggestions;
-  };
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
@@ -224,6 +235,17 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               <Calendar className="w-4 h-4 mr-2" />
               Profile Strength: {developer.profile_strength || 0}%
             </span>
+            
+            {/* Message Button - Only show for recruiters/admins */}
+            {onSendMessage && userProfile?.role !== 'developer' && (
+              <button
+                onClick={handleSendMessage}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold flex items-center"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Message
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { supabase, REALTIME_LISTEN_TYPES } from '../lib/supabase';
 import { 
   MessageSquare,
   Building, 
@@ -90,6 +90,7 @@ export const RecruiterDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   // Modal states
   const [showJobForm, setShowJobForm] = useState(false);
@@ -109,7 +110,7 @@ export const RecruiterDashboard: React.FC = () => {
   const [stats, setStats] = useState({
     activeJobs: 0,
     assignedDevelopers: 0,
-    successfulHires: 0,
+    successfulHires: 0, 
     responseRate: 0
   });
   const [jobs, setJobs] = useState<JobRole[]>([]);
@@ -126,6 +127,30 @@ export const RecruiterDashboard: React.FC = () => {
       fetchJobRoles();
       fetchAssignments();
       fetchHires();
+      fetchUnreadMessageCount();
+      
+      // Set up real-time subscription for new messages
+      const subscription = supabase
+        .channel('new-recruiter-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: REALTIME_LISTEN_TYPES.INSERT,
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${userProfile.id}`
+          },
+          (payload) => {
+            console.log('New message received:', payload);
+            // Update unread count
+            fetchUnreadMessageCount();
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     }
   }, [userProfile]);
 
@@ -194,6 +219,24 @@ export const RecruiterDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error fetching hires:', error);
       setError('Failed to load hires. Please try again.');
+    }
+  };
+
+  const fetchUnreadMessageCount = async () => {
+    try {
+      if (!userProfile?.id) return;
+      
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userProfile.id)
+        .eq('is_read', false);
+        
+      if (error) throw error;
+      
+      setUnreadMessages(count || 0);
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
     }
   };
 
@@ -283,6 +326,21 @@ export const RecruiterDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendMessage = (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
+    setSelectedThread({
+      otherUserId: developerId,
+      otherUserName: developerName,
+      otherUserRole: 'developer',
+      unreadCount: 0,
+      jobContext: jobRoleId && jobRoleTitle ? {
+        id: jobRoleId,
+        title: jobRoleTitle
+      } : undefined
+    });
+    
+    setActiveTab('messages');
   };
 
   const filteredJobRoles = jobs.filter(job => {
@@ -524,6 +582,11 @@ export const RecruiterDashboard: React.FC = () => {
             >
               <Icon className="w-5 h-5" />
               {label}
+              {id === 'messages' && unreadMessages > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {unreadMessages}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -742,7 +805,12 @@ export const RecruiterDashboard: React.FC = () => {
 
         {/* Developers Tab - Using DeveloperList component */}
         {activeTab === 'developers' && (
-          <DeveloperList recruiterId={userProfile?.id || ''} />
+          <DeveloperList 
+            recruiterId={userProfile?.id || ''} 
+            onSendMessage={(developerId, developerName) => {
+              handleSendMessage(developerId, developerName);
+            }}
+          />
         )}
 
         {/* Messages Tab - Using MessageList/MessageThread components */}
@@ -798,6 +866,7 @@ export const RecruiterDashboard: React.FC = () => {
                     setShowAssignModal(true);
                   }}
                   onJobRoleUpdated={handleJobRoleUpdated}
+                  onSendMessage={handleSendMessage}
                 />
               </div>
             </div>
@@ -871,6 +940,11 @@ export const RecruiterDashboard: React.FC = () => {
                   onClose={() => {
                     setShowDeveloperProfile(false);
                     setSelectedDeveloper(null);
+                  }}
+                  onSendMessage={(developerId, developerName) => {
+                    setShowDeveloperProfile(false);
+                    setSelectedDeveloper(null);
+                    handleSendMessage(developerId, developerName);
                   }}
                 />
               </div>

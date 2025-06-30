@@ -29,6 +29,7 @@ interface JobRoleDetailsProps {
   onClose?: () => void;
   onJobRoleUpdated?: () => void;
   isDeveloperView?: boolean;
+  onSendMessage?: (developerId: string, developerName: string, jobRoleId: string, jobRoleTitle: string) => void;
 }
 
 export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
@@ -38,7 +39,8 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   onAssignDeveloper,
   onClose,
   onJobRoleUpdated,
-  isDeveloperView = false
+  isDeveloperView = false,
+  onSendMessage
 }) => {
   const { userProfile } = useAuth();
   const [jobRole, setJobRole] = useState<JobRole | null>(null);
@@ -133,9 +135,10 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
     }
   };
 
-  const handleSendMessage = (developerId: string) => {
-    // This would be implemented to open a message thread with the developer
-    console.log('Send message to developer:', developerId);
+  const handleSendMessage = (developerId: string, developerName: string) => {
+    if (onSendMessage && jobRole) {
+      onSendMessage(developerId, developerName, jobRole.id, jobRole.title);
+    }
   };
 
   if (loading) {
@@ -378,7 +381,10 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                         View Profile
                       </button>
                       <button 
-                        onClick={() => handleSendMessage(assignment.developer_id)}
+                        onClick={() => handleSendMessage(
+                          assignment.developer_id, 
+                          assignment.developer?.user?.name || 'Developer'
+                        )}
                         className="px-3 py-2 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors font-semibold text-sm">
                         <MessageSquare className="w-4 h-4 mr-1 inline" />
                         Message
@@ -468,7 +474,10 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                   </div>
                   
                   <button 
-                    onClick={() => handleSendMessage(assignment.recruiter_id)}
+                    onClick={() => handleSendMessage(
+                      assignment.recruiter_id, 
+                      jobRole.recruiter?.name || 'Recruiter'
+                    )}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
                   >
                     <MessageSquare className="w-4 h-4 mr-2 inline" />
