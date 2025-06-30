@@ -198,8 +198,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDeveloperProfile(null);
       setNeedsOnboarding(false);
       
-      // No longer forcing page reload - let the component handle navigation
-      
     } catch (error) {
       console.error('❌ Error in signOut:', error);
       throw error;
