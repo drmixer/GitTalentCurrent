@@ -37,7 +37,8 @@ import {
   DollarSign,
   MapPin,
   Clock,
-  Calendar
+  Calendar,
+  Building
 } from 'lucide-react';
 import { Assignment, JobRole } from '../types';
 
