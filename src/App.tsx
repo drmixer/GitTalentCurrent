@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useContext, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext.tsx';
+import { AuthProvider, AuthContext } from './contexts/AuthContext.tsx';
 import { Header } from './components/Layout/Header';
 import { LandingPage } from './pages/LandingPage';
 import { LoginForm } from './components/Auth/LoginForm';
@@ -10,8 +10,27 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
+import { Navigate } from 'react-router-dom';
 
 function App() {
+  const { user, userProfile, loading } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (user && userProfile) {
+      // Redirect user based on role if logged in
+      if (userProfile.role === 'admin') {
+        // Redirect to Admin dashboard
+        return <Navigate to="/admin" />;
+      } else if (userProfile.role === 'recruiter') {
+        // Redirect to Recruiter dashboard
+        return <Navigate to="/recruiter" />;
+      } else if (userProfile.role === 'developer') {
+        // Redirect to Developer dashboard
+        return <Navigate to="/developer" />;
+      }
+    }
+  }, [user, userProfile]);
+
   return (
     <AuthProvider>
       <Router>
