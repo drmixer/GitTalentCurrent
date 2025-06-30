@@ -11,15 +11,18 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const { signIn, signInWithGitHub, user, loading: authLoading } = useAuth();
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     console.log('LoginForm useEffect:', { authLoading, user });
-    if (!authLoading && user) {
+    
+    // Only redirect if we're not in the middle of logging in
+    if (!authLoading && user && !loading) {
       console.log('✅ User authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +31,11 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
+      setLoginSuccess(true);
       console.log('✅ Sign in successful');
 
-      // TEMPORARY: force navigation in case auth state change is slow or not firing
-      navigate('/dashboard', { replace: true });
+      // Wait a moment before redirecting to allow auth state to update
+      setTimeout(() => navigate('/dashboard', { replace: true }), 500);
 
     } catch (error: any) {
       console.error('Login error:', error);
@@ -40,6 +44,13 @@ export const LoginForm = () => {
       setLoading(false);
     }
   };
+  
+  // If login was successful but we're still loading, show a loading state
+  if (loginSuccess && (loading || authLoading)) {
+    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>;
+  }
 
   const handleGitHubSignIn = async () => {
     setError('');

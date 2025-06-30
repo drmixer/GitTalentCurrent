@@ -175,7 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Fetching user profile for:', authUser.id);
-      console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 Auth user metadata:', authUser.user_metadata);
       
       // Add a small delay to ensure database operations are complete
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -190,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If we get a 500 error or the user doesn't exist, try to create the profile
       if (userError || !userProfileData) {
         console.log('⚠️ User profile not found, attempting to create:', userError?.message);
-        console.log('🔄 Auth user metadata for profile creation:', JSON.stringify(authUser.user_metadata));
+        console.log('🔄 Auth user metadata for profile creation:', authUser.user_metadata);
         
         // Try to create the user profile
         const success = await createUserProfileFromAuth(authUser);
@@ -213,6 +213,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             return;
           }
+          console.log('✅ User profile created and fetched successfully:', retryUserData);
           
           setUserProfile(retryUserData);
           await checkForRoleSpecificProfile(retryUserData, authUser.id);
@@ -220,6 +221,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error('❌ Failed to create user profile');
           setUserProfile(null);
           setDeveloperProfile(null);          
+          console.log('⚠️ Setting needsOnboarding to true due to profile creation failure');
           setNeedsOnboarding(true); // Set to true to trigger onboarding if profile creation failed
           setLoading(false);
           return;
@@ -232,6 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('❌ Error fetching profiles:', error);
       setUserProfile(null);
+      console.log('⚠️ Setting needsOnboarding to true due to profile fetch error');
       setDeveloperProfile(null);      
       setNeedsOnboarding(true); // Set to true to trigger onboarding if profile fetch failed
       setLoading(false);
@@ -241,7 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 Creating user profile from auth user:', authUser.id);
-      console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 Auth user metadata:', authUser.user_metadata);
       
       // Determine user role from metadata or default to developer
       const userRole = authUser.user_metadata?.role || 
@@ -254,7 +257,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       'User';
 
       // Try using the database function first
-      const { data, error: functionError } = await supabase.rpc('create_user_profile', {
+      const { error: functionError } = await supabase.rpc('create_user_profile', {
         user_id: authUser.id,
         user_email: authUser.email!,
         user_name: userName,
@@ -263,7 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (functionError) {
-        console.warn('⚠️ Database function failed, trying manual creation:', functionError);
+        console.warn('⚠️ Database function failed, trying manual creation:', functionError.message);
         
         // Fallback to manual creation
         const { error: insertError } = await supabase
@@ -278,6 +281,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (insertError) {
           console.error('❌ Manual user profile creation failed:', insertError);
+          console.log('⚠️ User profile creation failed with error:', insertError.message);
           return false;
         }
 
@@ -285,6 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
           const { error: devError } = await supabase
             .from('developers')
+            .upsert({ // Use upsert to handle potential duplicates
             .insert({
               user_id: authUser.id,
               github_handle: authUser.user_metadata?.user_name || '',
@@ -299,7 +304,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (devError) {
             console.error('❌ Error creating developer profile:', devError);
-            // Don't fail the whole process if developer profile creation fails
+            console.log('⚠️ Developer profile creation failed with error:', devError.message);
           } else {
             console.log('✅ Developer profile created successfully');
           }
@@ -308,6 +313,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const companyName = authUser.user_metadata?.company_name || 'Company';
           const { error: recError } = await supabase
             .from('recruiters')
+            .upsert({ // Use upsert to handle potential duplicates
             .insert({
               user_id: authUser.id,
               company_name: companyName,
@@ -318,7 +324,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
           if (recError) {
             console.error('❌ Error creating recruiter profile:', recError);
-            // Don't fail the whole process if recruiter profile creation fails
+            console.log('⚠️ Recruiter profile creation failed with error:', recError.message);
           } else {
             console.log('✅ Recruiter profile created successfully');
           }
@@ -336,7 +342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleGitHubSignIn = async (user: SupabaseUser) => {
     try {
       console.log('🔄 Handling GitHub sign-in for user:', user.id);
-      console.log('🔄 GitHub user metadata:', JSON.stringify(user.user_metadata));
+      console.log('🔄 GitHub user metadata:', user.user_metadata);
       
       // Get the name from localStorage if it was set during signup
       const pendingName = localStorage.getItem('pendingGitHubName');
@@ -350,7 +356,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userRole = user.user_metadata?.role || 'developer';
       console.log('🔄 Determined role for GitHub user:', userRole);
 
-      // Try to create user profile using the database function
+      // Try to create or update user profile using the database function
       const { data, error } = await supabase.rpc('create_user_profile', {
         user_id: user.id,
         user_email: user.email!,
@@ -360,7 +366,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) {
-        console.warn('⚠️ Database function failed, this might be expected if profile already exists:', error);
+        console.warn('⚠️ Database function failed, this might be expected if profile already exists:', error.message);
       }
 
       // If this is a GitHub user, also try to create/update developer profile with GitHub data
@@ -376,6 +382,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('🔄 Creating/updating GitHub developer profile for:', userId);
       console.log('🔄 GitHub username:', githubUsername);
+      console.log('🔄 GitHub username:', githubUsername);
       
       // Check if developer profile exists
       const { data: existingProfile } = await supabase
@@ -384,6 +391,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('user_id', userId)
         .single();
 
+      console.log('🔄 Existing developer profile:', existingProfile ? 'found' : 'not found');
       const profileData = {
         user_id: userId,
         github_handle: githubUsername,
@@ -398,7 +406,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (existingProfile) {
         // Update existing profile with GitHub data
-        await supabase
+        const { error: updateError } = await supabase
           .from('developers')
           .update({
             github_handle: githubUsername,
@@ -406,9 +414,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             location: githubMetadata?.location || existingProfile.location,
           })
           .eq('user_id', userId);
+          
+        if (updateError) {
+          console.error('❌ Error updating GitHub developer profile:', updateError);
+          return;
+        }
+        
       } else {
         // Create new developer profile
-        await supabase
+        const { error: insertError } = await supabase
           .from('developers')
           .insert(profileData);
       }
@@ -422,6 +436,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       console.log('🔄 Checking for role-specific profile:', userProfile.role);
+      console.log('🔄 User ID:', userId);
       
       if (userProfile.role === 'developer') {
         // Check for developer profile
@@ -431,6 +446,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .eq('user_id', userId)
           .maybeSingle();
 
+        console.log('🔄 Developer profile fetch result:', data ? 'found' : 'not found');
         if (!data) {
           // Developer profile doesn't exist, needs onboarding
           console.log('⚠️ Developer profile not found, needs onboarding');
@@ -438,7 +454,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setNeedsOnboarding(true);
         } else {
           console.log('✅ Developer profile found:', data);
-          console.log('GitHub handle from profile:', data.github_handle);
+          console.log('🔄 GitHub handle from profile:', data.github_handle || 'none');
           setDeveloperProfile(data);
           setNeedsOnboarding(false);
         }
@@ -450,6 +466,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .eq('user_id', userId)
           .maybeSingle();
 
+        console.log('🔄 Recruiter profile fetch result:', data ? 'found' : 'not found');
         if (!data) {
           console.log('⚠️ Recruiter profile not found, needs onboarding');
           setNeedsOnboarding(true);
@@ -466,6 +483,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setNeedsOnboarding(false);
       }
     } catch (error) {
+      console.error('❌ Error in checkForRoleSpecificProfile:', error);
       console.error('❌ Error checking role-specific profile:', error);
       setDeveloperProfile(null);
       setNeedsOnboarding(false);

@@ -33,6 +33,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
   const fetchAssignedDevelopers = async () => {
     try {
       setLoading(true);
+      console.log('DeveloperList: Fetching assigned developers for recruiter:', recruiterId);
       setError('');
 
       // Fetch assignments for this recruiter
@@ -44,6 +45,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
       if (assignmentsError) throw assignmentsError;
 
       if (!assignments || assignments.length === 0) {
+        console.log('DeveloperList: No assignments found for recruiter');
         setDevelopers([]);
         setLoading(false);
         return;
@@ -52,6 +54,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
       // Get unique developer IDs
       const developerIds = [...new Set(assignments.map(a => a.developer_id))];
 
+      console.log('DeveloperList: Found developer IDs:', developerIds);
       // Fetch developer profiles with user data
       const { data: developersData, error: developersError } = await supabase
         .from('developers')
@@ -62,6 +65,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({ recruiterId }) => 
         .in('user_id', developerIds);
 
       if (developersError) throw developersError;
+      console.log('DeveloperList: Fetched developers:', developersData?.length || 0);
       setDevelopers(developersData || []);
 
     } catch (error: any) {

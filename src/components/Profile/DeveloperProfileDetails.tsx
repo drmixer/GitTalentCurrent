@@ -40,8 +40,10 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   useEffect(() => {
     if (initialDeveloper) {
       setDeveloper(initialDeveloper);
+      console.log('DeveloperProfileDetails: Using provided developer data:', initialDeveloper.user_id);
       setLoading(false);
     } else if (developerId) {
+      console.log('DeveloperProfileDetails: Fetching developer profile for ID:', developerId);
       fetchDeveloperProfile();
     }
   }, [developerId, initialDeveloper]);
@@ -49,6 +51,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   const fetchDeveloperProfile = async () => {
     try {
       setLoading(true);
+      console.log('DeveloperProfileDetails: Starting fetch for developer ID:', developerId);
       setError('');
 
       // Fetch developer with user data
@@ -62,6 +65,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         .single();
 
       if (fetchError) {
+        console.error('DeveloperProfileDetails: Error fetching developer profile:', fetchError);
         console.error('Error fetching developer profile:', fetchError);
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
@@ -69,6 +73,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         console.log('Developer profile fetched successfully:', data);
         setDeveloper(data);
       }
+      
     } catch (err) {
       console.error('Error in fetchDeveloperProfile:', err);
       setError('Unexpected error loading developer profile');
@@ -82,6 +87,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     return (
       <div className="flex items-center justify-center py-12">
         <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+        <span className="text-gray-600 font-medium">Loading developer profile...</span>
       </div>
     );
   }

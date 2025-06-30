@@ -7,7 +7,7 @@ import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut } from '
 export const Dashboard = () => {
   const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile, signOut } = useAuth();
 
-  console.log('🔍 Dashboard state:', {
+  console.log('🔍 Dashboard render state:', {
     user: !!user,
     userProfile: !!userProfile,
     userRole: userProfile?.role || 'none',
@@ -16,6 +16,13 @@ export const Dashboard = () => {
     loading
   });
 
+  useEffect(() => {
+    if (user && !userProfile && !loading) {
+      console.log('🔄 Dashboard: User exists but no profile, refreshing profile');
+      refreshProfile();
+    }
+  }, [user, userProfile, loading, refreshProfile]);
+
   // Show loading state while auth is being determined
   if (loading) {
     return (
@@ -23,7 +30,7 @@ export const Dashboard = () => {
         <div className="text-center max-w-md mx-auto px-4">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Loading your profile...</p>
-          <p className="text-gray-500 text-sm mt-2">This may take a moment. Please wait...</p>
+          <p className="text-gray-500 text-sm mt-2">Verifying your account status...</p>
           
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
             <p className="text-sm text-blue-800 font-medium mb-2">What's happening?</p>
@@ -39,7 +46,7 @@ export const Dashboard = () => {
   // If no user is authenticated, redirect to login
   if (!user) {
     console.log('❌ No user found, redirecting to login');
-    return <Navigate to="/login" replace={true} />;
+    return <Navigate to="/login" replace />;
   }
 
   // If user exists but no profile, show error with retry option
@@ -47,7 +54,7 @@ export const Dashboard = () => {
     console.log('❌ User exists but no profile found');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md mx-auto text-center px-4">
+        <div className="max-w-md mx-auto text-center">
           <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-8 h-8 text-red-600" />
@@ -55,7 +62,7 @@ export const Dashboard = () => {
             <h1 className="text-2xl font-black text-gray-900 mb-4">Profile Not Found</h1>
             <p className="text-gray-600 mb-6">
               We couldn't load your profile data. This might be a temporary issue with the database connection.
-            </p>
+            </p> 
             <div className="space-y-3">
               <button
                 onClick={refreshProfile}
@@ -66,7 +73,7 @@ export const Dashboard = () => {
               </button>
               <div className="flex space-x-3">
                 <button
-                  onClick={() => window.location.replace('/login')}
+                  onClick={signOut}
                   className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
                 >
                   <LogOut className="w-4 h-4 mr-2" />

@@ -75,6 +75,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (developerProfile?.github_handle) {
       console.log('useGitHub - GitHub handle found:', developerProfile.github_handle);
+      console.log('useGitHub - Developer profile:', {
+        id: developerProfile.user_id,
+        handle: developerProfile.github_handle,
+        languages: developerProfile.top_languages?.length || 0
+      });
       refreshGitHubData();
     } else {
       console.log('useGitHub - No GitHub handle found in developer profile');
@@ -99,6 +104,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       console.log('refreshGitHubData - Fetching data for:', developerProfile.github_handle);
+      console.log('refreshGitHubData - Starting GitHub API calls');
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
 
       // Fetch GitHub user data
@@ -108,6 +114,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
           'User-Agent': 'GitTalent-App'
         }
       });
+      console.log('refreshGitHubData - User API response status:', userResponse.status);
       
       if (!userResponse.ok) {
         if (userResponse.status === 404) {
@@ -123,6 +130,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const userData: GitHubUser = await userResponse.json();
+      console.log('refreshGitHubData - User data fetched:', userData.login);
 
       // Fetch user's repositories (public only)
       const reposResponse = await fetch(`https://api.github.com/users/${developerProfile.github_handle}/repos?sort=updated&per_page=100&type=public`, {
@@ -131,6 +139,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
           'User-Agent': 'GitTalent-App'
         }
       });
+      console.log('refreshGitHubData - Repos API response status:', reposResponse.status);
       
       if (!reposResponse.ok) {
         console.error(`Failed to fetch repositories: ${reposResponse.status}`);
@@ -138,6 +147,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const reposData: GitHubRepo[] = await reposResponse.json();
+      console.log('refreshGitHubData - Repos fetched:', reposData.length);
 
       // Filter out forks unless they have significant stars
       const filteredRepos = reposData.filter(repo => 
@@ -146,6 +156,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       // Calculate total stars
       const totalStars = filteredRepos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
+      console.log('refreshGitHubData - Total stars:', totalStars);
 
       // Aggregate languages from repositories
       const languageStats: GitHubLanguages = {};
@@ -153,6 +164,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       // For each repo with a language, fetch detailed language stats
       for (const repo of filteredRepos.slice(0, 20)) { // Limit to avoid rate limiting
         if (repo.language) {
+          console.log('refreshGitHubData - Processing repo language:', repo.language);
           try {
             const langResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/languages`, {
               headers: {
@@ -160,6 +172,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
                 'User-Agent': 'GitTalent-App'
               }
             });
+            console.log('refreshGitHubData - Language API response status:', langResponse.status);
             
             if (langResponse.ok) {
               const langData = await langResponse.json();
@@ -167,9 +180,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
                 languageStats[lang] = (languageStats[lang] || 0) + (bytes as number);
               });
             } else {
+              console.log('refreshGitHubData - Falling back to primary language count');
               // Fallback to just counting repos by primary language
               languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
             }
+            
           } catch (error) {
             // Fallback to just counting repos by primary language
             languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
@@ -177,6 +192,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
+      console.log('refreshGitHubData - Languages processed:', Object.keys(languageStats).length);
       setGitHubData({
         user: userData,
         repos: filteredRepos,
@@ -187,7 +203,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
 
     } catch (error: any) {
-      console.error('Error in refreshGitHubData:', error);
+      console.error('Error in refreshGitHubData:', error.message || error);
       setGitHubData(prev => ({
         ...prev,
         loading: false,
