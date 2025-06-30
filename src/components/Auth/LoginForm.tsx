@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, AlertCircle, Eye, EyeOff, Github } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -10,19 +10,15 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
-  const { signIn, signInWithGitHub, user, loading: authLoading } = useAuth();
-  const [loginSuccess, setLoginSuccess] = useState(false);
+  const { signIn, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('LoginForm useEffect:', { authLoading, user });
-    
-    // Only redirect if we're not in the middle of logging in
-    if (!authLoading && user && !loading) {
+    if (!authLoading && user) {
       console.log('✅ User authenticated, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, authLoading, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,12 +27,8 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      setLoginSuccess(true);
-      console.log('✅ Sign in successful');
-
-      // Wait a moment before redirecting to allow auth state to update
-      setTimeout(() => navigate('/dashboard', { replace: true }), 500);
-
+      // Navigation will happen via useEffect when auth state changes
+      console.log('✅ Sign in successful, waiting for auth state change...');
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login');
@@ -44,13 +36,6 @@ export const LoginForm = () => {
       setLoading(false);
     }
   };
-  
-  // If login was successful but we're still loading, show a loading state
-  if (loginSuccess && (loading || authLoading)) {
-    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-    </div>;
-  }
 
   const handleGitHubSignIn = async () => {
     setError('');
@@ -66,6 +51,7 @@ export const LoginForm = () => {
     }
   };
 
+  // Show loading state while checking authentication status
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50">
@@ -243,6 +229,7 @@ export const LoginForm = () => {
           </form>
         </div>
 
+        {/* Terms and Privacy */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-600">
             By signing in, you agree to our{' '}

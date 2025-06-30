@@ -40,7 +40,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   useEffect(() => {
     if (initialDeveloper) {
       setDeveloper(initialDeveloper);
-      console.log('DeveloperProfileDetails: Using provided developer data:', initialDeveloper.user_id);
+      console.log('DeveloperProfileDetails: Using provided developer data:', initialDeveloper);
       setLoading(false);
     } else if (developerId) {
       console.log('DeveloperProfileDetails: Fetching developer profile for ID:', developerId);
@@ -52,7 +52,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     try {
       setLoading(true);
       console.log('DeveloperProfileDetails: Starting fetch for developer ID:', developerId);
-      setError('');
+      setError(''); 
 
       // Fetch developer with user data
       const { data, error: fetchError } = await supabase
@@ -66,7 +66,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
       if (fetchError) {
         console.error('DeveloperProfileDetails: Error fetching developer profile:', fetchError);
-        console.error('Error fetching developer profile:', fetchError);
+        console.error('Error fetching developer profile:', fetchError.message);
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
       } else {
@@ -75,7 +75,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       }
       
     } catch (err) {
-      console.error('Error in fetchDeveloperProfile:', err);
+      console.error('Error in fetchDeveloperProfile:', err); 
       setError('Unexpected error loading developer profile');
       setDeveloper(null);
     } finally {
@@ -83,7 +83,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     }
   };
 
-  if (loading) {
+  if (loading) { 
     return (
       <div className="flex items-center justify-center py-12">
         <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
@@ -92,7 +92,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  if (error || !developer) {
+  if (error || !developer) { 
     return (
       <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
@@ -100,7 +100,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
             <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
             <p className="text-red-800 font-medium">{error || 'Developer profile not found'}</p>
           </div>
-          {onClose && (
+          {onClose && ( 
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
@@ -113,7 +113,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  const displayName = developer.github_handle 
+  const displayName = developer.github_handle  
     ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
     : developer.user.name;
 
@@ -121,7 +121,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     { id: 'profile', label: 'Profile' },
     { id: 'portfolio', label: 'Portfolio' },
     { id: 'github', label: 'GitHub Activity' },
-  ];
+  ]; 
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
@@ -129,7 +129,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         <h2 className="text-2xl font-black text-gray-900">Developer Profile</h2>
         {onClose && (
           <button
-            onClick={onClose}
+            onClick={onClose} 
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
           >
             <X className="w-5 h-5" />
@@ -137,7 +137,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         )}
       </div>
 
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100"> 
         <div className="flex items-start md:items-center flex-col md:flex-row md:justify-between">
           <div className="flex items-center space-x-6 mb-4 md:mb-0">
             <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
@@ -145,7 +145,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
             </div>
             <div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <div className="flex items-center space-x-4 text-sm text-gray-600"> 
                 {developer.github_handle && (
                   <a
                     href={`https://github.com/${developer.github_handle}`}
@@ -153,7 +153,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                     rel="noopener noreferrer"
                     className="flex items-center hover:text-blue-600 transition-colors"
                   >
-                    <Github className="w-4 h-4 mr-1" />
+                    <Github className="w-4 h-4 mr-1" /> 
                     @{developer.github_handle}
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </a>
@@ -161,7 +161,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                 {(userProfile?.role === 'admin' || userProfile?.id === developer.user_id) && (
                   <div className="flex items-center">
                     <Mail className="w-4 h-4 mr-1" />
-                    {developer.user.email}
+                    {developer.user.email} 
                   </div>
                 )}
               </div>
@@ -169,7 +169,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           </div>
           <div className="flex items-center space-x-3">
             <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
-              developer.availability 
+              developer.availability  
                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
                 : 'bg-gray-100 text-gray-800 border border-gray-200'
             }`}>
@@ -177,7 +177,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                 developer.availability ? 'bg-emerald-500' : 'bg-gray-500'
               }`}></div>
               {developer.availability ? 'Available for hire' : 'Not available'}
-            </span>
+            </span> 
             <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200">
               <Calendar className="w-4 h-4 mr-2" />
               Profile Strength: {developer.profile_strength || 0}%
@@ -185,7 +185,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           </div>
         </div>
       </div>
-
+      
       <div className="mb-8">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
@@ -193,7 +193,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${ 
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -206,7 +206,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         </div>
       </div>
 
-      {activeTab === 'profile' && (
+      {activeTab === 'profile' && ( 
         <div className="space-y-8">
           <div className="grid md:grid-cols-4 gap-6">
             <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
@@ -214,7 +214,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               <div className="text-sm font-semibold text-gray-600">Years Experience</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{developer.top_languages.length}</div>
+              <div className="text-2xl font-black text-gray-900 mb-1">{developer.top_languages?.length || 0}</div>
               <div className="text-sm font-semibold text-gray-600">Languages</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
@@ -222,7 +222,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               <div className="text-sm font-semibold text-gray-600">Projects</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">
+              <div className="text-2xl font-black text-gray-900 mb-1"> 
                 {developer.desired_salary > 0 ? `$${developer.desired_salary.toLocaleString()}` : 'N/A'}
               </div>
               <div className="text-sm font-semibold text-gray-600">Desired Salary</div>
@@ -230,7 +230,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
+            <h3 className="text-lg font-black text-gray-900 mb-4">About</h3> 
             <p className="text-gray-600 leading-relaxed">
               {developer.bio || 'No bio provided.'}
             </p>
@@ -238,7 +238,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
-            <div>
+            <div> 
               <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
               <div className="flex flex-wrap gap-2">
                 {developer.top_languages.length > 0 ? (
@@ -246,7 +246,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                     <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
                       {skill}
                     </span>
-                  ))
+                  )) 
                 ) : (
                   <p className="text-gray-500">No languages specified</p>
                 )}
@@ -256,7 +256,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Experience & Location</h3>
-            <div className="space-y-4 text-gray-600">
+            <div className="space-y-4 text-gray-600"> 
               <div className="flex items-center">
                 <Briefcase className="w-5 h-5 mr-3 text-gray-400" />
                 <span className="font-medium">{developer.experience_years} years of experience</span>
@@ -264,7 +264,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               {developer.location && (
                 <div className="flex items-center">
                   <MapPin className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">{developer.location}</span>
+                  <span className="font-medium">{developer.location}</span> 
                 </div>
               )}
               {developer.desired_salary > 0 && (
@@ -278,7 +278,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Linked Projects</h3>
-            <div className="space-y-4">
+            <div className="space-y-4"> 
               {developer.linked_projects.length > 0 ? (
                 developer.linked_projects.map((project, index) => (
                   <div key={index} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
@@ -286,7 +286,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
                         <p className="text-gray-600 text-sm mb-3 break-all">{project}</p>
-                      </div>
+                      </div> 
                       <a
                         href={project}
                         target="_blank"
@@ -294,7 +294,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
                       >
                         <ExternalLink className="w-4 h-4" />
-                      </a>
+                      </a> 
                     </div>
                   </div>
                 ))
@@ -308,7 +308,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           </div>
 
           <ProfileStrengthIndicator
-            strength={developer.profile_strength || 0}
+            strength={developer.profile_strength || 0} 
             suggestions={[]}
           />
         </div>
@@ -316,13 +316,13 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
       {activeTab === 'portfolio' && (
         <PortfolioManager 
-          developerId={developer.user_id} 
+          developerId={developer.user_id}  
           isEditable={false}
         />
       )}
 
       {activeTab === 'github' && (
-        <RealGitHubChart 
+        <RealGitHubChart  
           githubHandle={developer.github_handle || ''} 
           className="w-full"
         />

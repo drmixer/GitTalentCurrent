@@ -6,7 +6,8 @@ import {
   Building, 
   Users, 
   Briefcase, 
-  TrendingUp, 
+  TrendingUp,
+  Loader,
   Plus, 
   Search, 
   Filter,
@@ -109,31 +110,6 @@ export const RecruiterDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [hires, setHires] = useState<(Hire & { assignment: Assignment })[]>([]);
-
-  // Inline Loader component to avoid missing import issues
-  const Loader = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg
-      {...props}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v8z"
-      />
-    </svg>
-  );
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
 
@@ -268,7 +244,7 @@ export const RecruiterDashboard: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" /> 
           <p className="text-gray-600 font-medium">Loading dashboard...</p>
           <p className="text-gray-500 text-sm mt-2">Fetching your recruiter profile...</p>
         </div>
@@ -278,13 +254,13 @@ export const RecruiterDashboard: React.FC = () => {
 
   // Redirect if not authenticated
   if (!userProfile) {
-    console.log('❌ No user profile, redirecting to dashboard');
+    console.log('❌ No user profile, redirecting to dashboard'); 
     return <Navigate to="/dashboard" replace />;
   }
 
   // Redirect if not a recruiter
   if (userProfile.role !== 'recruiter') {
-    console.log('❌ Not a recruiter role, redirecting to dashboard');
+    console.log('❌ Not a recruiter role, redirecting to dashboard'); 
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -292,7 +268,7 @@ export const RecruiterDashboard: React.FC = () => {
   if (!userProfile.is_approved) {
     console.log('⚠️ Recruiter not approved yet');
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center"> 
         <div className="max-w-md mx-auto text-center">
           <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
             <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -300,7 +276,7 @@ export const RecruiterDashboard: React.FC = () => {
             </div>
             <h1 className="text-2xl font-black text-gray-900 mb-4">Account Pending Approval</h1>
             <p className="text-gray-600 mb-6">
-              Your recruiter account is currently under review by our admin team. 
+              Your recruiter account is currently under review by our admin team.  
               You'll receive an email notification once your account is approved and you can access the dashboard.
             </p>
             <div className="text-sm text-gray-500">
