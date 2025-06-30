@@ -277,26 +277,25 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
         </div>
       </div>
 
-        {/* Additional Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-4 text-center">
-          <div className="p-2 bg-gray-50 rounded-lg">
-            <div className="text-base font-bold text-gray-900">{totalContributions}</div>
-            <div className="text-xs text-gray-600">Total Contributions</div>
-          </div>
-          <div className="p-2 bg-gray-50 rounded-lg">
-            <div className="text-base font-bold text-gray-900">{longestStreak}</div>
-            <div className="text-xs text-gray-600">Longest Streak</div>
-          </div>
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+      {/* Additional Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4 text-center">
         <div className="p-2 bg-gray-50 rounded-lg">
-          <div className="text-sm font-bold text-gray-900">{totalContributions}</div>
-          </div>
+          <div className="text-base font-bold text-gray-900">{totalContributions}</div>
+          <div className="text-xs text-gray-600">Total Contributions</div>
         </div>
+        <div className="p-2 bg-gray-50 rounded-lg">
+          <div className="text-base font-bold text-gray-900">{longestStreak}</div>
+          <div className="text-xs text-gray-600">Longest Streak</div>
+        </div>
+        <div className="p-2 bg-gray-50 rounded-lg">
+          <div className="text-base font-bold text-gray-900">{currentStreak}</div>
+          <div className="text-xs text-gray-600">Current Streak</div>
+        </div>
+      </div>
 
-        {/* Top Repositories */}
-        {repos.length > 0 && (
-          <div className="mt-4">
-        <div>
+      {/* Top Repositories */}
+      {repos.length > 0 && (
+        <div className="mt-4">
           <h4 className="text-xs font-bold text-gray-700 mb-2">Top Repositories</h4>
           <div className="space-y-1">
             {repos
@@ -319,23 +318,23 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
                         {repo.language}
                       </span>
                     )}
-                ))}
-                  <div className="flex items-center text-xs text-gray-500 ml-2">
-                    <Star className="w-3 h-3 mr-1" />
-                    {repo.stargazers_count}
+                    <div className="flex items-center text-xs text-gray-500 ml-2">
+                      <Star className="w-3 h-3 mr-1" />
+                      {repo.stargazers_count}
+                    </div>
                   </div>
                 </div>
               ))}
-        )}
+          </div>
         </div>
       )}
-        {/* Profile Info */}
-        {githubUser?.bio && (
-          <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-        <div className="mt-2 p-1.5 bg-blue-50 rounded-lg">
+
+      {/* Profile Info */}
+      {githubUser?.bio && (
+        <div className="mt-3 p-2 bg-blue-50 rounded-lg">
           <p className="text-xs text-gray-700">{githubUser.bio}</p>
         </div>
-      </div>
+      )}
     </div>
   );
 };
