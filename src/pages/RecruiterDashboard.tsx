@@ -32,6 +32,7 @@ import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperList } from '../components/DeveloperList';
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { AssignmentList } from '../components/Assignments/AssignmentList';
 
 interface JobRole {
   id: string;
