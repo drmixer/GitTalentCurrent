@@ -9,6 +9,7 @@ import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { 
   Briefcase, 
+  Edit,
   Users, 
   MessageSquare, 
   TrendingUp, 
@@ -25,6 +26,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { JobRole } from '../types';
+import { AssignmentList } from '../components/Assignments/AssignmentList';
 
 interface MessageThread {
   otherUserId: string;
@@ -582,6 +584,21 @@ export const RecruiterDashboard = () => {
                 </button>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-gray-50 rounded-xl">
+            <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 font-medium">No developer assignments yet</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Create a job posting and assign developers to get started
+            </p>
+            <button
+              onClick={() => setShowJobForm(true)}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4 mr-2 inline" />
+              Create Job Posting
+            </button>
           ))}
         </div>
       ) : (
@@ -656,6 +673,13 @@ export const RecruiterDashboard = () => {
         onThreadSelect={setSelectedThread}
       />
     );
+  };
+
+  const handleAssignDeveloper = (jobId: string) => {
+    // This function would open a modal to assign developers to the job
+    console.log('Assign developer to job:', jobId);
+    // For now, we'll just show an alert
+    alert('Developer assignment functionality coming soon!');
   };
 
   return (
