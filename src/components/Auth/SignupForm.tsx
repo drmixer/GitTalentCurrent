@@ -126,7 +126,7 @@ export const SignupForm = () => {
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
             <img 
-              src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjc3NDA0LCJleHAiOjE3ODI4MTM0MDR9.ecwYI2CisfiBgLKL_CLo3Y7TV2LFY9E-vvYGOxAQ-w8"
+              src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28gKDEpLnBuZyIsImlhdCI6MTc1MTI3ODAzMiwiZXhwIjoxNzgyODE0MDMyfQ.RSxR-UPfLSdds3m-WkyTHHu4y7jy9fL974ce-JdCjPc"
               alt="GitTalent"
               className="w-12 h-12 object-contain"
               onError={(e) => {

@@ -80,9 +80,6 @@ export const Header = () => {
     }
   };
 
-  const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentTransparent.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudFRyYW5zcGFyZW50LnBuZyIsImlhdCI6MTc1MTE3MzAyNiwiZXhwIjoxODE0MjQ1MDI2fQ.MYaFFrD9tDFprRRFwD4L-rlAleWAXYbVCpYnWp7c630';
-  const customLogoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjc3NDA0LCJleHAiOjE3ODI4MTM0MDR9.ecwYI2CisfiBgLKL_CLo3Y7TV2LFY9E-vvYGOxAQ-w8';
-
   // Format display name for developers
   const getDisplayName = () => {
     if (userProfile?.role === 'developer' && developerProfile?.github_handle) {
@@ -99,7 +96,7 @@ export const Header = () => {
           <Link to="/" className="flex items-center group py-8">
             <div className="h-32 w-auto flex items-center justify-center group-hover:scale-105 transition-all duration-300">
               <img 
-                src={customLogoUrl}
+                src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28gKDEpLnBuZyIsImlhdCI6MTc1MTI3ODAzMiwiZXhwIjoxNzgyODE0MDMyfQ.RSxR-UPfLSdds3m-WkyTHHu4y7jy9fL974ce-JdCjPc"
                 alt="GitTalent Logo" 
                 className="h-full w-auto object-contain"
                 onError={(e) => {
