@@ -22,6 +22,7 @@ interface MessageThread {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
+  otherUserProfilePicUrl?: string;
   lastMessage: Message;
   unreadCount: number;
   jobContext?: {
@@ -98,6 +99,33 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
       // Group messages into threads
       const threadMap = new Map<string, MessageThread>();
 
+      // Fetch profile pictures for developers
+      const developerIds = new Set<string>();
+      messages?.forEach(message => {
+        const isFromCurrentUser = message.sender_id === userProfile.id;
+        const otherUserId = isFromCurrentUser ? message.receiver_id : message.sender_id;
+        const otherUser = isFromCurrentUser ? message.receiver : message.sender;
+        
+        if (otherUser?.role === 'developer') {
+          developerIds.add(otherUserId);
+        }
+      });
+
+      // Get profile pictures for developers
+      const developerProfilePics: Record<string, string> = {};
+      if (developerIds.size > 0) {
+        const { data: developers } = await supabase
+          .from('developers')
+          .select('user_id, profile_pic_url')
+          .in('user_id', Array.from(developerIds));
+          
+        developers?.forEach(dev => {
+          if (dev.profile_pic_url) {
+            developerProfilePics[dev.user_id] = dev.profile_pic_url;
+          }
+        });
+      }
+
       messages?.forEach((message) => {
         const isFromCurrentUser = message.sender_id === userProfile.id;
         const otherUser = isFromCurrentUser ? message.receiver : message.sender;
@@ -118,10 +146,14 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
              (m.sender_id === otherUser.id && !m.job_role_id && !message.job_role_id))
           ).length;
 
+          // Get profile picture URL if available
+          const profilePicUrl = otherUser.role === 'developer' ? developerProfilePics[otherUser.id] : undefined;
+
           threadMap.set(threadKey, {
             otherUserId: otherUser.id,
             otherUserName: otherUser.name,
             otherUserRole: otherUser.role,
+            otherUserProfilePicUrl: profilePicUrl,
             lastMessage: message,
             unreadCount,
             jobContext: message.job_role ? {
@@ -343,9 +375,29 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
                 onClick={() => onThreadSelect?.(thread)}
               >
                 <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                    {thread.otherUserName.split(' ').map(n => n[0]).join('')}
-                  </div>
+                  {thread.otherUserProfilePicUrl ? (
+                    <img 
+                      src={thread.otherUserProfilePicUrl} 
+                      alt={thread.otherUserName}
+                      className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = "w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
+                          fallback.textContent = thread.otherUserName.split(' ').map(n => n[0]).join('');
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                      {thread.otherUserName.split(' ').map(n => n[0]).join('')}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center space-x-2">

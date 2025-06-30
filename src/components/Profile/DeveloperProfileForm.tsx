@@ -15,7 +15,8 @@ import {
   Loader,
   Save,
   FileText,
-  Bell
+  Bell,
+  Image
 } from 'lucide-react';
 import { Developer } from '../../types';
 
@@ -45,8 +46,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     experience_years: 0,
     desired_salary: 0,
     top_languages: [] as string[],
-    linked_projects: [] as string[],
     resume_url: '',
+    profile_pic_url: '',
     notification_preferences: {
       email: true,
       in_app: true,
@@ -56,7 +57,24 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   });
 
   const [newLanguage, setNewLanguage] = useState('');
-  const [newProject, setNewProject] = useState('');
+  const [filteredLanguageSuggestions, setFilteredLanguageSuggestions] = useState<string[]>([]);
+
+  // Common web technologies for autocomplete
+  const commonWebTechnologies = [
+    'JavaScript', 'TypeScript', 'Python', 'Java', 'Go', 'Rust', 'C++', 'C#', 'PHP', 'Ruby', 
+    'Swift', 'Kotlin', 'HTML', 'CSS', 'React', 'Angular', 'Vue.js', 'Svelte', 'Next.js', 
+    'Node.js', 'Express', 'Django', 'Flask', 'Spring Boot', 'Laravel', 'Ruby on Rails',
+    'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'SQLite', 'DynamoDB', 'Cassandra',
+    'AWS', 'Azure', 'Google Cloud', 'Firebase', 'Heroku', 'Vercel', 'Netlify',
+    'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'Jenkins', 'GitHub Actions', 'CircleCI',
+    'GraphQL', 'REST API', 'WebSockets', 'gRPC', 'Kafka', 'RabbitMQ',
+    'Tailwind CSS', 'Bootstrap', 'Material UI', 'Chakra UI', 'Styled Components', 'Sass',
+    'Redux', 'MobX', 'Zustand', 'React Query', 'SWR', 'Apollo Client',
+    'Jest', 'Mocha', 'Cypress', 'Playwright', 'Selenium', 'Testing Library',
+    'Webpack', 'Vite', 'Rollup', 'Parcel', 'esbuild', 'Babel',
+    'Git', 'GitHub', 'GitLab', 'Bitbucket', 'Jira', 'Confluence', 'Notion',
+    'Figma', 'Sketch', 'Adobe XD', 'Photoshop', 'Illustrator'
+  ];
 
   useEffect(() => {
     // Initialize form with user data from GitHub metadata if available
@@ -66,6 +84,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         github_handle: user.user_metadata?.user_name || user.user_metadata?.preferred_username || prev.github_handle,
         bio: user.user_metadata?.bio || prev.bio,
         location: user.user_metadata?.location || prev.location,
+        profile_pic_url: user.user_metadata?.avatar_url || prev.profile_pic_url,
       }));
     }
     
@@ -79,8 +98,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         experience_years: initialData.experience_years || prev.experience_years || 0,
         desired_salary: initialData.desired_salary || prev.desired_salary || 0,
         top_languages: initialData.top_languages || prev.top_languages || [],
-        linked_projects: initialData.linked_projects || prev.linked_projects || [],
         resume_url: initialData.resume_url || prev.resume_url || '',
+        profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url || '',
         notification_preferences: initialData.notification_preferences || prev.notification_preferences || {
           email: true,
           in_app: true,
@@ -116,13 +135,31 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }));
   };
 
-  const addLanguage = () => {
-    if (newLanguage.trim() && !formData.top_languages.includes(newLanguage.trim())) {
+  const handleLanguageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewLanguage(value);
+    
+    if (value.trim()) {
+      // Filter common technologies based on input
+      const filtered = commonWebTechnologies.filter(tech => 
+        tech.toLowerCase().includes(value.toLowerCase()) && 
+        !formData.top_languages.includes(tech)
+      );
+      setFilteredLanguageSuggestions(filtered.slice(0, 5)); // Limit to 5 suggestions
+    } else {
+      setFilteredLanguageSuggestions([]);
+    }
+  };
+
+  const addLanguage = (language?: string) => {
+    const langToAdd = language || newLanguage.trim();
+    if (langToAdd && !formData.top_languages.includes(langToAdd)) {
       setFormData(prev => ({
         ...prev,
-        top_languages: [...prev.top_languages, newLanguage.trim()]
+        top_languages: [...prev.top_languages, langToAdd]
       }));
       setNewLanguage('');
+      setFilteredLanguageSuggestions([]);
     }
   };
 
@@ -130,23 +167,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setFormData(prev => ({
       ...prev,
       top_languages: prev.top_languages.filter(lang => lang !== language)
-    }));
-  };
-
-  const addProject = () => {
-    if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        linked_projects: [...prev.linked_projects, newProject.trim()]
-      }));
-      setNewProject('');
-    }
-  };
-
-  const removeProject = (project: string) => {
-    setFormData(prev => ({
-      ...prev,
-      linked_projects: prev.linked_projects.filter(proj => proj !== project)
     }));
   };
 
@@ -168,6 +188,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         bio: formData.bio.trim(),
         location: formData.location.trim(),
         resume_url: formData.resume_url.trim(),
+        profile_pic_url: formData.profile_pic_url.trim(),
         notification_preferences: formData.notification_preferences
       };
 
@@ -251,6 +272,28 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               onChange={handleChange}
             />
           </div>
+        </div>
+
+        {/* Profile Picture URL */}
+        <div>
+          <label htmlFor="profile_pic_url" className="block text-sm font-bold text-gray-700 mb-2">
+            Profile Picture URL (Optional)
+          </label>
+          <div className="relative">
+            <Image className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              id="profile_pic_url"
+              name="profile_pic_url"
+              type="url"
+              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              placeholder="https://example.com/your-profile-picture.jpg"
+              value={formData.profile_pic_url}
+              onChange={handleChange}
+            />
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Link to your profile picture (GitHub avatar will be used if available)
+          </p>
         </div>
 
         {/* Bio */}
@@ -507,23 +550,42 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </div>
           </div>
 
-          {/* Custom Language Input */}
-          <div className="flex space-x-2 mb-4">
-            <input
-              type="text"
-              value={newLanguage}
-              onChange={(e) => setNewLanguage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              placeholder="Add a programming language..."
-            />
-            <button
-              type="button"
-              onClick={addLanguage}
-              className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
+          {/* Custom Language Input with Autocomplete */}
+          <div className="relative mb-4">
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={newLanguage}
+                onChange={handleLanguageInputChange}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="Add a programming language..."
+              />
+              <button
+                type="button"
+                onClick={() => addLanguage()}
+                className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Autocomplete Suggestions */}
+            {filteredLanguageSuggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                {filteredLanguageSuggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-gray-700"
+                    onClick={() => {
+                      addLanguage(suggestion);
+                    }}
+                  >
+                    {suggestion}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Selected Languages */}
@@ -542,55 +604,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Linked Projects */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-4">
-            Linked Projects (Optional)
-          </label>
-          <p className="text-sm text-gray-600 mb-4">
-            Add GitHub repository URLs or project links to showcase your work
-          </p>
-          
-          <div className="flex space-x-2 mb-4">
-            <input
-              type="url"
-              value={newProject}
-              onChange={(e) => setNewProject(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              placeholder="https://github.com/username/project-name"
-            />
-            <button
-              type="button"
-              onClick={addProject}
-              className="px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {formData.linked_projects.map((project) => (
-              <div
-                key={project}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
-              >
-                <div className="flex items-center overflow-hidden">
-                  <GitBranch className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                  <span className="text-sm font-medium text-gray-900 truncate">{project}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeProject(project)}
-                  className="text-gray-400 hover:text-red-600 transition-colors ml-2 flex-shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
             ))}
           </div>
         </div>

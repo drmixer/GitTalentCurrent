@@ -37,6 +37,7 @@ interface MessageThread {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
+  otherUserProfilePicUrl?: string;
   unreadCount: number;
   jobContext?: {
     id: string;
@@ -272,6 +273,11 @@ export const DeveloperDashboard = () => {
     console.log('❌ No developer profile, redirecting to onboarding');
     return <Navigate to="/onboarding" replace />;
   }
+
+  // Format display name as FirstName (github_handle)
+  const displayName = developerProfile.github_handle 
+    ? `${userProfile.name.split(' ')[0]} (${developerProfile.github_handle})`
+    : userProfile.name;
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
@@ -928,6 +934,7 @@ export const DeveloperDashboard = () => {
           otherUserId={selectedThread.otherUserId}
           otherUserName={selectedThread.otherUserName}
           otherUserRole={selectedThread.otherUserRole}
+          otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
           jobContext={selectedThread.jobContext}
           onBack={() => setSelectedThread(null)}
         />
@@ -949,14 +956,34 @@ export const DeveloperDashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-black text-gray-900 mb-2">
-                Welcome, {userProfile.name}!
+                Welcome, {displayName}!
               </h1>
               <p className="text-gray-600">Manage your developer profile and connect with recruiters</p>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                <Code className="w-6 h-6" />
-              </div>
+              {developerProfile.profile_pic_url ? (
+                <img 
+                  src={developerProfile.profile_pic_url} 
+                  alt={userProfile.name}
+                  className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      const fallback = document.createElement('div');
+                      fallback.className = "w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
+                      fallback.textContent = userProfile.name.split(' ').map(n => n[0]).join('');
+                      parent.appendChild(fallback);
+                    }
+                  }}
+                />
+              ) : (
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                  <Code className="w-6 h-6" />
+                </div>
+              )}
             </div>
           </div>
           

@@ -18,6 +18,7 @@ interface MessageThreadProps {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
+  otherUserProfilePicUrl?: string;
   jobContext?: {
     id: string;
     title: string;
@@ -29,6 +30,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   otherUserId,
   otherUserName,
   otherUserRole,
+  otherUserProfilePicUrl,
   jobContext,
   onBack
 }) => {
@@ -327,13 +329,33 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
           )}
-          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-            {showLimitedInfo ? (
-              <Lock className="w-6 h-6" />
-            ) : (
-              otherUserName.split(' ').map(n => n[0]).join('')
-            )}
-          </div>
+          {otherUserProfilePicUrl ? (
+            <img 
+              src={otherUserProfilePicUrl} 
+              alt={otherUserName}
+              className="w-12 h-12 rounded-xl object-cover shadow-lg"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
+                  fallback.textContent = showLimitedInfo ? "?" : otherUserName.split(' ').map(n => n[0]).join('');
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          ) : (
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+              {showLimitedInfo ? (
+                <Lock className="w-6 h-6" />
+              ) : (
+                otherUserName.split(' ').map(n => n[0]).join('')
+              )}
+            </div>
+          )}
           <div className="flex-1">
             <div className="flex items-center space-x-2">
               <h2 className="text-xl font-black text-gray-900">

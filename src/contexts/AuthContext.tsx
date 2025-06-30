@@ -109,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Extract GitHub username from user metadata
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = pendingName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'GitHub User';
+      const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
       // Determine the role - GitHub users are typically developers
       const userRole = authUser.user_metadata?.role || 'developer';
@@ -129,14 +130,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // If this is a GitHub user, also try to create/update developer profile with GitHub data
       if (githubUsername && userRole === 'developer') {
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, authUser.user_metadata);
+        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata);
       }
     } catch (error) {
       console.error('❌ Error in handleGitHubSignIn:', error);
     }
   };
 
-  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, githubMetadata: any) => {
+  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any) => {
     try {
       console.log('🔄 Creating/updating GitHub developer profile for:', userId);
       
@@ -157,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         location: githubMetadata?.location || '',
         experience_years: 0,
         desired_salary: 0,
+        profile_pic_url: avatarUrl || ''
       };
 
       if (existingProfile) {
@@ -167,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             github_handle: githubUsername,
             bio: githubMetadata?.bio || existingProfile.bio,
             location: githubMetadata?.location || existingProfile.location,
+            profile_pic_url: avatarUrl || existingProfile.profile_pic_url
           })
           .eq('user_id', userId);
       } else {
@@ -342,6 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userRole = authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
       const userName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User';
       const companyName = authUser.user_metadata?.company_name || 'Company';
+      const avatarUrl = authUser.user_metadata?.avatar_url || '';
       
       const { error: insertError } = await supabase
         .from('users') 
@@ -372,6 +376,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             location: authUser.user_metadata?.location || '',
             experience_years: 0,
             desired_salary: 0,
+            profile_pic_url: avatarUrl
           });
 
         if (devError) {
@@ -473,6 +478,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_location: profileData.location || '',
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
+        p_profile_pic_url: profileData.profile_pic_url || null
       });
 
       if (error) {
@@ -508,6 +514,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         location: profileData.location?.trim() || null,
         linked_projects: profileData.linked_projects?.filter(p => p.trim()) || [],
         top_languages: profileData.top_languages?.filter(l => l.trim()) || [],
+        profile_pic_url: profileData.profile_pic_url?.trim() || null
       };
 
       const { error } = await supabase

@@ -88,9 +88,29 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
       {/* Header */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-start space-x-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-            {developer.user.name.split(' ').map(n => n[0]).join('')}
-          </div>
+          {developer.profile_pic_url ? (
+            <img 
+              src={developer.profile_pic_url} 
+              alt={developer.user.name}
+              className="w-16 h-16 rounded-2xl object-cover shadow-lg"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
+                  fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          ) : (
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
+              {developer.user.name.split(' ').map(n => n[0]).join('')}
+            </div>
+          )}
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <h3 className="text-xl font-black text-gray-900">{displayName}</h3>

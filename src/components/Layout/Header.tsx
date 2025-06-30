@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
 export const Header = () => {
-  const { user, userProfile, signOut } = useAuth();
+  const { user, userProfile, developerProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -82,6 +82,14 @@ export const Header = () => {
 
   const logoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentTransparent.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudFRyYW5zcGFyZW50LnBuZyIsImlhdCI6MTc1MTE3MzAyNiwiZXhwIjoxODE0MjQ1MDI2fQ.MYaFFrD9tDFprRRFwD4L-rlAleWAXYbVCpYnWp7c630';
   const customLogoUrl = 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28ucG5nIiwiaWF0IjoxNzUxMjI5Mzc4LCJleHAiOjE3ODI3NjUzNzh9.d6zoyw7HdUn4z6mPJiFwIm7RCQYnDBfRXursnPHuGmo';
+
+  // Format display name for developers
+  const getDisplayName = () => {
+    if (userProfile?.role === 'developer' && developerProfile?.github_handle) {
+      return `${userProfile.name.split(' ')[0]} (${developerProfile.github_handle})`;
+    }
+    return userProfile?.name || '';
+  };
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
@@ -182,7 +190,7 @@ export const Header = () => {
                     className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
                   >
                     <User className="w-4 h-4" />
-                    <span className="text-sm font-semibold">{userProfile.name}</span>
+                    <span className="text-sm font-semibold">{getDisplayName()}</span>
                   </Link>
                   <button
                     onClick={handleSignOut}
@@ -283,7 +291,7 @@ export const Header = () => {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <User className="w-4 h-4" />
-                      <span>{userProfile.name}</span>
+                      <span>{getDisplayName()}</span>
                     </Link>
                     <button
                       onClick={handleSignOut}

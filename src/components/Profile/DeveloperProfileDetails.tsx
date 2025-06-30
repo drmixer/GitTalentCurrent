@@ -193,9 +193,29 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100"> 
         <div className="flex items-start md:items-center flex-col md:flex-row md:justify-between">
           <div className="flex items-center space-x-6 mb-4 md:mb-0">
-            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
-              {developer.user.name.split(' ').map(n => n[0]).join('')}
-            </div>
+            {developer.profile_pic_url ? (
+              <img 
+                src={developer.profile_pic_url} 
+                alt={developer.user.name}
+                className="w-20 h-20 rounded-2xl object-cover shadow-xl"
+                onError={(e) => {
+                  // Fallback to initials if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    const fallback = document.createElement('div');
+                    fallback.className = "w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl";
+                    fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                    parent.appendChild(fallback);
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
+                {developer.user.name.split(' ').map(n => n[0]).join('')}
+              </div>
+            )}
             <div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
               <div className="flex items-center space-x-4 text-sm text-gray-600"> 

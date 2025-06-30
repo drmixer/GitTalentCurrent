@@ -90,6 +90,7 @@ export interface Developer {
   public_profile_slug: string;
   notification_preferences: NotificationPreferences;
   resume_url?: string;
+  profile_pic_url?: string;
   created_at: string;
   updated_at: string;
   user?: User;
