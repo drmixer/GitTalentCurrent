@@ -43,6 +43,7 @@ export const Hero = () => {
                     </span>
                     <div className="absolute -bottom-2 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full"></div>
                   </span>
+                </span>
               </h1>
 
               {/* Subtitle */}
