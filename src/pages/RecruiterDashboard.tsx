@@ -366,6 +366,7 @@ export const RecruiterDashboard: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'jobs', label: 'My Jobs', icon: Briefcase },
     { id: 'developers', label: 'Assigned Developers', icon: Users },
+    { id: 'assignments', label: 'Assignments', icon: UserPlus },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
   ];
 
@@ -810,6 +811,18 @@ export const RecruiterDashboard: React.FC = () => {
             onSendMessage={(developerId, developerName) => {
               handleSendMessage(developerId, developerName);
             }}
+          />
+        )}
+
+        {/* Assignments Tab - Using AssignmentList component */}
+        {activeTab === 'assignments' && (
+          <AssignmentList 
+            recruiterId={userProfile?.id || ''}
+            onViewDeveloper={(developerId) => {
+              setSelectedDeveloper(developerId);
+              setShowDeveloperProfile(true);
+            }}
+            onSendMessage={handleSendMessage}
           />
         )}
 
