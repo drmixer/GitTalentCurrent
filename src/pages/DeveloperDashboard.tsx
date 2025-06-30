@@ -32,7 +32,12 @@ import {
   FileText,
   ArrowLeft,
   ExternalLink,
-  Search
+  Search,
+  ArrowRight,
+  DollarSign,
+  MapPin,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { Assignment, JobRole } from '../types';
 
