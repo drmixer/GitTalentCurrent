@@ -498,7 +498,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-    }
   };
 
   const refreshProfile = async () => {
