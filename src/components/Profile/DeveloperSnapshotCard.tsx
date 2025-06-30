@@ -174,10 +174,6 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
             <span className="text-xs text-gray-500">
               No GitHub handle
             </span>
-          ) : (
-            <span className="text-xs text-gray-500">
-              No GitHub handle
-            </span>
           )}
         </div>
         
