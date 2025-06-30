@@ -481,10 +481,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       )}
 
       {activeTab === 'github' && (
-        <RealGitHubChart  
-          githubHandle={developer.github_handle || ''} 
-          className="w-full"
-        />
+        <div>
+          <RealGitHubChart  
+            githubHandle={developer.github_handle || ''} 
+            className="w-full"
+          />
+        </div>
       )}
     </div>
   );

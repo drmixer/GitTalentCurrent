@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { DeveloperProfileForm } from '../components/Profile/DeveloperProfileForm';
-import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
-import { AssignmentList } from '../components/Assignments/AssignmentList';
-import { JobSearchList } from '../components/JobRoles/JobSearchList';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
+import { 
+  DeveloperProfileForm,
+  PortfolioManager,
+  MessageList,
+  MessageThread,
+  JobSearchList,
+  JobRoleDetails,
+  ProfileStrengthIndicator,
+  RealGitHubChart
+} from '../components';
 import { 
   User, 
   Briefcase, 
@@ -109,9 +111,8 @@ interface MessageThread {
 
 export const DeveloperDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'portfolio' | 'messages' | 'jobs' | 'github'>('overview');
   const [developer, setDeveloper] = useState<Developer | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [messages, setMessages] = useState<MessageThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +124,6 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchDeveloperData();
-      fetchAssignments();
       fetchMessages();
       fetchRecommendedJobs();
     }
@@ -146,38 +146,6 @@ export const DeveloperDashboard: React.FC = () => {
       setDeveloper(data);
     } catch (error) {
       console.error('Error fetching developer data:', error);
-    }
-  };
-
-  const fetchAssignments = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          job_role:job_roles(
-            title,
-            description,
-            location,
-            job_type,
-            tech_stack,
-            salary_min,
-            salary_max,
-            recruiter:recruiters(
-              company_name,
-              user:users(name)
-            )
-          )
-        `)
-        .eq('developer_id', user.id)
-        .order('assigned_at', { ascending: false });
-
-      if (error) throw error;
-      setAssignments(data || []);
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
     }
   };
 
@@ -299,20 +267,6 @@ export const DeveloperDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Briefcase className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Active Assignments</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {assignments.filter(a => a.status !== 'Rejected' && a.status !== 'Hired').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
               <MessageSquare className="w-6 h-6 text-green-600" />
             </div>
@@ -336,42 +290,20 @@ export const DeveloperDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Recent Assignments */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Assignments</h3>
-          <button
-            onClick={() => setActiveTab('assignments')}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-          >
-            View All
-          </button>
-        </div>
-        {assignments.slice(0, 3).map((assignment) => (
-          <div key={assignment.id} className="border-b border-gray-200 last:border-b-0 py-4 first:pt-0 last:pb-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-medium text-gray-900">{assignment.job_role.title}</h4>
-                <p className="text-sm text-gray-600">{assignment.job_role.recruiter.company_name}</p>
-                <div className="flex items-center mt-1 text-xs text-gray-500">
-                  <Calendar className="w-3 h-3 mr-1" />
-                  {new Date(assignment.assigned_at).toLocaleDateString()}
-                </div>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                assignment.status === 'New' ? 'bg-blue-100 text-blue-800' :
-                assignment.status === 'Contacted' ? 'bg-yellow-100 text-yellow-800' :
-                assignment.status === 'Shortlisted' ? 'bg-green-100 text-green-800' :
-                assignment.status === 'Hired' ? 'bg-purple-100 text-purple-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {assignment.status}
-              </span>
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Briefcase className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Job Interests</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {recommendedJobs.length > 0 ? recommendedJobs.length : '--'}
+              </p>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
       {/* Recommended Jobs */}
@@ -458,8 +390,8 @@ export const DeveloperDashboard: React.FC = () => {
             {[
               { id: 'overview', name: 'Overview', icon: TrendingUp },
               { id: 'profile', name: 'Profile', icon: User },
+              { id: 'github', name: 'GitHub Activity', icon: Github },
               { id: 'portfolio', name: 'Portfolio', icon: Briefcase },
-              { id: 'assignments', name: 'Assignments', icon: Briefcase },
               { id: 'messages', name: 'Messages', icon: MessageSquare },
               { id: 'jobs', name: 'Job Search', icon: Search },
             ].map((tab) => {
@@ -493,8 +425,12 @@ export const DeveloperDashboard: React.FC = () => {
         <div className="space-y-6">
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'profile' && <DeveloperProfileForm />}
-          {activeTab === 'portfolio' && <PortfolioManager />}
-          {activeTab === 'assignments' && <AssignmentList />}
+          {activeTab === 'github' && developer?.github_handle && (
+            <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
+          )}
+          {activeTab === 'portfolio' && developer && (
+            <PortfolioManager developerId={developer.user_id} isEditable={true} />
+          )}
           {activeTab === 'messages' && renderMessages()}
           {activeTab === 'jobs' && (
             <JobSearchList onViewDetails={handleViewJobDetails} />
