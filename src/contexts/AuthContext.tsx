@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { error } = await supabase.auth.signOut();
       if (error) {
-    } catch (error) {
+          } catch (error) {
       console.error('❌ Error in signOut:', error);
       throw error;
     } finally {
@@ -107,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSigningOut(false);
     }
   };
+  )
 
   const signIn = async (email: string, password: string) => {
     console.log('🔄 Signing in with email...');
