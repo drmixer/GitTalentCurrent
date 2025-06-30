@@ -186,13 +186,14 @@ export const DeveloperDashboard: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('job_roles')
+      // Fetch job roles with proper join syntax
+      const { data, error } = await supabase.from('job_roles')
         .select(`
           *,
-          recruiter:recruiters(
-            company_name,
-            user:users(name)
+          recruiter:users!job_roles_recruiter_id_fkey(
+            name,
+            email,
+            recruiters(company_name)
           )
         `)
         .eq('is_active', true)
