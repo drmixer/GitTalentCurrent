@@ -29,6 +29,13 @@ export const SignupForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // For developers, only GitHub signup is allowed
+    if (formData.role === 'developer') {
+      handleGitHubSignUp();
+      return;
+    }
+    
     setError('');
     setSuccess('');
     setLoading(true);
@@ -111,10 +118,6 @@ export const SignupForm = () => {
       </div>
     );
   }
-
-  // Show GitHub option for developers, but disable if no name
-  const showGitHubOption = formData.role === 'developer';
-  const isGitHubDisabled = !formData.name.trim();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -209,64 +212,6 @@ export const SignupForm = () => {
                 </div>
               </div>
 
-              {/* GitHub Sign Up Option for Developers */}
-              {showGitHubOption && (
-                <div className="space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500 font-medium">Choose signup method</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGitHubSignUp}
-                    disabled={githubLoading || isGitHubDisabled || loading}
-                    className={`w-full flex items-center justify-center px-6 py-4 border-2 rounded-2xl font-bold transition-all duration-300 group ${
-                      isGitHubDisabled || loading
-                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
-                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500'
-                    }`}
-                  >
-                    {githubLoading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
-                        Connecting to GitHub...
-                      </div>
-                    ) : (
-                      <>
-                        <Github className={`w-5 h-5 mr-3 transition-transform ${!isGitHubDisabled && !loading ? 'group-hover:scale-110' : ''}`} />
-                        Continue with GitHub
-                      </>
-                    )}
-                  </button>
-                  
-                  {isGitHubDisabled && (
-                    <p className="text-xs text-amber-600 text-center font-medium">
-                      ⚠️ Please enter your name above to continue with GitHub
-                    </p>
-                  )}
-                  
-                  {!isGitHubDisabled && !loading && (
-                    <p className="text-xs text-gray-500 text-center">
-                      ✨ Automatically imports your GitHub profile and projects
-                    </p>
-                  )}
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
                   Full name *
@@ -287,100 +232,148 @@ export const SignupForm = () => {
                 </div>
               </div>
 
-              {/* Email Input */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
-                  Email address *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    disabled={loading || githubLoading}
-                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {formData.role === 'recruiter' && (
-                <div>
-                  <label htmlFor="company_name" className="block text-sm font-bold text-gray-700 mb-2">
-                    Company name *
-                  </label>
+              {formData.role === 'developer' ? (
+                // For developers, show GitHub signup option only
+                <div className="space-y-4">
                   <div className="relative">
-                    <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      id="company_name"
-                      name="company_name"
-                      type="text"
-                      required
-                      disabled={loading || githubLoading}
-                      className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      placeholder="Enter your company name"
-                      value={formData.company_name}
-                      onChange={handleChange}
-                    />
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-gray-500 font-medium">Sign up with GitHub</span>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
-                  Password *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    required
-                    minLength={6}
-                    disabled={loading || githubLoading}
-                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    placeholder="Create a strong password (min 6 characters)"
-                    value={formData.password}
-                    onChange={handleChange}
-                  />
                   <button
                     type="button"
-                    disabled={loading || githubLoading}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={handleGitHubSignUp}
+                    disabled={githubLoading || !formData.name.trim() || loading}
+                    className={`w-full flex items-center justify-center px-6 py-4 border-2 rounded-2xl font-bold transition-all duration-300 group ${
+                      !formData.name.trim() || loading
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500'
+                    }`}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
+                    {githubLoading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
+                        Connecting to GitHub...
+                      </div>
                     ) : (
-                      <Eye className="h-5 w-5" />
+                      <>
+                        <Github className={`w-5 h-5 mr-3 transition-transform ${!formData.name.trim() || loading ? '' : 'group-hover:scale-110'}`} />
+                        Continue with GitHub
+                      </>
                     )}
                   </button>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading || githubLoading}
-                className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-              >
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                    Creating account...
+                  
+                  {!formData.name.trim() && (
+                    <p className="text-xs text-amber-600 text-center font-medium">
+                      ⚠️ Please enter your name above to continue with GitHub
+                    </p>
+                  )}
+                  
+                  <div className="text-center text-sm text-gray-600 mt-4">
+                    <p>Developers must sign up with GitHub to verify their identity and sync their coding activity.</p>
                   </div>
-                ) : (
-                  'Create account'
-                )}
-              </button>
+                </div>
+              ) : (
+                // For recruiters, show email/password signup form
+                <>
+                  {/* Email Input */}
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
+                      Email address *
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        disabled={loading || githubLoading}
+                        className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="company_name" className="block text-sm font-bold text-gray-700 mb-2">
+                      Company name *
+                    </label>
+                    <div className="relative">
+                      <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        id="company_name"
+                        name="company_name"
+                        type="text"
+                        required
+                        disabled={loading || githubLoading}
+                        className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Enter your company name"
+                        value={formData.company_name}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
+                      Password *
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        id="password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        required
+                        minLength={6}
+                        disabled={loading || githubLoading}
+                        className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Create a strong password (min 6 characters)"
+                        value={formData.password}
+                        onChange={handleChange}
+                      />
+                      <button
+                        type="button"
+                        disabled={loading || githubLoading}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button
+                      type="submit"
+                      disabled={loading || githubLoading}
+                      className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                    >
+                      {loading ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                          Creating account...
+                        </div>
+                      ) : (
+                        'Create account'
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {formData.role === 'recruiter' && (

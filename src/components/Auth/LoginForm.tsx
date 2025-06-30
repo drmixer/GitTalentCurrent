@@ -119,6 +119,11 @@ export const LoginForm = () => {
               </>
             )}
           </button>
+          
+          <p className="text-center text-sm text-blue-600 mb-6">
+            <Github className="w-4 h-4 inline mr-1" />
+            Developers: Sign in with GitHub to access your account
+          </p>
 
           {/* Divider */}
           <div className="relative mb-6">
