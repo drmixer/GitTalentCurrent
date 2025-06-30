@@ -10,8 +10,9 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
-  const { signIn, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
+  const { signIn, signInWithGitHub, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
   useEffect(() => {
     if (!authLoading && user) {
       console.log('✅ User authenticated, redirecting to dashboard...');
