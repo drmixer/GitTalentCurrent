@@ -16,7 +16,7 @@ export const SignupForm = () => {
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [success, setSuccess] = useState('');
-  const { signUp, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
+  const { signUp, signInWithGitHub, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   // Redirect to dashboard if user is already authenticated and has a profile
@@ -209,6 +209,7 @@ export const SignupForm = () => {
                 </div>
               </div>
 
+              {/* Full name input */}
               <div>
                 <label htmlFor="name" className="block text-sm font-bold text-gray-700 mb-2">
                   Full name *
@@ -229,64 +230,7 @@ export const SignupForm = () => {
                 </div>
               </div>
 
-              {/* GitHub Sign Up Option for Developers */}
-              {showGitHubOption && (
-                <div className="space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500 font-medium">Choose signup method</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGitHubSignUp}
-                    disabled={githubLoading || isGitHubDisabled || loading}
-                    className={`w-full flex items-center justify-center px-6 py-4 border-2 rounded-2xl font-bold transition-all duration-300 group ${
-                      isGitHubDisabled || loading
-                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
-                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500'
-                    }`}
-                  >
-                    {githubLoading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
-                        Connecting to GitHub...
-                      </div>
-                    ) : (
-                      <>
-                        <Github className={`w-5 h-5 mr-3 transition-transform ${!isGitHubDisabled && !loading ? 'group-hover:scale-110' : ''}`} />
-                        Continue with GitHub
-                      </>
-                    )}
-                  </button>
-                  
-                  {isGitHubDisabled && (
-                    <p className="text-xs text-amber-600 text-center font-medium">
-                      ⚠️ Please enter your name above to continue with GitHub
-                    </p>
-                  )}
-                  
-                  {!isGitHubDisabled && !loading && (
-                    <p className="text-xs text-gray-500 text-center">
-                      ✨ Automatically imports your GitHub profile and projects
-                    </p>
-                  )}
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+              {/* Email Input */}
               <div>
                 <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
                   Email address *
@@ -308,6 +252,7 @@ export const SignupForm = () => {
                 </div>
               </div>
 
+              {/* Company Name for Recruiters */}
               {formData.role === 'recruiter' && (
                 <div>
                   <label htmlFor="company_name" className="block text-sm font-bold text-gray-700 mb-2">
@@ -330,6 +275,7 @@ export const SignupForm = () => {
                 </div>
               )}
 
+              {/* Password Input */}
               <div>
                 <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
                   Password *
@@ -382,6 +328,7 @@ export const SignupForm = () => {
               </button>
             </div>
 
+            {/* Recruiter approval notice */}
             {formData.role === 'recruiter' && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
                 <div className="flex items-start">
