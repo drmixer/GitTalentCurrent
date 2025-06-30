@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
       
       // Skip processing if we're in the middle of signing out
-      if (signingOut) {
+      if (signingOut) { 
         console.log('🔄 Still in signing out process, ignoring auth change');
         return;
       }
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user && !signingOut) {
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') { 
             console.log('✅ User signed in, handling profile setup...');
             await handleGitHubSignIn(session.user);
           }
@@ -190,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // If we get a 500 error or the user doesn't exist, try to create the profile
       if (userError || !userProfileData) {
-        console.log('⚠️ User profile not found, attempting to create:', userError?.message);
+        console.log('⚠️ User profile not found, attempting to create:', userError?.message || 'No data');
         console.log('🔄 Auth user metadata for profile creation:', authUser.user_metadata);
         
         // Try to create the user profile
@@ -209,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (retryError) {
             console.error('❌ Error fetching user profile after creation:', retryError);
             setUserProfile(null);
-            setDeveloperProfile(null);            
+            setDeveloperProfile(null);
             setNeedsOnboarding(true); // Set to true to trigger onboarding if profile creation failed
             setLoading(false);
             return;
@@ -221,7 +221,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.error('❌ Failed to create user profile');
           setUserProfile(null);
-          setDeveloperProfile(null);          
+          setDeveloperProfile(null);
           console.log('⚠️ Setting needsOnboarding to true due to profile creation failure');
           setNeedsOnboarding(true); // Set to true to trigger onboarding if profile creation failed
           setLoading(false);
@@ -236,7 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('❌ Error fetching profiles:', error);
       setUserProfile(null);
       console.log('⚠️ Setting needsOnboarding to true due to profile fetch error');
-      setDeveloperProfile(null);      
+      setDeveloperProfile(null);
       setNeedsOnboarding(true); // Set to true to trigger onboarding if profile fetch failed
       setLoading(false);
     }

@@ -32,10 +32,6 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
     }
   }, [githubHandle, repos]);
 
-  useEffect(() => {
-    if (githubHandle) refreshGitHubData();
-  }, [githubHandle]);
-
   const generateContributionsFromRepos = () => {
     // Generate realistic contribution data based on repository activity
     const contributionData: ContributionDay[] = [];
