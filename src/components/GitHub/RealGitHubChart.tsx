@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Star, GitFork, ExternalLink, Loader, AlertCircle, RefreshCw, Github } from 'lucide-react';
+import { Star, GitFork, ExternalLink, Loader, AlertCircle, RefreshCw, Github } from 'lucide-react';
 import { useGitHub } from '../../hooks/useGitHub';
 
 interface RealGitHubChartProps {
@@ -200,7 +200,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   }
 
   return (
-    <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-lg mx-auto ${className}`}>
+    <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-2">
@@ -228,59 +228,54 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
       </div>
 
       {/* Real GitHub Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{githubUser.public_repos}</div>
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="text-center p-2 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+          <div className="text-lg font-black text-gray-900 mb-1">{githubUser.public_repos}</div>
           <div className="text-xs font-semibold text-gray-600">Public Repos</div>
         </div>
-        <div className="text-center p-3 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{totalStars}</div>
+        <div className="text-center p-2 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+          <div className="text-lg font-black text-gray-900 mb-1">{totalStars}</div>
           <div className="text-xs font-semibold text-gray-600">Total Stars</div>
         </div>
-        <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{githubUser.followers}</div>
+        <div className="text-center p-2 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+          <div className="text-lg font-black text-gray-900 mb-1">{githubUser.followers}</div>
           <div className="text-xs font-semibold text-gray-600">Followers</div>
         </div>
-        <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{currentStreak}</div>
+        <div className="text-center p-2 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
+          <div className="text-lg font-black text-gray-900 mb-1">{currentStreak}</div>
           <div className="text-xs font-semibold text-gray-600">Current Streak</div>
         </div>
       </div>
 
-      {/* Contribution Graph - Responsive Design */}
-      <div className="mb-6">
-        <div className="text-sm font-semibold text-gray-700 mb-3">
+      {/* Contribution Graph */}
+      <div className="mb-4">
+        <div className="text-xs font-medium text-gray-700 mb-2">
           {totalContributions} contributions in the last year
         </div>
-
-        <div className="mb-4">
-          <div className="text-sm font-semibold text-gray-700 mb-3">
-            {totalContributions} contributions in the last year
-          </div>
-          
-          <div className="grid grid-cols-12 gap-1 mb-3">
-            {contributions.map((day, index) => (
-              <div
-                key={index}
-                className={`w-2.5 h-2.5 rounded-sm ${getColorClass(day.level)} hover:ring-1 hover:ring-emerald-400 cursor-pointer transition-all duration-200`}
-                title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
-              />
-            ))}
-          </div>
-          
-          {/* Legend */}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span className="font-medium">Less</span>
-            <div className="flex items-center space-x-1">
-              <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
-            </div>
-            <span className="font-medium">More</span>
-          </div>
+        
+        <div className="grid grid-cols-12 gap-1 mb-2">
+          {contributions.slice(0, 84).map((day, index) => (
+            <div
+              key={index}
+              className={`w-2.5 h-2.5 rounded-sm ${getColorClass(day.level)} hover:ring-1 hover:ring-emerald-400 cursor-pointer transition-all duration-200`}
+              title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
+            />
+          ))}
         </div>
+        
+        {/* Legend */}
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span className="font-medium">Less</span>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-gray-100 rounded-sm"></div>
+            <div className="w-2 h-2 bg-emerald-200 rounded-sm"></div>
+            <div className="w-2 h-2 bg-emerald-300 rounded-sm"></div>
+            <div className="w-2 h-2 bg-emerald-500 rounded-sm"></div>
+            <div className="w-2 h-2 bg-emerald-600 rounded-sm"></div>
+          </div>
+          <span className="font-medium">More</span>
+        </div>
+      </div>
 
         {/* Additional Stats */}
         <div className="grid grid-cols-3 gap-3 mb-4 text-center">
@@ -292,59 +287,54 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
             <div className="text-base font-bold text-gray-900">{longestStreak}</div>
             <div className="text-xs text-gray-600">Longest Streak</div>
           </div>
-          <div className="p-2 bg-gray-50 rounded-lg">
-            <div className="text-base font-bold text-gray-900">{Math.round(totalContributions / 365 * 10) / 10}</div>
-            <div className="text-xs text-gray-600">Avg per Day</div>
+      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+        <div className="p-2 bg-gray-50 rounded-lg">
+          <div className="text-sm font-bold text-gray-900">{totalContributions}</div>
           </div>
         </div>
 
         {/* Top Repositories */}
         {repos.length > 0 && (
           <div className="mt-4">
-            <h4 className="text-xs font-bold text-gray-700 mb-2">Top Repositories</h4>
-            <div className="space-y-1.5">
-              {repos
-                .filter(repo => !repo.fork && repo.stargazers_count >= 0)
-                .sort((a, b) => b.stargazers_count - a.stargazers_count)
-                .slice(0, 3)
-                .map((repo) => (
-                  <div key={repo.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <a
-                          href={repo.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate"
-                        >
-                          {repo.name}
-                        </a>
-                        {repo.language && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                            {repo.language}
-                          </span>
-                        )}
-                      </div>
-                      {repo.description && (
-                        <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center text-xs text-gray-500 ml-2">
-                      <Star className="w-3 h-3 mr-1" />
-                      {repo.stargazers_count}
-                    </div>
-                  </div>
+        <div>
+          <h4 className="text-xs font-bold text-gray-700 mb-2">Top Repositories</h4>
+          <div className="space-y-1">
+            {repos
+              .filter(repo => !repo.fork && repo.stargazers_count >= 0)
+              .sort((a, b) => b.stargazers_count - a.stargazers_count)
+              .slice(0, 3)
+              .map((repo) => (
+                <div key={repo.id} className="flex items-center justify-between p-1.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={repo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 truncate"
+                    >
+                      {repo.name}
+                    </a>
+                    {repo.language && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                        {repo.language}
+                      </span>
+                    )}
                 ))}
-            </div>
-          </div>
+                  <div className="flex items-center text-xs text-gray-500 ml-2">
+                    <Star className="w-3 h-3 mr-1" />
+                    {repo.stargazers_count}
+                  </div>
+                </div>
+              ))}
         )}
-
+        </div>
+      )}
         {/* Profile Info */}
         {githubUser?.bio && (
           <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-            <p className="text-xs text-gray-700">{githubUser.bio}</p>
-          </div>
-        )}
+        <div className="mt-2 p-1.5 bg-blue-50 rounded-lg">
+          <p className="text-xs text-gray-700">{githubUser.bio}</p>
+        </div>
       </div>
     </div>
   );
