@@ -8,6 +8,7 @@ import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
 import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthIndicator';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
+import { DeveloperProfileForm } from '../components/Profile/DeveloperProfileForm';
 import { 
   User, 
   Code, 
@@ -22,7 +23,8 @@ import {
   Loader,
   Edit,
   Plus,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { Assignment } from '../types';
 
@@ -43,6 +45,7 @@ export const DeveloperDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  const [showEditProfileForm, setShowEditProfileForm] = useState(false);
 
   // Stats data
   const [stats, setStats] = useState({
@@ -106,6 +109,11 @@ export const DeveloperDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProfileUpdateSuccess = () => {
+    setShowEditProfileForm(false);
+    fetchDashboardData();
   };
 
   if (authLoading || loading) {
@@ -264,7 +272,9 @@ export const DeveloperDashboard = () => {
                     <div className="text-sm text-gray-600">Link your GitHub profile to show your work</div>
                   </div>
                 </div>
-                <button className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
+                <button 
+                  onClick={() => setShowEditProfileForm(true)}
+                  className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
                   Connect
                 </button>
               </div>
@@ -292,7 +302,9 @@ export const DeveloperDashboard = () => {
                     <div className="text-sm text-gray-600">Add programming languages and technologies</div>
                   </div>
                 </div>
-                <button className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
+                <button 
+                  onClick={() => setShowEditProfileForm(true)}
+                  className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
                   Add Skills
                 </button>
               </div>
@@ -321,7 +333,16 @@ export const DeveloperDashboard = () => {
 
   const renderStats = () => (
     <div className="space-y-8">
-      <h2 className="text-2xl font-black text-gray-900">Your Stats</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">Your Stats</h2>
+        <button
+          onClick={() => setShowEditProfileForm(true)}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+        >
+          <Edit className="w-4 h-4 mr-2" />
+          Edit Profile
+        </button>
+      </div>
 
       {/* Main Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -496,7 +517,9 @@ export const DeveloperDashboard = () => {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-black text-gray-900">Profile Visibility</h3>
-          <button className="text-sm text-blue-600 font-medium hover:text-blue-800 transition-colors">
+          <button 
+            onClick={() => setShowEditProfileForm(true)}
+            className="text-sm text-blue-600 font-medium hover:text-blue-800 transition-colors">
             <Edit className="w-4 h-4 mr-1 inline" />
             Edit Settings
           </button>
@@ -573,7 +596,9 @@ export const DeveloperDashboard = () => {
           <p className="text-gray-600 mb-6">
             Connect your GitHub account to showcase your contributions and projects to potential employers.
           </p>
-          <button className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+          <button 
+            onClick={() => setShowEditProfileForm(true)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold">
             <Github className="w-4 h-4 mr-2 inline" />
             Connect GitHub
           </button>
@@ -624,8 +649,15 @@ export const DeveloperDashboard = () => {
           {/* Quick Actions */}
           <div className="flex flex-wrap gap-4">
             <button 
-              onClick={() => setActiveTab('portfolio')}
+              onClick={() => setShowEditProfileForm(true)}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Profile
+            </button>
+            <button 
+              onClick={() => setActiveTab('portfolio')}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Portfolio Item
@@ -666,6 +698,30 @@ export const DeveloperDashboard = () => {
             </nav>
           </div>
         </div>
+
+        {/* Edit Profile Modal */}
+        {showEditProfileForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                <h2 className="text-2xl font-black text-gray-900">Edit Your Profile</h2>
+                <button
+                  onClick={() => setShowEditProfileForm(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-6">
+                <DeveloperProfileForm
+                  initialData={developerProfile}
+                  onSuccess={handleProfileUpdateSuccess}
+                  onCancel={() => setShowEditProfileForm(false)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         {activeTab === 'overview' && renderOverview()}
