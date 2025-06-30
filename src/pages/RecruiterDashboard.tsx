@@ -20,7 +20,8 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle,
-  Download
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
@@ -33,6 +34,7 @@ import { DeveloperList } from '../components/DeveloperList';
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AssignmentList } from '../components/Assignments/AssignmentList';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
 
 interface JobRole {
   id: string;
@@ -68,6 +70,7 @@ interface MessageThread {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
+  otherUserProfilePicUrl?: string;
   unreadCount: number;
   jobContext?: {
     id: string;
@@ -343,6 +346,14 @@ export const RecruiterDashboard: React.FC = () => {
     setActiveTab('messages');
   };
 
+  const handleViewJobDetails = (jobRoleId: string) => {
+    const job = jobs.find(j => j.id === jobRoleId);
+    if (job) {
+      setSelectedJob(job);
+      setShowJobDetails(true);
+    }
+  };
+
   const filteredJobRoles = jobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -440,7 +451,13 @@ export const RecruiterDashboard: React.FC = () => {
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+            <button 
+              onClick={() => handleViewJobRole(job)}
+              className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+            >
+              {job.title}
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </button>
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
               job.is_active 
                 ? 'bg-green-100 text-green-800' 
@@ -679,7 +696,13 @@ export const RecruiterDashboard: React.FC = () => {
                   {jobs.slice(0, 3).map((job) => (
                     <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                       <div>
-                        <div className="font-semibold text-gray-900">{job.title}</div>
+                        <button 
+                          onClick={() => handleViewJobRole(job)}
+                          className="font-semibold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                        >
+                          {job.title}
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </button>
                         <div className="text-sm text-gray-600">Posted {new Date(job.created_at).toLocaleDateString()}</div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -705,8 +728,22 @@ export const RecruiterDashboard: React.FC = () => {
                           {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                         </div>
                         <div>
-                          <div className="font-semibold text-gray-900">{assignment.developer?.name || 'Unknown'}</div>
-                          <div className="text-sm text-gray-600">{assignment.job_role?.title}</div>
+                          <button 
+                            onClick={() => {
+                              setSelectedDeveloper(assignment.developer_id);
+                              setShowDeveloperProfile(true);
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                          >
+                            {assignment.developer?.name || 'Unknown'}
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </button>
+                          <button 
+                            onClick={() => handleViewJobDetails(assignment.job_role_id)}
+                            className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            {assignment.job_role?.title}
+                          </button>
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -822,6 +859,9 @@ export const RecruiterDashboard: React.FC = () => {
               setSelectedDeveloper(developerId);
               setShowDeveloperProfile(true);
             }}
+            onViewJobRole={(jobRoleId) => {
+              handleViewJobDetails(jobRoleId);
+            }}
             onSendMessage={handleSendMessage}
           />
         )}
@@ -833,6 +873,7 @@ export const RecruiterDashboard: React.FC = () => {
               otherUserId={selectedThread.otherUserId}
               otherUserName={selectedThread.otherUserName}
               otherUserRole={selectedThread.otherUserRole}
+              otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
               jobContext={selectedThread.jobContext}
               onBack={() => setSelectedThread(null)}
             />
@@ -866,6 +907,7 @@ export const RecruiterDashboard: React.FC = () => {
               <div className="p-6">
                 <JobRoleDetails
                   jobRoleId={selectedJob.id}
+                  jobRole={selectedJob}
                   onClose={() => {
                     setShowJobDetails(false);
                     setSelectedJob(null);

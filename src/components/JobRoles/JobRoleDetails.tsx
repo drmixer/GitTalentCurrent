@@ -18,9 +18,12 @@ import {
   Loader,
   ArrowLeft,
   AlertCircle,
-  Lock
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { JobRole, Assignment, User, Developer } from '../../types';
+import { RecruiterProfileDetails } from '../Profile/RecruiterProfileDetails';
+import { DeveloperProfileDetails } from '../Profile/DeveloperProfileDetails';
 
 interface JobRoleDetailsProps {
   jobRoleId: string;
@@ -51,6 +54,9 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hasRecruiterContact, setHasRecruiterContact] = useState(false);
+  const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
+  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialJobRole) {
@@ -157,6 +163,17 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
     }
   };
 
+  const handleViewDeveloperProfile = (developerId: string) => {
+    setSelectedDeveloperId(developerId);
+    setShowDeveloperProfile(true);
+  };
+
+  const handleViewRecruiterProfile = () => {
+    if (jobRole?.recruiter_id) {
+      setShowRecruiterProfile(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -195,6 +212,49 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
 
   // Determine if we should show limited info for developer view
   const showLimitedInfo = isDeveloperView && !hasRecruiterContact;
+
+  if (showRecruiterProfile && jobRole.recruiter) {
+    return (
+      <div>
+        <button
+          onClick={() => setShowRecruiterProfile(false)}
+          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Job Details
+        </button>
+        <RecruiterProfileDetails 
+          recruiterId={jobRole.recruiter_id} 
+          onClose={() => setShowRecruiterProfile(false)}
+        />
+      </div>
+    );
+  }
+
+  if (showDeveloperProfile && selectedDeveloperId) {
+    return (
+      <div>
+        <button
+          onClick={() => {
+            setShowDeveloperProfile(false);
+            setSelectedDeveloperId(null);
+          }}
+          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Job Details
+        </button>
+        <DeveloperProfileDetails 
+          developerId={selectedDeveloperId}
+          onClose={() => {
+            setShowDeveloperProfile(false);
+            setSelectedDeveloperId(null);
+          }}
+          onSendMessage={handleSendMessage}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -308,7 +368,13 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                 {showLimitedInfo ? (
                   <p className="text-gray-600">Recruiter details will be visible after they contact you</p>
                 ) : (
-                  <p className="text-gray-600">{jobRole.recruiter.name}</p>
+                  <button 
+                    onClick={handleViewRecruiterProfile}
+                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                  >
+                    {jobRole.recruiter.name}
+                    <ExternalLink className="w-3 h-3 ml-1" />
+                  </button>
                 )}
               </div>
             </div>
@@ -376,9 +442,13 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-bold text-gray-900">
+                          <button 
+                            onClick={() => handleViewDeveloperProfile(assignment.developer_id)}
+                            className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                          >
                             {assignment.developer?.user?.name || 'Unknown Developer'}
-                          </h3>
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </button>
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                             assignment.developer?.availability 
                               ? 'bg-emerald-100 text-emerald-800' 
@@ -423,7 +493,10 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
 
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center space-x-2">
-                      <button className="px-3 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold text-sm">
+                      <button 
+                        onClick={() => handleViewDeveloperProfile(assignment.developer_id)}
+                        className="px-3 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold text-sm"
+                      >
                         <Eye className="w-4 h-4 mr-1 inline" />
                         View Profile
                       </button>

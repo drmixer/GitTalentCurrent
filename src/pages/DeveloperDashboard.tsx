@@ -29,7 +29,8 @@ import {
   X,
   GitBranch,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  ExternalLink
 } from 'lucide-react';
 import { Assignment, JobRole } from '../types';
 
@@ -358,8 +359,19 @@ export const DeveloperDashboard = () => {
                 <div>
                   {assignment.has_recruiter_contact ? (
                     <>
-                      <div className="font-semibold text-gray-900">{assignment.job_role?.title || 'Unknown Job'}</div>
-                      <div className="text-sm text-gray-600">{assignment.recruiter?.name || 'Unknown Recruiter'}</div>
+                      <button 
+                        onClick={() => handleViewJobDetails(assignment.job_role_id)}
+                        className="font-semibold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                      >
+                        {assignment.job_role?.title || 'Unknown Job'}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </button>
+                      <button
+                        onClick={() => handleViewJobDetails(assignment.job_role_id)}
+                        className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        {assignment.recruiter?.name || 'Unknown Recruiter'}
+                      </button>
                     </>
                   ) : (
                     <>
@@ -655,9 +667,10 @@ export const DeveloperDashboard = () => {
                       href={repo.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate"
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-700 truncate flex items-center"
                     >
                       {repo.name}
+                      <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
                     </a>
                     {repo.description && (
                       <p className="text-xs text-gray-600 truncate mt-1">{repo.description}</p>
@@ -886,9 +899,10 @@ export const DeveloperDashboard = () => {
                         href={repo.html_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 font-semibold"
+                        className="text-blue-600 hover:text-blue-800 font-semibold flex items-center"
                       >
                         {repo.name}
+                        <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                       <div className="flex items-center text-xs text-gray-500">
                         <Star className="w-3 h-3 mr-1" />
@@ -1088,6 +1102,20 @@ export const DeveloperDashboard = () => {
                 <JobRoleDetails
                   jobRoleId={selectedJobForDetails}
                   isDeveloperView={true}
+                  onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
+                    setSelectedThread({
+                      otherUserId: developerId,
+                      otherUserName: developerName,
+                      otherUserRole: 'recruiter',
+                      unreadCount: 0,
+                      jobContext: {
+                        id: jobRoleId,
+                        title: jobRoleTitle
+                      }
+                    });
+                    setShowJobDetailsModal(false);
+                    setActiveTab('messages');
+                  }}
                 />
               </div>
             </div>

@@ -158,6 +158,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
           otherUserId={selectedDeveloper.user_id}
           otherUserName={selectedDeveloper.user.name}
           otherUserRole="developer"
+          otherUserProfilePicUrl={selectedDeveloper.profile_pic_url}
           onBack={handleBackToList}
         />
       </div>

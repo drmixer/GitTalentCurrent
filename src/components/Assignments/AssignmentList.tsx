@@ -10,7 +10,8 @@ import {
   AlertCircle,
   Filter,
   Search,
-  Users
+  Users,
+  ExternalLink
 } from 'lucide-react';
 import { Assignment, JobRole, User } from '../../types';
 import { MarkAsHiredModal } from '../Hires/MarkAsHiredModal';
@@ -20,13 +21,15 @@ interface AssignmentListProps {
   jobRoleId?: string;
   onViewDeveloper?: (developerId: string) => void;
   onSendMessage?: (developerId: string, developerName: string, jobRoleId: string, jobRoleTitle: string) => void;
+  onViewJobRole?: (jobRoleId: string) => void;
 }
 
 export const AssignmentList: React.FC<AssignmentListProps> = ({ 
   recruiterId, 
   jobRoleId,
   onViewDeveloper,
-  onSendMessage
+  onSendMessage,
+  onViewJobRole
 }) => {
   const { userProfile } = useAuth();
   const [assignments, setAssignments] = useState<(Assignment & {
@@ -99,6 +102,12 @@ export const AssignmentList: React.FC<AssignmentListProps> = ({
     setShowHireModal(true);
   };
 
+  const handleViewJob = (jobRoleId: string) => {
+    if (onViewJobRole) {
+      onViewJobRole(jobRoleId);
+    }
+  };
+
   const filteredAssignments = assignments.filter(assignment => {
     // Filter by search term (developer name or job title)
     const matchesSearch = !searchTerm || 
@@ -168,14 +177,18 @@ export const AssignmentList: React.FC<AssignmentListProps> = ({
             <div key={assignment.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
                     {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="text-lg font-bold text-gray-900">
+                      <button 
+                        onClick={() => onViewDeveloper && onViewDeveloper(assignment.developer_id)}
+                        className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                      >
                         {assignment.developer?.name || 'Unknown Developer'}
-                      </h3>
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </button>
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                         assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
                         assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
@@ -187,9 +200,13 @@ export const AssignmentList: React.FC<AssignmentListProps> = ({
                       </span>
                     </div>
                     
-                    <div className="text-sm text-blue-600 font-medium mb-2">
+                    <button 
+                      onClick={() => onViewJobRole && onViewJobRole(assignment.job_role_id)}
+                      className="text-sm text-blue-600 font-medium mb-2 hover:text-blue-800 transition-colors flex items-center"
+                    >
                       {assignment.job_role?.title || 'Unknown Job'}
-                    </div>
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </button>
                     
                     <div className="text-sm text-gray-500">
                       Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
