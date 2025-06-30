@@ -9,6 +9,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const navigate = useNavigate();
@@ -16,7 +17,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session
     const initializeAuth = async () => {
       try {
         console.log('🔄 Initializing auth... Checking for existing session');
@@ -50,15 +50,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out flag:', signingOut);
       
-      // Skip processing if we're in the middle of signing out
       if (signingOut) { 
         console.log('🔄 Still in signing out process, ignoring auth change');
         return;
@@ -75,9 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           await fetchUserProfile(newUser);
         } else if (event === 'SIGNED_OUT') {
-          // Clear all state when user signs out
-          console.log('🔄 Clearing auth state...');
+          console.log('🔄 User signed out, clearing auth state...');
           setUserProfile(null);
+          setDeveloperProfile(null);
           setLoading(false);
         }
       } catch (error) {
@@ -98,13 +94,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setSigningOut(true);
       console.log('🔄 Signing out...');
-      
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
       }
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
     } catch (error) {
-      console.error('❌ Error in signOut:', error);
+      console.error('❌ Error during sign out:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -135,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 Signing up user...');
       console.log('🔄 User data for signup:', userData);
       
-      // First, sign up the user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -150,7 +147,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
 
-      // The trigger should handle profile creation, but we'll verify it worked
       if (data?.user) {
         console.log('✅ User signed up successfully:', data.user.id, 'with role:', userData.role);
       }
@@ -280,6 +276,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     signOut,
     fetchUserProfile,
+    developerProfile, // Exposed developer profile state
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
