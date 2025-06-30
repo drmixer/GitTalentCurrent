@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { GitHubChart } from '../components/GitHub/GitHubChart';
 import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
@@ -24,7 +25,8 @@ import {
   Edit,
   Plus,
   RefreshCw,
-  X
+  X,
+  GitBranch
 } from 'lucide-react';
 import { Assignment } from '../types';
 
@@ -156,6 +158,59 @@ export const DeveloperDashboard = () => {
     }
   };
 
+  // Generate dynamic profile strength suggestions based on profile data
+  const generateProfileSuggestions = (): string[] => {
+    const suggestions: string[] = [];
+    
+    if (!developerProfile) return suggestions;
+    
+    // Check GitHub handle
+    if (!developerProfile.github_handle) {
+      suggestions.push('Add your GitHub handle to showcase your coding activity');
+    }
+    
+    // Check bio
+    if (!developerProfile.bio || developerProfile.bio.length < 50) {
+      suggestions.push('Complete your bio with at least 50 characters to better introduce yourself');
+    }
+    
+    // Check location
+    if (!developerProfile.location) {
+      suggestions.push('Add your location to receive location-specific opportunities');
+    }
+    
+    // Check experience years
+    if (developerProfile.experience_years === 0) {
+      suggestions.push('Specify your years of experience to help match you with appropriate roles');
+    }
+    
+    // Check desired salary
+    if (developerProfile.desired_salary === 0) {
+      suggestions.push('Set your desired salary to help match you with appropriate compensation');
+    }
+    
+    // Check top languages
+    if (!developerProfile.top_languages || developerProfile.top_languages.length < 3) {
+      suggestions.push('Add at least 3 programming languages to showcase your technical skills');
+    }
+    
+    // Check linked projects
+    if (!developerProfile.linked_projects || developerProfile.linked_projects.length < 2) {
+      suggestions.push('Link at least 2 projects to demonstrate your work');
+    }
+    
+    // Check resume URL
+    if (!developerProfile.resume_url) {
+      suggestions.push('Add a link to your resume for recruiters to review');
+    }
+    
+    // Check portfolio items
+    // This would require a separate query, so we'll just add a generic suggestion
+    suggestions.push('Add portfolio items to showcase your best work');
+    
+    return suggestions;
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -205,12 +260,7 @@ export const DeveloperDashboard = () => {
       {/* Profile Strength */}
       <ProfileStrengthIndicator
         strength={stats.profileStrength}
-        suggestions={[
-          'Add more programming languages to showcase your skills',
-          'Link your GitHub projects to demonstrate your work',
-          'Complete your bio to tell recruiters about yourself',
-          'Add your location to receive location-specific opportunities'
-        ]}
+        suggestions={generateProfileSuggestions()}
       />
 
       {/* Stats Grid */}
@@ -374,6 +424,23 @@ export const DeveloperDashboard = () => {
                 Add Now
               </button>
             </div>
+            
+            {!developerProfile.resume_url && (
+              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl">
+                <div className="flex items-center">
+                  <FileText className="w-5 h-5 text-yellow-600 mr-3" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Add Your Resume</div>
+                    <div className="text-sm text-gray-600">Link to your resume for recruiters to review</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowEditProfileForm(true)}
+                  className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600 text-white">
+                  Add Resume
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

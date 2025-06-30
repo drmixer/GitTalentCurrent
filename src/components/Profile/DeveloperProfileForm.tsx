@@ -13,7 +13,9 @@ import {
   Code,
   GitBranch,
   Loader,
-  Save
+  Save,
+  FileText,
+  Bell
 } from 'lucide-react';
 import { Developer } from '../../types';
 
@@ -44,6 +46,13 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     desired_salary: 0,
     top_languages: [] as string[],
     linked_projects: [] as string[],
+    resume_url: '',
+    notification_preferences: {
+      email: true,
+      in_app: true,
+      messages: true,
+      assignments: true
+    }
   });
 
   const [newLanguage, setNewLanguage] = useState('');
@@ -71,6 +80,13 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         desired_salary: initialData.desired_salary || prev.desired_salary || 0,
         top_languages: initialData.top_languages || prev.top_languages || [],
         linked_projects: initialData.linked_projects || prev.linked_projects || [],
+        resume_url: initialData.resume_url || prev.resume_url || '',
+        notification_preferences: initialData.notification_preferences || prev.notification_preferences || {
+          email: true,
+          in_app: true,
+          messages: true,
+          assignments: true
+        }
       }));
     }
   }, [user, initialData]);
@@ -87,6 +103,16 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setFormData(prev => ({
       ...prev,
       availability: !prev.availability
+    }));
+  };
+
+  const handleNotificationChange = (key: keyof typeof formData.notification_preferences) => {
+    setFormData(prev => ({
+      ...prev,
+      notification_preferences: {
+        ...prev.notification_preferences,
+        [key]: !prev.notification_preferences[key]
+      }
     }));
   };
 
@@ -141,6 +167,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         github_handle: formData.github_handle.trim(),
         bio: formData.bio.trim(),
         location: formData.location.trim(),
+        resume_url: formData.resume_url.trim(),
+        notification_preferences: formData.notification_preferences
       };
 
       let success;
@@ -302,6 +330,117 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               value={formData.desired_salary}
               onChange={handleChange}
             />
+          </div>
+        </div>
+
+        {/* Resume URL */}
+        <div>
+          <label htmlFor="resume_url" className="block text-sm font-bold text-gray-700 mb-2">
+            Resume URL (Optional)
+          </label>
+          <div className="relative">
+            <FileText className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              id="resume_url"
+              name="resume_url"
+              type="url"
+              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              placeholder="https://example.com/your-resume.pdf"
+              value={formData.resume_url}
+              onChange={handleChange}
+            />
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Link to your resume or CV hosted online (Google Drive, Dropbox, etc.)
+          </p>
+        </div>
+
+        {/* Notification Preferences */}
+        <div className="bg-gray-50 rounded-2xl p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 mb-2">Notification Preferences</h3>
+              <p className="text-gray-600">Control how you receive notifications</p>
+            </div>
+            <Bell className="w-5 h-5 text-gray-400" />
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label htmlFor="email_notifications" className="text-gray-700 font-medium">
+                Email Notifications
+              </label>
+              <button
+                type="button"
+                onClick={() => handleNotificationChange('email')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.notification_preferences.email ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.notification_preferences.email ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label htmlFor="in_app_notifications" className="text-gray-700 font-medium">
+                In-App Notifications
+              </label>
+              <button
+                type="button"
+                onClick={() => handleNotificationChange('in_app')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.notification_preferences.in_app ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.notification_preferences.in_app ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label htmlFor="message_notifications" className="text-gray-700 font-medium">
+                Message Notifications
+              </label>
+              <button
+                type="button"
+                onClick={() => handleNotificationChange('messages')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.notification_preferences.messages ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.notification_preferences.messages ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label htmlFor="assignment_notifications" className="text-gray-700 font-medium">
+                Assignment Notifications
+              </label>
+              <button
+                type="button"
+                onClick={() => handleNotificationChange('assignments')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.notification_preferences.assignments ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.notification_preferences.assignments ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
 
