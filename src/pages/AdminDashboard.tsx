@@ -1,1255 +1,1581 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { supabase, REALTIME_LISTEN_TYPES } from '../lib/supabase';
-import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
-import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
-import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
+import { supabase } from '../lib/supabase';
 import { 
   Users, 
   Briefcase, 
-  UserCheck, 
-  TrendingUp, 
-  Search, 
+  UserPlus, 
+  CheckCircle, 
+  Loader, 
+  AlertCircle,
+  Search,
   Filter,
-  MoreVertical,
+  Download,
   Eye,
-  MessageSquare,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Award,
+  Edit,
+  Trash2,
+  X,
+  Plus,
   Building,
   Code,
-  Mail,
-  Phone,
+  MessageSquare,
+  Clock,
+  DollarSign,
   Calendar,
-  ArrowUpRight,
-  Plus,
-  Loader,
-  Download,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
-import { User, Developer, Recruiter, Assignment, Hire, JobRole } from '../types';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
+import { User, Developer, Recruiter, JobRole, Assignment, Hire } from '../types';
 
-interface MessageThread {
-  otherUserId: string;
-  otherUserName: string;
-  otherUserRole: string;
-  unreadCount: number;
-  jobContext?: {
-    id: string;
-    title: string;
-  };
-}
-
-export const AdminDashboard = () => {
-  const { userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [searchTerm, setSearchTerm] = useState('');
+export const AdminDashboard: React.FC = () => {
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState('recruiters');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  // Modal states
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showJobDetails, setShowJobDetails] = useState(false);
-  const [showDeveloperProfile, setShowDeveloperProfile] = useState(false);
-  const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
-  
-  // Selected item states
-  const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
-  const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
-  const [selectedRecruiterId, setSelectedRecruiterId] = useState<string | null>(null);
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  // Recruiters tab state
+  const [recruiters, setRecruiters] = useState<(User & { recruiter: Recruiter })[]>([]);
+  const [pendingRecruiters, setPendingRecruiters] = useState<(User & { recruiter: Recruiter })[]>([]);
+  const [approvedRecruiters, setApprovedRecruiters] = useState<(User & { recruiter: Recruiter })[]>([]);
+  const [selectedRecruiter, setSelectedRecruiter] = useState<string | null>(null);
+  const [showRecruiterDetails, setShowRecruiterDetails] = useState(false);
+  const [recruiterSearchTerm, setRecruiterSearchTerm] = useState('');
 
-  // Data states
-  const [stats, setStats] = useState({
-    totalDevelopers: 0,
-    activeRecruiters: 0,
-    successfulHires: 0, 
-    revenue: 0,
-    pendingApprovals: 0
-  });
-  const [developers, setDevelopers] = useState<(Developer & { user: User })[]>([]);
-  const [recruiters, setRecruiters] = useState<(Recruiter & { user: User })[]>([]);
+  // Developers tab state
+  const [developers, setDevelopers] = useState<(User & { developer: Developer })[]>([]);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null);
+  const [showDeveloperDetails, setShowDeveloperDetails] = useState(false);
+  const [showAssignDeveloperModal, setShowAssignDeveloperModal] = useState(false);
+  const [developerSearchTerm, setDeveloperSearchTerm] = useState('');
+  const [filterAvailableDevelopers, setFilterAvailableDevelopers] = useState<boolean | null>(null);
+
+  // Job roles tab state
   const [jobRoles, setJobRoles] = useState<(JobRole & { recruiter: User })[]>([]);
-  const [assignments, setAssignments] = useState<(Assignment & {
-    developer: User,
-    job_role: JobRole,
-    recruiter: User
+  const [selectedJobRole, setSelectedJobRole] = useState<JobRole | null>(null);
+  const [showJobRoleDetails, setShowJobRoleDetails] = useState(false);
+  const [showJobRoleForm, setShowJobRoleForm] = useState(false);
+  const [jobRoleSearchTerm, setJobRoleSearchTerm] = useState('');
+  const [filterActiveJobs, setFilterActiveJobs] = useState<boolean | null>(null);
+
+  // Assignments tab state
+  const [assignments, setAssignments] = useState<(Assignment & { 
+    developer: User, 
+    recruiter: User, 
+    job_role: JobRole 
   })[]>([]);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [showHireModal, setShowHireModal] = useState(false);
+  const [assignmentSearchTerm, setAssignmentSearchTerm] = useState('');
+  const [filterAssignmentStatus, setFilterAssignmentStatus] = useState<string | null>(null);
+
+  // Hires tab state
   const [hires, setHires] = useState<(Hire & { 
-    assignment: Assignment & {
-      developer: User,
-      job_role: JobRole,
-      recruiter: User
-    }
+    assignment: Assignment & { 
+      developer: User, 
+      recruiter: User, 
+      job_role: JobRole 
+    } 
   })[]>([]);
-  const [pendingRecruiters, setPendingRecruiters] = useState<(Recruiter & { user: User })[]>([]);
+  const [hireSearchTerm, setHireSearchTerm] = useState('');
+  const [filterHireDate, setFilterHireDate] = useState<{start?: string, end?: string}>({});
+  const [filterHireRecruiter, setFilterHireRecruiter] = useState<string | null>(null);
 
   useEffect(() => {
     if (userProfile?.role === 'admin') {
-      fetchDashboardData();
-      
-      // Set up real-time subscriptions
-      setupRealtimeSubscriptions();
+      fetchData();
     }
   }, [userProfile]);
 
-  const setupRealtimeSubscriptions = () => {
-    console.log('Setting up real-time subscriptions for admin dashboard...');
-    
-    // Subscribe to changes in the recruiters table
-    const recruitersSubscription = supabase
-      .channel('recruiters-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'recruiters'
-        },
-        (payload) => {
-          console.log('Recruiters table change detected:', payload);
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
-    
-    // Subscribe to changes in the users table
-    const usersSubscription = supabase
-      .channel('users-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'users',
-          filter: 'role=eq.recruiter' // Only listen for recruiter role changes
-        },
-        (payload) => {
-          console.log('Users table change detected for recruiters:', payload);
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
-    
-    // Clean up subscriptions when component unmounts
-    return () => {
-      console.log('Cleaning up real-time subscriptions...');
-      supabase.removeChannel(recruitersSubscription);
-      supabase.removeChannel(usersSubscription);
-    };
-  };
+  useEffect(() => {
+    // Filter recruiters when search term changes
+    if (recruiters.length > 0) {
+      const filtered = recruiters.filter(recruiter => 
+        recruiter.name.toLowerCase().includes(recruiterSearchTerm.toLowerCase()) ||
+        recruiter.email.toLowerCase().includes(recruiterSearchTerm.toLowerCase()) ||
+        recruiter.recruiter.company_name.toLowerCase().includes(recruiterSearchTerm.toLowerCase())
+      );
+      
+      setPendingRecruiters(filtered.filter(r => !r.is_approved));
+      setApprovedRecruiters(filtered.filter(r => r.is_approved));
+    }
+  }, [recruiters, recruiterSearchTerm]);
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      console.log('Fetching dashboard data...');
 
-      // Fetch stats
-      const [
-        { count: developersCount },
-        { count: recruitersCount },
-        { count: hiresCount }
-      ] = await Promise.all([
-        supabase.from('developers').select('*', { count: 'exact', head: true }),
-        supabase.from('recruiters').select('*', { count: 'exact', head: true }),
-        supabase.from('hires').select('*', { count: 'exact', head: true })
-      ]);
-
-      setStats({
-        totalDevelopers: developersCount || 0,
-        activeRecruiters: recruitersCount || 0,
-        successfulHires: hiresCount || 0,
-        revenue: (hiresCount || 0) * 15000, // Estimate based on average hire fee
-        pendingApprovals: 0
-      });
-
-      // Fetch developers with user data
-      const { data: developersData, error: devError } = await supabase
-        .from('developers')
-        .select(`
-          *,
-          user:users(*)
-        `)
-        .limit(50);
-
-      if (devError) throw devError;
-      setDevelopers(developersData || []);
-
-      // Fetch recruiters with user data
-      const { data: recruitersData, error: recError } = await supabase
-        .from('recruiters')
-        .select(`
-          *,
-          user:users(*)
-        `)
-        .limit(50);
-
-      if (recError) throw recError;
-      setRecruiters(recruitersData || []);
-
-      // Fetch pending recruiters with detailed logging
-      console.log('Fetching pending recruiters...');
-      const { data: pendingData, error: pendingError } = await supabase
-        .from('recruiters')
-        .select(`
-          *,
-          user:users!inner(*)
-        `)
-        .eq('user.is_approved', false)
-        .limit(10);
-
-      if (pendingError) {
-        console.error('Error fetching pending recruiters:', pendingError);
-        throw pendingError;
+      // Fetch data based on active tab
+      switch (activeTab) {
+        case 'recruiters':
+          await fetchRecruiters();
+          break;
+        case 'developers':
+          await fetchDevelopers();
+          break;
+        case 'jobs':
+          await fetchJobRoles();
+          break;
+        case 'assignments':
+          await fetchAssignments();
+          break;
+        case 'hires':
+          await fetchHires();
+          break;
+        default:
+          await fetchRecruiters();
       }
-      
-      console.log('Pending recruiters data:', pendingData);
-      setPendingRecruiters(pendingData || []);
-
-      // Update stats with pending approvals count
-      setStats(prev => ({
-        ...prev,
-        pendingApprovals: pendingData?.length || 0
-      }));
-
-      // Fetch job roles with recruiter data
-      const { data: jobRolesData, error: jobError } = await supabase
-        .from('job_roles')
-        .select(`
-          *,
-          recruiter:users!job_roles_recruiter_id_fkey(*)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (jobError) throw jobError;
-      setJobRoles(jobRolesData || []);
-
-      // Fetch assignments
-      const { data: assignmentsData, error: assignError } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          developer:users!assignments_developer_id_fkey(*),
-          job_role:job_roles(*),
-          recruiter:users!assignments_recruiter_id_fkey(*)
-        `)
-        .order('assigned_at', { ascending: false })
-        .limit(50);
-
-      if (assignError) throw assignError;
-      setAssignments(assignmentsData || []);
-
-      // Fetch hires
-      const { data: hiresData, error: hiresError } = await supabase
-        .from('hires')
-        .select(`
-          *,
-          assignment:assignments(
-            *,
-            developer:users!assignments_developer_id_fkey(*),
-            job_role:job_roles(*),
-            recruiter:users!assignments_recruiter_id_fkey(*)
-          )
-        `)
-        .order('hire_date', { ascending: false })
-        .limit(50);
-
-      if (hiresError) throw hiresError;
-      setHires(hiresData || []);
-
     } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-      setError(error.message || 'Failed to load dashboard data');
+      console.error(`Error fetching ${activeTab} data:`, error);
+      setError(error.message || `Failed to load ${activeTab} data`);
     } finally {
       setLoading(false);
     }
   };
 
-  const approveRecruiter = async (userId: string) => {
+  const fetchRecruiters = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        *,
+        recruiter:recruiters(*)
+      `)
+      .eq('role', 'recruiter')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setRecruiters(data || []);
+    setPendingRecruiters(data?.filter(r => !r.is_approved) || []);
+    setApprovedRecruiters(data?.filter(r => r.is_approved) || []);
+  };
+
+  const fetchDevelopers = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        *,
+        developer:developers(*)
+      `)
+      .eq('role', 'developer')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setDevelopers(data || []);
+  };
+
+  const fetchJobRoles = async () => {
+    const { data, error } = await supabase
+      .from('job_roles')
+      .select(`
+        *,
+        recruiter:users!job_roles_recruiter_id_fkey(*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setJobRoles(data || []);
+  };
+
+  const fetchAssignments = async () => {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select(`
+        *,
+        developer:users!assignments_developer_id_fkey(*),
+        recruiter:users!assignments_recruiter_id_fkey(*),
+        job_role:job_roles(*)
+      `)
+      .order('assigned_at', { ascending: false });
+
+    if (error) throw error;
+    setAssignments(data || []);
+  };
+
+  const fetchHires = async () => {
+    const { data, error } = await supabase
+      .from('hires')
+      .select(`
+        *,
+        assignment:assignments(
+          *,
+          developer:users!assignments_developer_id_fkey(*),
+          recruiter:users!assignments_recruiter_id_fkey(*),
+          job_role:job_roles(*)
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setHires(data || []);
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setLoading(true);
+    
+    // Reset search terms and filters when changing tabs
+    setRecruiterSearchTerm('');
+    setDeveloperSearchTerm('');
+    setJobRoleSearchTerm('');
+    setAssignmentSearchTerm('');
+    setHireSearchTerm('');
+    setFilterAvailableDevelopers(null);
+    setFilterActiveJobs(null);
+    setFilterAssignmentStatus(null);
+    setFilterHireDate({});
+    setFilterHireRecruiter(null);
+    
+    fetchData();
+  };
+
+  const handleApproveRecruiter = async (recruiterId: string) => {
     try {
-      const result = await updateUserApprovalStatus(userId, true);
-      if (result) {
-        console.log('Recruiter approved successfully:', userId);
-        fetchDashboardData();
-      }
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: true })
+        .eq('id', recruiterId);
+
+      if (error) throw error;
+      
+      setSuccessMessage('Recruiter approved successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Update local state
+      setRecruiters(prev => 
+        prev.map(r => 
+          r.id === recruiterId ? { ...r, is_approved: true } : r
+        )
+      );
+      setPendingRecruiters(prev => prev.filter(r => r.id !== recruiterId));
+      setApprovedRecruiters(prev => [
+        ...prev, 
+        recruiters.find(r => r.id === recruiterId)!
+      ]);
     } catch (error: any) {
       console.error('Error approving recruiter:', error);
       setError(error.message || 'Failed to approve recruiter');
     }
   };
 
-  const rejectRecruiter = async (userId: string) => {
+  const handleDeactivateRecruiter = async (recruiterId: string) => {
     try {
-      const result = await updateUserApprovalStatus(userId, false);
-      if (result) {
-        console.log('Recruiter rejected successfully:', userId);
-        // Also delete the recruiter profile
-        await supabase.from('recruiters').delete().eq('user_id', userId);
-        await supabase.from('users').delete().eq('id', userId);
-        fetchDashboardData();
-      }
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: false })
+        .eq('id', recruiterId);
+
+      if (error) throw error;
+      
+      setSuccessMessage('Recruiter deactivated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Update local state
+      setRecruiters(prev => 
+        prev.map(r => 
+          r.id === recruiterId ? { ...r, is_approved: false } : r
+        )
+      );
+      setApprovedRecruiters(prev => prev.filter(r => r.id !== recruiterId));
+      setPendingRecruiters(prev => [
+        ...prev, 
+        recruiters.find(r => r.id === recruiterId)!
+      ]);
     } catch (error: any) {
-      console.error('Error rejecting recruiter:', error);
-      setError(error.message || 'Failed to reject recruiter');
+      console.error('Error deactivating recruiter:', error);
+      setError(error.message || 'Failed to deactivate recruiter');
     }
   };
 
-  const exportHiresToCSV = () => {
-    if (hires.length === 0) return;
+  const handleDeleteJobRole = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job role? This action cannot be undone.')) {
+      return;
+    }
 
-    const csvData = hires.map(hire => ({
-      'Developer Name': hire.assignment?.developer?.name || 'Unknown',
-      'Recruiter Name': hire.assignment?.recruiter?.name || 'Unknown',
-      'Job Title': hire.assignment?.job_role?.title || 'Unknown',
-      'Salary': hire.salary,
-      'Hire Date': new Date(hire.hire_date).toLocaleDateString(),
-      'Start Date': hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not specified',
-      'Notes': hire.notes || ''
-    }));
+    try {
+      const { error } = await supabase
+        .from('job_roles')
+        .delete()
+        .eq('id', jobId);
 
-    const csvContent = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `all-hires-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      if (error) throw error;
+      
+      setSuccessMessage('Job role deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Update local state
+      setJobRoles(prev => prev.filter(job => job.id !== jobId));
+    } catch (error: any) {
+      console.error('Error deleting job role:', error);
+      setError(error.message || 'Failed to delete job role');
+    }
   };
 
-  if (authLoading || loading) {
+  const handleToggleJobStatus = async (jobId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('job_roles')
+        .update({ is_active: !currentStatus })
+        .eq('id', jobId);
+
+      if (error) throw error;
+      
+      setSuccessMessage(`Job ${!currentStatus ? 'activated' : 'paused'} successfully`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Update local state
+      setJobRoles(prev => 
+        prev.map(job => 
+          job.id === jobId ? { ...job, is_active: !currentStatus } : job
+        )
+      );
+    } catch (error: any) {
+      console.error('Error toggling job status:', error);
+      setError(error.message || 'Failed to update job status');
+    }
+  };
+
+  const handleUpdateAssignmentStatus = async (assignmentId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .update({ status: newStatus })
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+      
+      setSuccessMessage(`Assignment status updated to ${newStatus}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Update local state
+      setAssignments(prev => 
+        prev.map(assignment => 
+          assignment.id === assignmentId ? { ...assignment, status: newStatus } : assignment
+        )
+      );
+    } catch (error: any) {
+      console.error('Error updating assignment status:', error);
+      setError(error.message || 'Failed to update assignment status');
+    }
+  };
+
+  const handleExportHiresCSV = () => {
+    // Filter hires based on current filters
+    const filteredHires = hires.filter(hire => {
+      const matchesSearch = !hireSearchTerm || 
+        hire.assignment.developer.name.toLowerCase().includes(hireSearchTerm.toLowerCase()) ||
+        hire.assignment.job_role.title.toLowerCase().includes(hireSearchTerm.toLowerCase()) ||
+        hire.assignment.recruiter.name.toLowerCase().includes(hireSearchTerm.toLowerCase());
+      
+      const matchesRecruiter = !filterHireRecruiter || hire.assignment.recruiter_id === filterHireRecruiter;
+      
+      const matchesDateRange = 
+        (!filterHireDate.start || new Date(hire.hire_date) >= new Date(filterHireDate.start)) &&
+        (!filterHireDate.end || new Date(hire.hire_date) <= new Date(filterHireDate.end));
+      
+      return matchesSearch && matchesRecruiter && matchesDateRange;
+    });
+    
+    // Create CSV content
+    const headers = ['Developer', 'Job Title', 'Recruiter', 'Company', 'Salary', 'Hire Date', 'Start Date'];
+    const rows = filteredHires.map(hire => [
+      hire.assignment.developer.name,
+      hire.assignment.job_role.title,
+      hire.assignment.recruiter.name,
+      hire.assignment.recruiter.company_name,
+      hire.salary,
+      new Date(hire.hire_date).toLocaleDateString(),
+      hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'N/A'
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+    
+    // Create and download the CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `hires_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filter developers based on search term and availability
+  const filteredDevelopers = developers.filter(dev => {
+    const matchesSearch = !developerSearchTerm || 
+      dev.name.toLowerCase().includes(developerSearchTerm.toLowerCase()) ||
+      dev.email.toLowerCase().includes(developerSearchTerm.toLowerCase()) ||
+      dev.developer?.github_handle?.toLowerCase().includes(developerSearchTerm.toLowerCase()) ||
+      dev.developer?.top_languages?.some(lang => lang.toLowerCase().includes(developerSearchTerm.toLowerCase()));
+    
+    const matchesAvailability = filterAvailableDevelopers === null || 
+      dev.developer?.availability === filterAvailableDevelopers;
+    
+    return matchesSearch && matchesAvailability;
+  });
+
+  // Filter job roles based on search term and active status
+  const filteredJobRoles = jobRoles.filter(job => {
+    const matchesSearch = !jobRoleSearchTerm || 
+      job.title.toLowerCase().includes(jobRoleSearchTerm.toLowerCase()) ||
+      job.location.toLowerCase().includes(jobRoleSearchTerm.toLowerCase()) ||
+      job.recruiter?.name?.toLowerCase().includes(jobRoleSearchTerm.toLowerCase()) ||
+      job.tech_stack?.some(tech => tech.toLowerCase().includes(jobRoleSearchTerm.toLowerCase()));
+    
+    const matchesActive = filterActiveJobs === null || job.is_active === filterActiveJobs;
+    
+    return matchesSearch && matchesActive;
+  });
+
+  // Filter assignments based on search term and status
+  const filteredAssignments = assignments.filter(assignment => {
+    const matchesSearch = !assignmentSearchTerm || 
+      assignment.developer?.name?.toLowerCase().includes(assignmentSearchTerm.toLowerCase()) ||
+      assignment.recruiter?.name?.toLowerCase().includes(assignmentSearchTerm.toLowerCase()) ||
+      assignment.job_role?.title?.toLowerCase().includes(assignmentSearchTerm.toLowerCase());
+    
+    const matchesStatus = !filterAssignmentStatus || assignment.status === filterAssignmentStatus;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Filter hires based on search term, date range, and recruiter
+  const filteredHires = hires.filter(hire => {
+    const matchesSearch = !hireSearchTerm || 
+      hire.assignment?.developer?.name?.toLowerCase().includes(hireSearchTerm.toLowerCase()) ||
+      hire.assignment?.recruiter?.name?.toLowerCase().includes(hireSearchTerm.toLowerCase()) ||
+      hire.assignment?.job_role?.title?.toLowerCase().includes(hireSearchTerm.toLowerCase());
+    
+    const matchesRecruiter = !filterHireRecruiter || hire.assignment?.recruiter_id === filterHireRecruiter;
+    
+    const matchesDateRange = 
+      (!filterHireDate.start || new Date(hire.hire_date) >= new Date(filterHireDate.start)) &&
+      (!filterHireDate.end || new Date(hire.hire_date) <= new Date(filterHireDate.end));
+    
+    return matchesSearch && matchesRecruiter && matchesDateRange;
+  });
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Loading dashboard...</p>
-          <p className="text-gray-500 text-sm mt-2">Fetching admin data...</p>
         </div>
       </div>
     );
   }
 
-  // Redirect if not authenticated
-  if (!userProfile) {
-    console.log('❌ No user profile, redirecting to dashboard');
+  // Redirect if not authenticated or not an admin
+  if (!userProfile || userProfile.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
-
-  // Redirect if not an admin
-  if (userProfile.role !== 'admin') {
-    console.log('❌ Not an admin role, redirecting to dashboard');
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  const statsCards = [
-    {
-      title: 'Total Developers',
-      value: stats.totalDevelopers.toString(),
-      change: '+12%',
-      changeType: 'positive',
-      icon: Code,
-      color: 'from-blue-500 to-indigo-600',
-    },
-    {
-      title: 'Recruiters',
-      value: stats.activeRecruiters.toString(),
-      change: stats.pendingApprovals > 0 ? `${stats.pendingApprovals} pending approval` : 'All approved',
-      changeType: 'positive',
-      icon: Building,
-      color: 'from-purple-500 to-pink-600',
-    },
-    {
-      title: 'Successful Hires',
-      value: stats.successfulHires.toString(),
-      change: 'Total hires',
-      changeType: 'positive',
-      icon: Award,
-      color: 'from-emerald-500 to-teal-600',
-    },
-    {
-      title: 'Revenue (Est.)',
-      value: `$${Math.round(stats.revenue / 1000)}K`,
-      change: '15% of hire salaries',
-      changeType: 'positive',
-      icon: TrendingUp,
-      color: 'from-orange-500 to-red-600',
-    },
-  ];
-
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: TrendingUp },
-    { id: 'recruiters', label: 'Recruiters', icon: Building },
-    { id: 'developers', label: 'Developers', icon: Code },
-    { id: 'jobs', label: 'Job Roles', icon: Briefcase },
-    { id: 'assignments', label: 'Assignments', icon: UserCheck },
-    { id: 'hires', label: 'Hires', icon: Award },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-  ];
-
-  const renderOverview = () => (
-    <div className="space-y-8">
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
-
-      {/* Stats Grid */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Overview</h2>
-        <button
-          onClick={fetchDashboardData}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center"
-        >
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Data
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat, index) => (
-          <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-gray-900 mb-1">{stat.value}</div>
-            <div className="text-sm font-medium text-gray-600 mb-2">{stat.title}</div>
-            <div className={`text-xs ${
-              stat.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'
-            } font-medium`}>
-              {stat.change}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Recent Assignments</h3>
-          <div className="space-y-4">
-            {assignments.slice(0, 5).map((assignment) => (
-              <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="font-semibold text-gray-900">{assignment.developer?.name}</div>
-                  <div className="text-sm text-gray-600">{assignment.job_role?.title} at {assignment.recruiter?.name}</div>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                  assignment.status === 'Contacted' ? 'bg-blue-100 text-blue-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {assignment.status}
-                </span>
-              </div>
-            ))}
-            {assignments.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No recent assignments</p>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-6">Pending Approvals</h3>
-          <div className="space-y-4">
-            {pendingRecruiters.slice(0, 5).map((recruiter) => (
-              <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
-                  <div className="text-sm text-gray-600">{recruiter.company_name || 'Unknown Company'}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {recruiter.user?.email || 'No email'} • Created {new Date(recruiter.user?.created_at || Date.now()).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={() => approveRecruiter(recruiter.user_id)}
-                    className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => rejectRecruiter(recruiter.user_id)}
-                    className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                  >
-                    <XCircle className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {pendingRecruiters.length === 0 && (
-              <div className="text-center py-8">
-                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 font-medium">No pending approvals</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  New recruiter signups will appear here for approval
-                </p>
-                <button
-                  onClick={fetchDashboardData}
-                  className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium inline-flex items-center"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" /> Check Again
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderRecruiters = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Recruiters</h2>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search recruiters..."
-              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-            <Filter className="w-5 h-5 mr-2 text-gray-500" />
-            Filter
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Industry</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {recruiters
-                .filter(rec => 
-                  !searchTerm || 
-                  rec.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  rec.company_name.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map((recruiter) => (
-                <tr key={recruiter.user_id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {recruiter.user?.name?.split(' ').map(n => n[0]).join('') || 'R'}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">{recruiter.user?.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{recruiter.user?.email || 'No email'}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900">{recruiter.company_name}</div>
-                    <div className="text-sm text-gray-500">{recruiter.company_size}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      recruiter.user?.is_approved 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {recruiter.user?.is_approved ? (
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                      ) : (
-                        <Clock className="w-3 h-3 mr-1" />
-                      )}
-                      {recruiter.user?.is_approved ? 'Approved' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {recruiter.industry || 'Not specified'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {!recruiter.user?.is_approved && (
-                        <>
-                          <button 
-                            onClick={() => approveRecruiter(recruiter.user_id)}
-                            className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                            title="Approve Recruiter"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => rejectRecruiter(recruiter.user_id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                            title="Reject Recruiter"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      <button 
-                        onClick={() => {
-                          setSelectedRecruiterId(recruiter.user_id);
-                          setShowRecruiterProfile(true);
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                        title="View Profile"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedThread({
-                            otherUserId: recruiter.user_id,
-                            otherUserName: recruiter.user.name,
-                            otherUserRole: 'recruiter',
-                            unreadCount: 0
-                          });
-                          setActiveTab('messages');
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                        title="Message"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderDevelopers = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Developers</h2>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search developers..."
-              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-            <Filter className="w-5 h-5 mr-2 text-gray-500" />
-            Filter
-          </button>
-          <button 
-            onClick={() => setShowAssignModal(true)}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-          >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            Assign Developer
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Skills</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Experience</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {developers
-                .filter(dev => 
-                  !searchTerm || 
-                  dev.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  (dev.github_handle && dev.github_handle.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                  (dev.top_languages && dev.top_languages.some(lang => lang.toLowerCase().includes(searchTerm.toLowerCase())))
-                )
-                .map((developer) => (
-                <tr key={developer.user_id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-4">
-                        {developer.user.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">{developer.user.name}</div>
-                        <div className="text-sm text-gray-500">{developer.user.email}</div>
-                        {developer.github_handle && (
-                          <div className="text-xs text-gray-400">@{developer.github_handle}</div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {developer.top_languages && developer.top_languages.slice(0, 3).map((lang, index) => (
-                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-lg">
-                          {lang}
-                        </span>
-                      ))}
-                      {developer.top_languages && developer.top_languages.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg">
-                          +{developer.top_languages.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                      developer.availability 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        developer.availability ? 'bg-emerald-500' : 'bg-gray-500'
-                      }`}></div>
-                      {developer.availability ? 'Available' : 'Busy'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {developer.experience_years} years
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {developer.location || 'Not specified'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedDeveloperId(developer.user_id);
-                          setShowDeveloperProfile(true);
-                        }}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        title="View Profile"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedThread({
-                            otherUserId: developer.user_id,
-                            otherUserName: developer.user.name,
-                            otherUserRole: 'developer',
-                            unreadCount: 0
-                          });
-                          setActiveTab('messages');
-                        }}
-                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                        title="Message"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedDeveloperId(developer.user_id);
-                          setShowAssignModal(true);
-                        }}
-                        className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                        title="Assign to Job"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderJobRoles = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Job Roles</h2>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search jobs..."
-              className="pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <button className="flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-            <Filter className="w-5 h-5 mr-2 text-gray-500" />
-            Filter
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-6">
-        {jobRoles
-          .filter(job => 
-            !searchTerm || 
-            job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job.recruiter?.name.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          .map((job) => (
-          <div key={job.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-xl font-black text-gray-900">{job.title}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {job.is_active ? 'Active' : 'Paused'}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
-                  <div className="flex items-center">
-                    <Building className="w-4 h-4 mr-1" />
-                    {job.recruiter?.name}
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    Posted {new Date(job.created_at).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    {assignments.filter(a => a.job_role_id === job.id).length} assigned
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 mb-4">
-                  {job.tech_stack.slice(0, 4).map((tech, index) => (
-                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed line-clamp-2">
-                  {job.description}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span>${job.salary_min}k - ${job.salary_max}k</span>
-                <span>{job.location}</span>
-                <span>{job.job_type}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => {
-                    setSelectedJob(job);
-                    setShowJobDetails(true);
-                  }}
-                  className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
-                >
-                  View Details
-                </button>
-                <button 
-                  onClick={() => {
-                    setSelectedJob(job);
-                    setShowAssignModal(true);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  Assign Developer
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderAssignments = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Assignments</h2>
-        <button 
-          onClick={() => setShowAssignModal(true)}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-        >
-          <Plus className="w-4 h-4 mr-2 inline" />
-          New Assignment
-        </button>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Role</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {assignments.map((assignment) => (
-                <tr key={assignment.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
-                        {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                      </div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {assignment.developer?.name || 'Unknown'}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900">
-                      {assignment.job_role?.title || 'Unknown'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {assignment.recruiter?.name || 'Unknown'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                      assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                      assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {assignment.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(assignment.assigned_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedJob(assignment.job_role);
-                          setShowJobDetails(true);
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                        title="View Job"
-                      >
-                        <Briefcase className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedThread({
-                            otherUserId: assignment.developer_id,
-                            otherUserName: assignment.developer?.name || 'Unknown',
-                            otherUserRole: 'developer',
-                            unreadCount: 0,
-                            jobContext: {
-                              id: assignment.job_role_id,
-                              title: assignment.job_role?.title || 'Unknown'
-                            }
-                          });
-                          setActiveTab('messages');
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                        title="Message Developer"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderHires = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">All Hires</h2>
-        {hires.length > 0 && (
-          <button 
-            onClick={exportHiresToCSV}
-            className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </button>
-        )}
-      </div>
-
-      {hires.length > 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Revenue</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {hires.map((hire) => (
-                  <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
-                          {hire.assignment?.developer?.name?.split(' ').map(n => n?.[0]).join('') || 'U'}
-                        </div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {hire.assignment?.developer?.name || 'Unknown'}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {hire.assignment?.job_role?.title || 'Unknown'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {hire.assignment?.recruiter?.name || 'Unknown'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">
-                        ${hire.salary.toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(hire.hire_date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-emerald-600">
-                        ${Math.round(hire.salary * 0.15).toLocaleString()}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Hires Yet</h3>
-          <p className="text-gray-600">Successful hires will appear here once recruiters mark developers as hired.</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderMessages = () => {
-    if (selectedThread) {
-      return (
-        <MessageThread
-          otherUserId={selectedThread.otherUserId}
-          otherUserName={selectedThread.otherUserName}
-          otherUserRole={selectedThread.otherUserRole}
-          jobContext={selectedThread.jobContext}
-          onBack={() => setSelectedThread(null)}
-        />
-      );
-    }
-
-    return (
-      <MessageList
-        onThreadSelect={setSelectedThread}
-      />
-    );
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage developers, recruiters, and platform operations</p>
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage users, job roles, assignments, and view reports</p>
         </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center">
+            <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
+            <p className="text-green-700 font-medium">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
+            <p className="text-red-700 font-medium">{error}</p>
+          </div>
+        )}
 
         {/* Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-semibold text-sm transition-all ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5 mr-2" />
-                  {tab.label}
-                  {tab.id === 'recruiters' && pendingRecruiters.length > 0 && (
-                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      {pendingRecruiters.length}
-                    </span>
+        <div className="flex border-b border-gray-200 mb-8 overflow-x-auto">
+          <button
+            onClick={() => handleTabChange('recruiters')}
+            className={`flex items-center whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
+              activeTab === 'recruiters'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Building className="w-5 h-5 mr-2" />
+            Recruiters
+            {pendingRecruiters.length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                {pendingRecruiters.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleTabChange('developers')}
+            className={`flex items-center whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
+              activeTab === 'developers'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Code className="w-5 h-5 mr-2" />
+            Developers
+          </button>
+          <button
+            onClick={() => handleTabChange('jobs')}
+            className={`flex items-center whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
+              activeTab === 'jobs'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Briefcase className="w-5 h-5 mr-2" />
+            Job Roles
+          </button>
+          <button
+            onClick={() => handleTabChange('assignments')}
+            className={`flex items-center whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
+              activeTab === 'assignments'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <UserPlus className="w-5 h-5 mr-2" />
+            Assignments
+          </button>
+          <button
+            onClick={() => handleTabChange('hires')}
+            className={`flex items-center whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
+              activeTab === 'hires'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <CheckCircle className="w-5 h-5 mr-2" />
+            Hires Report
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
+            <span className="text-gray-600 font-medium">Loading data...</span>
+          </div>
+        ) : (
+          <>
+            {/* Recruiters Tab */}
+            {activeTab === 'recruiters' && (
+              <div className="space-y-8">
+                {/* Pending Recruiters */}
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900">Pending Approval</h2>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search recruiters..."
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={recruiterSearchTerm}
+                        onChange={(e) => setRecruiterSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {pendingRecruiters.length > 0 ? (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {pendingRecruiters.map((recruiter) => (
+                              <tr key={recruiter.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                      {recruiter.name.split(' ').map(n => n[0]).join('')}
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">{recruiter.name}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{recruiter.email}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{recruiter.recruiter?.company_name || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-500">{new Date(recruiter.created_at).toLocaleDateString()}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <div className="flex items-center space-x-3">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedRecruiter(recruiter.id);
+                                        setShowRecruiterDetails(true);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-900 font-medium"
+                                    >
+                                      <Eye className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleApproveRecruiter(recruiter.id)}
+                                      className="text-green-600 hover:text-green-900 font-medium"
+                                    >
+                                      <CheckCircle className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeactivateRecruiter(recruiter.id)}
+                                      className="text-red-600 hover:text-red-900 font-medium"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {pendingRecruiters.length === 0 && recruiterSearchTerm && (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">No pending recruiters match your search</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                      <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Recruiters</h3>
+                      <p className="text-gray-500">
+                        {recruiterSearchTerm 
+                          ? "No pending recruiters match your search" 
+                          : "All recruiters have been reviewed"}
+                      </p>
+                    </div>
                   )}
+                </div>
+
+                {/* Approved Recruiters */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Approved Recruiters</h2>
+                  
+                  {approvedRecruiters.length > 0 ? (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {approvedRecruiters.map((recruiter) => (
+                              <tr key={recruiter.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                      {recruiter.name.split(' ').map(n => n[0]).join('')}
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">{recruiter.name}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{recruiter.email}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{recruiter.recruiter?.company_name || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-500">{new Date(recruiter.created_at).toLocaleDateString()}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <div className="flex items-center space-x-3">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedRecruiter(recruiter.id);
+                                        setShowRecruiterDetails(true);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-900 font-medium"
+                                    >
+                                      <Eye className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeactivateRecruiter(recruiter.id)}
+                                      className="text-red-600 hover:text-red-900 font-medium"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {approvedRecruiters.length === 0 && recruiterSearchTerm && (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">No approved recruiters match your search</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                      <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Approved Recruiters</h3>
+                      <p className="text-gray-500">
+                        {recruiterSearchTerm 
+                          ? "No approved recruiters match your search" 
+                          : "Approve recruiters to see them here"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Developers Tab */}
+            {activeTab === 'developers' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Developers</h2>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search developers..."
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={developerSearchTerm}
+                        onChange={(e) => setDeveloperSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-gray-400" />
+                      <select
+                        value={filterAvailableDevelopers === null ? 'all' : filterAvailableDevelopers.toString()}
+                        onChange={(e) => setFilterAvailableDevelopers(e.target.value === 'all' ? null : e.target.value === 'true')}
+                        className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      >
+                        <option value="all">All Developers</option>
+                        <option value="true">Available Only</option>
+                        <option value="false">Unavailable Only</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {filteredDevelopers.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredDevelopers.map((developer) => (
+                      <div key={developer.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center">
+                            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                              {developer.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="ml-4">
+                              <h3 className="text-lg font-bold text-gray-900">{developer.name}</h3>
+                              <div className="flex items-center space-x-2">
+                                {developer.developer?.github_handle && (
+                                  <span className="text-sm text-gray-600">@{developer.developer.github_handle}</span>
+                                )}
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                                  developer.developer?.availability 
+                                    ? 'bg-emerald-100 text-emerald-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  <div className={`w-2 h-2 rounded-full mr-1 ${
+                                    developer.developer?.availability ? 'bg-emerald-500' : 'bg-gray-500'
+                                  }`}></div>
+                                  {developer.developer?.availability ? 'Available' : 'Busy'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <div className="text-sm text-gray-600 mb-2">
+                            <span className="font-medium">Experience:</span> {developer.developer?.experience_years || 0} years
+                          </div>
+                          {developer.developer?.location && (
+                            <div className="text-sm text-gray-600 mb-2">
+                              <span className="font-medium">Location:</span> {developer.developer.location}
+                            </div>
+                          )}
+                          {developer.developer?.desired_salary > 0 && (
+                            <div className="text-sm text-gray-600 mb-2">
+                              <span className="font-medium">Desired Salary:</span> ${developer.developer.desired_salary.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {developer.developer?.top_languages && developer.developer.top_languages.length > 0 && (
+                          <div className="mb-4">
+                            <div className="text-sm font-medium text-gray-700 mb-2">Top Languages:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {developer.developer.top_languages.slice(0, 5).map((lang, index) => (
+                                <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
+                                  {lang}
+                                </span>
+                              ))}
+                              {developer.developer.top_languages.length > 5 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg">
+                                  +{developer.developer.top_languages.length - 5} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              setSelectedDeveloper(developer.id);
+                              setShowDeveloperDetails(true);
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
+                          >
+                            <Eye className="w-4 h-4 mr-2 inline" />
+                            View Profile
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedDeveloper(developer.id);
+                              setShowAssignDeveloperModal(true);
+                            }}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold text-sm"
+                          >
+                            <UserPlus className="w-4 h-4 mr-2 inline" />
+                            Assign to Job
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                    <Code className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Developers Found</h3>
+                    <p className="text-gray-500">
+                      {developerSearchTerm || filterAvailableDevelopers !== null
+                        ? "No developers match your search criteria"
+                        : "There are no developers registered in the system"}
+                    </p>
+                    {(developerSearchTerm || filterAvailableDevelopers !== null) && (
+                      <button
+                        onClick={() => {
+                          setDeveloperSearchTerm('');
+                          setFilterAvailableDevelopers(null);
+                        }}
+                        className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Job Roles Tab */}
+            {activeTab === 'jobs' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Job Roles</h2>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search job roles..."
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={jobRoleSearchTerm}
+                        onChange={(e) => setJobRoleSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-gray-400" />
+                      <select
+                        value={filterActiveJobs === null ? 'all' : filterActiveJobs.toString()}
+                        onChange={(e) => setFilterActiveJobs(e.target.value === 'all' ? null : e.target.value === 'true')}
+                        className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      >
+                        <option value="all">All Jobs</option>
+                        <option value="true">Active Only</option>
+                        <option value="false">Inactive Only</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {filteredJobRoles.length > 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recruiter</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salary Range</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredJobRoles.map((job) => (
+                            <tr key={job.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{job.title}</div>
+                                <div className="text-xs text-gray-500">{job.job_type}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{job.recruiter?.name || 'Unknown'}</div>
+                                <div className="text-xs text-gray-500">{job.recruiter?.email || ''}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{job.location}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">${job.salary_min}k - ${job.salary_max}k</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  job.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {job.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex items-center space-x-3">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedJobRole(job);
+                                      setShowJobRoleDetails(true);
+                                    }}
+                                    className="text-blue-600 hover:text-blue-900"
+                                  >
+                                    <Eye className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedJobRole(job);
+                                      setShowJobRoleForm(true);
+                                    }}
+                                    className="text-green-600 hover:text-green-900"
+                                  >
+                                    <Edit className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteJobRole(job.id)}
+                                    className="text-red-600 hover:text-red-900"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleJobStatus(job.id, job.is_active)}
+                                    className={`${
+                                      job.is_active ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'
+                                    }`}
+                                  >
+                                    {job.is_active ? (
+                                      <Clock className="w-5 h-5" />
+                                    ) : (
+                                      <CheckCircle className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {filteredJobRoles.length === 0 && jobRoleSearchTerm && (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No job roles match your search</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                    <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Job Roles Found</h3>
+                    <p className="text-gray-500">
+                      {jobRoleSearchTerm || filterActiveJobs !== null
+                        ? "No job roles match your search criteria"
+                        : "There are no job roles in the system"}
+                    </p>
+                    {(jobRoleSearchTerm || filterActiveJobs !== null) && (
+                      <button
+                        onClick={() => {
+                          setJobRoleSearchTerm('');
+                          setFilterActiveJobs(null);
+                        }}
+                        className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Assignments Tab */}
+            {activeTab === 'assignments' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Assignments</h2>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search assignments..."
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={assignmentSearchTerm}
+                        onChange={(e) => setAssignmentSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-gray-400" />
+                      <select
+                        value={filterAssignmentStatus || ''}
+                        onChange={(e) => setFilterAssignmentStatus(e.target.value || null)}
+                        className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Shortlisted">Shortlisted</option>
+                        <option value="Hired">Hired</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => setShowAssignDeveloperModal(true)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2 inline" />
+                      New Assignment
+                    </button>
+                  </div>
+                </div>
+
+                {filteredAssignments.length > 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Developer</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Role</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recruiter</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredAssignments.map((assignment) => (
+                            <tr key={assignment.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                                    {assignment.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                                  </div>
+                                  <div className="ml-3">
+                                    <div className="text-sm font-medium text-gray-900">{assignment.developer?.name || 'Unknown'}</div>
+                                    <div className="text-xs text-gray-500">{assignment.developer?.email || ''}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{assignment.job_role?.title || 'Unknown'}</div>
+                                <div className="text-xs text-gray-500">{assignment.job_role?.location || ''}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{assignment.recruiter?.name || 'Unknown'}</div>
+                                <div className="text-xs text-gray-500">{assignment.recruiter?.email || ''}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  assignment.status === 'Hired' ? 'bg-green-100 text-green-800' :
+                                  assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                                  assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                                  assignment.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {assignment.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-500">{new Date(assignment.assigned_at).toLocaleDateString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex items-center space-x-3">
+                                  <select
+                                    value={assignment.status}
+                                    onChange={(e) => handleUpdateAssignmentStatus(assignment.id, e.target.value)}
+                                    className="px-2 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                  >
+                                    <option value="New">New</option>
+                                    <option value="Contacted">Contacted</option>
+                                    <option value="Shortlisted">Shortlisted</option>
+                                    <option value="Hired">Hired</option>
+                                    <option value="Rejected">Rejected</option>
+                                  </select>
+                                  {assignment.status === 'Shortlisted' && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedAssignment(assignment);
+                                        setShowHireModal(true);
+                                      }}
+                                      className="text-green-600 hover:text-green-900"
+                                    >
+                                      <CheckCircle className="w-5 h-5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {filteredAssignments.length === 0 && (assignmentSearchTerm || filterAssignmentStatus) && (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No assignments match your search</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                    <UserPlus className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Assignments Found</h3>
+                    <p className="text-gray-500">
+                      {assignmentSearchTerm || filterAssignmentStatus
+                        ? "No assignments match your search criteria"
+                        : "There are no assignments in the system"}
+                    </p>
+                    {(assignmentSearchTerm || filterAssignmentStatus) && (
+                      <button
+                        onClick={() => {
+                          setAssignmentSearchTerm('');
+                          setFilterAssignmentStatus(null);
+                        }}
+                        className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hires Report Tab */}
+            {activeTab === 'hires' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Hires Report</h2>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search hires..."
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={hireSearchTerm}
+                        onChange={(e) => setHireSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      onClick={handleExportHiresCSV}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                    >
+                      <Download className="w-4 h-4 mr-2 inline" />
+                      Export CSV
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Filters</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">From</label>
+                          <input
+                            type="date"
+                            value={filterHireDate.start || ''}
+                            onChange={(e) => setFilterHireDate(prev => ({ ...prev, start: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">To</label>
+                          <input
+                            type="date"
+                            value={filterHireDate.end || ''}
+                            onChange={(e) => setFilterHireDate(prev => ({ ...prev, end: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Recruiter</label>
+                      <select
+                        value={filterHireRecruiter || ''}
+                        onChange={(e) => setFilterHireRecruiter(e.target.value || null)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      >
+                        <option value="">All Recruiters</option>
+                        {Array.from(new Set(hires.map(hire => hire.assignment?.recruiter_id))).map(recruiterId => {
+                          const recruiter = hires.find(h => h.assignment?.recruiter_id === recruiterId)?.assignment?.recruiter;
+                          return (
+                            <option key={recruiterId} value={recruiterId}>
+                              {recruiter?.name || 'Unknown'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={() => {
+                          setHireSearchTerm('');
+                          setFilterHireDate({});
+                          setFilterHireRecruiter(null);
+                        }}
+                        className="w-full px-3 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2 inline" />
+                        Reset Filters
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hires Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Total Hires</h3>
+                    <p className="text-3xl font-bold text-gray-900">{filteredHires.length}</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Average Salary</h3>
+                    <p className="text-3xl font-bold text-gray-900">
+                      ${filteredHires.length > 0 
+                        ? Math.round(filteredHires.reduce((sum, hire) => sum + hire.salary, 0) / filteredHires.length).toLocaleString()
+                        : 0}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Total Revenue</h3>
+                    <p className="text-3xl font-bold text-gray-900">
+                      ${filteredHires.reduce((sum, hire) => sum + Math.round(hire.salary * 0.15), 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Based on 15% commission</p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Active Recruiters</h3>
+                    <p className="text-3xl font-bold text-gray-900">
+                      {new Set(filteredHires.map(hire => hire.assignment?.recruiter_id)).size}
+                    </p>
+                  </div>
+                </div>
+
+                {filteredHires.length > 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Developer</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Role</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recruiter</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salary</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hire Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredHires.map((hire) => (
+                            <tr key={hire.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                                    {hire.assignment?.developer?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                                  </div>
+                                  <div className="ml-3">
+                                    <div className="text-sm font-medium text-gray-900">{hire.assignment?.developer?.name || 'Unknown'}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{hire.assignment?.job_role?.title || 'Unknown'}</div>
+                                <div className="text-xs text-gray-500">{hire.assignment?.job_role?.location || ''}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{hire.assignment?.recruiter?.name || 'Unknown'}</div>
+                                <div className="text-xs text-gray-500">{hire.assignment?.recruiter?.company_name || ''}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">${hire.salary.toLocaleString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-green-600">${Math.round(hire.salary * 0.15).toLocaleString()}</div>
+                                <div className="text-xs text-gray-500">15%</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{new Date(hire.hire_date).toLocaleDateString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not set'}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Hires Found</h3>
+                    <p className="text-gray-500">
+                      {hireSearchTerm || filterHireDate.start || filterHireDate.end || filterHireRecruiter
+                        ? "No hires match your search criteria"
+                        : "There are no hires recorded in the system"}
+                    </p>
+                    {(hireSearchTerm || filterHireDate.start || filterHireDate.end || filterHireRecruiter) && (
+                      <button
+                        onClick={() => {
+                          setHireSearchTerm('');
+                          setFilterHireDate({});
+                          setFilterHireRecruiter(null);
+                        }}
+                        className="mt-4 px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Recruiter Details Modal */}
+        {showRecruiterDetails && selectedRecruiter && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 border-b border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowRecruiterDetails(false);
+                    setSelectedRecruiter(null);
+                  }}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Recruiters
                 </button>
-              ))}
-            </nav>
+              </div>
+              <div className="p-6">
+                <RecruiterProfileDetails
+                  recruiterId={selectedRecruiter}
+                  onClose={() => {
+                    setShowRecruiterDetails(false);
+                    setSelectedRecruiter(null);
+                  }}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Content */}
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'recruiters' && renderRecruiters()}
-        {activeTab === 'developers' && renderDevelopers()}
-        {activeTab === 'jobs' && renderJobRoles()}
-        {activeTab === 'assignments' && renderAssignments()}
-        {activeTab === 'hires' && renderHires()}
-        {activeTab === 'messages' && renderMessages()}
+        {/* Developer Details Modal */}
+        {showDeveloperDetails && selectedDeveloper && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 border-b border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowDeveloperDetails(false);
+                    setSelectedDeveloper(null);
+                  }}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Developers
+                </button>
+              </div>
+              <div className="p-6">
+                <DeveloperProfileDetails
+                  developerId={selectedDeveloper}
+                  onClose={() => {
+                    setShowDeveloperDetails(false);
+                    setSelectedDeveloper(null);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Role Details Modal */}
+        {showJobRoleDetails && selectedJobRole && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 border-b border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowJobRoleDetails(false);
+                    setSelectedJobRole(null);
+                  }}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Job Roles
+                </button>
+              </div>
+              <div className="p-6">
+                <JobRoleDetails
+                  jobRoleId={selectedJobRole.id}
+                  jobRole={selectedJobRole}
+                  onClose={() => {
+                    setShowJobRoleDetails(false);
+                    setSelectedJobRole(null);
+                  }}
+                  onEdit={() => {
+                    setShowJobRoleDetails(false);
+                    setShowJobRoleForm(true);
+                  }}
+                  onAssignDeveloper={() => {
+                    setShowJobRoleDetails(false);
+                    setShowAssignDeveloperModal(true);
+                  }}
+                  onJobRoleUpdated={() => {
+                    setShowJobRoleDetails(false);
+                    setSelectedJobRole(null);
+                    fetchJobRoles();
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Role Form Modal */}
+        {showJobRoleForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <JobRoleForm
+                jobRole={selectedJobRole || undefined}
+                onSuccess={() => {
+                  setShowJobRoleForm(false);
+                  setSelectedJobRole(null);
+                  setSuccessMessage(selectedJobRole ? 'Job role updated successfully' : 'Job role created successfully');
+                  setTimeout(() => setSuccessMessage(''), 3000);
+                  fetchJobRoles();
+                }}
+                onCancel={() => {
+                  setShowJobRoleForm(false);
+                  setSelectedJobRole(null);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Assign Developer Modal */}
+        {showAssignDeveloperModal && (
+          <AssignDeveloperModal
+            isOpen={showAssignDeveloperModal}
+            onClose={() => {
+              setShowAssignDeveloperModal(false);
+              setSelectedDeveloper(null);
+              setSelectedJobRole(null);
+            }}
+            preSelectedDeveloperId={selectedDeveloper || undefined}
+            preSelectedJobId={selectedJobRole?.id || undefined}
+            onSuccess={() => {
+              setShowAssignDeveloperModal(false);
+              setSelectedDeveloper(null);
+              setSelectedJobRole(null);
+              setSuccessMessage('Developer assigned successfully');
+              setTimeout(() => setSuccessMessage(''), 3000);
+              fetchAssignments();
+            }}
+          />
+        )}
+
+        {/* Hire Modal */}
+        {showHireModal && selectedAssignment && (
+          <MarkAsHiredModal
+            isOpen={showHireModal}
+            onClose={() => {
+              setShowHireModal(false);
+              setSelectedAssignment(null);
+            }}
+            assignment={selectedAssignment}
+            onSuccess={() => {
+              setShowHireModal(false);
+              setSelectedAssignment(null);
+              setSuccessMessage('Developer marked as hired successfully');
+              setTimeout(() => setSuccessMessage(''), 3000);
+              fetchAssignments();
+              fetchHires();
+            }}
+          />
+        )}
       </div>
-
-      {/* Modals */}
-      <AssignDeveloperModal
-        isOpen={showAssignModal}
-        onClose={() => {
-          setShowAssignModal(false);
-          setSelectedDeveloperId(null);
-          setSelectedJob(null);
-        }}
-        preSelectedJobId={selectedJob?.id}
-        preSelectedDeveloperId={selectedDeveloperId || undefined}
-        onSuccess={() => {
-          setShowAssignModal(false);
-          setSelectedDeveloperId(null);
-          setSelectedJob(null);
-          fetchDashboardData();
-        }}
-      />
-
-      {/* Job Details Modal */}
-      {showJobDetails && selectedJob && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
-            <div className="p-6 border-b border-gray-200">
-              <button
-                onClick={() => {
-                  setShowJobDetails(false);
-                  setSelectedJob(null);
-                }}
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Jobs
-              </button>
-            </div>
-            <div className="p-6">
-              <JobRoleDetails
-                jobRoleId={selectedJob.id}
-                jobRole={selectedJob}
-                onAssignDeveloper={() => {
-                  setShowJobDetails(false);
-                  setShowAssignModal(true);
-                }}
-                onClose={() => {
-                  setShowJobDetails(false);
-                  setSelectedJob(null);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Developer Profile Modal */}
-      {showDeveloperProfile && selectedDeveloperId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
-            <div className="p-6 border-b border-gray-200">
-              <button
-                onClick={() => {
-                  setShowDeveloperProfile(false);
-                  setSelectedDeveloperId(null);
-                }}
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Developers
-              </button>
-            </div>
-            <div className="p-6">
-              <DeveloperProfileDetails
-                developerId={selectedDeveloperId}
-                onClose={() => {
-                  setShowDeveloperProfile(false);
-                  setSelectedDeveloperId(null);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recruiter Profile Modal */}
-      {showRecruiterProfile && selectedRecruiterId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
-            <div className="p-6 border-b border-gray-200">
-              <button
-                onClick={() => {
-                  setShowRecruiterProfile(false);
-                  setSelectedRecruiterId(null);
-                }}
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Recruiters
-              </button>
-            </div>
-            <div className="p-6">
-              <RecruiterProfileDetails
-                recruiterId={selectedRecruiterId}
-                onClose={() => {
-                  setShowRecruiterProfile(false);
-                  setSelectedRecruiterId(null);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
