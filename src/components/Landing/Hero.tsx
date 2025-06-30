@@ -25,25 +25,23 @@ export const Hero = () => {
 
               {/* Connecting Recruiters and Dev Talent */}
               <div className="mb-6">
-                <h2 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-2">
-                  Connecting Recruiters and Dev Talent
+                <h2 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-2 text-center">
+                  Connecting Devs & Recruiters
                 </h2>
                 <div className="flex items-center">
                   <div className="h-1 w-16 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full mr-3"></div>
-                  <span className="text-xl text-gray-500 font-medium">At A Time</span>
+                  <span className="text-xl text-gray-500 font-medium">One Commit At A Time</span>
                 </div>
               </div>
 
               {/* Main Heading */}
-              <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-gray-900 leading-none mb-8">
-                <span className="block">One{' '}
-                  <span className="relative inline-block">
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 font-black">
-                      Commit
-                    </span>
-                    <div className="absolute -bottom-2 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full"></div>
+              <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-gray-900 leading-none mb-8 text-center">
+                One <span className="relative inline-block">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 font-black">
+                    Commit
                   </span>
-                </span>
+                  <div className="absolute -bottom-2 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full"></div>
+                </span> At A Time
               </h1>
 
               {/* Subtitle */}
