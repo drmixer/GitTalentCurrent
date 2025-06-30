@@ -305,7 +305,7 @@ export const DeveloperDashboard: React.FC = () => {
               View Full Activity
             </button>
           </div>
-          <RealGitHubChart githubHandle={developer.github_handle} className="" />
+          <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
         </div>
       )}
 
@@ -432,7 +432,7 @@ export const DeveloperDashboard: React.FC = () => {
             <PortfolioManager developerId={developer.user_id} isEditable={true} />
           )}
           {activeTab === 'github' && developer?.github_handle && (
-            <RealGitHubChart githubHandle={developer.github_handle} className="" />
+            <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
           )}
           {activeTab === 'messages' && renderMessages()}
           {activeTab === 'jobs' && (

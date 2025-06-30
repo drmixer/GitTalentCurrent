@@ -73,6 +73,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   });
   const [currentHandle, setCurrentHandle] = useState<string | null>(null); 
   const [fetchInProgress, setFetchInProgress] = useState(false);
+  const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
   useEffect(() => {
     if (developerProfile?.github_handle) {
@@ -216,6 +217,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         loading: false,
         error: '',
       });
+      setLastFetchedHandle(handle);
 
       // Automatically sync data to profile
       if (handle === developerProfile?.github_handle) {
@@ -238,7 +240,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const refreshGitHubData = async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
     if (!handleToUse) {
-      console.log('refreshGitHubData - No GitHub handle provided');
+      console.log('refreshGitHubData - No GitHub handle provided or found in profile');
       setGitHubData(prev => ({ 
         ...prev, 
         error: 'No GitHub handle provided',
@@ -249,7 +251,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     
     // If we're already fetching data for this handle, don't start another fetch
     if (fetchInProgress && currentHandle === handleToUse) {
-      console.log('refreshGitHubData - Fetch already in progress for:', handleToUse);
+      console.log('refreshGitHubData - Fetch already in progress for handle:', handleToUse);
+      return;
+    }
+    
+    // If we already have data for this handle, don't fetch again
+    if (lastFetchedHandle === handleToUse && githubData.user && githubData.user.login.toLowerCase() === handleToUse.toLowerCase()) {
+      console.log('refreshGitHubData - Already have data for handle:', handleToUse);
       return;
     }
     
