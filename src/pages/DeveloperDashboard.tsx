@@ -9,6 +9,7 @@ import { ProfileStrengthIndicator } from '../components/Profile/ProfileStrengthI
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperProfileForm } from '../components/Profile/DeveloperProfileForm';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { useGitHub } from '../hooks/useGitHub';
 import { 
   User, 
@@ -26,9 +27,11 @@ import {
   Plus,
   RefreshCw,
   X,
-  GitBranch
+  GitBranch,
+  FileText,
+  ArrowLeft
 } from 'lucide-react';
-import { Assignment } from '../types';
+import { Assignment, JobRole } from '../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -61,6 +64,8 @@ export const DeveloperDashboard = () => {
   const [error, setError] = useState('');
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [showEditProfileForm, setShowEditProfileForm] = useState(false);
+  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
 
   // Stats data
   const [stats, setStats] = useState({
@@ -156,6 +161,33 @@ export const DeveloperDashboard = () => {
     if (developerProfile?.github_handle) {
       refreshGitHubData();
     }
+  };
+
+  const handleViewJobDetails = (jobRoleId: string) => {
+    setSelectedJobForDetails(jobRoleId);
+    setShowJobDetailsModal(true);
+  };
+
+  const handleCloseJobDetails = () => {
+    setShowJobDetailsModal(false);
+    setSelectedJobForDetails(null);
+  };
+
+  const handleMessageRecruiter = (assignment: Assignment) => {
+    if (!assignment.recruiter || !assignment.job_role) return;
+    
+    setSelectedThread({
+      otherUserId: assignment.recruiter_id,
+      otherUserName: assignment.recruiter.name,
+      otherUserRole: 'recruiter',
+      unreadCount: 0,
+      jobContext: {
+        id: assignment.job_role_id,
+        title: assignment.job_role.title
+      }
+    });
+    
+    setActiveTab('messages');
   };
 
   // Generate dynamic profile strength suggestions based on profile data
@@ -330,14 +362,35 @@ export const DeveloperDashboard = () => {
                     </>
                   )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
-                  assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
-                  assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {assignment.status}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    assignment.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                    assignment.status === 'Shortlisted' ? 'bg-blue-100 text-blue-800' :
+                    assignment.status === 'Contacted' ? 'bg-purple-100 text-purple-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {assignment.status}
+                  </span>
+                  
+                  {assignment.has_recruiter_contact && (
+                    <div className="flex space-x-1">
+                      <button 
+                        onClick={() => handleViewJobDetails(assignment.job_role_id)}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="View Job Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleMessageRecruiter(assignment)}
+                        className="p-1 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Message Recruiter"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             {assignments.length === 0 && (
@@ -985,6 +1038,29 @@ export const DeveloperDashboard = () => {
                   initialData={developerProfile}
                   onSuccess={handleProfileUpdateSuccess}
                   onCancel={() => setShowEditProfileForm(false)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Details Modal */}
+        {showJobDetailsModal && selectedJobForDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 border-b border-gray-200">
+                <button
+                  onClick={handleCloseJobDetails}
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Dashboard
+                </button>
+              </div>
+              <div className="p-6">
+                <JobRoleDetails
+                  jobRoleId={selectedJobForDetails}
+                  isDeveloperView={true}
                 />
               </div>
             </div>
