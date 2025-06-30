@@ -71,7 +71,8 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     loading: false,
     error: ''
   });
-  const [currentHandle, setCurrentHandle] = useState<string | null>(null);
+  const [currentHandle, setCurrentHandle] = useState<string | null>(null); 
+  const [fetchInProgress, setFetchInProgress] = useState(false);
 
   useEffect(() => {
     if (developerProfile?.github_handle) {
@@ -99,15 +100,23 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const refreshGitHubDataInternal = async (handle: string) => {
     if (!handle) {
       console.log('refreshGitHubDataInternal - No GitHub handle provided');
-      setGitHubData(prev => ({ 
-        ...prev, 
+      setGitHubData(prev => ({
+        ...prev,
         loading: false,
-        error: 'No GitHub handle provided' 
+        error: 'No GitHub handle provided'
       }));
+      setFetchInProgress(false);
+      return;
+    }
+
+    // Prevent multiple simultaneous fetches for the same handle
+    if (fetchInProgress && currentHandle === handle) {
+      console.log('refreshGitHubDataInternal - Fetch already in progress for:', handle);
       return;
     }
 
     try {
+      setFetchInProgress(true);
       console.log('refreshGitHubDataInternal - Fetching data for:', handle);
       console.log('refreshGitHubDataInternal - Starting GitHub API calls');
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
@@ -205,7 +214,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         languages: languageStats,
         totalStars,
         loading: false,
-        error: ''
+        error: '',
       });
 
       // Automatically sync data to profile
@@ -213,7 +222,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         await syncLanguagesToProfile();
         await syncProjectsToProfile();
       }
-
+      
     } catch (error: any) {
       console.error('Error in refreshGitHubDataInternal:', error.message || error);
       setGitHubData(prev => ({
@@ -221,6 +230,8 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         loading: false,
         error: error.message || 'Failed to fetch GitHub data'
       }));
+    } finally {
+      setFetchInProgress(false);
     }
   };
 
@@ -228,7 +239,17 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     const handleToUse = handle || developerProfile?.github_handle;
     if (!handleToUse) {
       console.log('refreshGitHubData - No GitHub handle provided');
-      setGitHubData(prev => ({ ...prev, error: 'No GitHub handle provided' }));
+      setGitHubData(prev => ({ 
+        ...prev, 
+        error: 'No GitHub handle provided',
+        loading: false 
+      }));
+      return;
+    }
+    
+    // If we're already fetching data for this handle, don't start another fetch
+    if (fetchInProgress && currentHandle === handleToUse) {
+      console.log('refreshGitHubData - Fetch already in progress for:', handleToUse);
       return;
     }
     

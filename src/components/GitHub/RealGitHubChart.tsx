@@ -27,10 +27,13 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
 
   useEffect(() => {
     if (githubHandle) {
-      console.log('RealGitHubChart - Fetching data for handle:', githubHandle);
-      refreshGitHubData(githubHandle);
+      // Only fetch data if we don't already have data for this handle
+      if (!githubUser || loading) {
+        console.log('RealGitHubChart - Fetching data for handle:', githubHandle);
+        refreshGitHubData(githubHandle);
+      }
     }
-  }, [githubHandle, refreshGitHubData]);
+  }, [githubHandle, refreshGitHubData, githubUser, loading]);
 
   useEffect(() => {
     if (githubHandle && repos.length > 0) {
