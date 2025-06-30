@@ -13,22 +13,27 @@ import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding
 
 function App() {
   const { user, userProfile, loading } = useContext(AuthContext);
-  const [redirectPath, setRedirectPath] = useState<string | null>(null);
+  
+  // Redirect paths for different roles
+  const getRedirectPath = () => {
+    if (userProfile) {
+      if (userProfile.role === 'admin') return '/admin';
+      if (userProfile.role === 'recruiter') return '/recruiter';
+      if (userProfile.role === 'developer') return '/developer';
+    }
+    return null;
+  };
+
+  // Redirect path based on role
+  const redirectPath = getRedirectPath();
 
   useEffect(() => {
-    if (!loading && user && userProfile) {
-      if (userProfile.role === 'admin') {
-        setRedirectPath('/admin');
-      } else if (userProfile.role === 'recruiter') {
-        setRedirectPath('/recruiter');
-      } else if (userProfile.role === 'developer') {
-        setRedirectPath('/developer');
-      }
+    if (!loading && user && userProfile && redirectPath) {
+      // Once the redirectPath is determined, handle redirection
     }
   }, [user, userProfile, loading]);
 
   if (loading) {
-    // You can add a loading spinner or a similar UI
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
@@ -37,8 +42,8 @@ function App() {
   }
 
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <div className="min-h-screen bg-gray-50">
           <Header />
           <Routes>
@@ -56,8 +61,8 @@ function App() {
             <Route path="/contact" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Contact Coming Soon</h1></div>} />
           </Routes>
         </div>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
