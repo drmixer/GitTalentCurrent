@@ -368,7 +368,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log('✅ User profile created successfully');
       return true;
-
+    } catch (error) {
       console.error('❌ Error in createUserProfileFromAuth:', error);
       return false;
     }
