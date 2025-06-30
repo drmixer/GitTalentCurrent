@@ -8,7 +8,8 @@ import {
   Eye, 
   ArrowRight,
   ExternalLink,
-  Star
+  Star,
+  FileText
 } from 'lucide-react';
 import { Developer, User as UserType, PortfolioItem } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -33,19 +34,10 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
     availability: developer.availability
   });
 
-  console.log('Rendering DeveloperSnapshotCard for:', developer.user_id, developer.user.name);
-  console.log('Developer data in snapshot card:', { 
-    githubHandle: developer.github_handle || 'none',
-    bio: developer.bio?.substring(0, 20) + '...' || 'none',
-    languages: developer.top_languages?.length || 0,
-    availability: developer.availability
-  });
-
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('Fetching portfolio items for developer:', developer.user_id);
     console.log('Fetching portfolio items for developer:', developer.user_id);
     fetchFeaturedPortfolioItem();
   }, [developer.user_id]);
@@ -252,6 +244,24 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Resume Link */}
+      {developer.resume_url && (
+        <div className="p-6 border-b border-gray-100">
+          <h4 className="text-sm font-bold text-gray-900 mb-3">Resume</h4>
+          <a 
+            href={developer.resume_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            View Resume
+            <ExternalLink className="w-3 h-3 ml-1" />
+          </a>
         </div>
       )}
 

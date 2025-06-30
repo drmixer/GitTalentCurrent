@@ -33,6 +33,9 @@ export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> =
     return 'Needs Work';
   };
 
+  // Filter suggestions to show only the most relevant ones
+  const filteredSuggestions = suggestions.slice(0, 5);
+
   return (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
       <div className="flex items-center justify-between mb-6">
@@ -66,11 +69,11 @@ export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> =
       </div>
 
       {/* Suggestions */}
-      {suggestions.length > 0 && (
+      {filteredSuggestions.length > 0 && (
         <div>
           <h4 className="font-bold text-gray-900 mb-3 text-sm">Ways to improve:</h4>
           <div className="space-y-2">
-            {suggestions.map((suggestion, index) => (
+            {filteredSuggestions.map((suggestion, index) => (
               <div key={index} className="flex items-start space-x-3">
                 <Circle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-sm text-gray-600">{suggestion}</span>

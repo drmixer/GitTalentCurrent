@@ -16,7 +16,10 @@ import {
   ExternalLink,
   Loader,
   AlertCircle,
-  X
+  X,
+  FileText,
+  Bell,
+  Link
 } from 'lucide-react';
 import { Developer, User as UserType } from '../../types';
 
@@ -122,6 +125,45 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     { id: 'portfolio', label: 'Portfolio' },
     { id: 'github', label: 'GitHub Activity' },
   ]; 
+
+  // Generate profile strength suggestions based on missing data
+  const generateProfileSuggestions = (): string[] => {
+    const suggestions: string[] = [];
+    
+    if (!developer.github_handle) {
+      suggestions.push('Add your GitHub handle to showcase your coding activity');
+    }
+    
+    if (!developer.bio || developer.bio.length < 50) {
+      suggestions.push('Complete your bio with at least 50 characters');
+    }
+    
+    if (!developer.location) {
+      suggestions.push('Add your location to receive location-specific opportunities');
+    }
+    
+    if (developer.experience_years === 0) {
+      suggestions.push('Specify your years of experience');
+    }
+    
+    if (developer.desired_salary === 0) {
+      suggestions.push('Set your desired salary to help match with appropriate roles');
+    }
+    
+    if (!developer.top_languages || developer.top_languages.length < 3) {
+      suggestions.push('Add at least 3 programming languages to your profile');
+    }
+    
+    if (!developer.linked_projects || developer.linked_projects.length < 2) {
+      suggestions.push('Link at least 2 projects to demonstrate your work');
+    }
+    
+    if (!developer.resume_url) {
+      suggestions.push('Add a link to your resume for recruiters to review');
+    }
+    
+    return suggestions;
+  };
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
@@ -273,8 +315,83 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                   <span className="font-medium">${developer.desired_salary.toLocaleString()}/year</span>
                 </div>
               )}
+              {developer.resume_url && (
+                <div className="flex items-center">
+                  <FileText className="w-5 h-5 mr-3 text-gray-400" />
+                  <a 
+                    href={developer.resume_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                  >
+                    View Resume
+                    <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
+                </div>
+              )}
+              {developer.public_profile_slug && (
+                <div className="flex items-center">
+                  <Link className="w-5 h-5 mr-3 text-gray-400" />
+                  <span className="font-medium">
+                    Public Profile: {developer.public_profile_slug}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Notification Preferences */}
+          {(userProfile?.role === 'admin' || userProfile?.id === developer.user_id) && 
+           developer.notification_preferences && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center mb-4">
+                <Bell className="w-5 h-5 mr-2 text-gray-500" />
+                <h3 className="text-lg font-black text-gray-900">Notification Preferences</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700 font-medium">Email Notifications</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    developer.notification_preferences.email 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {developer.notification_preferences.email ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700 font-medium">In-App Notifications</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    developer.notification_preferences.in_app 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {developer.notification_preferences.in_app ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700 font-medium">Message Notifications</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    developer.notification_preferences.messages 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {developer.notification_preferences.messages ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700 font-medium">Assignment Notifications</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    developer.notification_preferences.assignments 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {developer.notification_preferences.assignments ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Linked Projects</h3>
@@ -309,7 +426,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
           <ProfileStrengthIndicator
             strength={developer.profile_strength || 0} 
-            suggestions={[]}
+            suggestions={generateProfileSuggestions()}
           />
         </div>
       )}

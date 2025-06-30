@@ -31,7 +31,6 @@ import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { DeveloperList } from '../components/DeveloperList';
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
-import { AssignmentList } from '../components/Assignments/AssignmentList';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 interface JobRole {
@@ -116,7 +115,6 @@ export const RecruiterDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [hires, setHires] = useState<(Hire & { assignment: Assignment })[]>([]);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
 
@@ -146,14 +144,6 @@ export const RecruiterDashboard: React.FC = () => {
       }
       console.log('Fetched job roles:', data?.length || 0);
       setJobs(data || []);
-      
-      // Update stats
-      if (data) {
-        setStats(prev => ({
-          ...prev,
-          activeJobs: data.filter(job => job.is_active).length
-        }));
-      }
     } catch (error) {
       console.error('Error fetching job roles:', error);
       setError('Failed to load job roles. Please try again.');
@@ -177,17 +167,6 @@ export const RecruiterDashboard: React.FC = () => {
 
       if (error) throw error;
       setAssignments(data || []);
-      
-      // Update stats
-      if (data) {
-        // Count unique developers
-        const uniqueDevelopers = new Set(data.map(a => a.developer_id)).size;
-        
-        setStats(prev => ({
-          ...prev,
-          assignedDevelopers: uniqueDevelopers
-        }));
-      }
     } catch (error) {
       console.error('Error fetching assignments:', error);
       setError('Failed to load assignments. Please try again.');
@@ -211,14 +190,6 @@ export const RecruiterDashboard: React.FC = () => {
 
       if (error) throw error;
       setHires(data || []);
-      
-      // Update stats
-      if (data) {
-        setStats(prev => ({
-          ...prev,
-          successfulHires: data.length
-        }));
-      }
     } catch (error) {
       console.error('Error fetching hires:', error);
       setError('Failed to load hires. Please try again.');
@@ -311,30 +282,6 @@ export const RecruiterDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleViewDeveloper = (developerId: string) => {
-    setSelectedDeveloper(developerId);
-    setShowDeveloperProfile(true);
-  };
-
-  const handleSendMessage = (
-    developerId: string, 
-    developerName: string, 
-    jobRoleId: string, 
-    jobRoleTitle: string
-  ) => {
-    setSelectedThread({
-      otherUserId: developerId,
-      otherUserName: developerName,
-      otherUserRole: 'developer',
-      unreadCount: 0,
-      jobContext: {
-        id: jobRoleId,
-        title: jobRoleTitle
-      }
-    });
-    setActiveTab('messages');
   };
 
   const filteredJobRoles = jobs.filter(job => {
@@ -513,22 +460,6 @@ export const RecruiterDashboard: React.FC = () => {
           )}
         </div>
       )}
-
-      {/* Assignment count */}
-      <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-        <div className="text-sm text-gray-600">
-          {assignments.filter(a => a.job_role_id === job.id).length} developers assigned
-        </div>
-        <button
-          onClick={() => {
-            setActiveJobId(job.id);
-            setActiveTab('developers');
-          }}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-        >
-          View Assignments
-        </button>
-      </div>
     </div>
   );
 
@@ -583,12 +514,7 @@ export const RecruiterDashboard: React.FC = () => {
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => {
-                setActiveTab(id);
-                if (id !== 'developers') {
-                  setActiveJobId(null);
-                }
-              }}
+              onClick={() => setActiveTab(id)}
               className={`flex items-center gap-2 pb-4 border-b-2 font-semibold ${
                 activeTab === id
                   ? 'border-purple-600 text-purple-600'
@@ -734,58 +660,6 @@ export const RecruiterDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Recent Hires */}
-            {hires.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h3 className="text-lg font-black text-gray-900 mb-6">Recent Hires</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Role</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {hires.slice(0, 5).map((hire) => (
-                        <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
-                                {hire.assignment?.developer?.name?.split(' ').map(n => n?.[0]).join('') || 'U'}
-                              </div>
-                              <div className="text-sm font-semibold text-gray-900">
-                                {hire.assignment?.developer?.name || 'Unknown'}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-gray-900">
-                              {hire.assignment?.job_role?.title || 'Unknown'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-bold text-gray-900">
-                              ${hire.salary.toLocaleString()}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(hire.hire_date).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {hire.start_date ? new Date(hire.start_date).toLocaleDateString() : 'Not set'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -865,134 +739,9 @@ export const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Developers Tab */}
+        {/* Developers Tab - Using DeveloperList component */}
         {activeTab === 'developers' && (
-          <div className="space-y-6">
-            {activeJobId ? (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => setActiveJobId(null)}
-                      className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <ArrowLeft className="w-5 h-5 text-gray-600" />
-                    </button>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      Developers for {jobs.find(j => j.id === activeJobId)?.title || 'Job'}
-                    </h2>
-                  </div>
-                </div>
-                <AssignmentList 
-                  recruiterId={userProfile?.id || ''}
-                  jobRoleId={activeJobId}
-                  onViewDeveloper={handleViewDeveloper}
-                  onSendMessage={handleSendMessage}
-                />
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Jobs with Assigned Developers</h2>
-                </div>
-                
-                {jobs.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {jobs.map(job => {
-                      const jobAssignments = assignments.filter(a => a.job_role_id === job.id);
-                      const assignmentCount = jobAssignments.length;
-                      
-                      return (
-                        <div 
-                          key={job.id}
-                          className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer"
-                          onClick={() => setActiveJobId(job.id)}
-                        >
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-2">{job.title}</h3>
-                              <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  job.is_active 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {job.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                                <span className="text-sm text-gray-500">
-                                  {assignmentCount} {assignmentCount === 1 ? 'developer' : 'developers'}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                              <Users className="w-5 h-5 text-white" />
-                            </div>
-                          </div>
-                          
-                          {/* Assignment status counts */}
-                          <div className="grid grid-cols-4 gap-2 mt-4">
-                            <div className="text-center p-2 bg-yellow-50 rounded-lg">
-                              <div className="text-sm font-bold text-gray-900">
-                                {jobAssignments.filter(a => a.status === 'New').length}
-                              </div>
-                              <div className="text-xs text-gray-600">New</div>
-                            </div>
-                            <div className="text-center p-2 bg-purple-50 rounded-lg">
-                              <div className="text-sm font-bold text-gray-900">
-                                {jobAssignments.filter(a => a.status === 'Contacted').length}
-                              </div>
-                              <div className="text-xs text-gray-600">Contacted</div>
-                            </div>
-                            <div className="text-center p-2 bg-blue-50 rounded-lg">
-                              <div className="text-sm font-bold text-gray-900">
-                                {jobAssignments.filter(a => a.status === 'Shortlisted').length}
-                              </div>
-                              <div className="text-xs text-gray-600">Shortlisted</div>
-                            </div>
-                            <div className="text-center p-2 bg-emerald-50 rounded-lg">
-                              <div className="text-sm font-bold text-gray-900">
-                                {jobAssignments.filter(a => a.status === 'Hired').length}
-                              </div>
-                              <div className="text-xs text-gray-600">Hired</div>
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveJobId(job.id);
-                            }}
-                            className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm flex items-center justify-center"
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Assigned Developers
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
-                    <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Jobs Created Yet</h3>
-                    <p className="text-gray-600 mb-6">
-                      Create your first job to start getting developer assignments
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSelectedJob(null);
-                        setShowJobForm(true);
-                      }}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-                    >
-                      <Plus className="w-4 h-4 mr-2 inline" />
-                      Create Job Role
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <DeveloperList recruiterId={userProfile?.id || ''} />
         )}
 
         {/* Messages Tab - Using MessageList/MessageThread components */}
