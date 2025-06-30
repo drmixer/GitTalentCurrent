@@ -18,14 +18,20 @@ interface MarkAsHiredModalProps {
   isOpen: boolean;
   onClose: () => void;
   assignment: Assignment;
+  assignmentId?: string;
   onSuccess?: () => void;
+  onHire?: () => void;
+  onCancel?: () => void;
 }
 
 export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
   isOpen,
   onClose,
   assignment,
-  onSuccess
+  assignmentId,
+  onSuccess,
+  onHire,
+  onCancel
 }) => {
   const { createHire } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -109,6 +115,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         setSuccess('Hire recorded successfully!');
         setTimeout(() => {
           onSuccess?.();
+          onHire?.();
           onClose();
           resetForm();
         }, 1500);
@@ -265,6 +272,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  onCancel?.();
                   onClose();
                   resetForm();
                 }}
