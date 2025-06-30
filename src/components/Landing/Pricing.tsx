@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ArrowRight, Star, Zap, Shield } from 'lucide-react';
+import { Check, ArrowRight, Star, Zap, Shield, DollarSign, Sparkles, Brain } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const Pricing = () => {
@@ -9,7 +9,7 @@ export const Pricing = () => {
         {/* Header */}
         <div className="text-center mb-20">
           <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-700 border border-emerald-200 mb-6">
-            <Star className="w-4 h-4 mr-2" />
+            <DollarSign className="w-4 h-4 mr-2" />
             Simple Pricing
           </div>
           <h2 className="text-5xl lg:text-6xl font-black text-gray-900 mb-6 leading-tight">
@@ -30,7 +30,7 @@ export const Pricing = () => {
             <div className="p-10">
               <div className="text-center mb-10">
                 <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <Shield className="w-10 h-10 text-white" />
+                  <Code className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-3xl font-black text-gray-900 mb-3">For Developers</h3>
                 <p className="text-gray-600 mb-8 text-lg leading-relaxed">
@@ -44,7 +44,7 @@ export const Pricing = () => {
                   to="/signup"
                   className="w-full inline-flex items-center justify-center px-8 py-4 border-2 border-blue-600 text-blue-600 font-bold rounded-2xl hover:bg-blue-50 transition-all duration-300 hover:scale-105"
                 >
-                  Join as Developer
+                  Find Your Dream Job
                   <ArrowRight className="ml-3 w-5 h-5" />
                 </Link>
               </div>
@@ -54,11 +54,11 @@ export const Pricing = () => {
                 <ul className="space-y-4">
                   {[
                     'GitHub integration & real-time sync',
-                    'Unlimited profile updates',
+                    'Create and customize your developer profile',
+                    'Browse all job opportunities',
+                    'AI-powered job recommendations',
                     'Direct messaging with recruiters',
-                    'Job opportunity notifications',
-                    'Assignment status tracking',
-                    'Priority support & guidance',
+                    'Self-managed job search and filtering',
                     'Portfolio showcase tools',
                     'Skills verification badges'
                   ].map((feature, index) => (
@@ -86,7 +86,7 @@ export const Pricing = () => {
             <div className="p-10">
               <div className="text-center mb-10">
                 <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                  <Zap className="w-10 h-10 text-white" />
+                  <Brain className="w-10 h-10 text-white" />
                 </div>
                 <h3 className="text-3xl font-black text-gray-900 mb-3">For Recruiters</h3>
                 <p className="text-gray-600 mb-8 text-lg leading-relaxed">
@@ -112,14 +112,14 @@ export const Pricing = () => {
                 <h4 className="font-black text-gray-900 text-sm uppercase tracking-wider">Premium Features</h4>
                 <ul className="space-y-4">
                   {[
-                    'Access to curated developer pool',
+                    'Access to all developer profiles',
                     'Unlimited job postings',
-                    'CSV bulk job import',
+                    'AI-powered developer recommendations',
                     'Advanced filtering & search',
-                    'Direct messaging with matches',
+                    'Direct messaging with developers',
                     'Hiring analytics & reporting',
-                    'Dedicated account manager',
-                    'Priority assignment queue'
+                    'CSV bulk job import',
+                    'Digital hiring agreements'
                   ].map((feature, index) => (
                     <li key={index} className="flex items-start space-x-4">
                       <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -148,13 +148,13 @@ export const Pricing = () => {
               {
                 step: '1',
                 title: 'Post Jobs Free',
-                description: 'Create unlimited job postings and get matched with qualified developers at zero cost.',
+                description: 'Create unlimited job postings and browse developer profiles at zero cost.',
                 color: 'from-blue-500 to-indigo-600',
               },
               {
                 step: '2',
                 title: 'Interview & Hire',
-                description: 'Connect with assigned developers, conduct interviews, and make your hiring decisions.',
+                description: 'Connect with developers, conduct interviews, and make your hiring decisions.',
                 color: 'from-purple-500 to-pink-600',
               },
               {

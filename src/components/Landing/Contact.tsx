@@ -23,7 +23,7 @@ export const Contact = () => {
   };
 
   return (
-    <div className="py-20 bg-white">
+    <div id="contact" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Get in Touch</h2>
@@ -74,19 +74,22 @@ export const Contact = () => {
             </div>
 
             <div className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl">
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Quick Response Times</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Our Commitment</h4>
+              <p className="text-gray-600 mb-4">
+                We're dedicated to transforming the tech hiring process with:
+              </p>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">General Inquiries</span>
-                  <span className="font-medium text-gray-900">&lt; 24 hours</span>
+                  <span className="text-gray-600">AI-Powered Matching</span>
+                  <span className="font-medium text-gray-900">95% accuracy</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Technical Support</span>
-                  <span className="font-medium text-gray-900">&lt; 4 hours</span>
+                  <span className="text-gray-600">Open Access Platform</span>
+                  <span className="font-medium text-gray-900">No gatekeeping</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Sales Questions</span>
-                  <span className="font-medium text-gray-900">&lt; 2 hours</span>
+                  <span className="text-gray-600">Pay-Per-Hire Model</span>
+                  <span className="font-medium text-gray-900">Zero upfront cost</span>
                 </div>
               </div>
             </div>
@@ -143,7 +146,7 @@ export const Contact = () => {
                   <option value="">Select a subject</option>
                   <option value="general">General Inquiry</option>
                   <option value="support">Technical Support</option>
-                  <option value="sales">Sales Question</option>
+                  <option value="sales">Hiring Questions</option>
                   <option value="partnership">Partnership</option>
                   <option value="feedback">Feedback</option>
                 </select>

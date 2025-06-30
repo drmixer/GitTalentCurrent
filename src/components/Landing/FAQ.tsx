@@ -3,12 +3,12 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const faqs = [
   {
-    question: "How does GitTalent match developers with recruiters?",
-    answer: "We analyze GitHub activity, contribution patterns, project involvement, and technical skills to create meaningful matches. Our admin team then assigns developers to specific job roles based on this analysis, ensuring quality over quantity."
+    question: "How does GitTalent's AI matching work?",
+    answer: "Our AI analyzes GitHub activity, contribution patterns, project involvement, and technical skills to create meaningful matches. The system recommends developers to recruiters based on job requirements and technical compatibility, ensuring quality matches without manual intervention."
   },
   {
     question: "Is GitTalent free for developers?",
-    answer: "Yes! GitTalent is completely free for developers. You can create your profile, showcase your GitHub activity, receive job assignments, and communicate with recruiters at no cost."
+    answer: "Yes! GitTalent is completely free for developers. You can create your profile, showcase your GitHub activity, browse job opportunities, and communicate with recruiters at no cost."
   },
   {
     question: "How does the payment system work for recruiters?",
@@ -16,7 +16,7 @@ const faqs = [
   },
   {
     question: "Can developers contact recruiters directly?",
-    answer: "No, developers can only respond to recruiters who have been assigned to them by our admin team for specific job roles. This ensures all communications are relevant and targeted."
+    answer: "Developers can browse all job listings and view recruiter profiles. However, to prevent spam, developers can only message recruiters after the recruiter has initiated contact first."
   },
   {
     question: "How do I get approved as a recruiter?",
@@ -31,16 +31,16 @@ const faqs = [
     answer: "Yes! Recruiters can import job postings in bulk using our CSV import feature. This makes it easy to manage multiple positions and streamline your hiring process."
   },
   {
-    question: "How do assignments work?",
-    answer: "Our admin team reviews job requirements and developer profiles to make strategic assignments. Developers are assigned to specific job roles (not general recruiters), ensuring each match is purposeful and relevant."
+    question: "How do I express interest in a job as a developer?",
+    answer: "Developers can browse all job listings and express interest in specific positions. This notifies the recruiter, who can then review your profile and initiate contact if they're interested."
   },
   {
     question: "What happens after a successful hire?",
-    answer: "Once you hire a developer, you'll mark them as 'Hired' in the system and provide salary details. The 15% fee is calculated and invoiced based on the first-year salary you report."
+    answer: "Once you hire a developer, you'll mark them as 'Hired' in the system and provide salary details. You'll sign a digital agreement, and the 15% fee will be calculated based on the first-year salary you report."
   },
   {
     question: "Can I see all developers on the platform?",
-    answer: "No, recruiters can only view and contact developers who have been specifically assigned to their job postings. This maintains developer privacy and ensures all interactions are meaningful."
+    answer: "Yes! Unlike traditional platforms, GitTalent provides open access to all developer profiles. You can browse, search, and filter to find the perfect match for your job openings."
   }
 ];
 
@@ -52,7 +52,7 @@ export const FAQ = () => {
   };
 
   return (
-    <div className="py-20 bg-gray-50">
+    <div id="faq" className="py-20 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
@@ -96,11 +96,14 @@ export const FAQ = () => {
           <p className="text-gray-600 mb-8">
             Can't find the answer you're looking for? Please chat with our friendly team.
           </p>
-          <button className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+          <Link to="/contact" className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
             Contact Support
-          </button>
+          </Link>
         </div>
       </div>
     </div>
   );
 };
+
+// Add missing import
+import { Link } from 'react-router-dom';
