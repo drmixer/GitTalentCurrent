@@ -253,15 +253,16 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           {totalContributions} contributions in the last year
         </div>
 
-        {/* Contribution Graph - Consistent with homepage */}
+        {/* Contribution Graph */}
         <div className="grid grid-cols-53 gap-1 mb-3">
           {contributions.map((day, index) => (
             <div
-              key={day.date}
-              className={`w-2.5 h-2.5 rounded-sm ${getColorClass(day.level)}`}
-              title={`${day.count} contributions on ${day.date}`}
+              key={index}
+              className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
+              title={`${day.count} contributions on ${new Date(day.date).toLocaleDateString()}`}
             />
           ))}
+        </div>
         </div>
         
         {/* Legend */}
