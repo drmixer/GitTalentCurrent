@@ -192,17 +192,26 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
         
         console.log('Admin users for developer:', adminUsers);
 
-        const { data: assignments } = await supabase
-          .from('assignments')
+        // Get all recruiters who have messaged this developer
+        const { data: recruitersWhoMessaged } = await supabase
+          .from('messages')
           .select(`
-            recruiter_id,
-            recruiter:users!assignments_recruiter_id_fkey(*)
+            sender:users!messages_sender_id_fkey(*)
           `)
-          .eq('developer_id', userProfile.id);
+          .eq('receiver_id', userProfile.id)
+          .eq('sender.role', 'recruiter');
+        
+        // Extract unique recruiters
+        const uniqueRecruiters = new Map();
+        recruitersWhoMessaged?.forEach(msg => {
+          if (msg.sender && !uniqueRecruiters.has(msg.sender.id)) {
+            uniqueRecruiters.set(msg.sender.id, msg.sender);
+          }
+        });
 
         contacts = [
           ...(adminUsers || []),
-          ...(assignments?.map(a => a.recruiter).filter(Boolean) || [])
+          ...Array.from(uniqueRecruiters.values())
         ];
         
         // For each recruiter, check if they've messaged the developer
@@ -229,17 +238,15 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
           .select('*')
           .eq('role', 'admin');
 
-        const { data: assignments } = await supabase
-          .from('assignments')
-          .select(`
-            developer_id,
-            developer:users!assignments_developer_id_fkey(*)
-          `)
-          .eq('recruiter_id', userProfile.id);
+        // Get all developers
+        const { data: developers } = await supabase
+          .from('users')
+          .select('*')
+          .eq('role', 'developer');
 
         contacts = [
           ...(adminUsers || []),
-          ...(assignments?.map(a => a.developer).filter(Boolean) || [])
+          ...(developers || [])
         ];
         
         // Recruiters can always initiate contact with developers they're assigned to
