@@ -109,6 +109,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDeveloperProfile(null);
       setNeedsOnboarding(false);
       
+      // Clear all state before signing out from Supabase
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setNeedsOnboarding(false);
+      
       // Clear all state before signing out
       setUser(null);
       setUserProfile(null);
@@ -118,6 +124,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('❌ Error signing out:', error);
+        throw error;
+      }
+      
+      console.log('✅ Sign out successful');
+    } catch (error) {
         throw error;
       }
       
@@ -443,42 +454,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (userProfile?.role === 'developer') {
         // Check for developer profile
-        const { data, error } = await supabase
+        const { data: devProfileData, error: devError } = await supabase
           .from('developers')
           .select('*')
           .eq('user_id', userId)
           .maybeSingle();
 
-        console.log('🔄 Developer profile fetch result:', data ? 'found' : 'not found');
-        if (error && error.code !== 'PGRST116') {
+        console.log('🔄 Developer profile fetch result:', devProfileData ? 'found' : 'not found');
+        if (devError && devError.code !== 'PGRST116') {
+          console.error('❌ Error fetching developer profile:', devError);
         }
-        if (!data) {
+        
+        if (!devProfileData) {
           // Developer profile doesn't exist, needs onboarding
           console.log('⚠️ Developer profile not found, needs onboarding');
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
-          console.log('✅ Developer profile found:', data);
-          console.log('🔄 GitHub handle from profile:', data.github_handle || 'none');
-          setDeveloperProfile(data);
-          setDeveloperProfile(data);
+          console.log('✅ Developer profile found:', devProfileData);
+          console.log('🔄 GitHub handle from profile:', devProfileData.github_handle || 'none');
+          setDeveloperProfile(devProfileData);
           setNeedsOnboarding(false);
         }
-      } else if (userProfile?.role === 'recruiter') {
+      } else if (userProfile.role === 'recruiter') {
         // Check for recruiter profile
-        const { data, error } = await supabase
+        const { data: recProfileData, error: recError } = await supabase
           .from('recruiters')
           .select('*')
           .eq('user_id', userId)
           .maybeSingle();
 
-        console.log('🔄 Recruiter profile fetch result:', data ? 'found' : 'not found');
-        if (error && error.code !== 'PGRST116') {
-          console.error('❌ Error fetching recruiter profile:', error);
+        console.log('🔄 Recruiter profile fetch result:', recProfileData ? 'found' : 'not found');
+        if (recError && recError.code !== 'PGRST116') {
+          console.error('❌ Error fetching recruiter profile:', recError);
           setNeedsOnboarding(true);
         }
         
-        if (!data) {
+        if (!recProfileData) {
           console.log('⚠️ Recruiter profile not found, needs onboarding');
           setNeedsOnboarding(true);
         } else {
@@ -491,9 +503,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setDeveloperProfile(null);
         setNeedsOnboarding(false);
       }
-    } catch (error) {
-      console.error('❌ Error in checkForRoleSpecificProfile:', error);
-      console.error('❌ Error checking role-specific profile:', error);
+    } catch (error: any) {
+      console.error('❌ Error checking role-specific profile:', error.message || error);
       setNeedsOnboarding(false);
     } finally {
       setLoading(false);
