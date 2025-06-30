@@ -81,28 +81,47 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
 
-    try {
-      // Check if the current user is a developer and the other user is a recruiter
-      if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
+    // Recruiters can always message developers
+    if (userProfile.role === 'recruiter' && otherUserRole === 'developer') {
+      setCanSendMessage(true);
+      return;
+    }
+    
+    // Admins can always message anyone
+    if (userProfile.role === 'admin') {
+      setCanSendMessage(true);
+      return;
+    }
+    
+    // Anyone can message admins
+    if (otherUserRole === 'admin') {
+      setCanSendMessage(true);
+      return;
+    }
+    
+    // Developers can only message recruiters who have messaged them first
+    if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
+      try {
         // Check if there are any messages from the recruiter to the developer
-        const { count, error } = await supabase
+        const { count, error: messagesError } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('sender_id', otherUserId)
           .eq('receiver_id', userProfile.id);
           
-        if (error) throw error;
+        if (messagesError) throw messagesError;
         
         // Developer can only send messages if the recruiter has messaged first
         setCanSendMessage(count ? count > 0 : false);
-      } else {
-        // Admin can always send messages, and recruiters can always message assigned developers
-        setCanSendMessage(true);
+      } catch (error) {
+        console.error('Error checking message permissions:', error);
+        setCanSendMessage(false);
       }
-    } catch (error) {
-      console.error('Error checking message permissions:', error);
-      setCanSendMessage(false);
+      return;
     }
+    
+    // Default: no messaging allowed
+    setCanSendMessage(false);
   };
 
   const fetchNewMessage = async (messageId: string) => {
@@ -297,12 +316,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   // Determine if we should show limited info for the other user
   const shouldShowLimitedInfo = () => {
-    // If the current user is a developer and the other user is a recruiter
-    if (userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
-      // Check if there are any messages from the recruiter
-      const hasRecruiterSentMessage = messages.some(msg => msg.sender_id === otherUserId);
-      return !hasRecruiterSentMessage && !hasInitiatedContact;
-    }
     return false;
   };
 
@@ -466,7 +479,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
           <div className="mt-2 text-xs text-amber-600 font-medium">
             <Lock className="w-3 h-3 inline mr-1" />
-            You can reply after the recruiter contacts you first
+            You can only reply after the recruiter contacts you first
           </div>
         )}
       </div>

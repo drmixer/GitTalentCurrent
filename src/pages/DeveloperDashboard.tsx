@@ -259,6 +259,45 @@ export const DeveloperDashboard = () => {
     
     // Send a message to the recruiter expressing interest
     sendInterestMessage(job);
+    
+    // Send a message to the recruiter expressing interest
+    sendInterestMessage(job);
+  };
+
+  const sendInterestMessage = async (job: JobRole) => {
+    try {
+      if (!userProfile?.id) return;
+      
+      // Create a message to the recruiter
+      const messageData = {
+        sender_id: userProfile.id,
+        receiver_id: job.recruiter_id,
+        subject: `Interest in: ${job.title}`,
+        body: `I'm interested in the ${job.title} position. Please review my profile and let me know if you'd like to discuss further.`,
+        job_role_id: job.id,
+        is_read: false
+      };
+
+      const { error } = await supabase
+        .from('messages')
+        .insert(messageData);
+
+      if (error) {
+        if (error.code === '42501') {
+          // Policy violation - likely the developer can't message this recruiter yet
+          setError('You cannot express interest until the recruiter contacts you first.');
+        } else {
+          throw error;
+        }
+      } else {
+        // Show success message and view job details
+        alert('Interest expressed successfully! The recruiter will be notified.');
+        handleViewJobDetails(job.id);
+      }
+    } catch (error: any) {
+      console.error('Error expressing interest:', error);
+      setError(error.message || 'Failed to express interest');
+    }
   };
 
   const sendInterestMessage = async (job: JobRole) => {

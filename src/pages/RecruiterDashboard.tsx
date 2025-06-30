@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { AssignmentList } from '../components/Assignments/AssignmentList';
 import { DeveloperList } from '../components/DeveloperList';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
-import { AssignDeveloperModal } from '../components/Assignments/AssignDeveloperModal';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
@@ -48,8 +46,6 @@ export const RecruiterDashboard = () => {
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJobRole, setEditingJobRole] = useState<JobRole | null>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedJobForAssign, setSelectedJobForAssign] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [stats, setStats] = useState({
@@ -152,11 +148,6 @@ export const RecruiterDashboard = () => {
   const handleEditJob = (job: JobRole) => {
     setEditingJobRole(job);
     setShowJobForm(true);
-  };
-
-  const handleAssignDeveloper = (jobId?: string) => {
-    setSelectedJobForAssign(jobId || null);
-    setShowAssignModal(true);
   };
 
   const handleImportSuccess = () => {
@@ -367,15 +358,10 @@ export const RecruiterDashboard = () => {
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleEditJob(job)}
-                      className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                      className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors font-semibold flex items-center"
                     >
+                      <Edit className="w-4 h-4 mr-2" />
                       Edit
-                    </button>
-                    <button
-                      onClick={() => handleAssignDeveloper(job.id)}
-                      className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-                    >
-                      Assign
                     </button>
                   </div>
                 </div>
@@ -618,8 +604,22 @@ export const RecruiterDashboard = () => {
   );
 
   const renderDevelopers = () => (
-    <DeveloperList 
-      recruiterId={userProfile.id}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-gray-900">Developer Talent Pool</h2>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={fetchDashboardData}
+            className="px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            <RefreshCw className="w-4 h-4 mr-2 inline" />
+            Refresh
+          </button>
+        </div>
+      </div>
+      
+      <DeveloperList 
+      fetchType="all"
       onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
         setSelectedThread({
           otherUserId: developerId,
@@ -634,38 +634,6 @@ export const RecruiterDashboard = () => {
         setActiveTab('messages');
       }}
     />
-  );
-
-  const renderAssignments = () => (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">Developer Assignments</h2>
-        <button
-          onClick={() => handleAssignDeveloper()}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
-        >
-          <Plus className="w-4 h-4 mr-2 inline" />
-          Assign Developer
-        </button>
-      </div>
-
-      <AssignmentList 
-        recruiterId={userProfile.id}
-        onViewDeveloper={() => setActiveTab('developers')}
-        onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
-          setSelectedThread({
-            otherUserId: developerId,
-            otherUserName: developerName,
-            otherUserRole: 'developer',
-            unreadCount: 0,
-            jobContext: {
-              id: jobRoleId,
-              title: jobRoleTitle
-            }
-          });
-          setActiveTab('messages');
-        }}
-      />
     </div>
   );
 
@@ -739,17 +707,6 @@ export const RecruiterDashboard = () => {
                 Developers
               </button>
               <button
-                onClick={() => setActiveTab('assignments')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'assignments'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Users className="w-5 h-5 mr-2" />
-                Assignments
-              </button>
-              <button
                 onClick={() => setActiveTab('messages')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'messages'
@@ -773,7 +730,6 @@ export const RecruiterDashboard = () => {
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'jobs' && renderJobs()}
         {activeTab === 'developers' && renderDevelopers()}
-        {activeTab === 'assignments' && renderAssignments()}
         {activeTab === 'messages' && renderMessages()}
 
         {/* Job Form Modal */}
@@ -790,23 +746,6 @@ export const RecruiterDashboard = () => {
               />
             </div>
           </div>
-        )}
-
-        {/* Assign Developer Modal */}
-        {showAssignModal && (
-          <AssignDeveloperModal
-            isOpen={showAssignModal}
-            onClose={() => {
-              setShowAssignModal(false);
-              setSelectedJobForAssign(null);
-            }}
-            preSelectedJobId={selectedJobForAssign || undefined}
-            onSuccess={() => {
-              setShowAssignModal(false);
-              setSelectedJobForAssign(null);
-              fetchDashboardData();
-            }}
-          />
         )}
 
         {/* Import Jobs Modal */}
