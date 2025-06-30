@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Briefcase, 
@@ -21,9 +21,22 @@ import {
   DollarSign,
   Eye,
   Trash2,
-  Edit
+  Edit,
+  MessageSquare,
+  TrendingUp,
+  ArrowLeft,
+  ExternalLink,
+  BarChart,
+  PieChart,
+  User,
+  X
 } from 'lucide-react';
-import { Developer, JobRole, Hire } from '../types';
+import { Developer, JobRole, Hire, User as UserType } from '../types';
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
 
 interface PendingRecruiter {
   user_id: string;
@@ -35,7 +48,7 @@ interface PendingRecruiter {
 
 export const AdminDashboard = () => {
   const { user, userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState('recruiters');
+  const [activeTab, setActiveTab] = useState('overview');
   const [developers, setDevelopers] = useState<(Developer & { user: any })[]>([]);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
@@ -46,11 +59,31 @@ export const AdminDashboard = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [processingIds, setProcessingIds] = useState<string[]>([]);
+  const [selectedThread, setSelectedThread] = useState<any | null>(null);
+  const [recruiterCount, setRecruiterCount] = useState(0);
+  const [developerCount, setDeveloperCount] = useState(0);
+  const [hireCount, setHireCount] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [selectedDeveloperForDetails, setSelectedDeveloperForDetails] = useState<Developer | null>(null);
+  const [showDeveloperDetailsModal, setShowDeveloperDetailsModal] = useState(false);
+  const [selectedRecruiterForDetails, setSelectedRecruiterForDetails] = useState<string | null>(null);
+  const [showRecruiterDetailsModal, setShowRecruiterDetailsModal] = useState(false);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
+  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (userProfile?.role === 'admin') {
-      fetchRecruiters();
-      if (activeTab === 'developers') {
+      fetchAdminData();
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    // Fetch specific data based on active tab
+    if (userProfile?.role === 'admin') {
+      if (activeTab === 'recruiters') {
+        fetchRecruiters();
+      } else if (activeTab === 'developers') {
         fetchDevelopers();
       } else if (activeTab === 'jobs') {
         fetchJobs();
@@ -58,7 +91,65 @@ export const AdminDashboard = () => {
         fetchHires();
       }
     }
-  }, [userProfile, activeTab]);
+  }, [activeTab, userProfile]);
+
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Fetch counts for overview
+      const { count: recruitersCount, error: recruitersError } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'recruiter');
+
+      if (recruitersError) throw recruitersError;
+      setRecruiterCount(recruitersCount || 0);
+
+      const { count: developersCount, error: developersError } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'developer');
+
+      if (developersError) throw developersError;
+      setDeveloperCount(developersCount || 0);
+
+      const { count: hiresCount, error: hiresError } = await supabase
+        .from('hires')
+        .select('*', { count: 'exact', head: true });
+
+      if (hiresError) throw hiresError;
+      setHireCount(hiresCount || 0);
+
+      // Calculate total revenue (15% of all hire salaries)
+      const { data: hiresData, error: hiresDataError } = await supabase
+        .from('hires')
+        .select('salary');
+
+      if (hiresDataError) throw hiresDataError;
+      
+      const revenue = (hiresData || []).reduce((sum, hire) => sum + Math.round(hire.salary * 0.15), 0);
+      setTotalRevenue(revenue);
+
+      // Fetch initial data for the default tab
+      if (activeTab === 'recruiters') {
+        fetchRecruiters();
+      } else if (activeTab === 'developers') {
+        fetchDevelopers();
+      } else if (activeTab === 'jobs') {
+        fetchJobs();
+      } else if (activeTab === 'hires') {
+        fetchHires();
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching admin data:', error);
+      setError(error.message || 'Failed to load admin data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchRecruiters = async () => {
     try {
@@ -198,6 +289,70 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleViewDeveloperDetails = (developer: Developer) => {
+    setSelectedDeveloperForDetails(developer);
+    setShowDeveloperDetailsModal(true);
+  };
+
+  const handleViewRecruiterDetails = (recruiterId: string) => {
+    setSelectedRecruiterForDetails(recruiterId);
+    setShowRecruiterDetailsModal(true);
+  };
+
+  const handleViewJobDetails = (jobId: string) => {
+    setSelectedJobForDetails(jobId);
+    setShowJobDetailsModal(true);
+  };
+
+  const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
+    try {
+      setError('');
+      
+      const { error } = await supabase
+        .from('job_roles')
+        .update({ is_featured: !isFeatured })
+        .eq('id', jobId);
+      
+      if (error) throw error;
+      
+      // Refresh jobs
+      fetchJobs();
+      
+      setSuccessMessage(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully`);
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error featuring job:', error);
+      setError(error.message || 'Failed to feature job');
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) return;
+    
+    try {
+      setError('');
+      
+      const { error } = await supabase
+        .from('job_roles')
+        .delete()
+        .eq('id', jobId);
+      
+      if (error) throw error;
+      
+      setSuccessMessage('Job deleted successfully!');
+      fetchJobs();
+      
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error deleting job:', error);
+      setError(error.message || 'Failed to delete job');
+    }
+  };
+
   const handleApprove = async (userId: string) => {
     try {
       setProcessingIds(prev => [...prev, userId]);
@@ -256,28 +411,264 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
-    try {
-      setError('');
-      
-      const { error } = await supabase
-        .from('job_roles')
-        .update({ is_featured: !isFeatured })
-        .eq('id', jobId);
-      
-      if (error) throw error;
-      
-      // Refresh jobs
-      fetchJobs();
-      
-      setSuccessMessage(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully`);
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error featuring job:', error);
-      setError(error.message || 'Failed to feature job');
+  const renderOverview = () => (
+    <div className="space-y-8">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Building className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{recruiterCount}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Total Recruiters</div>
+          <div className="text-xs text-emerald-600 font-medium">
+            {pendingRecruiters.length} pending approval
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Code className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{developerCount}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Total Developers</div>
+          <div className="text-xs text-emerald-600 font-medium">Active talent pool</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Briefcase className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{jobRoles.length}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Active Job Listings</div>
+          <div className="text-xs text-emerald-600 font-medium">
+            {jobRoles.filter(job => job.is_featured).length} featured jobs
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-gray-900 mb-1">{hireCount}</div>
+          <div className="text-sm font-medium text-gray-600 mb-2">Successful Hires</div>
+          <div className="text-xs text-emerald-600 font-medium">${totalRevenue.toLocaleString()} in revenue</div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
+        <div className="grid md:grid-cols-4 gap-6">
+          <button
+            onClick={() => setActiveTab('recruiters')}
+            className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
+          >
+            <Building className="w-8 h-8 text-blue-600 mb-3" />
+            <span className="font-semibold text-gray-900">Manage Recruiters</span>
+            <span className="text-sm text-gray-600 mt-1">Approve and monitor recruiters</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('developers')}
+            className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
+          >
+            <Code className="w-8 h-8 text-purple-600 mb-3" />
+            <span className="font-semibold text-gray-900">View Developers</span>
+            <span className="text-sm text-gray-600 mt-1">Browse developer profiles</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('jobs')}
+            className="flex flex-col items-center justify-center p-6 bg-emerald-50 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
+          >
+            <Briefcase className="w-8 h-8 text-emerald-600 mb-3" />
+            <span className="font-semibold text-gray-900">Manage Jobs</span>
+            <span className="text-sm text-gray-600 mt-1">Feature and monitor job listings</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('hires')}
+            className="flex flex-col items-center justify-center p-6 bg-orange-50 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors"
+          >
+            <DollarSign className="w-8 h-8 text-orange-600 mb-3" />
+            <span className="font-semibold text-gray-900">View Hires</span>
+            <span className="text-sm text-gray-600 mt-1">Track successful placements</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Pending Recruiters */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Pending Approvals</h3>
+          {pendingRecruiters.length > 0 ? (
+            <div className="space-y-4">
+              {pendingRecruiters.slice(0, 3).map((recruiter) => (
+                <div key={recruiter.user_id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{recruiter.name}</h4>
+                    <p className="text-sm text-gray-600">{recruiter.company_name}</p>
+                    <div className="text-xs text-gray-500 mt-1">
+                      <Clock className="w-3 h-3 inline mr-1" />
+                      Joined {new Date(recruiter.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleApprove(recruiter.user_id)}
+                      disabled={processingIds.includes(recruiter.user_id)}
+                      className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1 inline" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleReject(recruiter.user_id)}
+                      disabled={processingIds.includes(recruiter.user_id)}
+                      className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                    >
+                      <XCircle className="w-4 h-4 mr-1 inline" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {pendingRecruiters.length > 3 && (
+                <button
+                  onClick={() => setActiveTab('recruiters')}
+                  className="w-full text-center text-blue-600 hover:text-blue-800 text-sm font-medium py-2"
+                >
+                  View all {pendingRecruiters.length} pending recruiters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+              <p className="text-gray-600">No pending approvals</p>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Hires */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Hires</h3>
+          {hires.length > 0 ? (
+            <div className="space-y-4">
+              {hires.slice(0, 3).map((hire) => (
+                <div key={hire.id} className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">
+                      {hire.assignment?.developer?.name || 'Unknown Developer'}
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {hire.assignment?.job_role?.title || 'Unknown Position'}
+                    </p>
+                    <div className="text-xs text-gray-500 mt-1">
+                      <Calendar className="w-3 h-3 inline mr-1" />
+                      Hired {new Date(hire.hire_date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-emerald-600">${Math.round(hire.salary * 0.15).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">15% of ${hire.salary.toLocaleString()}</div>
+                  </div>
+                </div>
+              ))}
+              {hires.length > 3 && (
+                <button
+                  onClick={() => setActiveTab('hires')}
+                  className="w-full text-center text-blue-600 hover:text-blue-800 text-sm font-medium py-2"
+                >
+                  View all {hires.length} hires
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600">No hires recorded yet</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Platform Stats */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-gray-900">Platform Statistics</h3>
+          <div className="flex space-x-2">
+            <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
+              Last 30 Days
+            </button>
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="bg-gray-50 rounded-xl p-6 flex items-center justify-center">
+            <div className="text-center">
+              <BarChart className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">
+                Detailed analytics will be available soon
+              </p>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-xl p-6 flex items-center justify-center">
+            <div className="text-center">
+              <PieChart className="w-12 h-12 text-purple-500 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">
+                Detailed analytics will be available soon
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMessages = () => {
+    if (selectedThread) {
+      return (
+        <div className="space-y-6">
+          <button
+            onClick={() => setSelectedThread(null)}
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to Messages
+          </button>
+          
+          <MessageThread
+            otherUserId={selectedThread.otherUserId}
+            otherUserName={selectedThread.otherUserName}
+            otherUserRole={selectedThread.otherUserRole}
+            otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+            jobContext={selectedThread.jobContext}
+          />
+        </div>
+      );
     }
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-black text-gray-900">Messages</h2>
+        
+        <MessageList
+          onThreadSelect={setSelectedThread}
+        />
+      </div>
+    );
   };
 
   const filteredPendingRecruiters = pendingRecruiters.filter(recruiter => 
@@ -326,6 +717,7 @@ export const AdminDashboard = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Render the Admin Dashboard
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -354,59 +746,39 @@ export const AdminDashboard = () => {
         {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('recruiters')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'recruiters'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Building className="w-5 h-5 mr-2" />
-                Recruiters
-                {pendingRecruiters.length > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {pendingRecruiters.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('developers')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'developers'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Users className="w-5 h-5 mr-2" />
-                Developers
-              </button>
-              <button
-                onClick={() => setActiveTab('jobs')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'jobs' 
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Briefcase className="w-5 h-5 mr-2" />
-                Jobs
-              </button>
-              <button
-                onClick={() => setActiveTab('hires')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'hires'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <DollarSign className="w-5 h-5 mr-2" />
-                Hires
-              </button>
+            <nav className="-mb-px flex flex-wrap space-x-6">
+              {[
+                { id: 'overview', label: 'Overview', icon: TrendingUp, badge: null },
+                { id: 'recruiters', label: 'Recruiters', icon: Building, badge: pendingRecruiters.length > 0 ? pendingRecruiters.length : null },
+                { id: 'developers', label: 'Developers', icon: Code, badge: null },
+                { id: 'jobs', label: 'Job Listings', icon: Briefcase, badge: null },
+                { id: 'hires', label: 'Hires Report', icon: DollarSign, badge: null },
+                { id: 'messages', label: 'Messages', icon: MessageSquare, badge: null }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <tab.icon className="w-5 h-5 mr-2" />
+                  {tab.label}
+                  {tab.badge && (
+                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
             </nav>
           </div>
         </div>
+
+        {/* Overview Tab */}
+        {activeTab === 'overview' && renderOverview()}
 
         {/* Recruiters Tab */}
         {activeTab === 'recruiters' && (
@@ -571,9 +943,13 @@ export const AdminDashboard = () => {
                               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
                                 {recruiter.name.split(' ').map(n => n[0]).join('')}
                               </div>
-                              <div className="text-sm font-semibold text-gray-900">
+                              <button 
+                                onClick={() => handleViewRecruiterDetails(recruiter.user_id)}
+                                className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors flex items-center"
+                              >
                                 {recruiter.name}
-                              </div>
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                              </button>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -615,7 +991,7 @@ export const AdminDashboard = () => {
         {/* Developers Tab Placeholder */}
         {activeTab === 'developers' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black text-gray-900">Developers</h2>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -657,7 +1033,7 @@ export const AdminDashboard = () => {
                               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm mr-3">
                                 {developer.user.name.split(' ').map(n => n[0]).join('')}
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <div className="text-sm font-semibold text-gray-900">{developer.user.name}</div>
                                 <div className="text-sm text-gray-500">{developer.user.email}</div>
                               </div>
@@ -713,12 +1089,30 @@ export const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              className="text-blue-600 hover:text-blue-900"
-                              title="View Profile"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleViewDeveloperDetails(developer)}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="View Profile"
+                              >
+                                <Eye className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedThread({
+                                    otherUserId: developer.user_id,
+                                    otherUserName: developer.user.name,
+                                    otherUserRole: 'developer',
+                                    otherUserProfilePicUrl: developer.profile_pic_url
+                                  });
+                                  setActiveTab('messages');
+                                }}
+                                className="text-purple-600 hover:text-purple-900"
+                                title="Message Developer"
+                              >
+                                <MessageSquare className="w-5 h-5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -738,10 +1132,10 @@ export const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Jobs Tab Placeholder */}
+        {/* Jobs Tab */}
         {activeTab === 'jobs' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black text-gray-900">Job Listings</h2>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -835,12 +1229,14 @@ export const AdminDashboard = () => {
                                 <Star className="w-5 h-5" fill={job.is_featured ? "currentColor" : "none"} />
                               </button>
                               <button
+                                onClick={() => handleViewJobDetails(job.id)}
                                 className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
-                                title="Edit Job"
+                                title="View Job Details"
                               >
-                                <Edit className="w-5 h-5" />
+                                <Eye className="w-5 h-5" />
                               </button>
                               <button
+                                onClick={() => handleDeleteJob(job.id)}
                                 className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
                                 title="Delete Job"
                               >
@@ -961,6 +1357,88 @@ export const AdminDashboard = () => {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Messages Tab */}
+        {activeTab === 'messages' && renderMessages()}
+
+        {/* Developer Details Modal */}
+        {showDeveloperDetailsModal && selectedDeveloperForDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                <h2 className="text-2xl font-black text-gray-900">Developer Profile</h2>
+                <button
+                  onClick={() => setShowDeveloperDetailsModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-6">
+                <DeveloperProfileDetails
+                  developer={selectedDeveloperForDetails}
+                  onClose={() => setShowDeveloperDetailsModal(false)}
+                  onSendMessage={(developerId, developerName) => {
+                    setSelectedThread({
+                      otherUserId: developerId,
+                      otherUserName: developerName,
+                      otherUserRole: 'developer',
+                      otherUserProfilePicUrl: selectedDeveloperForDetails.profile_pic_url
+                    });
+                    setShowDeveloperDetailsModal(false);
+                    setActiveTab('messages');
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recruiter Details Modal */}
+        {showRecruiterDetailsModal && selectedRecruiterForDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                <h2 className="text-2xl font-black text-gray-900">Recruiter Profile</h2>
+                <button
+                  onClick={() => setShowRecruiterDetailsModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-6">
+                <RecruiterProfileDetails
+                  recruiterId={selectedRecruiterForDetails}
+                  onClose={() => setShowRecruiterDetailsModal(false)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Details Modal */}
+        {showJobDetailsModal && selectedJobForDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
+              <div className="p-6 flex justify-between items-center border-b border-gray-200">
+                <h2 className="text-2xl font-black text-gray-900">Job Details</h2>
+                <button
+                  onClick={() => setShowJobDetailsModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-6">
+                <JobRoleDetails
+                  jobRoleId={selectedJobForDetails}
+                  onClose={() => setShowJobDetailsModal(false)}
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>
