@@ -57,32 +57,22 @@ export interface GitHubLanguages {
 export interface AuthContextType {
   user: SupabaseUser | null;
   userProfile: User | null;
-  developerProfile: Developer | null;
-  developerProfile: Developer | null;
+  developerProfile: Developer | null; 
   loading: boolean;
-  needsOnboarding: boolean;
-  needsOnboarding: boolean;
+  needsOnboarding: boolean; 
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGitHub: () => Promise<void>;
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
-  updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
-  createJobRole?: (jobData: Partial<JobRole>) => Promise<boolean>;
-  updateJobRole?: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>;
-  createAssignment?: (assignmentData: Partial<Assignment>) => Promise<boolean>;
-  importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
-  createHire?: (hireData: Partial<Hire>) => Promise<boolean>;
-  updateUserApprovalStatus?: (userId: string, isApproved: boolean) => Promise<boolean>;
-  updateDeveloperProfile: (profileData: Partial<Developer>) => Promise<boolean>;
-  createJobRole: (jobData: Partial<JobRole>) => Promise<boolean>;
-  updateJobRole: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>;
-  createAssignment: (assignmentData: Partial<Assignment>) => Promise<boolean>;
-  importJobsFromCSV: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
-  createHire: (hireData: Partial<Hire>) => Promise<boolean>;
-  updateUserApprovalStatus: (userId: string, isApproved: boolean) => Promise<boolean>;
-  syncGitHubData: () => Promise<void>; // New method to sync GitHub data to user profile
+  createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
+  updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
+  createJobRole?: (jobData: Partial<JobRole>) => Promise<boolean>; 
+  updateJobRole?: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>; 
+  createAssignment?: (assignmentData: Partial<Assignment>) => Promise<boolean>; 
+  importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>; 
+  createHire?: (hireData: Partial<Hire>) => Promise<boolean>; 
+  updateUserApprovalStatus?: (userId: string, isApproved: boolean) => Promise<boolean>; 
 }
 
 export interface Developer {
@@ -103,7 +93,6 @@ export interface Developer {
   created_at: string;
   updated_at: string;
   user?: User;
-  github_profile?: GitHubUser;  // Adding GitHub profile data
 }
 
 export interface PortfolioItem {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader, GitBranch } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -65,7 +65,8 @@ export const LoginForm = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl shadow-xl">
+      <div className="max-w-md w-full">
+        {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
             <img 
@@ -76,8 +77,12 @@ export const LoginForm = () => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
               }}
             />
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg hidden">
+              <GitBranch className="w-7 h-7 text-white" />
+            </div>
             <span className="text-2xl font-black text-gray-900">GitTalent</span>
           </Link>
           <h2 className="text-3xl font-black text-gray-900 mb-3">
@@ -92,7 +97,11 @@ export const LoginForm = () => {
               Sign up for free
             </Link>
           </p>
+        </div>
 
+        {/* Form */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-8">
+          {/* GitHub Sign In Button */}
           <button
             onClick={handleGitHubSignIn}
             disabled={githubLoading || loading}
@@ -110,6 +119,8 @@ export const LoginForm = () => {
               </>
             )}
           </button>
+
+          {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
@@ -225,7 +236,7 @@ export const LoginForm = () => {
           </form>
         </div>
 
-        {/* Terms and Privacy */}
+        {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-600">
             By signing in, you agree to our{' '}
