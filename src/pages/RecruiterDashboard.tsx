@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { 
   Users, 
   Briefcase, 
-  MessageSquare, 
+  MessageSquare,
   TrendingUp, 
   Plus,
   Search,
@@ -32,7 +32,7 @@ import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
-import { JobRole, Assignment, Hire, Message } from '../types';
+import { JobRole, Hire, Message } from '../types';
 
 interface MessageThread {
   otherUserId: string;
@@ -54,6 +54,7 @@ export const RecruiterDashboard = () => {
     totalJobs: 0,
     activeJobs: 0,
     featuredJobs: 0,
+    featuredJobs: 0,
     totalMessages: 0,
     unreadMessages: 0,
     totalHires: 0,
@@ -68,13 +69,12 @@ export const RecruiterDashboard = () => {
   
   const [showJobForm, setShowJobForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [editingJob, setEditingJob] = useState<JobRole | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showJobDetails, setShowJobDetails] = useState(false);
   
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [showHireModal, setShowHireModal] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [editingJob, setEditingJob] = useState<JobRole | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [jobInterestCounts, setJobInterestCounts] = useState<{[jobId: string]: number}>({});
@@ -367,19 +367,6 @@ export const RecruiterDashboard = () => {
     setActiveTab('messages');
   };
 
-  const handleMarkAsHired = (assignment: Assignment) => {
-    setSelectedAssignment(assignment);
-    setShowHireModal(true);
-  };
-
-  const handleHireSuccess = async () => {
-    setShowHireModal(false);
-    setSelectedAssignment(null);
-    await fetchHires();
-    await fetchStats();
-    setSuccess('Developer hired successfully!');
-    
-    // Clear success message after delay
     setTimeout(() => {
       setSuccess('');
     }, 3000);
@@ -745,7 +732,7 @@ export const RecruiterDashboard = () => {
                     {job.is_active ? 'Active' : 'Paused'}
                   </span>
                   
-                  <div className="text-sm text-gray-500 flex items-center">
+                    {jobInterestCounts[job.id] || 0} interests
                     <MessageSquare className="w-4 h-4 mr-1" />
                     <span>{jobInterestCounts[job.id] || 0} interests</span>
                   </div>
@@ -759,7 +746,7 @@ export const RecruiterDashboard = () => {
                 >
                   <Eye className="w-4 h-4 mr-1 inline" />
                   View Details
-                </button>
+                  <p className="text-sm text-gray-600">{job.location} • {job.job_type}</p>
                 
                 <div className="flex items-center space-x-2">
                   <button
@@ -1146,19 +1133,6 @@ export const RecruiterDashboard = () => {
               fetchJobRoles();
               fetchStats();
             }}
-          />
-        )}
-
-        {/* Hire Modal */}
-        {showHireModal && selectedAssignment && (
-          <MarkAsHiredModal
-            isOpen={showHireModal}
-            onClose={() => {
-              setShowHireModal(false);
-              setSelectedAssignment(null);
-            }}
-            assignment={selectedAssignment}
-            onSuccess={handleHireSuccess}
           />
         )}
       </div>
