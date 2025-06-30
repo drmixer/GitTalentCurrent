@@ -16,9 +16,12 @@ interface ContributionDay {
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, className = '' }) => {
   const { user: githubUser, repos, totalStars, loading, error, refreshGitHubData } = useGitHub();
   const [contributions, setContributions] = useState<ContributionDay[]>([]);
+  
+  console.log('RealGitHubChart - Rendering with handle:', githubHandle);
 
   useEffect(() => {
     if (githubHandle && repos.length > 0) {
+      console.log('RealGitHubChart - Generating contributions from repos');
       generateContributionsFromRepos();
     }
   }, [githubHandle, repos]);
@@ -138,9 +141,10 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   if (!githubHandle) {
     return (
       <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 py-8">
           <Github className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">Add your GitHub handle to see your real contribution activity</p>
+          <p className="text-sm font-medium">No GitHub handle provided</p>
+          <p className="text-xs text-gray-400 mt-2">Developer needs to add their GitHub username</p>
         </div>
       </div>
     );
@@ -149,9 +153,9 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   if (loading) {
     return (
       <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
-        <div className="flex items-center justify-center py-8">
+        <div className="flex flex-col items-center justify-center py-8">
           <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-          <span className="text-gray-600">Loading real GitHub data...</span>
+          <span className="text-gray-600 mt-4">Loading GitHub data for @{githubHandle}...</span>
         </div>
       </div>
     );
@@ -160,9 +164,10 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   if (error) {
     return (
       <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
-        <div className="text-center">
+        <div className="text-center py-8">
           <AlertCircle className="w-8 h-8 mx-auto mb-3 text-red-500" />
           <p className="text-sm text-red-600 mb-3">{error}</p>
+          <p className="text-xs text-gray-500 mb-3">GitHub handle: @{githubHandle}</p>
           <button 
             onClick={refreshGitHubData}
             className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-semibold"
@@ -178,9 +183,10 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
   if (!githubUser) {
     return (
       <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 py-8">
           <Github className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">GitHub data not available</p>
+          <p className="text-sm font-medium">GitHub data not available for @{githubHandle}</p>
+          <p className="text-xs text-gray-400 mt-2">Unable to fetch GitHub profile data</p>
         </div>
       </div>
     );

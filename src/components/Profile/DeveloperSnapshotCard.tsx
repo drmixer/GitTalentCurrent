@@ -26,6 +26,13 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   className = ''
 }) => {
   console.log('Rendering DeveloperSnapshotCard for:', developer.user_id, developer.user.name);
+  console.log('Developer data in snapshot card:', { 
+    githubHandle: developer.github_handle || 'none',
+    bio: developer.bio?.substring(0, 20) + '...' || 'none',
+    languages: developer.top_languages?.length || 0,
+    availability: developer.availability
+  });
+
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -143,7 +150,7 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-bold text-gray-900">GitHub Activity</h4>
-          {developer.github_handle && (
+          {developer.github_handle ? (
             <a 
               href={`https://github.com/${developer.github_handle}`}
               target="_blank"
@@ -154,6 +161,10 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
               View on GitHub
               <ExternalLink className="w-3 h-3 ml-1" />
             </a>
+          ) : (
+            <span className="text-xs text-gray-500">
+              No GitHub handle
+            </span>
           )}
         </div>
         

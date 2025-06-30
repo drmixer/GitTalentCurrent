@@ -74,8 +74,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (developerProfile?.github_handle) {
+      console.log('useGitHub - GitHub handle found:', developerProfile.github_handle);
       refreshGitHubData();
     } else {
+      console.log('useGitHub - No GitHub handle found in developer profile');
       // Clear data if no GitHub handle
       setGitHubData({
         user: null,
@@ -90,11 +92,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshGitHubData = async () => {
     if (!developerProfile?.github_handle) {
+      console.log('refreshGitHubData - No GitHub handle provided');
       setGitHubData(prev => ({ ...prev, error: 'No GitHub handle provided' }));
       return;
     }
 
     try {
+      console.log('refreshGitHubData - Fetching data for:', developerProfile.github_handle);
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
 
       // Fetch GitHub user data
@@ -107,10 +111,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       
       if (!userResponse.ok) {
         if (userResponse.status === 404) {
+          console.error(`GitHub user '${developerProfile.github_handle}' not found`);
           throw new Error(`GitHub user '${developerProfile.github_handle}' not found`);
         } else if (userResponse.status === 403) {
+          console.error('GitHub API rate limit exceeded');
           throw new Error('GitHub API rate limit exceeded. Please try again later.');
         } else {
+          console.error(`GitHub API error: ${userResponse.status}`);
           throw new Error(`GitHub API error: ${userResponse.status}`);
         }
       }
@@ -126,6 +133,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (!reposResponse.ok) {
+        console.error(`Failed to fetch repositories: ${reposResponse.status}`);
         throw new Error(`Failed to fetch repositories: ${reposResponse.status}`);
       }
       
@@ -179,7 +187,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
 
     } catch (error: any) {
-      console.error('Error fetching GitHub data:', error);
+      console.error('Error in refreshGitHubData:', error);
       setGitHubData(prev => ({
         ...prev,
         loading: false,
@@ -189,6 +197,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getTopLanguages = (limit: number = 10): string[] => {
+    console.log('getTopLanguages - Languages data:', Object.keys(githubData.languages).length);
     return Object.entries(githubData.languages)
       .sort(([, a], [, b]) => b - a)
       .slice(0, limit)
@@ -196,6 +205,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getTopRepos = (limit: number = 10): GitHubRepo[] => {
+    console.log('getTopRepos - Repos count:', githubData.repos.length);
     return githubData.repos
       .filter(repo => !repo.name.includes('.github.io') && !repo.fork)
       .sort((a, b) => b.stargazers_count - a.stargazers_count)
@@ -203,9 +213,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const syncLanguagesToProfile = async () => {
-    if (!developerProfile || githubData.loading) return;
+    if (!developerProfile || githubData.loading) {
+      console.log('syncLanguagesToProfile - Skipping, profile missing or loading');
+      return;
+    }
     
     const topLanguages = getTopLanguages(15);
+    console.log('syncLanguagesToProfile - Top languages:', topLanguages);
     if (topLanguages.length > 0) {
       await updateDeveloperProfile({
         top_languages: topLanguages
@@ -214,9 +228,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const syncProjectsToProfile = async () => {
-    if (!developerProfile || githubData.loading) return;
+    if (!developerProfile || githubData.loading) {
+      console.log('syncProjectsToProfile - Skipping, profile missing or loading');
+      return;
+    }
     
     const topRepos = getTopRepos(8).map(repo => repo.html_url);
+    console.log('syncProjectsToProfile - Top repos:', topRepos.length);
     if (topRepos.length > 0) {
       const existingProjects = developerProfile.linked_projects || [];
       const uniqueProjects = [...new Set([...existingProjects, ...topRepos])];
