@@ -30,7 +30,7 @@ export const Hero = () => {
                 </h2>
                 <div className="flex items-center">
                   <div className="h-1 w-16 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full mr-3"></div>
-                  <span className="text-xl text-gray-500 font-medium">One Commit At A Time</span>
+                  <span className="text-xl text-gray-500 font-medium">At A Time</span>
                 </div>
               </div>
 
@@ -43,7 +43,6 @@ export const Hero = () => {
                     </span>
                     <div className="absolute -bottom-2 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full"></div>
                   </span>
-                </span>
               </h1>
 
               {/* Subtitle */}
