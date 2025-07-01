@@ -14,9 +14,7 @@ import {
   MessageSquare,
   Loader,
   AlertCircle,
-  ExternalLink,
-  Star,
-  Building
+  ExternalLink
 } from 'react-feather';
 import { JobRole } from '../../types';
 
