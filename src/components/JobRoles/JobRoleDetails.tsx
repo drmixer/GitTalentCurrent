@@ -33,6 +33,7 @@ interface JobRoleDetailsProps {
   onViewDeveloper?: (developerId: string) => void;
   onClose?: () => void;
   onAssignDeveloper?: () => void;
+  onExpressInterest?: () => void;
   isDeveloperView?: boolean;
 }
 
@@ -44,6 +45,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   onViewDeveloper,
   onClose,
   onAssignDeveloper,
+  onExpressInterest,
   isDeveloperView = false
 }) => {
   const { user, userProfile } = useAuth();
@@ -229,28 +231,35 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
             </div>
           </div>
 
-          {!isDeveloperView && (
-            <div className="flex items-center space-x-3">
-              {canAssign && (
-                <button
-                  onClick={onAssignDeveloper}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold"
-                >
-                  <UserPlus className="w-4 h-4 mr-2 inline" />
-                  Assign Developer
-                </button>
-              )}
-              {canEdit && (
-                <button 
-                  onClick={onEdit}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  <Edit className="w-4 h-4 mr-2 inline" />
-                  Edit Job
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center space-x-3">
+            {isDeveloperView && (
+              <button
+                onClick={onExpressInterest}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold"
+              >
+                <Star className="w-4 h-4 mr-2 inline" />
+                Express Interest
+              </button>
+            )}
+            {!isDeveloperView && canAssign && (
+              <button
+                onClick={onAssignDeveloper}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold"
+              >
+                <UserPlus className="w-4 h-4 mr-2 inline" />
+                Assign Developer
+              </button>
+            )}
+            {canEdit && (
+              <button 
+                onClick={onEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+              >
+                <Edit className="w-4 h-4 mr-2 inline" />
+                Edit Job
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Company Info - Only show in developer view */}
@@ -264,7 +273,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                   onClick={handleViewRecruiterProfile}
                   className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
                 >
-                  {jobRole.recruiter.name}
+                  {jobRole.recruiter.company_name || jobRole.recruiter.name}
                   <ExternalLink className="w-3 h-3 ml-1" />
                 </button>
               </div>

@@ -11,6 +11,7 @@ export interface SkillCategory {
   [category: string]: {
     skills: string[];
     proficiency: 'beginner' | 'intermediate' | 'expert';
+    company_name: string;
   };
 }
 
@@ -137,6 +138,7 @@ export interface JobRole {
   created_at: string;
   updated_at: string;
   recruiter?: Recruiter;
+    id: string;
 }
 
 export interface CSVJobImport {
