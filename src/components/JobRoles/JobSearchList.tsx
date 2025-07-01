@@ -22,9 +22,11 @@ interface JobSearchListProps {
   onViewJobDetails?: (jobRoleId: string) => void;
   onExpressInterest?: (jobRoleId: string) => void;
   onViewRecruiter?: (recruiterId: string) => void;
+  onViewDetails?: (jobRoleId: string) => void;
 }
 
 export const JobSearchList: React.FC<JobSearchListProps> = ({
+  onViewDetails,
   onViewJobDetails,
   onExpressInterest,
   onViewRecruiter

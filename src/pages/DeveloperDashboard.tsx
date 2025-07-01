@@ -154,7 +154,7 @@ export const DeveloperDashboard: React.FC = () => {
         
         {/* All Jobs */}
         <JobSearchList 
-          onViewDetails={(jobId) => {
+          onViewJobDetails={(jobId) => {
             const job = recommendedJobs.find(j => j.id === jobId);
             if (job) {
               handleViewJobDetails(job);
@@ -680,13 +680,13 @@ export const DeveloperDashboard: React.FC = () => {
                   onViewDetails={(jobId) => {
                     const job = recommendedJobs.find(j => j.id === jobId);
                     if (job) {
-                      setTimeout(() => handleViewJobDetails(job), 0);
+                      handleViewJobDetails(job);
                     }
                   }}
                   onExpressInterest={(jobId) => {
                     const job = recommendedJobs.find(j => j.id === jobId);
                     if (job) {
-                      setTimeout(() => handleExpressInterest(job.id), 0);
+                      handleExpressInterest(job.id);
                     }
                   }}
                   onViewRecruiter={handleViewRecruiter}
