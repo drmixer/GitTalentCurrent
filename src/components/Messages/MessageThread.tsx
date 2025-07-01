@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase, REALTIME_LISTEN_TYPES } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
+import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
 import { 
   Send, 
   ArrowLeft, 
