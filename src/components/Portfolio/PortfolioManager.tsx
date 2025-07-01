@@ -15,7 +15,8 @@ import {
   X,
   Loader,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Upload
 } from 'lucide-react';
 import { PortfolioItem } from '../../types';
 
@@ -35,6 +36,8 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<PortfolioItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -120,6 +123,47 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
     }));
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    
+    try {
+      setUploading(true);
+      
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${developerId}/${fileName}`;
+      
+      // Upload the file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('portfolio_images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('portfolio_images')
+        .getPublicUrl(filePath);
+      
+      // Update the form data with the image URL
+      setFormData(prev => ({
+        ...prev,
+        image_url: publicUrl
+      }));
+      
+      setSelectedFile(null);
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      setError(error.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
@@ -127,6 +171,13 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
     try {
       setSaving(true);
       setError('');
+
+      // Don't proceed if an image is still uploading
+      if (uploading) {
+        setError('Please wait for the image to finish uploading');
+        setSaving(false);
+        return;
+      }
 
       const itemData = {
         developer_id: developerId,
@@ -307,17 +358,75 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Image URL
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-gray-700">
+                  Project Image
                 </label>
-                <input
-                  type="url"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                />
+                
+                {formData.image_url ? (
+                  <div className="relative">
+                    <img 
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <label className="flex flex-col items-center px-4 py-6 bg-white text-blue-500 rounded-xl border-2 border-blue-200 border-dashed hover:bg-blue-50 hover:border-blue-300 transition-all cursor-pointer">
+                        <Upload className="w-8 h-8 mb-2" />
+                        <span className="text-sm font-medium">Click to upload image</span>
+                        <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              handleImageUpload(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Image className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <input
+                          id="image_url"
+                          name="image_url"
+                          type="url"
+                          className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                          placeholder="https://example.com/image.jpg"
+                          value={formData.image_url}
+                          onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Or enter an image URL</p>
+                    </div>
+                  </div>
+                )}
+                
+                {uploading && (
+                  <div className="flex items-center justify-center mt-2">
+                    <Loader className="animate-spin h-5 w-5 mr-2 text-blue-500" />
+                    <span className="text-sm text-gray-600">Uploading image...</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -423,7 +532,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                 <img
                   src={item.image_url}
                   alt={item.title}
-                  className="w-full h-48 object-cover rounded-xl"
+                  className="w-full h-48 object-cover rounded-xl border border-gray-200"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';

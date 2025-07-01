@@ -9,7 +9,8 @@ import {
   JobSearchList,
   JobRoleDetails,
   ProfileStrengthIndicator,
-  RealGitHubChart
+  RealGitHubChart,
+  RecruiterProfileDetails
 } from '../components';
 import { 
   User, 
@@ -93,13 +94,17 @@ export const DeveloperDashboard: React.FC = () => {
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobRole | null>(null);
   const [showJobSearch, setShowJobSearch] = useState(false);
+  const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
+  const [selectedRecruiterId, setSelectedRecruiterId] = useState<string | null>(null);
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
+  const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchDeveloperData();
       fetchMessages();
       fetchRecommendedJobs();
+      fetchFeaturedPortfolioItem();
     }
   }, [user]);
 
@@ -146,6 +151,42 @@ export const DeveloperDashboard: React.FC = () => {
     }
   };
 
+  const fetchFeaturedPortfolioItem = async () => {
+    if (!user) return;
+
+    try {
+      // First try to get a featured portfolio item
+      const { data: featuredData, error: featuredError } = await supabase
+        .from('portfolio_items')
+        .select('*')
+        .eq('developer_id', user.id)
+        .eq('featured', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (featuredError) throw featuredError;
+      
+      if (featuredData) {
+        setFeaturedPortfolioItem(featuredData);
+        return;
+      }
+      
+      // If no featured item, get the most recent one
+      const { data: recentData, error: recentError } = await supabase
+        .from('portfolio_items')
+        .select('*')
+        .eq('developer_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+        
+      if (recentError) throw recentError;
+      setFeaturedPortfolioItem(recentData);
+    } catch (error) {
+      console.error('Error fetching featured portfolio item:', error);
+    }
+  };
+
   const fetchRecommendedJobs = async () => {
     if (!user) return;
 
@@ -156,6 +197,7 @@ export const DeveloperDashboard: React.FC = () => {
         .select(`
           *,
           recruiter:users!job_roles_recruiter_id_fkey(
+            id,
             name,
             recruiters(company_name)
           )
@@ -170,6 +212,7 @@ export const DeveloperDashboard: React.FC = () => {
       const formattedJobs = data?.map(job => ({
         ...job,
         recruiter: {
+          id: job.recruiter?.id || '',
           name: job.recruiter?.name || 'Unknown',
           company_name: job.recruiter?.recruiters?.[0]?.company_name || 'Unknown Company'
         }
@@ -182,8 +225,15 @@ export const DeveloperDashboard: React.FC = () => {
   };
 
   const handleViewJobDetails = (job: JobRole) => {
+    console.log('Viewing job details:', job);
     setSelectedJobForDetails(job);
     setShowJobDetailsModal(true);
+  };
+
+  const handleViewRecruiter = (recruiterId: string) => {
+    console.log('Viewing recruiter profile:', recruiterId);
+    setSelectedRecruiterId(recruiterId);
+    setShowRecruiterProfile(true);
   };
 
   const handleCloseJobDetails = () => {
@@ -191,15 +241,20 @@ export const DeveloperDashboard: React.FC = () => {
     setSelectedJobForDetails(null);
   };
 
-  const handleMessageRecruiter = async (recruiterId: string, jobTitle: string) => {
+  const handleMessageRecruiter = async (recruiterId: string, jobTitle?: string) => {
     try {
+      const subject = jobTitle ? `Interest in ${jobTitle}` : 'Developer Inquiry';
+      const body = jobTitle 
+        ? `Hi, I'm interested in the ${jobTitle} position. I'd love to discuss this opportunity further.`
+        : `Hi, I'm interested in learning more about opportunities at your company.`;
+        
       const { error } = await supabase
         .from('messages')
         .insert({
           sender_id: user?.id,
           receiver_id: recruiterId,
-          subject: `Interest in ${jobTitle}`,
-          body: `Hi, I'm interested in the ${jobTitle} position. I'd love to discuss this opportunity further.`
+          subject,
+          body
         });
 
       if (error) throw error;
@@ -207,13 +262,19 @@ export const DeveloperDashboard: React.FC = () => {
       // Refresh messages
       fetchMessages();
       handleCloseJobDetails();
+      setShowRecruiterProfile(false);
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-  const handleExpressInterest = async (jobId: string, recruiterId: string, jobTitle: string) => {
-    await sendInterestMessage(recruiterId, jobTitle);
+  const handleExpressInterest = async (jobId: string) => {
+    if (!selectedJobForDetails) return;
+    
+    await sendInterestMessage(
+      selectedJobForDetails.recruiter_id, 
+      selectedJobForDetails.title
+    );
     handleCloseJobDetails();
   };
 
@@ -296,7 +357,7 @@ export const DeveloperDashboard: React.FC = () => {
       {/* GitHub Activity */}
       {developer?.github_handle && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">GitHub Activity</h3>
             <button
               onClick={() => setActiveTab('github')}
@@ -310,46 +371,118 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {/* Recommended Jobs */}
+      {/* Featured Portfolio Item */}
+      {featuredPortfolioItem && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Featured Project</h3>
+            <button
+              onClick={() => setActiveTab('portfolio')}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              View All Projects
+            </button>
+          </div>
+          
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            {featuredPortfolioItem.image_url && (
+              <div className="mb-4">
+                <img
+                  src={featuredPortfolioItem.image_url}
+                  alt={featuredPortfolioItem.title}
+                  className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <h4 className="text-xl font-bold text-gray-900">{featuredPortfolioItem.title}</h4>
+                  <Star className="w-5 h-5 text-yellow-500 fill-current" />
+                </div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800`}>
+                    <Briefcase className="w-3 h-3 mr-1" />
+                    <span className="capitalize">{featuredPortfolioItem.category}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {featuredPortfolioItem.description && (
+              <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                {featuredPortfolioItem.description}
+              </p>
+            )}
+
+            {featuredPortfolioItem.technologies.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-4">
+                {featuredPortfolioItem.technologies.map((tech, index) => (
+                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {featuredPortfolioItem.url && (
+              <a
+                href={featuredPortfolioItem.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold"
+              >
+                View Project
+                <ExternalLink className="w-4 h-4 ml-1" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Quick Job Stats */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Recommended Jobs</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Job Opportunities</h3>
           <button
-            onClick={() => setShowJobSearch(true)}
+            onClick={() => setActiveTab('jobs')}
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            Browse All
+            Browse All Jobs
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recommendedJobs.slice(0, 4).map((job) => (
-            <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-gray-900 text-sm">{job.title}</h4>
-                {job.is_featured && (
-                  <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                )}
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{job.recruiter.company_name}</p>
-              <div className="flex items-center text-xs text-gray-500 mb-2">
-                <MapPin className="w-3 h-3 mr-1" />
-                {job.location}
-                <span className="mx-2">•</span>
-                {job.job_type}
-              </div>
-              {job.salary_min > 0 && (
-                <div className="flex items-center text-xs text-gray-500 mb-3">
-                  <DollarSign className="w-3 h-3 mr-1" />
-                  ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
-                </div>
-              )}
-              <button
-                onClick={() => handleViewJobDetails(job)}
-                className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-              >
-                View Details
-              </button>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">{recommendedJobs.length}</div>
+            <div className="text-sm font-semibold text-gray-600">Matching Jobs</div>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {recommendedJobs.filter(job => job.is_featured).length}
             </div>
-          ))}
+            <div className="text-sm font-semibold text-gray-600">Featured Jobs</div>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+            <div className="text-2xl font-black text-gray-900 mb-1">
+              {recommendedJobs.filter(job => job.job_type === 'Remote' || job.location.toLowerCase().includes('remote')).length}
+            </div>
+            <div className="text-sm font-semibold text-gray-600">Remote Jobs</div>
+          </div>
+        </div>
+        
+        <div className="mt-6">
+          <button
+            onClick={() => setActiveTab('jobs')}
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+          >
+            Find Your Dream Job
+          </button>
         </div>
       </div>
     </div>
@@ -435,9 +568,7 @@ export const DeveloperDashboard: React.FC = () => {
             <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
           )}
           {activeTab === 'messages' && renderMessages()}
-          {activeTab === 'jobs' && (
-            <JobSearchList onViewDetails={handleViewJobDetails} />
-          )}
+          {activeTab === 'jobs' && renderJobSearch()}
         </div>
 
         {/* Job Details Modal */}
@@ -446,7 +577,12 @@ export const DeveloperDashboard: React.FC = () => {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <JobRoleDetails
                 jobRole={selectedJobForDetails}
+                jobRoleId={selectedJobForDetails.id}
                 onClose={handleCloseJobDetails}
+                onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
+                  handleMessageRecruiter(selectedJobForDetails.recruiter_id, selectedJobForDetails.title);
+                }}
+                onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
                 isDeveloperView={true}
               />
             </div>
@@ -470,12 +606,97 @@ export const DeveloperDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <JobSearchList onViewDetails={handleViewJobDetails} />
+                <JobSearchList 
+                  onViewDetails={(jobId) => {
+                    const job = recommendedJobs.find(j => j.id === jobId);
+                    if (job) {
+                      handleViewJobDetails(job);
+                    }
+                  }}
+                  onViewRecruiter={handleViewRecruiter}
+                />
               </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Recruiter Profile Modal */}
+        {showRecruiterProfile && selectedRecruiterId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <RecruiterProfileDetails
+                recruiterId={selectedRecruiterId}
+                onClose={() => setShowRecruiterProfile(false)}
+              />
             </div>
           </div>
         )}
       </div>
     </div>
   );
+  
+  const renderJobSearch = () => {
+    return (
+      <div className="space-y-8">
+        {/* Featured/Recommended Jobs Section */}
+        {recommendedJobs.filter(job => job.is_featured).length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <Star className="w-5 h-5 text-yellow-500 fill-current mr-2" />
+              Featured Job Opportunities
+            </h3>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {recommendedJobs.filter(job => job.is_featured).slice(0, 4).map((job) => (
+                <div key={job.id} className="bg-white rounded-xl p-4 shadow-sm border border-blue-200 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-bold text-gray-900">{job.title}</h4>
+                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                  </div>
+                  <p className="text-sm text-blue-600 mb-2 flex items-center">
+                    <Building className="w-3 h-3 mr-1" />
+                    <button 
+                      onClick={() => handleViewRecruiter(job.recruiter.id)}
+                      className="hover:underline flex items-center"
+                    >
+                      {job.recruiter.company_name}
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </button>
+                  </p>
+                  <div className="flex items-center text-xs text-gray-500 mb-2">
+                    <MapPin className="w-3 h-3 mr-1" />
+                    {job.location}
+                    <span className="mx-2">•</span>
+                    {job.job_type}
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mb-3">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
+                  </div>
+                  <button
+                    onClick={() => handleViewJobDetails(job)}
+                    className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* All Jobs */}
+        <JobSearchList 
+          onViewDetails={(jobId) => {
+            const job = recommendedJobs.find(j => j.id === jobId);
+            if (job) {
+              handleViewJobDetails(job);
+            }
+          }}
+          onExpressInterest={handleExpressInterest}
+          onViewRecruiter={handleViewRecruiter}
+        />
+      </div>
+    );
+  };
 };

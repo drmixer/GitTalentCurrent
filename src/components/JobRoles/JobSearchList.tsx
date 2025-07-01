@@ -21,11 +21,13 @@ import { JobRole } from '../../types';
 interface JobSearchListProps {
   onViewJobDetails?: (jobRoleId: string) => void;
   onExpressInterest?: (jobRoleId: string) => void;
+  onViewRecruiter?: (recruiterId: string) => void;
 }
 
 export const JobSearchList: React.FC<JobSearchListProps> = ({
   onViewJobDetails,
-  onExpressInterest
+  onExpressInterest,
+  onViewRecruiter
 }) => {
   const { userProfile } = useAuth();
   const [jobs, setJobs] = useState<JobRole[]>([]);
@@ -51,13 +53,28 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
         .from('job_roles')
         .select(`
           *,
-          recruiter:users!job_roles_recruiter_id_fkey(name, email)
+          recruiter:users!job_roles_recruiter_id_fkey(
+            id,
+            name, 
+            email,
+            recruiters(company_name)
+          )
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setJobs(data || []);
+      
+      // Transform the data to include company_name directly in the recruiter object
+      const formattedJobs = data?.map(job => ({
+        ...job,
+        recruiter: {
+          ...job.recruiter,
+          company_name: job.recruiter?.recruiters?.[0]?.company_name || 'Unknown Company'
+        }
+      })) || [];
+      
+      setJobs(formattedJobs);
     } catch (error: any) {
       console.error('Error fetching jobs:', error);
       setError(error.message || 'Failed to load jobs');
@@ -229,8 +246,17 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                   
                   <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center">
-                      <Building className="w-4 h-4 mr-1" />
-                      {job.recruiter?.name || 'Unknown Recruiter'}
+                      <Building className="w-4 h-4 mr-1" /> 
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewRecruiter?.(job.recruiter?.id);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                      >
+                        {job.recruiter?.company_name || 'Unknown Company'}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </button>
                     </div>
                     <div className="flex items-center">
                       <MapPin className="w-4 h-4 mr-1" />
