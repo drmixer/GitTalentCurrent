@@ -339,9 +339,9 @@ export const DeveloperDashboard: React.FC = () => {
   const handleExpressInterest = async (jobId: string) => {
     console.log('Handling express interest for job:', jobId);
     if (!selectedJobForDetails) return;
-    
+
     await sendInterestMessage(
-      selectedJobForDetails.recruiter_id, 
+      selectedJobForDetails.recruiter.id, 
       selectedJobForDetails.title
     );
     handleCloseJobDetails();
@@ -649,7 +649,7 @@ export const DeveloperDashboard: React.FC = () => {
                 jobRoleId={selectedJobForDetails.id}
                 onClose={handleCloseJobDetails}
                 onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
-                  handleMessageRecruiter(selectedJobForDetails.recruiter_id, selectedJobForDetails.title);
+                  handleMessageRecruiter(selectedJobForDetails.recruiter.id, selectedJobForDetails.title);
                 }}
                 onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
                 isDeveloperView={true}

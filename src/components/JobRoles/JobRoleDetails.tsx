@@ -234,7 +234,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
           <div className="flex items-center space-x-3">
             {isDeveloperView && (
               <button
-                onClick={onExpressInterest}
+                onClick={() => onExpressInterest?.()}
                 className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold"
               >
                 <Star className="w-4 h-4 mr-2 inline" />

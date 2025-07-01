@@ -4,12 +4,14 @@ import { CheckCircle, Circle, TrendingUp } from 'lucide-react';
 interface ProfileStrengthIndicatorProps {
   strength: number;
   suggestions?: string[];
+  showDetails?: boolean;
   className?: string;
 }
 
 export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> = ({
   strength,
   suggestions = [],
+  showDetails = false,
   className = ''
 }) => {
   const getStrengthColor = (strength: number) => {
@@ -34,7 +36,7 @@ export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> =
   };
 
   // Filter suggestions to show only the most relevant ones
-  const filteredSuggestions = suggestions.slice(0, 5);
+  const filteredSuggestions = suggestions.slice(0, showDetails ? suggestions.length : 5);
 
   return (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 ${className}`}>
@@ -69,7 +71,7 @@ export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> =
       </div>
 
       {/* Suggestions */}
-      {filteredSuggestions.length > 0 && (
+      {filteredSuggestions.length > 0 && (showDetails || filteredSuggestions.length <= 5) && (
         <div>
           <h4 className="font-bold text-gray-900 mb-3 text-sm">Ways to improve:</h4>
           <div className="space-y-2">
@@ -80,6 +82,14 @@ export const ProfileStrengthIndicator: React.FC<ProfileStrengthIndicatorProps> =
               </div>
             ))}
           </div>
+        </div>
+      )}
+      
+      {!showDetails && suggestions.length > 5 && (
+        <div className="mt-4 text-center">
+          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+            View all {suggestions.length} suggestions
+          </button>
         </div>
       )}
 
