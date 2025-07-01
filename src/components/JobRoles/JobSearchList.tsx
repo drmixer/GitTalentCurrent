@@ -15,7 +15,9 @@ import {
   Loader,
   AlertCircle,
   ExternalLink
-} from 'lucide-react';
+  Star,
+  ExternalLink,
+  Building
 import { JobRole } from '../../types';
 
 interface JobSearchListProps {

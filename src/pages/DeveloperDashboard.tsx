@@ -23,8 +23,10 @@ import {
   Calendar,
   DollarSign,
   MapPin,
-  Clock,
-  Send
+  Clock, 
+  Send,
+  ExternalLink,
+  Building
 } from 'lucide-react';
 
 interface Developer {
@@ -97,7 +99,7 @@ export const DeveloperDashboard: React.FC = () => {
   const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
   const [selectedRecruiterId, setSelectedRecruiterId] = useState<string | null>(null);
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
-  const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
+  const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
 
   useEffect(() => {
     if (user) {
