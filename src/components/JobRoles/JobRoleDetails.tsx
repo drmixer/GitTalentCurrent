@@ -34,7 +34,6 @@ interface JobRoleDetailsProps {
   onClose?: () => void;
   onAssignDeveloper?: () => void;
   onExpressInterest?: () => void;
-  onExpressInterest?: () => void;
   isDeveloperView?: boolean;
 }
 
@@ -46,7 +45,6 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   onViewDeveloper,
   onClose,
   onAssignDeveloper,
-  onExpressInterest,
   onExpressInterest,
   isDeveloperView = false
 }) => {
@@ -255,13 +253,6 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
             {canEdit && (
               <button 
                 onClick={onEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-              >
-                <Edit className="w-4 h-4 mr-2 inline" />
-                Edit Job
-              </button>
-            )}
-          </div>
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
               >
                 <Edit className="w-4 h-4 mr-2 inline" />
