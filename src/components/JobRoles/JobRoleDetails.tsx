@@ -20,7 +20,6 @@ import {
   AlertCircle,
   Lock,
   ExternalLink
-  ExternalLink
 } from 'lucide-react';
 import { JobRole, Assignment, User, Developer } from '../../types';
 import { RecruiterProfileDetails } from '../Profile/RecruiterProfileDetails';
