@@ -180,13 +180,21 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const handleImageUpload = async (file: File) => {
     if (!file) return;
     
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError('Image file size must be less than 5MB');
+      setUploading(false);
+      setSelectedFile(null);
+      return;
+    }
+    
     try {
       setUploading(true);
       
       // Create a unique file name
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      const filePath = `profile_pics/${user?.id}/${fileName}`;
+      const filePath = `${user?.id}/${fileName}`;
       
       // Upload the file to Supabase Storage
       const { data, error } = await supabase.storage
@@ -220,6 +228,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const handleResumeUpload = async (file: File) => {
     if (!file) return;
+    
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setError('Resume file size must be less than 10MB');
+      setResumeUploading(false);
+      setSelectedResumeFile(null);
+      return;
+    }
     
     try {
       setResumeUploading(true);

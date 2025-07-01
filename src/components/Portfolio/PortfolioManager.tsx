@@ -126,6 +126,14 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
   const handleImageUpload = async (file: File) => {
     if (!file) return;
     
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError('Image file size must be less than 5MB');
+      setUploading(false);
+      setSelectedFile(null);
+      return;
+    }
+    
     try {
       setUploading(true);
       
