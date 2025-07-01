@@ -10,6 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
+import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/recruiter" element={<RecruiterDashboard />} />
           <Route path="/developer" element={<DeveloperDashboard />} />
+          <Route path="/dev/:slug" element={<PublicDeveloperProfile />} />
           <Route path="/features" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Features Coming Soon</h1></div>} />
           <Route path="/pricing" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Pricing Coming Soon</h1></div>} />
           <Route path="/about" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">About Coming Soon</h1></div>} />
