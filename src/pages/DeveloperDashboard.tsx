@@ -101,6 +101,72 @@ export const DeveloperDashboard: React.FC = () => {
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
 
+  // Define renderJobSearch function before it's used in the return statement
+  const renderJobSearch = () => {
+    return (
+      <div className="space-y-8">
+        {/* Featured/Recommended Jobs Section */}
+        {recommendedJobs.filter(job => job.is_featured).length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <Star className="w-5 h-5 text-yellow-500 fill-current mr-2" />
+              Featured Job Opportunities
+            </h3>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {recommendedJobs.filter(job => job.is_featured).slice(0, 4).map((job) => (
+                <div key={job.id} className="bg-white rounded-xl p-4 shadow-sm border border-blue-200 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-bold text-gray-900">{job.title}</h4>
+                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                  </div>
+                  <p className="text-sm text-blue-600 mb-2 flex items-center">
+                    <Building className="w-3 h-3 mr-1" />
+                    <button 
+                      onClick={() => handleViewRecruiter(job.recruiter.id)}
+                      className="hover:underline flex items-center"
+                    >
+                      {job.recruiter.company_name}
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </button>
+                  </p>
+                  <div className="flex items-center text-xs text-gray-500 mb-2">
+                    <MapPin className="w-3 h-3 mr-1" />
+                    {job.location}
+                    <span className="mx-2">•</span>
+                    {job.job_type}
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mb-3">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
+                  </div>
+                  <button
+                    onClick={() => handleViewJobDetails(job)}
+                    className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* All Jobs */}
+        <JobSearchList 
+          onViewDetails={(jobId) => {
+            const job = recommendedJobs.find(j => j.id === jobId);
+            if (job) {
+              handleViewJobDetails(job);
+            }
+          }}
+          onExpressInterest={handleExpressInterest}
+          onViewRecruiter={handleViewRecruiter}
+        />
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (user) {
       fetchDeveloperData();
@@ -636,69 +702,4 @@ export const DeveloperDashboard: React.FC = () => {
       </div>
     </div>
   );
-  
-  const renderJobSearch = () => {
-    return (
-      <div className="space-y-8">
-        {/* Featured/Recommended Jobs Section */}
-        {recommendedJobs.filter(job => job.is_featured).length > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <Star className="w-5 h-5 text-yellow-500 fill-current mr-2" />
-              Featured Job Opportunities
-            </h3>
-            
-            <div className="grid md:grid-cols-2 gap-4">
-              {recommendedJobs.filter(job => job.is_featured).slice(0, 4).map((job) => (
-                <div key={job.id} className="bg-white rounded-xl p-4 shadow-sm border border-blue-200 hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-bold text-gray-900">{job.title}</h4>
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                  </div>
-                  <p className="text-sm text-blue-600 mb-2 flex items-center">
-                    <Building className="w-3 h-3 mr-1" />
-                    <button 
-                      onClick={() => handleViewRecruiter(job.recruiter.id)}
-                      className="hover:underline flex items-center"
-                    >
-                      {job.recruiter.company_name}
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </button>
-                  </p>
-                  <div className="flex items-center text-xs text-gray-500 mb-2">
-                    <MapPin className="w-3 h-3 mr-1" />
-                    {job.location}
-                    <span className="mx-2">•</span>
-                    {job.job_type}
-                  </div>
-                  <div className="flex items-center text-xs text-gray-500 mb-3">
-                    <DollarSign className="w-3 h-3 mr-1" />
-                    ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
-                  </div>
-                  <button
-                    onClick={() => handleViewJobDetails(job)}
-                    className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    View Details
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* All Jobs */}
-        <JobSearchList 
-          onViewDetails={(jobId) => {
-            const job = recommendedJobs.find(j => j.id === jobId);
-            if (job) {
-              handleViewJobDetails(job);
-            }
-          }}
-          onExpressInterest={handleExpressInterest}
-          onViewRecruiter={handleViewRecruiter}
-        />
-      </div>
-    );
-  };
 };
