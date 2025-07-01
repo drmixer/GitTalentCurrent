@@ -16,7 +16,8 @@ import {
   Save,
   FileText,
   Bell,
-  Image
+  Image,
+  Upload
 } from 'lucide-react';
 import { Developer } from '../../types';
 
@@ -37,6 +38,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     github_handle: '',
@@ -170,11 +173,59 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }));
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    
+    try {
+      setUploading(true);
+      
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `profile_pics/${user?.id}/${fileName}`;
+      
+      // Upload the file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('profile_images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile_images')
+        .getPublicUrl(filePath);
+      
+      // Update the form data with the image URL
+      setFormData(prev => ({
+        ...prev,
+        profile_pic_url: publicUrl
+      }));
+      
+      setSelectedFile(null);
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      setError(error.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
+
+    // Don't proceed if an image is still uploading
+    if (uploading) {
+      setError('Please wait for the image to finish uploading');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Validate required fields
@@ -275,25 +326,74 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         {/* Profile Picture URL */}
-        <div>
-          <label htmlFor="profile_pic_url" className="block text-sm font-bold text-gray-700 mb-2">
-            Profile Picture URL (Optional)
+        <div className="space-y-2">
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Profile Picture
           </label>
-          <div className="relative">
-            <Image className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              id="profile_pic_url"
-              name="profile_pic_url"
-              type="url"
-              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-              placeholder="https://example.com/your-profile-picture.jpg"
-              value={formData.profile_pic_url}
-              onChange={handleChange}
-            />
-          </div>
-          <p className="mt-2 text-sm text-gray-500">
-            Link to your profile picture (GitHub avatar will be used if available)
-          </p>
+          
+          {formData.profile_pic_url ? (
+            <div className="relative w-32 h-32 mx-auto mb-4">
+              <img 
+                src={formData.profile_pic_url} 
+                alt="Profile" 
+                className="w-32 h-32 object-cover rounded-2xl border border-gray-200 shadow-md"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://via.placeholder.com/128?text=Invalid+Image';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, profile_pic_url: '' }))}
+                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-32 h-32 bg-gray-100 rounded-2xl flex items-center justify-center">
+                <User className="w-16 h-16 text-gray-400" />
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium cursor-pointer">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Photo
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setSelectedFile(file);
+                        handleImageUpload(file);
+                      }
+                    }}
+                  />
+                </label>
+                
+                <div className="relative flex-1">
+                  <Image className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="url"
+                    placeholder="Or enter image URL"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    value={formData.profile_pic_url}
+                    onChange={(e) => setFormData(prev => ({ ...prev, profile_pic_url: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {uploading && (
+            <div className="flex items-center justify-center mt-2">
+              <Loader className="animate-spin h-5 w-5 mr-2 text-blue-500" />
+              <span className="text-sm text-gray-600">Uploading image...</span>
+            </div>
+          )}
         </div>
 
         {/* Bio */}

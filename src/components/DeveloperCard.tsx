@@ -32,29 +32,42 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
       <div className="flex items-start space-x-4">
-        {developer.profile_pic_url ? (
-          <img 
-            src={developer.profile_pic_url} 
-            alt={developer.user.name}
-            className="w-16 h-16 rounded-xl object-cover shadow-lg"
-            onError={(e) => {
-              // Fallback to initials if image fails to load
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent) {
-                const fallback = document.createElement('div');
-                fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
-                fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
-                parent.appendChild(fallback);
-              }
-            }}
-          />
-        ) : (
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-            {developer.user.name.split(' ').map(n => n[0]).join('')}
+        <div className="relative">
+          {developer.profile_pic_url ? (
+            <img 
+              src={developer.profile_pic_url} 
+              alt={developer.user.name}
+              className="w-16 h-16 rounded-xl object-cover shadow-lg"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
+                  fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          ) : (
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+              {developer.user.name.split(' ').map(n => n[0]).join('')}
+            </div>
+          )}
+          
+          {/* Availability indicator */}
+          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
+            developer.availability ? 'bg-emerald-500' : 'bg-gray-400'
+          }`}>
+            <div className="w-full h-full flex items-center justify-center">
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                developer.availability ? 'bg-white animate-pulse' : 'bg-white'
+              }`}></div>
+            </div>
           </div>
-        )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-3 mb-1">
             <h3 className="text-lg font-bold text-gray-900 truncate">{displayName}</h3>

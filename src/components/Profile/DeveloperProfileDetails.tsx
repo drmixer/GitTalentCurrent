@@ -193,7 +193,8 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100"> 
         <div className="flex items-start md:items-center flex-col md:flex-row md:justify-between">
           <div className="flex items-center space-x-6 mb-4 md:mb-0">
-            {developer.profile_pic_url ? (
+            <div className="relative">
+              {developer.profile_pic_url ? (
               <img 
                 src={developer.profile_pic_url} 
                 alt={developer.user.name}
@@ -211,11 +212,23 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
                   }
                 }}
               />
-            ) : (
+              ) : (
               <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
                 {developer.user.name.split(' ').map(n => n[0]).join('')}
               </div>
-            )}
+              )}
+              
+              {/* Availability indicator */}
+              <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white ${
+                developer.availability ? 'bg-emerald-500' : 'bg-gray-400'
+              }`}>
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className={`w-2 h-2 rounded-full ${
+                    developer.availability ? 'bg-white animate-pulse' : 'bg-white'
+                  }`}></div>
+                </div>
+              </div>
+            </div>
             <div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
               <div className="flex items-center space-x-4 text-sm text-gray-600"> 

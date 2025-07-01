@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Export Supabase storage bucket names
+export const STORAGE_BUCKETS = {
+  PROFILE_IMAGES: 'profile_images',
+  PORTFOLIO_IMAGES: 'portfolio_images',
+  RESUME_FILES: 'resume_files'
+};
+
 // Export Supabase realtime listen types for use in components
 export const REALTIME_LISTEN_TYPES = {
   INSERT: 'INSERT',
@@ -23,6 +30,41 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 });
+
+// Initialize storage buckets if they don't exist
+export const initializeStorage = async () => {
+  try {
+    // Check if buckets exist and create them if they don't
+    for (const bucket of Object.values(STORAGE_BUCKETS)) {
+      const { data: existingBucket } = await supabase.storage.getBucket(bucket);
+      
+      if (!existingBucket) {
+        const { error } = await supabase.storage.createBucket(bucket, {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf']
+        });
+        
+        if (error) {
+          console.error(`Error creating bucket ${bucket}:`, error);
+        } else {
+          console.log(`Created storage bucket: ${bucket}`);
+          
+          // Set public bucket policy
+          const { error: policyError } = await supabase.storage.from(bucket).createSignedUrl('test.txt', 60);
+          if (policyError && policyError.message.includes('The resource was not found')) {
+            console.log(`Bucket ${bucket} created but needs public access policy`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing storage buckets:', error);
+  }
+};
+
+// Call initializeStorage when the app starts
+initializeStorage();
 
 export const signOut = async () => {
   try {
