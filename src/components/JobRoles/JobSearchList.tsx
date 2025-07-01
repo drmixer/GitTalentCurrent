@@ -22,11 +22,13 @@ interface JobSearchListProps {
   onViewJobDetails?: (jobRoleId: string) => void;
   onExpressInterest?: (jobRoleId: string) => void;
   onViewRecruiter?: (recruiterId: string) => void;
+  onViewRecruiter?: (recruiterId: string) => void;
 }
 
 export const JobSearchList: React.FC<JobSearchListProps> = ({
   onViewJobDetails,
   onExpressInterest,
+  onViewRecruiter
   onViewRecruiter
 }) => {
   const { userProfile } = useAuth();
@@ -59,12 +61,27 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
             email,
             recruiters(company_name)
           )
+            id,
+            name, 
+            email,
+            recruiters(company_name)
+          )
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
+      // Transform the data to include company_name directly in the recruiter object
+      const formattedJobs = data?.map(job => ({
+        ...job,
+        recruiter: {
+          ...job.recruiter,
+          company_name: job.recruiter?.recruiters?.[0]?.company_name || 'Unknown Company'
+        }
+      })) || [];
+      
+      setJobs(formattedJobs);
       // Transform the data to include company_name directly in the recruiter object
       const formattedJobs = data?.map(job => ({
         ...job,
@@ -86,6 +103,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   const handleViewDetails = (jobId: string) => {
     if (onViewJobDetails) {
       console.log('View details clicked for job:', jobId);
+      onViewJobDetails(jobId);
       // Prevent default behavior and explicitly call the handler
       setTimeout(() => onViewJobDetails(jobId), 0);
     }
@@ -94,6 +112,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
       console.log('Express interest clicked for job:', jobId);
+      onExpressInterest(jobId);
       // Prevent default behavior and explicitly call the handler
       setTimeout(() => onExpressInterest(jobId), 0);
     }
@@ -254,6 +273,17 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (onViewRecruiter && job.recruiter?.id) {
+                            onViewRecruiter(job.recruiter.id);
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                      >
+                        {job.recruiter?.company_name || 'Unknown Company'}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </button>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           onViewRecruiter?.(job.recruiter?.id);
                         }}
                         className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
@@ -299,6 +329,9 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                 <button
                   onClick={(e) => {
                     e.preventDefault();
+                    handleViewDetails(job.id);
+                  }}
+                    e.preventDefault();
                     e.stopPropagation();
                     handleViewDetails(job.id);
                   }}
@@ -309,6 +342,9 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                 </button>
                 <button
                   onClick={(e) => {
+                    e.preventDefault();
+                    handleExpressInterest(job.id);
+                  }}
                     e.preventDefault();
                     e.stopPropagation();
                     handleExpressInterest(job.id);
