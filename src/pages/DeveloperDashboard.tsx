@@ -337,6 +337,7 @@ export const DeveloperDashboard: React.FC = () => {
   };
 
   const handleExpressInterest = async (jobId: string) => {
+    console.log('Handling express interest for job:', jobId);
     if (!selectedJobForDetails) return;
     
     await sendInterestMessage(
@@ -351,6 +352,7 @@ export const DeveloperDashboard: React.FC = () => {
       const { error } = await supabase
         .from('messages')
         .insert({
+       console.error('Job not found:', jobId);
           sender_id: user?.id,
           receiver_id: recruiterId,
           subject: `Interest in ${jobTitle}`,
@@ -361,12 +363,14 @@ export const DeveloperDashboard: React.FC = () => {
       fetchMessages();
     } catch (error) {
       console.error('Error sending interest message:', error);
+              console.log('View details callback received for job:', jobId);
     }
   };
 
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Profile Strength */}
+              console.log('Express interest callback received for job:', jobId);
       {developer && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Strength</h3>
@@ -513,6 +517,7 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       )}
       
+     console.log('Found job:', job.title, 'Recruiter ID:', job.recruiter.id);
       {/* Quick Job Stats */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <div className="flex items-center justify-between mb-6">
@@ -562,6 +567,7 @@ export const DeveloperDashboard: React.FC = () => {
         <MessageThread
           threadId={selectedThread}
           onBack={() => setSelectedThread(null)}
+     console.log('Interest message sent successfully');
         />
       );
     }

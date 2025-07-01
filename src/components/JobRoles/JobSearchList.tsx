@@ -85,12 +85,14 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
 
   const handleViewDetails = (jobId: string) => {
     if (onViewJobDetails) {
+      console.log('View details clicked for job:', jobId);
       onViewJobDetails(jobId);
     }
   };
 
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
+      console.log('Express interest clicked for job:', jobId);
       onExpressInterest(jobId);
     }
   };
