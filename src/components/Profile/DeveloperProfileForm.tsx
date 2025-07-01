@@ -17,7 +17,8 @@ import {
   FileText,
   Bell,
   Image,
-  Upload
+  Upload,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Developer } from '../../types';
 
@@ -40,6 +41,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [success, setSuccess] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [selectedResumeFile, setSelectedResumeFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     github_handle: '',
@@ -51,6 +54,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     top_languages: [] as string[],
     resume_url: '',
     profile_pic_url: '',
+    public_profile_slug: '',
     notification_preferences: {
       email: true,
       in_app: true,
@@ -214,6 +218,47 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
+  const handleResumeUpload = async (file: File) => {
+    if (!file) return;
+    
+    try {
+      setResumeUploading(true);
+      
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${user?.id}/${fileName}`;
+      
+      // Upload the file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('resume_files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('resume_files')
+        .getPublicUrl(filePath);
+      
+      // Update the form data with the resume URL
+      setFormData(prev => ({
+        ...prev,
+        resume_url: publicUrl
+      }));
+      
+      setSelectedResumeFile(null);
+    } catch (error: any) {
+      console.error('Error uploading resume:', error);
+      setError(error.message || 'Failed to upload resume');
+    } finally {
+      setResumeUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -221,8 +266,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setLoading(true);
 
     // Don't proceed if an image is still uploading
-    if (uploading) {
-      setError('Please wait for the image to finish uploading');
+    if (uploading || resumeUploading) {
+      setError('Please wait for file uploads to complete');
       setLoading(false);
       return;
     }
@@ -477,25 +522,78 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         {/* Resume URL */}
-        <div>
-          <label htmlFor="resume_url" className="block text-sm font-bold text-gray-700 mb-2">
-            Resume URL (Optional)
+        <div className="space-y-2">
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Resume
           </label>
-          <div className="relative">
-            <FileText className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              id="resume_url"
-              name="resume_url"
-              type="url"
-              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-              placeholder="https://example.com/your-resume.pdf"
-              value={formData.resume_url}
-              onChange={handleChange}
-            />
-          </div>
-          <p className="mt-2 text-sm text-gray-500">
-            Link to your resume or CV hosted online (Google Drive, Dropbox, etc.)
-          </p>
+          
+          {formData.resume_url ? (
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex items-center">
+                <FileText className="w-8 h-8 text-blue-600 mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">Resume Uploaded</p>
+                  <a 
+                    href={formData.resume_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    View Resume <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, resume_url: '' }))}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-4">
+              <label className="flex-1 flex flex-col items-center px-4 py-6 bg-white text-blue-500 rounded-xl border-2 border-blue-200 border-dashed hover:bg-blue-50 hover:border-blue-300 transition-all cursor-pointer">
+                <Upload className="w-8 h-8 mb-2" />
+                <span className="text-sm font-medium">Click to upload resume</span>
+                <span className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX up to 10MB</span>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSelectedResumeFile(file);
+                      handleResumeUpload(file);
+                    }
+                  }}
+                />
+              </label>
+              <div className="flex-1">
+                <div className="relative">
+                  <FileText className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    id="resume_url"
+                    name="resume_url"
+                    type="url"
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                    placeholder="https://example.com/your-resume.pdf"
+                    value={formData.resume_url}
+                    onChange={handleChange}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Or enter a URL to your resume</p>
+              </div>
+            </div>
+          )}
+          
+          {resumeUploading && (
+            <div className="flex items-center justify-center mt-2">
+              <Loader className="animate-spin h-5 w-5 mr-2 text-blue-500" />
+              <span className="text-sm text-gray-600">Uploading resume...</span>
+            </div>
+          )}
         </div>
 
         {/* Notification Preferences */}
