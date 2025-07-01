@@ -31,6 +31,38 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Initialize storage buckets
+const initializeStorage = async () => {
+  try {
+    // Check if buckets exist, create them if they don't
+    for (const bucket of Object.values(STORAGE_BUCKETS)) {
+      try {
+        const { data: existingBucket } = await supabase.storage.getBucket(bucket);
+        
+        if (!existingBucket) {
+          const { error } = await supabase.storage.createBucket(bucket, {
+            public: true,
+            fileSizeLimit: bucket === STORAGE_BUCKETS.RESUME_FILES ? 10485760 : 5242880 // 10MB for resumes, 5MB for images
+          });
+          
+          if (error) {
+            console.error(`Error creating bucket ${bucket}:`, error.message);
+          } else {
+            console.log(`Created storage bucket: ${bucket}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking bucket ${bucket}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing storage:', error);
+  }
+};
+
+// Initialize storage buckets when the app starts
+initializeStorage();
+
 export const signOut = async () => {
   try {
     const { error } = await supabase.auth.signOut();
