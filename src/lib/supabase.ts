@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 // Export Supabase storage bucket names
 export const STORAGE_BUCKETS = {
   PROFILE_IMAGES: 'profile_images',
-}
+};
+
 export const signOut = async () => {
   try {
     const { error } = await supabase.auth.signOut();
