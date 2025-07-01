@@ -86,14 +86,16 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   const handleViewDetails = (jobId: string) => {
     if (onViewJobDetails) {
       console.log('View details clicked for job:', jobId);
-      onViewJobDetails(jobId);
+      // Prevent default behavior and explicitly call the handler
+      setTimeout(() => onViewJobDetails(jobId), 0);
     }
   };
 
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
       console.log('Express interest clicked for job:', jobId);
-      onExpressInterest(jobId);
+      // Prevent default behavior and explicitly call the handler
+      setTimeout(() => onExpressInterest(jobId), 0);
     }
   };
 
@@ -275,7 +277,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                   </div>
                   
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {job.tech_stack.map((tech, index) => (
+                    {job.tech_stack?.map((tech, index) => (
                       <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
                         {tech}
                       </span>
@@ -295,14 +297,22 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
               
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => handleViewDetails(job.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleViewDetails(job.id);
+                  }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   View Details
                 </button>
                 <button
-                  onClick={() => handleExpressInterest(job.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleExpressInterest(job.id);
+                  }}
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center"
                 >
                   <Star className="w-4 h-4 mr-2" />

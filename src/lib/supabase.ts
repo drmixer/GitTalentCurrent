@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // Export Supabase storage bucket names
 export const STORAGE_BUCKETS = {
   PROFILE_IMAGES: 'profile_images',
+}
 export const signOut = async () => {
   try {
     const { error } = await supabase.auth.signOut();
