@@ -225,7 +225,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
               <button
                 onClick={() => {
                   setFilterJobType(null);
-                  handleExpressInterest(job.id); 
+                  setFilterSalaryMin(null);
                   setFilterLocation('');
                 }}
                 className="px-4 py-2 text-blue-600 hover:text-blue-800 font-medium"

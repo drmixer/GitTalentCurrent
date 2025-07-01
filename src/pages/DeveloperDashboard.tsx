@@ -338,13 +338,21 @@ export const DeveloperDashboard: React.FC = () => {
 
   const handleExpressInterest = async (jobId: string) => {
     console.log('Handling express interest for job:', jobId);
-    if (!selectedJobForDetails) return;
+    const job = recommendedJobs.find(j => j.id === jobId);
+    if (!job) {
+      console.error('Job not found:', jobId);
+      return;
+    }
 
     await sendInterestMessage(
-      selectedJobForDetails.recruiter.id, 
-      selectedJobForDetails.title
+      job.recruiter.id, 
+      job.title
     );
-    handleCloseJobDetails();
+    
+    // Only close the modal if we're in the modal view
+    if (showJobDetailsModal) {
+      handleCloseJobDetails();
+    }
   };
 
   const sendInterestMessage = async (recruiterId: string, jobTitle: string) => {
