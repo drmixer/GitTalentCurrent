@@ -15,7 +15,7 @@ import {
   Loader,
   AlertCircle,
   ExternalLink
-} from 'react-feather';
+} from 'lucide-react';
 import { JobRole } from '../../types';
 
 interface JobSearchListProps {
