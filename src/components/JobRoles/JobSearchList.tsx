@@ -14,10 +14,11 @@ import {
   MessageSquare,
   Loader,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
   Star,
   ExternalLink,
   Building
+} from 'react-feather';
 import { JobRole } from '../../types';
 
 interface JobSearchListProps {
