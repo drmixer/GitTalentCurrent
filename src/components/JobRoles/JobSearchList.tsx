@@ -86,17 +86,18 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   };
 
   const handleViewDetails = (jobId: string) => {
-    if (onViewJobDetails) {
+    if (onViewDetails) {
       console.log('View details clicked for job:', jobId);
-      // Just call the handler once
+      onViewDetails(jobId);
+    } else if (onViewJobDetails) {
+      console.log('View details clicked for job:', jobId);
       onViewJobDetails(jobId); 
     }
   };
 
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
-      console.log('Express interest clicked for job:', jobId);
-      // Just call the handler once
+      console.log('Express interest clicked for job:', jobId); 
       onExpressInterest(jobId);
     }
   };
@@ -224,7 +225,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
               <button
                 onClick={() => {
                   setFilterJobType(null);
-                  setFilterSalaryMin(null);
+                  handleExpressInterest(job.id); 
                   setFilterLocation('');
                 }}
                 className="px-4 py-2 text-blue-600 hover:text-blue-800 font-medium"
