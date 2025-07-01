@@ -295,13 +295,13 @@ export const DeveloperDashboard: React.FC = () => {
   const handleViewJobDetails = (job: JobRole) => {
     console.log('Viewing job details:', job);
     setSelectedJobForDetails(job);
-    setTimeout(() => setShowJobDetailsModal(true), 0);
+    setShowJobDetailsModal(true);
   };
 
   const handleViewRecruiter = (recruiterId: string) => {
     console.log('Viewing recruiter profile:', recruiterId);
     setSelectedRecruiterId(recruiterId);
-    setTimeout(() => setShowRecruiterProfile(true), 0);
+    setShowRecruiterProfile(true);
   };
 
   const handleCloseJobDetails = () => {
@@ -339,12 +339,12 @@ export const DeveloperDashboard: React.FC = () => {
   const handleExpressInterest = async (jobId: string) => {
     console.log('Handling express interest for job:', jobId);
     if (!selectedJobForDetails) return;
-    
+
     await sendInterestMessage(
       selectedJobForDetails.recruiter.id, 
       selectedJobForDetails.title
     );
-    setTimeout(() => handleCloseJobDetails(), 0);
+    handleCloseJobDetails();
   };
 
   const sendInterestMessage = async (recruiterId: string, jobTitle: string) => {

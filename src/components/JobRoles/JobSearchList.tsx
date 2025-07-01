@@ -86,18 +86,16 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   const handleViewDetails = (jobId: string) => {
     if (onViewJobDetails) {
       console.log('View details clicked for job:', jobId);
-      onViewJobDetails(jobId);
-      // Prevent default behavior and explicitly call the handler
-      setTimeout(() => onViewJobDetails(jobId), 0);
+      // Just call the handler once
+      onViewJobDetails(jobId); 
     }
   };
 
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
       console.log('Express interest clicked for job:', jobId);
+      // Just call the handler once
       onExpressInterest(jobId);
-      // Prevent default behavior and explicitly call the handler
-      setTimeout(() => onExpressInterest(jobId), 0);
     }
   };
 
@@ -302,7 +300,6 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
               <div className="flex items-center space-x-3">
                 <button
                   onClick={(e) => {
-                    e.preventDefault();
                     e.stopPropagation();
                     handleViewDetails(job.id);
                   }}
@@ -313,7 +310,6 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                 </button>
                 <button
                   onClick={(e) => {
-                    e.preventDefault();
                     e.stopPropagation();
                     handleExpressInterest(job.id);
                   }}
