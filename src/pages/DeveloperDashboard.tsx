@@ -648,9 +648,10 @@ export const DeveloperDashboard: React.FC = () => {
                 jobRole={selectedJobForDetails}
                 jobRoleId={selectedJobForDetails.id}
                 onClose={handleCloseJobDetails}
-                onSendMessage={(developerId, developerName, jobRoleId, jobRoleTitle) => {
+                onSendMessage={() => {
                   handleMessageRecruiter(selectedJobForDetails.recruiter.id, selectedJobForDetails.title);
                 }}
+                onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
                 onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
                 isDeveloperView={true}
               />
@@ -679,7 +680,13 @@ export const DeveloperDashboard: React.FC = () => {
                   onViewDetails={(jobId) => {
                     const job = recommendedJobs.find(j => j.id === jobId);
                     if (job) {
-                      handleViewJobDetails(job);
+                      setTimeout(() => handleViewJobDetails(job), 0);
+                    }
+                  }}
+                  onExpressInterest={(jobId) => {
+                    const job = recommendedJobs.find(j => j.id === jobId);
+                    if (job) {
+                      setTimeout(() => handleExpressInterest(job.id), 0);
                     }
                   }}
                   onViewRecruiter={handleViewRecruiter}
