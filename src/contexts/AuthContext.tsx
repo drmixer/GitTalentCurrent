@@ -138,7 +138,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (githubUsername && userRole === 'developer') {
         // Pass installation_id if available from the metadata (e.g., from the redirect)
         const githubInstallationId = authUser.user_metadata?.github_installation_id || null;
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, githubMetadata, githubInstallationId);
+        // CORRECTED LINE: Use authUser.user_metadata
+        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
       }
     } catch (error) {
       console.error('❌ Error in handleGitHubSignIn:', error);
@@ -470,13 +471,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setDeveloperProfile(null); // Ensure developerProfile is null for recruiters
       } else {
-        setDeveloperProfile(null); // Default to null if role is neither
+        setDeveloperProfile(null);
       }
     } catch (error) {
       console.error('❌ Error checking role-specific profile:', error);
-      setNeedsOnboarding(false); // Ensure loading state is resolved even on error
+      setNeedsOnboarding(false);
     } finally {
-      setLoading(false); // Ensure loading state is resolved
+      setLoading(false);
     }
   };
 
@@ -497,7 +498,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
         p_profile_pic_url: profileData.profile_pic_url || null,
-        p_github_installation_id: profileData.github_installation_id || null // Pass installation_id
+        p_github_installation_id: profileData.github_installation_id || null
       });
 
       if (error) {
