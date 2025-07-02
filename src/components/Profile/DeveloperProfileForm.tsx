@@ -43,6 +43,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [resumeUploading, setResumeUploading] = useState(false);
   const [selectedResumeFile, setSelectedResumeFile] = useState<File | null>(null);
+  const [connectingGitHub, setConnectingGitHub] = useState(false);
 
   const [formData, setFormData] = useState({
     github_handle: '',
@@ -275,6 +276,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
+  const handleConnectGitHub = () => {
+    setConnectingGitHub(true);
+    
+    // Redirect to GitHub App installation page
+    const githubAppUrl = `https://github.com/apps/your-github-app-name/installations/new`;
+    window.location.href = githubAppUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -366,6 +375,41 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
           </div>
         )}
 
+        {/* GitHub Integration */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Github className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900 mb-2">GitHub Integration</h3>
+                <p className="text-gray-600 mb-4">
+                  Connect your GitHub account to showcase your repositories and contributions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectGitHub}
+              disabled={connectingGitHub}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              {connectingGitHub ? (
+                <div className="flex items-center">
+                  <Loader className="animate-spin h-4 w-4 mr-2" />
+                  Connecting...
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <Github className="w-4 h-4 mr-2" />
+                  Connect GitHub
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* GitHub Handle */}
         <div>
           <label htmlFor="github_handle" className="block text-sm font-bold text-gray-700 mb-2">
@@ -378,7 +422,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               name="github_handle"
               type="text"
               required
-              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+              disabled={loading || connectingGitHub}
+              className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="your-github-username"
               value={formData.github_handle}
               onChange={handleChange}
@@ -555,7 +600,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                     rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
                   >
-                    View Resume <ExternalLink className="w-3 h-3 ml-1" />
+                    View Resume <LinkIcon className="w-3 h-3 ml-1" />
                   </a>
                 </div>
               </div>

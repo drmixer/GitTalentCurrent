@@ -429,6 +429,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.log('✅ Developer profile found'); 
           setDeveloperProfile(devProfileData);
+          
+          // Check if GitHub App needs to be installed
+          if (!devProfileData.github_installation_id && devProfileData.github_handle) {
+            console.log('⚠️ GitHub App not installed, but GitHub handle exists');
+            // We'll handle this in the UI by showing a "Connect GitHub" button
+          }
+          
           setNeedsOnboarding(false);
         }
       } else if (userProfile?.role === 'recruiter') {
@@ -478,7 +485,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_location: profileData.location || '',
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
-        p_profile_pic_url: profileData.profile_pic_url || null
+        p_profile_pic_url: profileData.profile_pic_url || null,
+        p_github_installation_id: profileData.github_installation_id || null
       });
 
       if (error) {
@@ -514,7 +522,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         location: profileData.location?.trim() || null,
         linked_projects: profileData.linked_projects?.filter(p => p.trim()) || [],
         top_languages: profileData.top_languages?.filter(l => l.trim()) || [],
-        profile_pic_url: profileData.profile_pic_url?.trim() || null
+        profile_pic_url: profileData.profile_pic_url?.trim() || null,
+        github_installation_id: profileData.github_installation_id || null
       };
 
       const { error } = await supabase

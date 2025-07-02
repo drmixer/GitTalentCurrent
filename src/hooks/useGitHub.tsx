@@ -138,6 +138,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setGitHubData(prev => ({ ...prev, loading: true, error: '' }));
       setCurrentHandle(handle);
 
+      // Get the GitHub installation ID from the developer profile
+      const installationId = developerProfile?.github_installation_id;
+      console.log('Using GitHub installation ID:', installationId || 'not available');
+
       // Call the Supabase Edge Function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
@@ -150,7 +154,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({ handle })
+        body: JSON.stringify({ 
+          handle,
+          installationId // Pass the installation ID to the proxy
+        })
       });
 
       if (!response.ok) {

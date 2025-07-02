@@ -1,10 +1,17 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { create, verify } from 'npm:jsonwebtoken@9.0.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
+
+// GitHub App credentials from environment variables
+const GITHUB_APP_ID = Deno.env.get("GITHUB_APP_ID");
+const GITHUB_APP_PRIVATE_KEY = Deno.env.get("GITHUB_APP_PRIVATE_KEY")?.replace(/\\n/g, "\n");
+const GITHUB_APP_CLIENT_ID = Deno.env.get("GITHUB_APP_CLIENT_ID");
+const GITHUB_APP_CLIENT_SECRET = Deno.env.get("GITHUB_APP_CLIENT_SECRET");
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -16,8 +23,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Get GitHub handle from request
-    const { handle } = await req.json();
+    // Get GitHub handle and installation ID from request
+    const { handle, installationId } = await req.json();
     
     if (!handle) {
       return new Response(
@@ -32,18 +39,65 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`Fetching GitHub data for: ${handle}`);
+    console.log(`Fetching GitHub data for: ${handle}, Installation ID: ${installationId || 'not provided'}`);
+
+    // Determine if we should use GitHub App authentication or public access
+    let headers: Record<string, string> = {
+      "Accept": "application/vnd.github.v3+json",
+      "User-Agent": "GitTalent-App",
+    };
+
+    // If we have GitHub App credentials and an installation ID, use GitHub App authentication
+    if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
+      console.log("Using GitHub App authentication");
+      
+      try {
+        // Generate a JWT for the GitHub App
+        const now = Math.floor(Date.now() / 1000);
+        const payload = {
+          iat: now,
+          exp: now + (10 * 60), // JWT expires in 10 minutes
+          iss: GITHUB_APP_ID
+        };
+        
+        const jwt = create(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
+        
+        // Exchange the JWT for an installation access token
+        const tokenResponse = await fetch(
+          `https://api.github.com/app/installations/${installationId}/access_tokens`,
+          {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/vnd.github.v3+json',
+              'Authorization': `Bearer ${jwt}`,
+              'User-Agent': 'GitTalent-App'
+            }
+          }
+        );
+        
+        if (!tokenResponse.ok) {
+          const errorData = await tokenResponse.text();
+          console.error(`Error getting installation token: ${tokenResponse.status} ${errorData}`);
+          throw new Error(`Failed to get installation token: ${tokenResponse.status}`);
+        }
+        
+        const { token } = await tokenResponse.json();
+        
+        // Use the installation token for subsequent requests
+        headers["Authorization"] = `token ${token}`;
+        console.log("Successfully obtained installation access token");
+      } catch (error) {
+        console.error("Error generating GitHub App token:", error);
+        // Fall back to public access if token generation fails
+        console.log("Falling back to public access due to token error");
+      }
+    } else {
+      console.log("Using public access (no GitHub App credentials or installation ID provided)");
+    }
 
     // GitHub API URLs
     const userUrl = `https://api.github.com/users/${handle}`;
     const reposUrl = `https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`;
-
-    // GitHub API headers - using public access for now (rate limited but works for basic data)
-    // We'll remove the token authorization since it's not set up yet
-    const headers = {
-      "Accept": "application/vnd.github.v3+json",
-      "User-Agent": "GitTalent-App",
-    };
 
     // Fetch user data
     const userResponse = await fetch(userUrl, { headers });
@@ -141,8 +195,21 @@ Deno.serve(async (req: Request) => {
     // Wait for all language requests to complete
     await Promise.all(languagePromises);
 
-    // Generate contribution data based on repository activity
-    const contributionData = generateContributionsFromRepos(filteredRepos);
+    // Try to fetch real contribution data if we have an installation token
+    let contributionData;
+    if (headers["Authorization"]) {
+      try {
+        // Attempt to fetch contribution data using GraphQL API
+        contributionData = await fetchContributionData(handle, headers["Authorization"]);
+      } catch (error) {
+        console.error("Error fetching contribution data:", error);
+        // Fall back to generated data
+        contributionData = generateContributionsFromRepos(filteredRepos);
+      }
+    } else {
+      // Generate contribution data based on repository activity
+      contributionData = generateContributionsFromRepos(filteredRepos);
+    }
 
     // Return the combined data
     return new Response(
@@ -175,6 +242,70 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+// Helper function to fetch contribution data using GraphQL API
+async function fetchContributionData(username: string, authToken: string) {
+  const query = `
+    query {
+      user(login: "${username}") {
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+                contributionLevel
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': authToken,
+      'Content-Type': 'application/json',
+      'User-Agent': 'GitTalent-App'
+    },
+    body: JSON.stringify({ query })
+  });
+
+  if (!response.ok) {
+    throw new Error(`GraphQL request failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.errors) {
+    throw new Error(`GraphQL error: ${data.errors[0].message}`);
+  }
+
+  // Process the GraphQL response into our expected format
+  const calendar = data.data.user.contributionsCollection.contributionCalendar;
+  const contributions = [];
+
+  for (const week of calendar.weeks) {
+    for (const day of week.contributionDays) {
+      let level = 0;
+      if (day.contributionLevel === 'FIRST_QUARTILE') level = 1;
+      else if (day.contributionLevel === 'SECOND_QUARTILE') level = 2;
+      else if (day.contributionLevel === 'THIRD_QUARTILE') level = 3;
+      else if (day.contributionLevel === 'FOURTH_QUARTILE') level = 4;
+
+      contributions.push({
+        date: day.date,
+        count: day.contributionCount,
+        level
+      });
+    }
+  }
+
+  return contributions;
+}
 
 // Helper function to generate contribution data based on repository activity
 function generateContributionsFromRepos(repos: any[]): { date: string; count: number; level: number }[] {

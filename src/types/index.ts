@@ -92,6 +92,7 @@ export interface Developer {
   notification_preferences: NotificationPreferences;
   resume_url?: string;
   profile_pic_url?: string;
+  github_installation_id?: string;
   created_at: string;
   updated_at: string;
   user?: User;
