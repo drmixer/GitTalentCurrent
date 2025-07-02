@@ -202,13 +202,6 @@ export const Header = () => {
                     onClick={handleSignOut}
                     className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
                   >
-                    <User className="w-4 h-4" />
-                    <span className="text-sm font-semibold">{getDisplayName()}</span>
-                  </Link>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
-                  >
                     <LogOut className="w-4 h-4 mr-1" />
                     <span>Sign Out</span>
                   </button>
