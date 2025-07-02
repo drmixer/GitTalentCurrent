@@ -98,7 +98,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
   const handleConnectGitHub = () => {
     // Redirect to GitHub App installation page
-    const githubAppUrl = `https://github.com/apps/your-github-app-name/installations/new`;
+    const githubAppUrl = `https://github.com/apps/gittalentapp/installations/new`;
     window.location.href = githubAppUrl;
   };
 
@@ -309,6 +309,32 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         </div>
       </div>
       
+      {/* GitHub Connection */}
+      {isOwnProfile && !developer.github_installation_id && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 mb-8">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Github className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900 mb-2">Connect GitHub App</h3>
+                <p className="text-gray-600 mb-4">
+                  Connect your GitHub account to display your real contribution graph and repository data.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleConnectGitHub}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Github className="w-4 h-4 mr-2 inline" />
+              Connect GitHub
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="mb-8">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
@@ -358,32 +384,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               {developer.bio || 'No bio provided.'}
             </p>
           </div>
-
-          {/* GitHub Connection */}
-          {isOwnProfile && !developer.github_installation_id && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Github className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 mb-2">Connect GitHub App</h3>
-                    <p className="text-gray-600 mb-4">
-                      Connect your GitHub account to display your real contribution graph and repository data.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleConnectGitHub}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  <Github className="w-4 h-4 mr-2 inline" />
-                  Connect GitHub
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>

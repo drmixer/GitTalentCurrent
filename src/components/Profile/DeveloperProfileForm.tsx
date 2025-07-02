@@ -159,6 +159,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
+  const handleConnectGitHub = () => {
+    setConnectingGitHub(true);
+    
+    // Redirect to GitHub App installation page
+    const githubAppUrl = `https://github.com/apps/gittalentapp/installations/new`;
+    window.location.href = githubAppUrl;
+  };
+
   const addLanguage = (language?: string) => {
     const langToAdd = language || newLanguage.trim();
     if (langToAdd && !formData.top_languages.includes(langToAdd)) {
@@ -274,14 +282,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     } finally {
       setResumeUploading(false);
     }
-  };
-
-  const handleConnectGitHub = () => {
-    setConnectingGitHub(true);
-    
-    // Redirect to GitHub App installation page
-    const githubAppUrl = `https://github.com/apps/your-github-app-name/installations/new`;
-    window.location.href = githubAppUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
