@@ -38,11 +38,11 @@ Deno.serve(async (req: Request) => {
     const userUrl = `https://api.github.com/users/${handle}`;
     const reposUrl = `https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`;
 
-    // GitHub API headers with token
+    // GitHub API headers - using public access for now (rate limited but works for basic data)
+    // We'll remove the token authorization since it's not set up yet
     const headers = {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "GitTalent-App",
-      "Authorization": `token ${Deno.env.get("GITHUB_PAT")}`,
     };
 
     // Fetch user data
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
     const languageStats: Record<string, number> = {};
     
     // For each repo with a language, fetch detailed language stats
-    const languagePromises = filteredRepos.slice(0, 20).map(async (repo: any) => {
+    const languagePromises = filteredRepos.slice(0, 10).map(async (repo: any) => {
       if (repo.language) {
         try {
           const langResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/languages`, { headers });
@@ -142,7 +142,6 @@ Deno.serve(async (req: Request) => {
     await Promise.all(languagePromises);
 
     // Generate contribution data based on repository activity
-    // This is a simplified version since GitHub doesn't provide an API for the contribution graph
     const contributionData = generateContributionsFromRepos(filteredRepos);
 
     // Return the combined data

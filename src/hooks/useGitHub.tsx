@@ -142,6 +142,8 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
       
+      console.log('Calling GitHub proxy at:', apiUrl);
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -152,8 +154,22 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `GitHub API error: ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage = `GitHub API error: ${response.status}`;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // If parsing fails, use the raw text
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
