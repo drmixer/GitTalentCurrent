@@ -57,7 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
 
-      // Only proceed if not actively signing out to prevent race conditions
       if (signingOut && event !== 'SIGNED_OUT') {
         console.log('🔄 Still in signing out process, ignoring auth change');
         return;
@@ -103,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Handling GitHub sign-in for user:', authUser.id);
-      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2)); // Keep this log
+      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
       const pendingName = localStorage.getItem('pendingGitHubName');
       localStorage.removeItem('pendingGitHubName');
@@ -145,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
             if (rawMetaData.installation_id) {
               githubInstallationId = String(rawMetaData.installation_id);
-            } else if (rawMetaData.app_installation_id) { // Also check nested in raw_user_meta_data
+            } else if (rawMetaData.app_installation_id) {
               githubInstallationId = String(rawMetaData.app_installation_id);
             }
           } catch (parseError) {
@@ -253,7 +252,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: `${window.location.origin}/github-setup`, // This should match your GitHub App's "Redirect URL"
+        // IMPORTANT: Request installation_id directly from GitHub to our frontend
+        redirectTo: `${window.location.origin}/github-setup?installation_id=true`, // Added query param
         scopes: 'read:user user:email'
       },
     });
