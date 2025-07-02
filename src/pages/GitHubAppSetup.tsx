@@ -14,7 +14,7 @@ export const GitHubAppSetup = () => {
   const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('GitHubAppSetup useEffect - Current URL search params:', location.search); // Keep this log
+    console.log('GitHubAppSetup useEffect - Current URL search params:', location.search);
 
     if (authLoading) {
       console.log('GitHubAppSetup useEffect - Auth still loading, waiting...');
@@ -28,29 +28,35 @@ export const GitHubAppSetup = () => {
     }
 
     const params = new URLSearchParams(location.search);
-    // Directly look for 'installation_id' from GitHub's redirect
-    const installation_id = params.get('installation_id');
+    const installation_id_param = params.get('installation_id');
     const setup_action = params.get('setup_action');
 
-    console.log('GitHubAppSetup useEffect - Found installation_id:', installation_id);
+    // Attempt to parse installation_id as a number
+    const parsedInstallationId = installation_id_param ? parseInt(installation_id_param, 10) : null;
+    const isValidInstallationId = parsedInstallationId !== null && !isNaN(parsedInstallationId);
+
+    console.log('GitHubAppSetup useEffect - Found installation_id_param:', installation_id_param);
+    console.log('GitHubAppSetup useEffect - Parsed installationId:', parsedInstallationId);
     console.log('GitHubAppSetup useEffect - Found setup_action:', setup_action);
 
-    if (installation_id && setup_action === 'install') {
-      setInstallationIdFromUrl(installation_id);
-      console.log('GitHubAppSetup useEffect - Installation ID and setup_action found. Saving and completing setup...');
-      saveInstallationIdAndCompleteSetup(installation_id); // Call new function
+    // This condition is for when GitHub directly redirects after an App installation
+    if (isValidInstallationId && setup_action === 'install') {
+      setInstallationIdFromUrl(String(parsedInstallationId)); // Store as string for display
+      console.log('GitHubAppSetup useEffect - Valid Installation ID and setup_action "install" found. Saving and completing setup...');
+      saveInstallationIdAndCompleteSetup(String(parsedInstallationId)); // Pass as string
     } else if (setup_action === 'update') {
       console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.');
       // For updates, the ID might not be explicitly passed, just refresh profile
       completeSetup();
     } else {
-      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL.');
+      // This path is hit if installation_id or setup_action are missing or invalid (e.g., from OAuth flow)
+      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation.');
       setLoading(false);
-      setError('No GitHub App installation ID found in the URL. Please ensure you installed the app and try connecting your GitHub account again.');
+      setError('GitHub App installation ID not found in the URL. Please ensure you installed the app or try connecting your GitHub account again.');
     }
   }, [location, user, navigate, refreshProfile, authLoading]);
 
-  // New function to directly save installation ID and then complete setup
+  // Function to directly save installation ID to Supabase and then complete setup
   const saveInstallationIdAndCompleteSetup = async (id: string) => {
     try {
       setLoading(true);
@@ -81,7 +87,6 @@ export const GitHubAppSetup = () => {
       setLoading(false);
     }
   };
-
 
   const completeSetup = async () => {
     try {
