@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth'; // Ensure this is the correct path to your useAuth hook
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, developerProfile, refreshProfile } = useAuth();
+  const { user, refreshProfile, loading: authLoading } = useAuth(); // Get authLoading state
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [installationId, setInstallationId] = useState<string | null>(null);
+  const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null); // Renamed for clarity
 
   useEffect(() => {
+    // If auth is still loading, wait for it
+    if (authLoading) {
+      return;
+    }
+
+    // If user is not authenticated, redirect to login
     if (!user) {
       navigate('/login', { replace: true });
       return;
@@ -22,45 +27,42 @@ export const GitHubAppSetup = () => {
     // Extract installation_id from URL query parameters
     const params = new URLSearchParams(location.search);
     const installation_id = params.get('installation_id');
-    
-    if (installation_id) {
-      setInstallationId(installation_id);
-      saveInstallationId(installation_id);
-    } else {
-      setLoading(false);
-      setError('No installation ID found in the URL. Please try connecting your GitHub account again.');
-    }
-  }, [location, user]);
 
-  const saveInstallationId = async (installationId: string) => {
+    if (installation_id) {
+      setInstallationIdFromUrl(installation_id);
+      // We don't directly save it here anymore.
+      // AuthContext's handleGitHubSignIn should have already processed it
+      // from user_metadata during the OAuth callback.
+      // We just need to ensure the profile is refreshed to pick up any changes.
+      completeSetup();
+    } else {
+      // This path might be hit if the user manually navigates here
+      // or if GitHub's redirect didn't include the ID for some reason.
+      setLoading(false);
+      setError('No GitHub App installation ID found in the URL. Please try connecting your GitHub account again.');
+    }
+  }, [location, user, navigate, refreshProfile, authLoading]); // Added authLoading to dependencies
+
+  const completeSetup = async () => {
     try {
       setLoading(true);
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      // Update the developer profile with the installation ID
-      const { error } = await supabase
-        .from('developers')
-        .update({ github_installation_id: installationId })
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      
-      // Refresh the profile to get the updated data
+      setError('');
+
+      // Refresh the profile to ensure the latest data, including github_installation_id, is loaded
+      // AuthContext's handleGitHubSignIn should have already processed and saved it
+      // when the user signed in via GitHub OAuth.
       await refreshProfile();
-      
+
       setSuccess(true);
-      
+
       // Redirect to dashboard after a short delay
       setTimeout(() => {
         navigate('/developer', { replace: true });
       }, 2000);
-      
+
     } catch (err: any) {
-      console.error('Error saving GitHub installation ID:', err);
-      setError(err.message || 'Failed to save GitHub installation ID');
+      console.error('Error completing GitHub App setup:', err);
+      setError(err.message || 'Failed to complete GitHub App setup');
     } finally {
       setLoading(false);
     }
@@ -74,13 +76,13 @@ export const GitHubAppSetup = () => {
             <Github className="w-10 h-10 text-white" />
           </div>
         </div>
-        
+
         <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
-          {loading ? 'Connecting GitHub...' : 
-           success ? 'GitHub Connected!' : 
-           'GitHub Connection'}
+          {loading ? 'Connecting GitHub...' :
+            success ? 'GitHub Connected!' :
+            'GitHub Connection'}
         </h1>
-        
+
         {loading && (
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
@@ -92,7 +94,7 @@ export const GitHubAppSetup = () => {
             </p>
           </div>
         )}
-        
+
         {success && (
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -104,7 +106,7 @@ export const GitHubAppSetup = () => {
             </p>
           </div>
         )}
-        
+
         {error && (
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -118,14 +120,8 @@ export const GitHubAppSetup = () => {
             </button>
           </div>
         )}
-        
-        {installationId && !loading && !error && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-            <p className="text-sm text-gray-600">
-              Installation ID: <span className="font-mono text-xs">{installationId}</span>
-            </p>
-          </div>
-        )}
+
+        {/* Removed the display of installationIdFromUrl here, as it's an internal detail */}
       </div>
     </div>
   );
