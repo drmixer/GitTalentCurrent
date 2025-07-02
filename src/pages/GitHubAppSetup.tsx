@@ -1,67 +1,103 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth'; // Ensure this is the correct path to your useAuth hook
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase'; // Import supabase directly for this component
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, refreshProfile, loading: authLoading } = useAuth(); // Get authLoading state
+  const { user, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null); // Renamed for clarity
+  const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // If auth is still loading, wait for it
+    console.log('GitHubAppSetup useEffect - Current URL search params:', location.search); // Keep this log
+
     if (authLoading) {
+      console.log('GitHubAppSetup useEffect - Auth still loading, waiting...');
       return;
     }
 
-    // If user is not authenticated, redirect to login
     if (!user) {
+      console.log('GitHubAppSetup useEffect - User not authenticated, redirecting to login.');
       navigate('/login', { replace: true });
       return;
     }
 
-    // Extract installation_id from URL query parameters
     const params = new URLSearchParams(location.search);
+    // Directly look for 'installation_id' from GitHub's redirect
     const installation_id = params.get('installation_id');
+    const setup_action = params.get('setup_action');
 
-    if (installation_id) {
+    console.log('GitHubAppSetup useEffect - Found installation_id:', installation_id);
+    console.log('GitHubAppSetup useEffect - Found setup_action:', setup_action);
+
+    if (installation_id && setup_action === 'install') {
       setInstallationIdFromUrl(installation_id);
-      // We don't directly save it here anymore.
-      // AuthContext's handleGitHubSignIn should have already processed it
-      // from user_metadata during the OAuth callback.
-      // We just need to ensure the profile is refreshed to pick up any changes.
+      console.log('GitHubAppSetup useEffect - Installation ID and setup_action found. Saving and completing setup...');
+      saveInstallationIdAndCompleteSetup(installation_id); // Call new function
+    } else if (setup_action === 'update') {
+      console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.');
+      // For updates, the ID might not be explicitly passed, just refresh profile
       completeSetup();
     } else {
-      // This path might be hit if the user manually navigates here
-      // or if GitHub's redirect didn't include the ID for some reason.
+      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL.');
       setLoading(false);
-      setError('No GitHub App installation ID found in the URL. Please try connecting your GitHub account again.');
+      setError('No GitHub App installation ID found in the URL. Please ensure you installed the app and try connecting your GitHub account again.');
     }
-  }, [location, user, navigate, refreshProfile, authLoading]); // Added authLoading to dependencies
+  }, [location, user, navigate, refreshProfile, authLoading]);
+
+  // New function to directly save installation ID and then complete setup
+  const saveInstallationIdAndCompleteSetup = async (id: string) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Directly update the developer profile with the installation ID
+      const { error: updateError } = await supabase
+        .from('developers')
+        .update({ github_installation_id: id })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Error saving GitHub installation ID directly:', updateError);
+        throw updateError;
+      }
+      console.log('✅ GitHub installation ID saved directly to Supabase.');
+
+      await completeSetup(); // Now proceed with the rest of the setup (profile refresh, redirect)
+
+    } catch (err: any) {
+      console.error('GitHubAppSetup Error saving installation ID and completing setup:', err);
+      setError(err.message || 'Failed to save GitHub installation ID and complete setup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const completeSetup = async () => {
     try {
       setLoading(true);
       setError('');
-
-      // Refresh the profile to ensure the latest data, including github_installation_id, is loaded
-      // AuthContext's handleGitHubSignIn should have already processed and saved it
-      // when the user signed in via GitHub OAuth.
-      await refreshProfile();
+      console.log('GitHubAppSetup completeSetup - Initiating profile refresh...');
+      await refreshProfile(); // This will ensure AuthContext has the latest profile data
 
       setSuccess(true);
-
-      // Redirect to dashboard after a short delay
+      console.log('GitHubAppSetup completeSetup - Setup successful, redirecting to dashboard...');
       setTimeout(() => {
         navigate('/developer', { replace: true });
       }, 2000);
 
     } catch (err: any) {
-      console.error('Error completing GitHub App setup:', err);
+      console.error('GitHubAppSetup Error completing GitHub App setup:', err);
       setError(err.message || 'Failed to complete GitHub App setup');
     } finally {
       setLoading(false);
@@ -120,8 +156,6 @@ export const GitHubAppSetup = () => {
             </button>
           </div>
         )}
-
-        {/* Removed the display of installationIdFromUrl here, as it's an internal detail */}
       </div>
     </div>
   );
