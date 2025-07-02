@@ -20,13 +20,11 @@ import { JobRole } from '../../types';
 
 interface JobSearchListProps {
   onViewJobDetails?: (jobRoleId: string) => void;
-  onExpressInterest?: (jobRoleId: string) => void;
   onViewRecruiter?: (recruiterId: string) => void;
   onViewDetails?: (jobRoleId: string) => void;
 }
 
 export const JobSearchList: React.FC<JobSearchListProps> = ({
-  onViewDetails,
   onViewJobDetails,
   onExpressInterest,
   onViewRecruiter
@@ -86,10 +84,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   };
 
   const handleViewDetails = (jobId: string) => {
-    if (onViewDetails) {
-      console.log('View details clicked for job:', jobId);
-      onViewDetails(jobId);
-    } else if (onViewJobDetails) {
+    if (onViewJobDetails) {
       console.log('View details clicked for job:', jobId);
       onViewJobDetails(jobId); 
     }
@@ -98,7 +93,11 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   const handleExpressInterest = (jobId: string) => {
     if (onExpressInterest) {
       console.log('Express interest clicked for job:', jobId); 
-      onExpressInterest(jobId);
+      try {
+        onExpressInterest(jobId);
+      } catch (error) {
+        console.error('Error expressing interest:', error);
+      }
     }
   };
 

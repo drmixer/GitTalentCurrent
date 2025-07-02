@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X } from 'lucide-react';
+import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { NotificationBadge } from '../Notifications/NotificationBadge';
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
@@ -186,6 +187,20 @@ export const Header = () => {
                   <Link
                     to="/profile"
                     className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-semibold">{getDisplayName()}</span>
+                  </Link>
+                  <Link
+                    to={`${getDashboardPath()}?tab=notifications`}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
+                  >
+                    <NotificationBadge />
+                    <Bell className="w-4 h-4" />
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm font-semibold">{getDisplayName()}</span>

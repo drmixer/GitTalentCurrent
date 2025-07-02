@@ -9,7 +9,7 @@ import {
   TrendingUp, 
   Plus,
   Search,
-  Filter,
+  Bell,
   Eye,
   Edit,
   Trash2,
@@ -29,6 +29,7 @@ import {
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { DeveloperList } from '../components/DeveloperList';
+import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
@@ -50,7 +51,7 @@ interface MessageThread {
 
 export const RecruiterDashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'search-devs' | 'messages' | 'hires'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'search-devs' | 'messages' | 'notifications' | 'hires'>('overview');
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
@@ -75,6 +76,7 @@ export const RecruiterDashboard = () => {
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [showHireModal, setShowHireModal] = useState(false);
   const [editingJob, setEditingJob] = useState<JobRole | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [jobInterestCounts, setJobInterestCounts] = useState<{[jobId: string]: number}>({});
@@ -100,7 +102,8 @@ export const RecruiterDashboard = () => {
         fetchStats(),
         fetchJobRoles(),
         fetchHires(),
-        fetchJobInterestCounts()
+        fetchJobInterestCounts(),
+        fetchUnreadNotificationsCount()
       ]);
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -218,6 +221,23 @@ export const RecruiterDashboard = () => {
       setJobInterestCounts(counts);
     } catch (error: any) {
       console.error('Error fetching job interest counts:', error);
+    }
+  };
+
+  const fetchUnreadNotificationsCount = async () => {
+    try {
+      if (!userProfile?.id) return;
+      
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userProfile.id)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      setUnreadNotifications(count || 0);
+    } catch (error: any) {
+      console.error('Error fetching unread notifications count:', error);
     }
   };
 
@@ -365,6 +385,12 @@ export const RecruiterDashboard = () => {
       } : undefined
     });
     setActiveTab('messages');
+  };
+
+  const handleViewNotificationJobRole = (jobRoleId: string) => {
+    setSelectedJobId(jobRoleId);
+    setShowJobDetails(true);
+    setActiveTab('my-jobs');
   };
 
   const handleHireSuccess = async () => {
@@ -1001,6 +1027,22 @@ export const RecruiterDashboard = () => {
                 )}
               </button>
               <button
+                onClick={() => setActiveTab('notifications')}
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                  activeTab === 'notifications'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Bell className="w-5 h-5 mr-2" />
+                Notifications
+                {unreadNotifications > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {unreadNotifications}
+                  </span>
+                )}
+              </button>
+              <button
                 onClick={() => setActiveTab('hires')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'hires'
@@ -1055,6 +1097,15 @@ export const RecruiterDashboard = () => {
         {activeTab === 'search-devs' && renderSearchDevelopers()}
         {activeTab === 'messages' && renderMessages()}
         {activeTab === 'hires' && renderHires()}
+        {activeTab === 'notifications' && (
+          <NotificationList 
+            onViewJobRole={handleViewNotificationJobRole}
+            onViewMessage={(messageId) => {
+              // Handle viewing message
+              setActiveTab('messages');
+            }}
+          />
+        )}
 
         {/* Job Form Modal */}
         {showJobForm && (

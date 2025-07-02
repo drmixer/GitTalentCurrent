@@ -196,3 +196,14 @@ export interface Hire {
   created_at: string;
   assignment?: Assignment;
 }
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  entity_id: string;
+  entity_type: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
