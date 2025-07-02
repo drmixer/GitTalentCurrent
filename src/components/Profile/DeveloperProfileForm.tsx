@@ -56,6 +56,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     resume_url: '',
     profile_pic_url: '',
     public_profile_slug: '',
+    github_installation_id: '',
     notification_preferences: {
       email: true,
       in_app: true,
@@ -108,6 +109,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         top_languages: initialData.top_languages || prev.top_languages || [],
         resume_url: initialData.resume_url || prev.resume_url || '',
         profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url || '',
+        public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug || '',
+        github_installation_id: initialData.github_installation_id || prev.github_installation_id || '',
         notification_preferences: initialData.notification_preferences || prev.notification_preferences || {
           email: true,
           in_app: true,
@@ -310,7 +313,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         location: formData.location.trim(),
         resume_url: formData.resume_url.trim(),
         profile_pic_url: formData.profile_pic_url.trim(),
-        notification_preferences: formData.notification_preferences
+        notification_preferences: formData.notification_preferences,
+        github_installation_id: formData.github_installation_id
       };
 
       let success;
