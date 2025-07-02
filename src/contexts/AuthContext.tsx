@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Handling GitHub sign-in for user:', authUser.id);
-      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
+      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2)); // Keep this log for diagnostics
 
       const pendingName = localStorage.getItem('pendingGitHubName');
       localStorage.removeItem('pendingGitHubName');
@@ -252,8 +252,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        // IMPORTANT: Request installation_id directly from GitHub to our frontend
-        redirectTo: `${window.location.origin}/github-setup?installation_id=true`, // Added query param
+        // REVERTED: Removed ?installation_id=true from here.
+        // Supabase will handle the redirect to this URL after OAuth.
+        redirectTo: `${window.location.origin}/github-setup`,
         scopes: 'read:user user:email'
       },
     });
