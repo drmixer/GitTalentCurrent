@@ -2,9 +2,10 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import { create, verify } from 'npm:jsonwebtoken@9.0.2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://gittalent.dev",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400"
 };
 
 // GitHub App credentials from environment variables
