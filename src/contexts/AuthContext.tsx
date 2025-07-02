@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode, useContext } from 'react'; // Added useContext
+import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types';
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(newUser);
 
         if (newUser) {
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') { // Added INITIAL_SESSION
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
             console.log('✅ User signed in, handling profile setup...');
             // Add a small delay to ensure database operations are complete
             // This delay is a workaround and should ideally be replaced by proper event handling/polling
@@ -101,12 +101,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMounted(false);
       subscription.unsubscribe();
     };
-  }, [signingOut]); // Keep signingOut in dependencies
+  }, [signingOut]);
 
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Handling GitHub sign-in for user:', authUser.id);
-      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata));
+      // This console.log is crucial for debugging if the issue persists
+      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
       // Get the name from localStorage if it was set during signup
       const pendingName = localStorage.getItem('pendingGitHubName');
@@ -136,9 +137,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // If this is a GitHub user, also try to create/update developer profile with GitHub data
       if (githubUsername && userRole === 'developer') {
-        // Pass installation_id if available from the metadata (e.g., from the redirect)
-        const githubInstallationId = authUser.user_metadata?.github_installation_id || null;
-        // CORRECTED LINE: Use authUser.user_metadata
+        // --- Robust extraction of installation_id ---
+        let githubInstallationId: string | null = null;
+        if (authUser.user_metadata?.installation_id) {
+          githubInstallationId = String(authUser.user_metadata.installation_id);
+        } else if (authUser.user_metadata?.github?.installation_id) { // Check for nested 'github' object
+          githubInstallationId = String(authUser.user_metadata.github.installation_id);
+        } else if (authUser.user_metadata?.app_installation_id) { // Another common key
+          githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        }
+        // If the installation_id is part of raw_user_meta_data (stringified JSON)
+        if (!githubInstallationId && typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
+          try {
+            const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
+            if (rawMetaData.installation_id) {
+              githubInstallationId = String(rawMetaData.installation_id);
+            }
+          } catch (parseError) {
+            console.warn('Could not parse raw_user_meta_data for installation_id:', parseError);
+          }
+        }
+        // --- End robust extraction ---
+
         await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
       }
     } catch (error) {
@@ -168,7 +188,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         experience_years: 0,
         desired_salary: 0,
         profile_pic_url: avatarUrl || '',
-        github_installation_id: installationId || existingProfile?.github_installation_id || null // Preserve existing ID if not new
+        // Use the provided installationId, or existing, or null
+        github_installation_id: installationId || existingProfile?.github_installation_id || null
       };
 
       if (existingProfile) {
@@ -237,7 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`, // Ensure this URL is registered in your GitHub App settings
+        redirectTo: `${window.location.origin}/github-setup`, // Ensure this URL is registered in your GitHub App settings
         scopes: 'read:user user:email' // Minimal scopes needed
       },
     });
@@ -375,6 +396,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Create developer profile if needed
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
+        // --- Robust extraction of installation_id for initial creation ---
+        let githubInstallationId: string | null = null;
+        if (authUser.user_metadata?.installation_id) {
+          githubInstallationId = String(authUser.user_metadata.installation_id);
+        } else if (authUser.user_metadata?.github?.installation_id) {
+          githubInstallationId = String(authUser.user_metadata.github.installation_id);
+        } else if (authUser.user_metadata?.app_installation_id) {
+          githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        }
+        if (!githubInstallationId && typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
+          try {
+            const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
+            if (rawMetaData.installation_id) {
+              githubInstallationId = String(rawMetaData.installation_id);
+            }
+          } catch (parseError) {
+            console.warn('Could not parse raw_user_meta_data for installation_id during creation:', parseError);
+          }
+        }
+        // --- End robust extraction ---
+
         const { error: devError } = await supabase
           .from('developers')
           .insert({
@@ -388,7 +430,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             experience_years: 0,
             desired_salary: 0,
             profile_pic_url: avatarUrl,
-            github_installation_id: authUser.user_metadata?.github_installation_id || null // Capture installation_id here
+            github_installation_id: githubInstallationId // Use the extracted ID
           });
 
         if (devError) {
@@ -469,7 +511,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setNeedsOnboarding(false);
         }
 
-        setDeveloperProfile(null); // Ensure developerProfile is null for recruiters
+        setDeveloperProfile(null);
       } else {
         setDeveloperProfile(null);
       }
@@ -722,7 +764,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// --- NEW: Custom hook to consume the AuthContext ---
+// --- Custom hook to consume the AuthContext ---
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
