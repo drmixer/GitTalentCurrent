@@ -1,32 +1,45 @@
+// src/components/GitHub/RealGitHubChart.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Star, GitFork, ExternalLink, Loader, AlertCircle, RefreshCw, Github } from 'lucide-react';
-import { useGitHub } from '../../hooks/useGitHub';
-import { useAuth } from '../../hooks/useAuth';
+import { useGitHub } from '../../hooks/useGitHub'; // Assuming this hook provides the GitHub data
+import { useAuth } from '../../contexts/AuthContext'; // Assuming AuthContext provides user info
 
 interface RealGitHubChartProps {
   githubHandle: string;
   className?: string;
 }
 
+// Define types for contribution data for better type safety
+interface ContributionDay {
+  date: string;
+  count: number;
+  level: number;
+}
+
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, className = '' }) => {
-  const { 
-    user: githubUser, 
-    repos, 
-    totalStars, 
-    languages, 
-    contributions,
-    loading, 
-    error, 
-    refreshGitHubData 
+  const {
+    gitHubData, // This now contains user, repos, totalStars, languages, contributions, installationId
+    loading,
+    error,
+    refreshGitHubData
   } = useGitHub();
   const { developerProfile } = useAuth();
 
+  // Destructure directly from gitHubData for easier access
+  const githubUser = gitHubData?.user;
+  const repos = gitHubData?.repos || [];
+  const totalStars = gitHubData?.totalStars || 0;
+  const languages = gitHubData?.languages || {};
+  const contributions = gitHubData?.contributions || [];
+  const installationId = gitHubData?.installationId; // Get installationId from gitHubData
+
   console.log('RealGitHubChart - Rendering with handle:', githubHandle || 'none');
-  console.log('RealGitHubChart - GitHub data:', { 
-    userLoaded: !!githubUser, 
-    reposCount: repos.length, 
-    loading, 
-    error: error || 'none' 
+  console.log('RealGitHubChart - GitHub data:', {
+    userLoaded: !!githubUser,
+    reposCount: repos.length,
+    loading,
+    error: error || 'none'
   });
 
   useEffect(() => {
@@ -34,7 +47,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
       console.log('RealGitHubChart - GitHub handle effect triggered:', githubHandle);
       refreshGitHubData(githubHandle);
     }
-  }, [githubHandle]);
+  }, [githubHandle, refreshGitHubData]); // Added refreshGitHubData to dependency array for correctness
 
   const getColorClass = (level: number): string => {
     switch (level) {
@@ -49,13 +62,13 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
 
   const getTooltipText = (day: { date: string; count: number }): string => {
     const date = new Date(day.date);
-    const formattedDate = date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    const formattedDate = date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
-    
+
     if (day.count === 0) {
       return `No contributions on ${formattedDate}`;
     } else if (day.count === 1) {
@@ -65,18 +78,66 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
     }
   };
 
+  // --- NEW LOGIC FOR CHART GRID DATA ---
+  // Group contributions by week for display, ensuring a consistent 7-day week structure
+  const weeks: ContributionDay[][] = [];
+  let currentWeek: ContributionDay[] = [];
+
+  // Find the first day of the week for the start of the contributions array
+  // This pads the beginning of the first week if it doesn't start on Sunday
+  if (contributions.length > 0) {
+    const firstDate = new Date(contributions[0].date);
+    const dayOfWeek = firstDate.getDay(); // 0 for Sunday, 6 for Saturday
+    for (let i = 0; i < dayOfWeek; i++) {
+      currentWeek.push({ date: '', count: 0, level: 0 }); // Placeholder for empty days
+    }
+  }
+
+  contributions.forEach((day) => {
+    currentWeek.push(day);
+    if (currentWeek.length === 7) { // A full week
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+  });
+
+  // Add any remaining days as a partial last week
+  if (currentWeek.length > 0) {
+    // Pad the last week with empty days if needed
+    while (currentWeek.length < 7) {
+      currentWeek.push({ date: '', count: 0, level: 0 });
+    }
+    weeks.push(currentWeek);
+  }
+
+  // Ensure we have enough weeks to display a full year (approx 53 weeks)
+  // This is for visual consistency, filling any gaps if data is shorter than a full year
+  while (weeks.length < 53) { // A typical GitHub calendar has about 53 weeks
+    weeks.push(Array(7).fill({ date: '', count: 0, level: 0 }));
+  }
+  // --- END NEW LOGIC FOR CHART GRID DATA ---
+
   // Calculate stats from contributions
-  const totalContributions = contributions?.reduce((sum, day) => sum + day.count, 0) || 0;
-  
+  const totalContributions = contributions.reduce((sum, day) => sum + day.count, 0);
+
   const currentStreak = (() => {
     if (!contributions || contributions.length === 0) return 0;
     let streak = 0;
+    // Iterate backwards from the most recent day
     for (let i = contributions.length - 1; i >= 0; i--) {
-      if (contributions[i].count > 0) {
-        streak++;
-      } else {
-        break;
-      }
+        // Check if the date is today or in the past
+        const dayDate = new Date(contributions[i].date);
+        const today = new Date();
+        today.setHours(0,0,0,0); // Normalize today's date to compare only date part
+
+        // If it's today and there are contributions, start/continue streak
+        // If it's a past day with contributions, continue streak
+        // If it's a past day with no contributions, break streak
+        if (contributions[i].count > 0) {
+            streak++;
+        } else if (dayDate.getTime() < today.getTime()) { // Only break if past day has no contributions
+            break;
+        }
     }
     return streak;
   })();
@@ -85,7 +146,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
     if (!contributions || contributions.length === 0) return 0;
     let maxStreak = 0;
     let currentStreakCount = 0;
-    
+
     contributions.forEach(day => {
       if (day.count > 0) {
         currentStreakCount++;
@@ -94,25 +155,27 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
         currentStreakCount = 0;
       }
     });
-    
+
     return maxStreak;
   })();
 
   // Calculate average contributions per day
-  const averagePerDay = contributions?.length 
-    ? Math.round((totalContributions / contributions.length) * 10) / 10 
+  const averagePerDay = contributions.length
+    ? Math.round((totalContributions / contributions.length) * 10) / 10
     : 0;
 
   // Get top languages
-  const topLanguages = Object.entries(languages || {})
-    .sort(([, a], [, b]) => b - a)
+  const topLanguages = Object.entries(languages)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 4);
-  
+
   // Calculate total bytes for percentage calculation
   const totalBytes = topLanguages.reduce((sum, [, bytes]) => sum + bytes, 0);
 
   // Check if this is the user's own profile
+  // Use installationId to check if GitHub App is connected for this profile
   const isOwnProfile = developerProfile?.github_handle === githubHandle;
+  const isGitHubAppConnected = !!installationId; // Check if installationId is available
 
   if (!githubHandle) {
     return (
@@ -160,15 +223,17 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
         </div>
         <div className="px-8 py-6">
           <div className="bg-red-50 rounded-xl p-4 mb-4">
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-red-600">{error.message || "An unknown error occurred."}</p> {/* Use error.message */}
           </div>
-          {isOwnProfile && !developerProfile?.github_installation_id && (
+          {isOwnProfile && !isGitHubAppConnected && ( // Use isGitHubAppConnected here
             <div className="bg-blue-50 rounded-xl p-4 mb-4">
               <p className="text-sm text-blue-600">
                 Connect your GitHub App to display your real contribution data.
               </p>
-              <a 
+              <a
                 href="https://github.com/apps/gittalentapp/installations/new"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center text-sm font-medium text-blue-700"
               >
                 <Github className="w-4 h-4 mr-1" />
@@ -176,8 +241,8 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
               </a>
             </div>
           )}
-          <button 
-            onClick={() => refreshGitHubData(githubHandle)} 
+          <button
+            onClick={() => refreshGitHubData(githubHandle)}
             className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -206,8 +271,8 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           <div className="bg-gray-50 rounded-xl p-4 mb-4">
             <p className="text-sm text-gray-600">GitHub data not available for this user. The handle may be incorrect or the GitHub API may be experiencing issues.</p>
           </div>
-          <button 
-            onClick={() => refreshGitHubData(githubHandle)} 
+          <button
+            onClick={() => refreshGitHubData(githubHandle)}
             className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -226,9 +291,9 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           <div className="relative">
             <div className="w-16 h-16 bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
               {githubUser.avatar_url ? (
-                <img 
-                  src={githubUser.avatar_url} 
-                  alt={githubUser.login} 
+                <img
+                  src={githubUser.avatar_url}
+                  alt={githubUser.login}
                   className="w-16 h-16 object-cover"
                 />
               ) : (
@@ -274,49 +339,72 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           <h4 className="text-sm font-bold text-gray-900">Contribution Activity</h4>
           <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">Last 12 months</span>
         </div>
-        
+
         {/* Contribution Graph - Always show a full grid of 365 days */}
-        <div className="mb-6">
-          <div className="grid grid-cols-52 gap-1 mb-3">
-            {contributions && contributions.length > 0 ? (
-              // Display actual contributions data
-              contributions.map((day, index) => (
-                <div
-                  key={index}
-                  className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
-                  title={getTooltipText(day)}
-                />
-              ))
-            ) : (
-              // If no contributions data, show empty grid
-              Array.from({ length: 365 }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-3 h-3 rounded-sm bg-gray-100 hover:bg-gray-200 hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110"
-                  title={`No contributions`}
-                />
-              ))
-            )}
-          </div>
-          
-          {/* Legend */}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span className="font-medium">Less</span>
-            <div className="flex items-center space-x-1">
-              <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
-              <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+        <div className="mb-6 overflow-x-auto pb-2"> {/* Added overflow-x-auto for horizontal scrolling */}
+          <div className="flex items-start"> {/* Flex container for day labels and main grid */}
+            {/* Day of the week labels */}
+            <div className="flex flex-col text-xs text-gray-500 mr-2 mt-1"> {/* Adjusted margin-top for alignment */}
+              <span>S</span>
+              <span>M</span>
+              <span>T</span>
+              <span>W</span>
+              <span>T</span>
+              <span>F</span>
+              <span>S</span>
             </div>
-            <span className="font-medium">More</span>
+
+            {/* Main Contribution Grid */}
+            <div className="grid grid-flow-col grid-rows-7 gap-1 auto-cols-min"> {/* Key change for grid layout */}
+              {weeks.map((week, weekIndex) => (
+                <div key={weekIndex} className="flex flex-col gap-1"> {/* Each week is a column */}
+                  {week.map((day, dayIndex) => (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
+                      title={getTooltipText(day)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-6 text-center">
+        {/* Legend */}
+        <div className="flex items-center justify-between text-xs text-gray-500 mt-2"> {/* Adjusted margin-top */}
+          <span className="font-medium">Less</span>
+          <div className="flex items-center space-x-1">
+            <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
+            <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
+            <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
+            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
+            <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+          </div>
+          <span className="font-medium">More</span>
+        </div>
+
+        {/* Streak and Average Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-center">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
-            <div className="text-2xl font-black text-gray-900">{githubUser.public_repos}</div>
+            <div className="text-2xl font-black text-gray-900">{currentStreak}</div>
+            <div className="text-xs font-semibold text-gray-600">Current Streak</div>
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100">
+            <div className="text-2xl font-black text-gray-900">{longestStreak}</div>
+            <div className="text-xs font-semibold text-gray-600">Longest Streak</div>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-4 border border-yellow-100">
+            <div className="text-2xl font-black text-gray-900">{averagePerDay}</div>
+            <div className="text-xs font-semibold text-gray-600">Avg. / Day</div>
+          </div>
+        </div>
+
+        {/* Stats Grid (Repositories, Contributions, Stars) */}
+        {/* Moved this section below streaks for better flow, matching mock's general layout */}
+        <div className="grid grid-cols-3 gap-6 mt-6 mb-6 text-center">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
+            <div className="text-2xl font-black text-gray-900">{repos.length}</div>
             <div className="text-xs font-semibold text-gray-600">Repositories</div>
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100">
@@ -338,11 +426,11 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
           <div className="space-y-3">
             {topLanguages.length > 0 ? (
               topLanguages.map(([language, bytes], index) => {
-                const percentage = Math.round((bytes / totalBytes) * 100);
-                const colorClass = index === 0 ? "bg-blue-500" : 
-                                 index === 1 ? "bg-yellow-500" : 
-                                 index === 2 ? "bg-green-500" : 
-                                 "bg-purple-500";
+                const percentage = totalBytes > 0 ? Math.round((bytes / totalBytes) * 100) : 0; // Prevent division by zero
+                const colorClass = index === 0 ? "bg-blue-500" :
+                                   index === 1 ? "bg-yellow-500" :
+                                   index === 2 ? "bg-green-500" :
+                                   "bg-purple-500";
                 return (
                   <div key={language} className="flex items-center text-sm">
                     <div className={`w-3 h-3 rounded-full mr-3 ${colorClass}`}></div>
@@ -357,20 +445,20 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
               </div>
             )}
           </div>
-          
+
           {/* Language Progress Bar */}
           {topLanguages.length > 0 && (
             <div className="flex mt-4 h-2 bg-gray-200 rounded-full overflow-hidden shadow-inner">
               {topLanguages.map(([language, bytes], index) => {
-                const percentage = (bytes / totalBytes) * 100;
-                const colorClass = index === 0 ? "bg-blue-500" : 
-                                 index === 1 ? "bg-yellow-500" : 
-                                 index === 2 ? "bg-green-500" : 
-                                 "bg-purple-500";
+                const percentage = totalBytes > 0 ? (bytes / totalBytes) * 100 : 0; // Prevent division by zero
+                const colorClass = index === 0 ? "bg-blue-500" :
+                                   index === 1 ? "bg-yellow-500" :
+                                   index === 2 ? "bg-green-500" :
+                                   "bg-purple-500";
                 return (
-                  <div 
+                  <div
                     key={language}
-                    className={colorClass} 
+                    className={colorClass}
                     style={{ width: `${percentage}%` }}
                   ></div>
                 );
@@ -387,20 +475,22 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({ githubHandle, 
                 <Github className="w-4 h-4 mr-2 text-gray-600" />
                 <span className="text-sm font-medium text-gray-700">GitHub App</span>
               </div>
-              {developerProfile?.github_installation_id ? (
+              {isGitHubAppConnected ? (
                 <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
                   Connected
                 </span>
               ) : (
-                <a 
+                <a
                   href="https://github.com/apps/gittalentapp/installations/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full hover:bg-blue-200 transition-colors"
                 >
                   Connect App
                 </a>
               )}
             </div>
-            {!developerProfile?.github_installation_id && (
+            {!isGitHubAppConnected && (
               <p className="text-xs text-gray-500 mt-2">
                 Connect the GitHub App to display your real contribution data.
               </p>
