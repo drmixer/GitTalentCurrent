@@ -192,14 +192,14 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
     if (!handleToUse) {
-      console.log('refreshGitHubData - No GitHub handle provided or found in profile');
+      console.log('refreshGitHubData - No GitHub handle provided or found in profile.');
       setLoading(false);
       setError(new Error('No GitHub handle provided'));
       return;
     }
 
     if (fetchInProgress && lastFetchedHandle === handleToUse) {
-      console.log('refreshGitHubData - Fetch already in progress for handle:', handleToUse);
+      console.log('refreshGitHubData - Fetch already in progress for handle:', handleToUse, 'Skipping duplicate request.');
       return;
     }
 
@@ -207,10 +207,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]);
 
 
-  // MODIFIED EFFECT: Trigger refresh when handle OR installation ID changes, with a delay
+  // Trigger refresh when handle OR installation ID changes, with a delay
   useEffect(() => {
     if (developerProfile?.github_handle) {
-      console.log('useGitHub - GitHub handle or installation ID changed in developer profile, scheduling refresh.');
+      console.log('useGitHub - GitHub handle or installation ID changed in developer profile, scheduling refresh in 200ms.');
       // Add a small delay to ensure developerProfile is fully updated in AuthContext
       const timer = setTimeout(() => {
         refreshGitHubData(developerProfile.github_handle);
@@ -218,7 +218,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       return () => clearTimeout(timer); // Cleanup timer if component unmounts or deps change
     } else if (!authLoading && !developerProfile?.github_handle) {
-      console.log('useGitHub - No GitHub handle found in developer profile');
+      console.log('useGitHub - No GitHub handle found in developer profile.');
       setGitHubData({
         user: null,
         repos: [],
@@ -226,6 +226,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         totalStars: 0,
         contributions: [],
       });
+      
       setLoading(false);
       setError(new Error('No GitHub handle provided in your profile. Please add it.'));
     }
