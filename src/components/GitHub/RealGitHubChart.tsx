@@ -1,18 +1,15 @@
 import React from 'react';
-import { useGitHub } from '../../hooks/useGitHub';
-import { useAuth } from '../../hooks/useAuth'; // Import useAuth to check developerProfile
+import { useGitHub } from '../../hooks/useGitHub'; // Corrected path by Bolt
+import { useAuth } from '../../hooks/useAuth'; // Corrected path by Bolt
 import { Github, Loader, AlertCircle } from 'lucide-react';
 
 export const RealGitHubChart = () => {
   const { gitHubData, loading, error } = useGitHub();
-  const { developerProfile } = useAuth(); // Get developerProfile to check for installation ID
+  const { developerProfile } = useAuth();
 
-  // IMPORTANT: Replace 'gittalentapp' with your actual GitHub App slug!
-  // You can find this in your GitHub App settings under "Public page" or "Install App" URL.
-  const GITHUB_APP_SLUG = 'gittalentapp'; // <--- YOU MUST CHANGE THIS TO YOUR APP'S SLUG
+  const GITHUB_APP_SLUG = 'gittalentapp'; // IMPORTANT: Confirm this is your actual GitHub App slug
   const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
 
-  // Determine if the GitHub App is installed based on developerProfile
   const isGitHubAppInstalled = !!developerProfile?.github_installation_id;
 
   if (loading) {
@@ -24,7 +21,6 @@ export const RealGitHubChart = () => {
     );
   }
 
-  // Display the "Connect App" message and button if the app is not installed
   if (!isGitHubAppInstalled) {
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
@@ -35,7 +31,7 @@ export const RealGitHubChart = () => {
         </p>
         <a
           href={githubAppInstallUrl}
-          target="_blank" // Open in a new tab
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold shadow-lg"
         >
@@ -47,31 +43,46 @@ export const RealGitHubChart = () => {
     );
   }
 
-  // If we reach here, it means the GitHub App is installed, and we should attempt to display data.
-  // The 'weird' chart is due to the fallback data. Once the app is connected, this will improve.
+  // --- Chart Rendering Logic ---
   return (
-    <div>
-      {/* Your existing chart rendering logic using gitHubData */}
-      <h2 className="text-2xl font-bold mb-4">GitHub Contributions for {gitHubData.user?.login || developerProfile?.github_handle || 'User'}</h2>
-      {/* Render your contribution chart here */}
-      <div className="grid grid-cols-7 gap-1 p-2 bg-gray-100 rounded-lg">
-        {gitHubData.contributions.map((day, index) => (
-          <div
-            key={index}
-            className={`w-4 h-4 rounded-sm
-              ${day.level === 0 ? 'bg-gray-200' : ''}
-              ${day.level === 1 ? 'bg-green-100' : ''}
-              ${day.level === 2 ? 'bg-green-300' : ''}
-              ${day.level === 3 ? 'bg-green-500' : ''}
-              ${day.level === 4 ? 'bg-green-700' : ''}
-            `}
-            title={`${day.count} contributions on ${day.date}`}
-          ></div>
-        ))}
+    <div className="p-4"> {/* Add padding around the entire chart section */}
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">GitHub Contributions for {gitHubData.user?.login || developerProfile?.github_handle || 'User'}</h2>
+
+      {/* NEW: Wrapper for the chart grid to control its width and centering */}
+      <div className="w-full max-w-lg mx-auto bg-gray-100 rounded-lg p-3 shadow-inner">
+        <div className="grid grid-flow-col-dense auto-cols-min gap-0.5"> {/* Adjusted gap and flow */}
+          {/* Generate 53 columns for 53 weeks in a year (approx) */}
+          {Array.from({ length: 53 }).map((_, weekIndex) => (
+            <div key={`week-${weekIndex}`} className="flex flex-col gap-0.5">
+              {/* Generate 7 rows for 7 days in a week */}
+              {Array.from({ length: 7 }).map((_, dayIndex) => {
+                // Calculate the actual index in the contributions array
+                const contributionDayIndex = (weekIndex * 7) + dayIndex;
+                const day = gitHubData.contributions[contributionDayIndex];
+
+                // Default to a gray square if no data or data is missing
+                const levelClass = day
+                  ? `bg-green-${day.level === 0 ? '200' : day.level === 1 ? '300' : day.level === 2 ? '500' : day.level === 3 ? '700' : '900'}`
+                  : 'bg-gray-200'; // Fallback for missing data
+
+                const titleText = day ? `${day.count} contributions on ${day.date}` : 'No contributions';
+
+                return (
+                  <div
+                    key={`day-${weekIndex}-${dayIndex}`}
+                    className={`w-4 h-4 rounded-sm ${levelClass}`}
+                    title={titleText}
+                  ></div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
-      <p className="text-sm text-gray-500 mt-4">
-        Total Stars: {gitHubData.totalStars} | Repos: {gitHubData.repos.length}
-      </p>
+
+      <div className="mt-4 text-sm text-gray-600 text-center">
+        <p>Total Stars: {gitHubData.totalStars} | Repos: {gitHubData.repos.length}</p>
+      </div>
     </div>
   );
 };
