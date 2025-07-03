@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js'; // Import Session type
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User, Developer, JobRole, Assignment, Hire, AuthContextType, Message } from '../types';
 
@@ -16,15 +16,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let currentMounted = true;
-    setMounted(true);
+    setMounted(true); // Ensure mounted is true on effect run
 
-    async function handleInitialSession() {
+    // Log the current environment and URL for debugging
+    console.log('--- AuthProvider Init Debug ---');
+    console.log('Current window.location.origin:', window.location.origin);
+    console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('Supabase client instance:', supabase); // Check if supabase is initialized
+    console.log('-----------------------------');
+
+    async function handleSessionFromUrl() {
       try {
-        console.log('🔄 AuthProvider: Attempting to get initial session...');
+        const params = new URLSearchParams(window.location.hash.substring(1)); // Check hash for tokens
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        const expiresIn = params.get('expires_in');
+        const tokenType = params.get('token_type');
+
+        if (accessToken && refreshToken && expiresIn && tokenType) {
+          console.log('🚀 AuthProvider: Detected URL parameters for session, attempting to set session manually...');
+          const { data: { session }, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error('❌ AuthProvider: Error setting session from URL params:', error);
+            // If setting session fails, clear the URL hash to prevent infinite loops
+            window.location.hash = '';
+            return;
+          }
+
+          if (session) {
+            console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
+            // Clear the URL hash to clean up the URL
+            window.location.hash = '';
+            // Proceed to fetch profile
+            setUser(session.user);
+            await fetchUserProfile(session.user);
+            return; // Exit, session handled
+          }
+        }
+
+        // If no URL params, try to get session normally
+        console.log('🔄 AuthProvider: No session params in URL, attempting to get initial session normally...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ AuthProvider: Error getting initial session:', error);
+          console.error('❌ AuthProvider: Error getting initial session normally:', error);
           if (currentMounted) setLoading(false);
           return;
         }
@@ -42,12 +81,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       } catch (error) {
-        console.error('❌ AuthProvider: Error in handleInitialSession:', error);
+        console.error('❌ AuthProvider: Error in handleSessionFromUrl:', error);
         if (currentMounted) setLoading(false);
       }
     }
 
-    handleInitialSession(); // Call immediately on mount
+    handleSessionFromUrl(); // Call immediately on mount
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -80,7 +119,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
           setSigningOut(false);
         } else {
-          // For other events where newUser might be null (e.g., ERROR, USER_DELETED)
           console.log('ℹ️ AuthProvider: No user in session after auth state change, setting loading to false.');
           setLoading(false);
         }
@@ -289,8 +327,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 fetchUserProfile: Fetching user profile for:', authUser.id, 'Email:', authUser.email);
       console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
-      // Give Supabase's internal session state a moment to be consistent
-      await new Promise(resolve => setTimeout(resolve, 100)); 
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
 
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
@@ -510,7 +547,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('❌ checkForRoleSpecificProfile: Error checking role-specific profile:', error);
       setNeedsOnboarding(false);
     } finally {
-      setLoading(false); // Ensure loading is false once profile checks are complete
+      setLoading(false);
     }
   };
 
