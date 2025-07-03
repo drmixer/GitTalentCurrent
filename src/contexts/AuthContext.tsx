@@ -68,6 +68,9 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
 
         if (newUser && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
           console.log('✅ User signed in, fetching profile...');
+          if (newUser.app_metadata?.provider === 'github') {
+            await handleGitHubSignIn(newUser);
+          }
           await fetchUserProfile(newUser);
         } else if (event === 'SIGNED_OUT') {
           console.log('🔄 User signed out, clearing auth state...');
@@ -183,8 +186,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         console.log('⚠️ User profile not found:', userError?.message);
         console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
 
-        // Wait a bit and try again once more - the trigger might still be processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Try immediately without delay
         
         const { data: retryUserData, error: retryError } = await supabase
           .from('users')
