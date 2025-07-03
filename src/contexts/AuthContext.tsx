@@ -93,6 +93,122 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
     };
   }, [signingOut]);
 
+  const handleGitHubSignIn = async (authUser: SupabaseUser) => {
+    try {
+      console.log('🔄 Handling GitHub sign-in for user:', authUser.id);
+      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
+
+      const pendingName = localStorage.getItem('pendingGitHubName');
+      localStorage.removeItem('pendingGitHubName');
+
+      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
+      const fullName = pendingName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
+      const avatarUrl = authUser.user_metadata?.avatar_url || '';
+
+      let githubInstallationId: string | null = null;
+      if (authUser.user_metadata?.installation_id) {
+        githubInstallationId = String(authUser.user_metadata.installation_id);
+      } else if (authUser.user_metadata?.app_installation_id) {
+        githubInstallationId = String(authUser.user_metadata.app_installation_id);
+      }
+      else if (authUser.user_metadata?.github?.installation_id) {
+        githubInstallationId = String(authUser.user_metadata.github.installation_id);
+      }
+      else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
+        try {
+          const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
+          if (rawMetaData.installation_id) {
+            githubInstallationId = String(rawMetaData.installation_id);
+          } else if (rawMetaData.app_installation_id) {
+            githubInstallationId = String(rawMetaData.app_installation_id);
+          }
+        } catch (parseError) {
+          console.warn('Could not parse raw_user_meta_data for installation_id:', parseError);
+        }
+      }
+
+      console.log('🔄 GitHub installation ID:', githubInstallationId);
+
+      const userRole = authUser.user_metadata?.role || 'developer';
+      console.log('🔄 Determined role for GitHub user:', userRole);
+
+      try {
+        const { data, error } = await supabase.rpc('create_user_profile', {
+          user_id: authUser.id,
+          user_email: authUser.email!,
+          user_name: fullName,
+          user_role: userRole,
+          company_name: authUser.user_metadata?.company_name || ''
+        });
+
+        if (error) {
+          console.warn('⚠️ Database function failed, this might be expected if profile already exists:', error);
+        }
+      } catch (err) {
+        console.warn('⚠️ Error calling create_user_profile RPC:', err);
+      }
+
+      if (githubUsername && userRole === 'developer') {
+        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
+      }
+      
+      // Fetch the user profile after creating/updating it
+      await fetchUserProfile(authUser);
+    } catch (error) {
+      console.error('❌ Error in handleGitHubSignIn:', error);
+    }
+  };
+
+  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
+    try {
+      console.log('🔄 Creating/updating GitHub developer profile for:', userId);
+      console.log('🔄 GitHub username:', githubUsername);
+      console.log('🔄 Installation ID:', installationId);
+
+      const { data: existingProfile } = await supabase
+        .from('developers')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const profileData = {
+        github_handle: githubUsername,
+        bio: githubMetadata?.bio || '',
+        availability: true,
+        top_languages: [],
+        linked_projects: [],
+        location: githubMetadata?.location || '',
+        experience_years: 0,
+        desired_salary: 0,
+        profile_pic_url: avatarUrl,
+        github_installation_id: installationId
+      };
+
+      if (existingProfile) {
+        console.log('🔄 Updating existing developer profile');
+        await supabase
+          .from('developers')
+          .update({
+            ...profileData,
+            github_installation_id: installationId || existingProfile.github_installation_id
+          })
+          .eq('user_id', userId);
+      } else {
+        console.log('🔄 Creating new developer profile');
+        await supabase
+          .from('developers')
+          .insert({
+            user_id: userId,
+            ...profileData
+          });
+      }
+
+      console.log('✅ GitHub developer profile created/updated successfully');
+    } catch (error) {
+      console.error('❌ Error in createOrUpdateGitHubDeveloperProfile:', error);
+    }
+  };
+
   const signOut = async () => {
     try {
       setSigningOut(true);
@@ -175,7 +291,8 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 Fetching user profile for:', authUser.id, 'Email:', authUser.email);
-
+      console.log('🔄 Auth user metadata (in fetchUserProfile):', JSON.stringify(authUser.user_metadata));
+      
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
         .select('*')
@@ -186,29 +303,47 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         console.log('⚠️ User profile not found:', userError?.message);
         console.log('🔄 Auth user metadata:', JSON.stringify(authUser.user_metadata));
 
-        // Try immediately without delay
-        
-        const { data: retryUserData, error: retryError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .maybeSingle();
+        // Try to create the user profile
+        try {
+          const success = await createUserProfileFromAuth(authUser);
           
-        if (!retryError && retryUserData) {
-          console.log('✅ User profile found on retry:', retryUserData.role);
-          if (mounted) {
-            setUserProfile(retryUserData);
-            await checkForRoleSpecificProfile(retryUserData, authUser.id);
+          if (success) {
+            console.log('✅ Successfully created user profile, fetching again');
+            
+            const { data: retryUserData, error: retryError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', authUser.id)
+              .maybeSingle();
+              
+            if (retryError) {
+              console.error('❌ Error fetching user profile after creation:', retryError);
+              if (mounted) {
+                setUserProfile(null);
+                setDeveloperProfile(null);
+                setNeedsOnboarding(true);
+                setLoading(false);
+              }
+              return;
+            }
+            
+            if (mounted) {
+              setUserProfile(retryUserData);
+              await checkForRoleSpecificProfile(retryUserData, authUser.id);
+            }
+          } else {
+            console.error('❌ Failed to create user profile');
+            if (mounted) {
+              setUserProfile(null);
+              setDeveloperProfile(null);
+              setNeedsOnboarding(true);
+              setLoading(false);
+            }
+            return;
           }
-        } else {
-          console.error('❌ Failed to create user profile');
-          if (mounted) {
-            setUserProfile(null);
-            setDeveloperProfile(null); 
-            setNeedsOnboarding(true);
-            setLoading(false);
-          }
-          return;
+        } catch (err) {
+          console.error('❌ Error in createUserProfileFromAuth:', err);
+          setLoading(false);
         }
       } else {
         console.log('✅ User profile found:', userProfileData.role);
@@ -227,6 +362,97 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
     }
   };
 
+  const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
+    try {
+      console.log('🔄 Creating user profile from auth user:', authUser.id);
+
+      const userRole = authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
+      const userName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User';
+      const companyName = authUser.user_metadata?.company_name || 'Company';
+      const avatarUrl = authUser.user_metadata?.avatar_url || '';
+
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: authUser.id,
+          email: authUser.email || 'unknown@example.com',
+          name: userName || authUser.email?.split('@')[0] || 'User',
+          role: userRole,
+          is_approved: userRole === 'developer' || userRole === 'admin'
+        });
+
+      if (insertError) {
+        console.error('❌ User profile creation failed:', insertError);
+        return false;
+      }
+
+      if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
+        let githubInstallationId: string | null = null;
+        if (authUser.user_metadata?.installation_id) {
+          githubInstallationId = String(authUser.user_metadata.installation_id);
+        } else if (authUser.user_metadata?.app_installation_id) {
+          githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        }
+        else if (authUser.user_metadata?.github?.installation_id) {
+          githubInstallationId = String(authUser.user_metadata.github.installation_id);
+        }
+        else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
+          try {
+            const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
+            if (rawMetaData.installation_id) {
+              githubInstallationId = String(rawMetaData.installation_id);
+            } else if (rawMetaData.app_installation_id) {
+              githubInstallationId = String(rawMetaData.app_installation_id);
+            }
+          } catch (parseError) {
+            console.warn('Could not parse raw_user_meta_data for installation_id during creation:', parseError);
+          }
+        }
+
+        const { error: devError } = await supabase
+          .from('developers')
+          .insert({
+            user_id: authUser.id,
+            github_handle: authUser.user_metadata?.user_name || '',
+            bio: authUser.user_metadata?.bio || '',
+            availability: true,
+            top_languages: [],
+            linked_projects: [],
+            location: authUser.user_metadata?.location || '',
+            experience_years: 0,
+            desired_salary: 0,
+            profile_pic_url: avatarUrl,
+            github_installation_id: githubInstallationId
+          });
+
+        if (devError) {
+          console.error('❌ Error creating developer profile:', devError);
+        } else {
+          console.log('✅ Developer profile created successfully');
+        }
+      } else if (userRole === 'recruiter') {
+        const { error: recError } = await supabase
+          .from('recruiters')
+          .insert({
+            user_id: authUser.id,
+            company_name: companyName
+          });
+
+        if (recError) {
+          console.error('❌ Error creating recruiter profile:', recError);
+        } else {
+          console.log('✅ Recruiter profile created successfully');
+        }
+      }
+
+      console.log('✅ User profile created successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Error in createUserProfileFromAuth:', error);
+      return false;
+    }
+  };
+
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       if (userProfile.role === 'developer') {
@@ -236,7 +462,7 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
           .select('*')
           .eq('user_id', userId)
           .maybeSingle();
-
+      
         if (devError) {
           console.error('❌ Error fetching developer profile:', devError);
         }
@@ -335,8 +561,8 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         bio: profileData.bio?.trim() || null,
         github_handle: profileData.github_handle?.trim() || null,
         location: profileData.location?.trim() || null,
-        linked_projects: profileData.linked_projects?.filter(p => p.trim()) || [],
-        top_languages: profileData.top_languages?.filter(l => l.trim()) || [],
+        linked_projects: profileData.linked_projects?.filter(p => p && p.trim()) || [],
+        top_languages: profileData.top_languages?.filter(l => l && l.trim()) || [],
         profile_pic_url: profileData.profile_pic_url?.trim() || null,
         github_installation_id: profileData.github_installation_id || null
       };  
