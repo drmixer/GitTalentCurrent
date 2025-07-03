@@ -1,7 +1,13 @@
 import React from 'react';
 import { useGitHub } from '../../hooks/useGitHub';
 import { useAuth } from '../../hooks/useAuth';
-import { Github, Loader, AlertCircle, Star, GitFork, Eye } from 'lucide-react';
+import { Github, Loader, AlertCircle, Star, GitFork } from 'lucide-react';
+import { 
+  getContributionColorClass, 
+  getContributionTooltipText, 
+  calculateLanguagePercentage, 
+  getLanguageColorClass 
+} from '../../utils/githubUtils';
 
 export const RealGitHubChart = ({ githubHandle, className = '' }) => {
   const { gitHubData, loading, error } = useGitHub();
@@ -80,8 +86,8 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
           {gitHubData.contributions.map((day, index) => (
             <div
               key={index}
-              className={`w-3 h-3 rounded-sm ${getColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
-              title={getTooltipText(day)}
+              className={`w-3 h-3 rounded-sm ${getContributionColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
+              title={getContributionTooltipText(day)}
             />
           ))}
         </div>
@@ -103,19 +109,19 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.totalContributions || 0}</div>
+          <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.contributions.reduce((sum, day) => sum + day.count, 0)}</div>
           <div className="text-xs font-semibold text-gray-600">Total Contributions</div>
         </div>
         <div className="text-center p-3 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{calculateCurrentStreak(gitHubData.contributions)}</div>
+          <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.currentStreak || 0}</div>
           <div className="text-xs font-semibold text-gray-600">Current Streak</div>
         </div>
         <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{calculateLongestStreak(gitHubData.contributions)}</div>
+          <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.longestStreak || 0}</div>
           <div className="text-xs font-semibold text-gray-600">Longest Streak</div>
         </div>
         <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-          <div className="text-xl font-black text-gray-900 mb-1">{calculateAveragePerDay(gitHubData.contributions)}</div>
+          <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.averageContributions || 0}</div>
           <div className="text-xs font-semibold text-gray-600">Avg per Day</div>
         </div>
       </div>
@@ -178,8 +184,8 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
           {Object.entries(gitHubData.languages || {})
             .sort(([, a], [, b]) => (b as number) - (a as number))
             .slice(0, 4)
-            .map(([language, bytes], index) => {
-              const percentage = calculatePercentage(gitHubData.languages, language);
+            .map(([language], index) => {
+              const percentage = calculateLanguagePercentage(gitHubData.languages, language);
               return (
                 <div key={index} className="flex items-center text-sm">
                   <div className={`w-3 h-3 ${getLanguageColorClass(index)} rounded-full mr-3`}></div>
@@ -195,8 +201,8 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
           {Object.entries(gitHubData.languages || {})
             .sort(([, a], [, b]) => (b as number) - (a as number))
             .slice(0, 4)
-            .map(([language, bytes], index) => {
-              const percentage = calculatePercentage(gitHubData.languages, language);
+            .map(([language], index) => {
+              const percentage = calculateLanguagePercentage(gitHubData.languages, language);
               return (
                 <div 
                   key={index} 
@@ -209,88 +215,4 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
       </div>
     </div>
   );
-};
-
-// Helper functions
-const getColorClass = (level: number): string => {
-  switch (level) {
-    case 0: return 'bg-gray-100';
-    case 1: return 'bg-emerald-200';
-    case 2: return 'bg-emerald-300';
-    case 3: return 'bg-emerald-500';
-    case 4: return 'bg-emerald-600';
-    default: return 'bg-gray-100';
-  }
-};
-
-const getTooltipText = (day: { date: string; count: number }): string => {
-  const date = new Date(day.date);
-  const formattedDate = date.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  });
-  
-  if (day.count === 0) {
-    return `No contributions on ${formattedDate}`;
-  } else if (day.count === 1) {
-    return `1 contribution on ${formattedDate}`;
-  } else {
-    return `${day.count} contributions on ${formattedDate}`;
-  }
-};
-
-const calculateCurrentStreak = (contributions: { date: string; count: number }[]): number => {
-  if (!contributions || contributions.length === 0) return 0;
-  
-  let currentStreak = 0;
-  // Start from the most recent day (end of the array)
-  for (let i = contributions.length - 1; i >= 0; i--) {
-    if (contributions[i].count > 0) {
-      currentStreak++;
-    } else {
-      break;
-    }
-  }
-  
-  return currentStreak;
-};
-
-const calculateLongestStreak = (contributions: { date: string; count: number }[]): number => {
-  if (!contributions || contributions.length === 0) return 0;
-  
-  let longestStreak = 0;
-  let currentStreak = 0;
-  
-  for (const day of contributions) {
-    if (day.count > 0) {
-      currentStreak++;
-      longestStreak = Math.max(longestStreak, currentStreak);
-    } else {
-      currentStreak = 0;
-    }
-  }
-  
-  return longestStreak;
-};
-
-const calculateAveragePerDay = (contributions: { date: string; count: number }[]): number => {
-  if (!contributions || contributions.length === 0) return 0;
-  
-  const totalContributions = contributions.reduce((sum, day) => sum + day.count, 0);
-  return Math.round((totalContributions / contributions.length) * 10) / 10; // Round to 1 decimal place
-};
-
-const calculatePercentage = (languages: Record<string, number>, language: string): number => {
-  if (!languages || Object.keys(languages).length === 0) return 0;
-  
-  const total = Object.values(languages).reduce((sum, bytes) => sum + (bytes as number), 0);
-  const percentage = ((languages[language] as number) / total) * 100;
-  return Math.round(percentage);
-};
-
-const getLanguageColorClass = (index: number): string => {
-  const colors = ['bg-blue-500', 'bg-yellow-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500'];
-  return colors[index % colors.length];
 };

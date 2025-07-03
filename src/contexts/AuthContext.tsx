@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let currentMounted = true;
     setMounted(true); // Ensure mounted is true on effect run
-
+    
     // Log the current environment and URL for debugging
     console.log('--- AuthProvider Init Debug ---');
     console.log('Current window.location.origin:', window.location.origin);
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('Supabase client instance:', supabase); // Check if supabase is initialized
     console.log('-----------------------------');
 
-    async function handleSessionFromUrl() {
+    async function handleAuthRedirect() {
       try {
         const params = new URLSearchParams(window.location.hash.substring(1)); // Check hash for tokens
         const accessToken = params.get('access_token');
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const tokenType = params.get('token_type');
 
         if (accessToken && refreshToken && expiresIn && tokenType) {
-          console.log('🚀 AuthProvider: Detected URL parameters for session, attempting to set session manually...');
+          console.log('🚀 AuthProvider: Detected URL parameters for session, setting session...');
           const { data: { session }, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -51,42 +51,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
             // Clear the URL hash to clean up the URL
             window.location.hash = '';
-            // Proceed to fetch profile
-            setUser(session.user);
-            await fetchUserProfile(session.user);
-            return; // Exit, session handled
-          }
-        }
-
-        // If no URL params, try to get session normally
-        console.log('🔄 AuthProvider: No session params in URL, attempting to get initial session normally...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('❌ AuthProvider: Error getting initial session normally:', error);
-          if (currentMounted) setLoading(false);
-          return;
-        }
-
-        console.log('✅ AuthProvider: Initial getSession() result:', session ? `User ID: ${session.user.id}` : 'No session');
-        
-        if (currentMounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            console.log('✅ AuthProvider: Initial session found, fetching user profile...');
-            await fetchUserProfile(session.user);
-          } else {
-            console.log('ℹ️ AuthProvider: No initial session found, setting loading to false.');
-            setLoading(false);
+            return; // Exit, session handled - onAuthStateChange will handle the rest
           }
         }
       } catch (error) {
-        console.error('❌ AuthProvider: Error in handleSessionFromUrl:', error);
+        console.error('❌ AuthProvider: Error in handleAuthRedirect:', error);
         if (currentMounted) setLoading(false);
       }
     }
 
-    handleSessionFromUrl(); // Call immediately on mount
+    // Check for auth redirect parameters
+    handleAuthRedirect();
+
+    // Initialize auth state
+    const initializeAuth = async () => {
+      try {
+        console.log('🔄 Initializing auth... Checking for existing session');
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('❌ Error getting session:', error);
+          if (currentMounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (currentMounted) {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            console.log('✅ Session found for user:', session.user.id);
+            await fetchUserProfile(session.user);
+          } else {
+            console.log('ℹ️ No session found');
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error initializing auth:', error);
+        if (currentMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Initialize auth after checking for redirect
+    initializeAuth();
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -303,7 +313,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
         options: {
-          data: {
+          redirectTo: `${window.location.origin}/github-setup`,
             name: userData.name,
             role: userData.role,
             company_name: userData.role === 'recruiter' ? (userData as any).company_name : undefined,
