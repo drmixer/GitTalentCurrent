@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Building
 } from 'lucide-react';
+import { GitHubConnectPrompt } from '../components/GitHubConnectPrompt';
 
 interface Developer {
   user_id: string;
@@ -100,6 +101,7 @@ export const DeveloperDashboard: React.FC = () => {
   const [selectedRecruiterId, setSelectedRecruiterId] = useState<string | null>(null);
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
+  const [showGitHubConnectPrompt, setShowGitHubConnectPrompt] = useState(false);
 
   // Define renderJobSearch function before it's used in the return statement
   const renderJobSearch = () => {
@@ -191,6 +193,11 @@ export const DeveloperDashboard: React.FC = () => {
 
       if (error) throw error;
       setDeveloper(data);
+      
+      // Check if GitHub App is not connected but GitHub handle exists
+      if (data && data.github_handle && !data.github_installation_id) {
+        setShowGitHubConnectPrompt(true);
+      }
     } catch (error) {
       console.error('Error fetching developer data:', error);
     }
@@ -714,6 +721,11 @@ export const DeveloperDashboard: React.FC = () => {
               />
             </div>
           </div>
+        )}
+
+        {/* GitHub Connect Prompt */}
+        {showGitHubConnectPrompt && (
+          <GitHubConnectPrompt onClose={() => setShowGitHubConnectPrompt(false)} />
         )}
       </div>
     </div>
