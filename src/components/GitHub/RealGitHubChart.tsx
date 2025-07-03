@@ -1,6 +1,6 @@
 import React from 'react';
-import { useGitHub } from '../hooks/useGitHub';
-import { useAuth } from '../hooks/useAuth'; // Import useAuth to check developerProfile
+import { useGitHub } from '../../hooks/useGitHub';
+import { useAuth } from '../../hooks/useAuth'; // Import useAuth to check developerProfile
 import { Github, Loader, AlertCircle } from 'lucide-react';
 
 export const RealGitHubChart = () => {
