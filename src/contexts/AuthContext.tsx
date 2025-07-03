@@ -1,11 +1,11 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js'; // Import Session type
 import { supabase } from '../lib/supabase';
 import { User, Developer, JobRole, Assignment, Hire, AuthContextType, Message } from '../types';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX: Corrected children prop type
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
@@ -15,96 +15,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
   const [mounted, setMounted] = useState(true);
 
   useEffect(() => {
-    let currentMounted = true; // Use a local variable to capture mounted status for this effect run
-    setMounted(true); // Ensure mounted is true on effect run
+    let currentMounted = true;
+    setMounted(true);
 
-    async function initializeAuth() {
+    async function handleInitialSession() {
       try {
-        console.log('🔄 Initializing auth... Checking for existing session');
+        console.log('🔄 AuthProvider: Attempting to get initial session...');
         const { data: { session }, error } = await supabase.auth.getSession();
-
+        
         if (error) {
-          console.error('❌ Error getting session:', error);
-          if (currentMounted) {
-            setLoading(false);
-          }
+          console.error('❌ AuthProvider: Error getting initial session:', error);
+          if (currentMounted) setLoading(false);
           return;
         }
 
+        console.log('✅ AuthProvider: Initial getSession() result:', session ? `User ID: ${session.user.id}` : 'No session');
+        
         if (currentMounted) {
           setUser(session?.user ?? null);
           if (session?.user) {
-            console.log('✅ Session found for user:', session.user.id, 'Email:', session.user.email);
+            console.log('✅ AuthProvider: Initial session found, fetching user profile...');
             await fetchUserProfile(session.user);
           } else {
-            console.log('ℹ️ No session found initially.');
-            setLoading(false); // Only set loading false if no user is found after initial check
+            console.log('ℹ️ AuthProvider: No initial session found, setting loading to false.');
+            setLoading(false);
           }
         }
       } catch (error) {
-        console.error('❌ Error initializing auth:', error);
-        if (currentMounted) {
-          setLoading(false);
-        }
+        console.error('❌ AuthProvider: Error in handleInitialSession:', error);
+        if (currentMounted) setLoading(false);
       }
     }
 
-    initializeAuth();
+    handleInitialSession(); // Call immediately on mount
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!currentMounted) return; // Use local mounted variable
+      if (!currentMounted) return;
 
-      console.log('🔄 Auth state changed:', event, 'User ID:', session?.user?.id, 'Signing out:', signingOut);
+      console.log('🔄 AuthProvider: Auth state changed event:', event);
+      console.log('🔄 AuthProvider: Session object from onAuthStateChange:', JSON.stringify(session, null, 2));
+      console.log('🔄 AuthProvider: User ID from onAuthStateChange:', session?.user?.id, 'Signing out:', signingOut);
       
-      // If we are explicitly signing out, ignore other events until signed out
       if (signingOut && event !== 'SIGNED_OUT') {
-        console.log('🔄 Still in signing out process, ignoring auth change');
+        console.log('🔄 AuthProvider: Still in signing out process, ignoring auth change.');
         return;
       }
 
       try {
         const newUser = session?.user ?? null;
-        setUser(newUser); // Update user state immediately
+        setUser(newUser); // Always update user state based on the latest event
 
         if (newUser) {
-          console.log(`✅ User signed in/session active (${event}), fetching profile for:`, newUser.id);
-          // If it's a GitHub login, handle profile creation/update first
+          console.log(`✅ AuthProvider: User signed in/session active (${event}), fetching profile for:`, newUser.id);
           if (newUser.app_metadata?.provider === 'github') {
             await handleGitHubSignIn(newUser);
           }
-          // Always fetch user profile after any auth event that indicates a user is present
-          await fetchUserProfile(newUser);
+          await fetchUserProfile(newUser); // Fetch profile for any user-present event
         } else if (event === 'SIGNED_OUT') {
-          console.log('🔄 User signed out, clearing auth state...');
+          console.log('🔄 AuthProvider: User signed out, clearing auth state...');
           setUserProfile(null);
           setDeveloperProfile(null);
           setNeedsOnboarding(false);
-          setLoading(false); // Ensure loading is false after sign out
+          setLoading(false);
           setSigningOut(false);
         } else {
           // For other events where newUser might be null (e.g., ERROR, USER_DELETED)
-          console.log('ℹ️ No user in session after auth state change, setting loading to false.');
+          console.log('ℹ️ AuthProvider: No user in session after auth state change, setting loading to false.');
           setLoading(false);
         }
       } catch (error) {
-        console.error('❌ Error in auth state change listener:', error);
-        if (currentMounted) {
-          setLoading(false);
-        }
+        console.error('❌ AuthProvider: Error in onAuthStateChange listener:', error);
+        if (currentMounted) setLoading(false);
       }
     });
 
     return () => {
-      currentMounted = false; // Cleanup: Mark as unmounted
+      currentMounted = false;
       subscription.unsubscribe();
     };
-  }, [signingOut]); // Depend on signingOut to re-run the effect when sign-out state changes
+  }, [signingOut]);
 
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
-      console.log('🔄 Handling GitHub sign-in for user:', authUser.id);
-      console.log('🔄 GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
+      console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
+      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
       const pendingName = localStorage.getItem('pendingGitHubName');
       localStorage.removeItem('pendingGitHubName');
@@ -131,14 +126,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
             githubInstallationId = String(rawMetaData.app_installation_id);
           }
         } catch (parseError) {
-          console.warn('Could not parse raw_user_meta_data for installation_id:', parseError);
+          console.warn('⚠️ handleGitHubSignIn: Could not parse raw_user_meta_data for installation_id:', parseError);
         }
       }
 
-      console.log('🔄 GitHub installation ID (from metadata):', githubInstallationId || 'not found');
+      console.log('🔄 handleGitHubSignIn: GitHub installation ID (from metadata):', githubInstallationId || 'not found');
 
       const userRole = authUser.user_metadata?.role || 'developer';
-      console.log('🔄 Determined role for GitHub user:', userRole);
+      console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', userRole);
 
       try {
         const { data, error } = await supabase.rpc('create_user_profile', {
@@ -150,28 +145,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         });
 
         if (error) {
-          console.warn('⚠️ Database function create_user_profile failed, might already exist:', error);
+          console.warn('⚠️ handleGitHubSignIn: Database function create_user_profile failed, might already exist:', error);
         }
       } catch (err) {
-        console.warn('⚠️ Error calling create_user_profile RPC:', err);
+        console.warn('⚠️ handleGitHubSignIn: Error calling create_user_profile RPC:', err);
       }
 
       if (githubUsername && userRole === 'developer') {
         await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
       }
-      
-      // Removed the immediate fetchUserProfile here, as it's now handled by the main onAuthStateChange listener
-      // to avoid redundant fetches and ensure consistent state updates.
     } catch (error) {
-      console.error('❌ Error in handleGitHubSignIn:', error);
+      console.error('❌ handleGitHubSignIn: Error in handleGitHubSignIn:', error);
     }
   };
 
   const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
     try {
-      console.log('🔄 Creating/updating GitHub developer profile for:', userId);
-      console.log('🔄 GitHub username:', githubUsername);
-      console.log('🔄 Installation ID (to save):', installationId);
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername);
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Installation ID (to save):', installationId);
 
       const { data: existingProfile } = await supabase
         .from('developers')
@@ -189,18 +181,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         experience_years: 0,
         desired_salary: 0,
         profile_pic_url: avatarUrl,
-        // Ensure that if installationId is null, we don't overwrite an existing one
         github_installation_id: installationId || existingProfile?.github_installation_id || null
       };
 
       if (existingProfile) {
-        console.log('🔄 Updating existing developer profile');
+        console.log('🔄 createOrUpdateGitHubDeveloperProfile: Updating existing developer profile');
         await supabase
           .from('developers')
           .update(profileData)
           .eq('user_id', userId);
       } else {
-        console.log('🔄 Creating new developer profile');
+        console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating new developer profile');
         await supabase
           .from('developers')
           .insert({
@@ -209,18 +200,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           });
       }
 
-      console.log('✅ GitHub developer profile created/updated successfully in DB');
+      console.log('✅ createOrUpdateGitHubDeveloperProfile: GitHub developer profile created/updated successfully in DB');
     } catch (error) {
-      console.error('❌ Error in createOrUpdateGitHubDeveloperProfile:', error);
+      console.error('❌ createOrUpdateGitHubDeveloperProfile: Error in createOrUpdateGitHubDeveloperProfile:', error);
     }
   };
 
   const signOut = async () => {
     try {
       setSigningOut(true);
-      console.log('🔄 Starting sign out process...');
+      console.log('🔄 signOut: Starting sign out process...');
 
-      // Clear states immediately for responsive UI
       setUser(null);
       setUserProfile(null);
       setDeveloperProfile(null);
@@ -228,14 +218,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
 
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('❌ Error during sign out:', error);
+        console.error('❌ signOut: Error during sign out:', error);
         throw error;
       }
 
-      console.log('✅ Sign out API call successful');
+      console.log('✅ signOut: Sign out API call successful');
 
     } catch (error) {
-      console.error('❌ Error in signOut:', error);
+      console.error('❌ signOut: Error in signOut:', error);
       throw error;
     } finally {
       setSigningOut(false);
@@ -243,16 +233,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
   };
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔄 Signing in with email...');
+    console.log('🔄 signIn: Signing in with email...');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error('❌ Sign in error:', error);
+      console.error('❌ signIn: Sign in error:', error);
       throw error;
     }
   };
 
   const signInWithGitHub = async () => {
-    console.log('🔄 Signing in with GitHub...');
+    console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
@@ -261,15 +251,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
       },
     });
     if (error) {
-      console.error('❌ GitHub sign in error:', error);
+      console.error('❌ signInWithGitHub: GitHub sign in error:', error);
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
-      console.log('🔄 Signing up user...');
-      console.log('🔄 User data for signup:', userData);
+      console.log('🔄 signUp: Signing up user...');
+      console.log('🔄 signUp: User data for signup:', userData);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -286,20 +276,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
       if (error) throw error;
 
       if (data?.user) {
-        console.log('✅ User signed up successfully:', data.user.id, 'with role:', userData.role);
+        console.log('✅ signUp: User signed up successfully:', data.user.id, 'with role:', userData.role);
       }
     } catch (error) {
-      console.error('❌ Signup error:', error);
+      console.error('❌ signUp: Signup error:', error);
       throw error;
     }
   };
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
-      console.log('🔄 Fetching user profile for:', authUser.id, 'Email:', authUser.email);
-      console.log('🔄 Auth user metadata (in fetchUserProfile):', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 fetchUserProfile: Fetching user profile for:', authUser.id, 'Email:', authUser.email);
+      console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
-      // Introduce a small delay to ensure Supabase's internal session state is consistent
+      // Give Supabase's internal session state a moment to be consistent
       await new Promise(resolve => setTimeout(resolve, 100)); 
 
       const { data: userProfileData, error: userError } = await supabase
@@ -309,12 +299,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         .maybeSingle();
 
       if (userError || !userProfileData) {
-        console.log('⚠️ User profile not found in DB for:', authUser.id, userError?.message);
-        console.log('🔄 Attempting to create user profile from auth data...');
+        console.log('⚠️ fetchUserProfile: User profile not found in DB for:', authUser.id, userError?.message);
+        console.log('🔄 fetchUserProfile: Attempting to create user profile from auth data...');
         const success = await createUserProfileFromAuth(authUser);
         
         if (success) {
-          // After successful creation, fetch again to get the complete profile
           await new Promise(resolve => setTimeout(resolve, 500)); // Give DB a moment to sync
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
@@ -323,8 +312,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
             .maybeSingle();
             
           if (retryError) {
-            console.error('❌ Error fetching user profile after creation attempt:', retryError);
-            if (mounted) { // Use 'mounted' to prevent state updates on unmounted component
+            console.error('❌ fetchUserProfile: Error fetching user profile after creation attempt:', retryError);
+            if (mounted) {
               setUserProfile(null);
               setDeveloperProfile(null);
               setNeedsOnboarding(true);
@@ -337,7 +326,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
             await checkForRoleSpecificProfile(retryUserData, authUser.id);
           }
         } else {
-          console.error('❌ Failed to create user profile from auth data.');
+          console.error('❌ fetchUserProfile: Failed to create user profile from auth data.');
           if (mounted) {
             setUserProfile(null);
             setDeveloperProfile(null);
@@ -347,14 +336,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           return;
         }
       } else {
-        console.log('✅ User profile found in DB:', userProfileData.role);
+        console.log('✅ fetchUserProfile: User profile found in DB:', userProfileData.role);
         if (mounted) {
           setUserProfile(userProfileData);
           await checkForRoleSpecificProfile(userProfileData, authUser.id);
         }
       }
     } catch (error) {
-      console.error('❌ Unhandled error in fetchUserProfile:', error);
+      console.error('❌ fetchUserProfile: Unhandled error in fetchUserProfile:', error);
       if (mounted) {
         setUserProfile(null);
         setDeveloperProfile(null);
@@ -365,7 +354,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
 
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
-      console.log('🔄 Creating user profile from auth user:', authUser.id);
+      console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
 
       const userRole = authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
       const userName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User';
@@ -383,12 +372,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         });
 
       if (insertUserError) {
-        console.error('❌ User profile creation failed:', insertUserError);
-        // If it's a unique constraint violation, it means it already exists, which is fine.
-        // Otherwise, it's a real error.
-        if (insertUserError.code === '23505') { // PostgreSQL unique_violation error code
-          console.warn('User profile already exists (unique constraint violation).');
-          return true; // Consider it successful if it already exists
+        console.error('❌ createUserProfileFromAuth: User profile creation failed:', insertUserError);
+        if (insertUserError.code === '23505') {
+          console.warn('⚠️ createUserProfileFromAuth: User profile already exists (unique constraint violation).');
+          return true;
         }
         return false;
       }
@@ -412,7 +399,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
               githubInstallationId = String(rawMetaData.app_installation_id);
             }
           } catch (parseError) {
-            console.warn('Could not parse raw_user_meta_data for installation_id during creation:', parseError);
+            console.warn('⚠️ createUserProfileFromAuth: Could not parse raw_user_meta_data for installation_id during creation:', parseError);
           }
         }
 
@@ -433,14 +420,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           });
 
         if (devError) {
-          console.error('❌ Error creating developer profile:', devError);
-          if (devError.code === '23505') { // Unique constraint violation
-            console.warn('Developer profile already exists (unique constraint violation).');
-            return true; // Consider it successful if it already exists
+          console.error('❌ createUserProfileFromAuth: Error creating developer profile:', devError);
+          if (devError.code === '23505') {
+            console.warn('⚠️ createUserProfileFromAuth: Developer profile already exists (unique constraint violation).');
+            return true;
           }
           return false;
         } else {
-          console.log('✅ Developer profile created successfully');
+          console.log('✅ createUserProfileFromAuth: Developer profile created successfully');
         }
       } else if (userRole === 'recruiter') {
         const { error: recError } = await supabase
@@ -451,21 +438,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           });
 
         if (recError) {
-          console.error('❌ Error creating recruiter profile:', recError);
-          if (recError.code === '23505') { // Unique constraint violation
-            console.warn('Recruiter profile already exists (unique constraint violation).');
-            return true; // Consider it successful if it already exists
+          console.error('❌ createUserProfileFromAuth: Error creating recruiter profile:', recError);
+          if (recError.code === '23505') {
+            console.warn('⚠️ createUserProfileFromAuth: Recruiter profile already exists (unique constraint violation).');
+            return true;
           }
           return false;
         } else {
-          console.log('✅ Recruiter profile created successfully');
+          console.log('✅ createUserProfileFromAuth: Recruiter profile created successfully');
         }
       }
 
-      console.log('✅ User profile created successfully in DB');
+      console.log('✅ createUserProfileFromAuth: User profile created successfully in DB');
       return true;
     } catch (error) {
-      console.error('❌ Error in createUserProfileFromAuth (outer catch):', error);
+      console.error('❌ createUserProfileFromAuth: Error in createUserProfileFromAuth (outer catch):', error);
       return false;
     }
   };
@@ -480,19 +467,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           .maybeSingle();
       
         if (devError) {
-          console.error('❌ Error fetching developer profile:', devError);
+          console.error('❌ checkForRoleSpecificProfile: Error fetching developer profile:', devError);
         }
 
         if (!devProfileData) {
-          console.log('⚠️ Developer profile not found, needs onboarding (or still being created)');
+          console.log('⚠️ checkForRoleSpecificProfile: Developer profile not found, needs onboarding (or still being created).');
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
-          console.log('✅ Developer profile found and set in state.');
+          console.log('✅ checkForRoleSpecificProfile: Developer profile found and set in state.');
           setDeveloperProfile(devProfileData);
 
           if (!devProfileData.github_installation_id && devProfileData.github_handle) {
-            console.log('⚠️ GitHub App not installed, but GitHub handle exists for developer.');
+            console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer.');
           }
           setNeedsOnboarding(false);
         }
@@ -504,28 +491,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
           .maybeSingle();
 
         if (recError) {
-          console.error('❌ Error fetching recruiter profile:', recError);
+          console.error('❌ checkForRoleSpecificProfile: Error fetching recruiter profile:', recError);
         }
 
         if (!recProfileData) {
-          console.log('⚠️ Recruiter profile not found, needs onboarding');
+          console.log('⚠️ checkForRoleSpecificProfile: Recruiter profile not found, needs onboarding.');
           setNeedsOnboarding(true);
         } else {
-          console.log('✅ Recruiter profile found');
+          console.log('✅ checkForRoleSpecificProfile: Recruiter profile found.');
           setNeedsOnboarding(false);
         }
 
-        setDeveloperProfile(null); // Recruiters don't have a developer profile
+        setDeveloperProfile(null);
       } else {
-        setDeveloperProfile(null); // Other roles don't have a developer profile
+        setDeveloperProfile(null);
       }
     } catch (error) {
-      console.error('❌ Error checking role-specific profile:', error);
+      console.error('❌ checkForRoleSpecificProfile: Error checking role-specific profile:', error);
       setNeedsOnboarding(false);
     } finally {
-      // Only set loading to false here if all profile fetching and checks are complete
-      // This prevents premature rendering of children before auth state is fully resolved.
-      setLoading(false);
+      setLoading(false); // Ensure loading is false once profile checks are complete
     }
   };
 
@@ -533,7 +518,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
     if (!user) return false;
 
     try {
-      console.log('🔄 Creating developer profile for:', user.id);
+      console.log('🔄 createDeveloperProfile: Creating developer profile for:', user.id);
 
       const { data, error } = await supabase.rpc('create_developer_profile', {
         p_user_id: user.id,
@@ -550,18 +535,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
       });
 
       if (error) {
-        console.error('❌ Error creating developer profile:', error);
+        console.error('❌ createDeveloperProfile: Error creating developer profile:', error);
         return false;
       }
 
-      console.log('✅ Developer profile created successfully via RPC');
+      console.log('✅ createDeveloperProfile: Developer profile created successfully via RPC');
 
       await updateProfileStrength();
 
-      await fetchUserProfile(user); // Re-fetch to update context state
+      await fetchUserProfile(user);
       return true;
     } catch (error) {
-      console.error('❌ Error in createDeveloperProfile:', error);
+      console.error('❌ createDeveloperProfile: Error in createDeveloperProfile:', error);
       return false;
     }
   };
@@ -570,7 +555,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
     if (!user) return false;
 
     try {
-      console.log('🔄 Updating developer profile for:', user.id);
+      console.log('🔄 updateDeveloperProfile: Updating developer profile for:', user.id);
 
       const cleanedData = {
         ...profileData,
@@ -583,7 +568,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         github_installation_id: profileData.github_installation_id || null
       };
       
-      console.log('Updating developer profile with:', cleanedData);
+      console.log('🔄 updateDeveloperProfile: Updating developer profile with:', cleanedData);
 
       const { error } = await supabase
         .from('developers')
@@ -591,18 +576,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('❌ Error updating developer profile:', error);
+        console.error('❌ updateDeveloperProfile: Error updating developer profile:', error);
         return false;
       }
 
-      console.log('✅ Developer profile updated successfully in DB');
+      console.log('✅ updateDeveloperProfile: Developer profile updated successfully in DB');
 
       await updateProfileStrength();
 
-      await fetchUserProfile(user); // Re-fetch to update context state
+      await fetchUserProfile(user);
       return true;
     } catch (error) {
-      console.error('❌ Error in updateDeveloperProfile:', error);
+      console.error('❌ updateDeveloperProfile: Error in updateDeveloperProfile:', error);
       return false;
     }
   };
@@ -611,20 +596,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
     if (!user) return;
 
     try {
-      console.log('🔄 Updating profile strength for:', user.id);
+      console.log('🔄 updateProfileStrength: Updating profile strength for:', user.id);
 
       const { data, error } = await supabase.rpc('calculate_profile_strength_rpc', {
         p_user_id: user.id
       });
 
       if (error) {
-        console.error('❌ Error updating profile strength:', error);
+        console.error('❌ updateProfileStrength: Error updating profile strength:', error);
         return;
       }
 
-      console.log('✅ Profile strength updated to:', data);
+      console.log('✅ updateProfileStrength: Profile strength updated to:', data);
     } catch (error) {
-      console.error('❌ Error in updateProfileStrength:', error);
+      console.error('❌ updateProfileStrength: Error in updateProfileStrength:', error);
     }
   };
 
@@ -640,13 +625,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         });
 
       if (error) {
-        console.error('❌ Error creating job role:', error);
+        console.error('❌ createJobRole: Error creating job role:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in createJobRole:', error);
+      console.error('❌ createJobRole: Error in createJobRole:', error);
       return false;
     }
   };
@@ -662,13 +647,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         .eq('recruiter_id', user.id);
 
       if (error) {
-        console.error('❌ Error updating job role:', error);
+        console.error('❌ updateJobRole: Error updating job role:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in updateJobRole:', error);
+      console.error('❌ updateJobRole: Error in updateJobRole:', error);
       return false;
     }
   };
@@ -685,13 +670,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         });
 
       if (error) {
-        console.error('❌ Error creating assignment:', error);
+        console.error('❌ createAssignment: Error creating assignment:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in createAssignment:', error);
+      console.error('❌ createAssignment: Error in createAssignment:', error);
       return false;
     }
   };
@@ -708,13 +693,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         });
 
       if (error) {
-        console.error('❌ Error creating hire:', error);
+        console.error('❌ createHire: Error creating hire:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in createHire:', error);
+      console.error('❌ createHire: Error in createHire:', error);
       return false;
     }
   };
@@ -727,13 +712,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
         .eq('id', userId);
 
       if (error) {
-        console.error('❌ Error updating user approval status:', error);
+        console.error('❌ updateUserApprovalStatus: Error updating user approval status:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in updateUserApprovalStatus:', error);
+      console.error('❌ updateUserApprovalStatus: Error in updateUserApprovalStatus:', error);
       return false;
     }
   };
@@ -750,7 +735,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => { // FIX:
     signOut,
     refreshProfile: async () => {
       if (user) {
-        console.log('🔄 Refreshing profile...');
+        console.log('🔄 refreshProfile: Refreshing profile...');
         setLoading(true);
         await fetchUserProfile(user);
       }
