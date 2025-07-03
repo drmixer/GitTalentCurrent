@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'; // Added useCallback
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -47,13 +47,12 @@ interface GitHubData {
   languages: GitHubLanguages;
   totalStars: number;
   contributions: GitHubContribution[];
-  // Removed loading and error from here as they are part of the hook's state directly
 }
 
 interface GitHubContextType {
-  gitHubData: GitHubData; // Now holds all the fetched data
-  loading: boolean; // Loading state for the hook
-  error: Error | null; // Error state for the hook
+  gitHubData: GitHubData;
+  loading: boolean;
+  error: Error | null;
   refreshGitHubData: (handle?: string) => Promise<void>;
   getTopLanguages: (limit?: number) => string[];
   getTopRepos: (limit?: number) => GitHubRepo[];
@@ -72,21 +71,20 @@ export const useGitHub = () => {
 };
 
 export const GitHubProvider = ({ children }: { children: ReactNode }) => {
-  const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth(); // Get authLoading
+  const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth();
 
-  const [gitHubData, setGitHubData] = useState<GitHubData>({ // Renamed to gitHubData for clarity
+  const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
     repos: [],
     languages: {},
     totalStars: 0,
     contributions: [],
   });
-  const [loading, setLoading] = useState(true); // Overall loading state for this hook
-  const [error, setError] = useState<Error | null>(null); // Overall error state for this hook
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [fetchInProgress, setFetchInProgress] = useState(false);
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
-  // Use useCallback to memoize refreshGitHubDataInternal
   const refreshGitHubDataInternal = useCallback(async (handle: string) => {
     if (!handle) {
       console.log('refreshGitHubDataInternal - No GitHub handle provided');
@@ -96,31 +94,30 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Prevent multiple simultaneous fetches for the same handle
-    if (fetchInProgress) { // Removed currentHandle check here, as it's handled by lastFetchedHandle
+    if (fetchInProgress) {
       console.log('refreshGitHubDataInternal - Fetch already in progress for:', handle);
       return;
     }
 
-    // If we already have data for this handle, don't fetch again unless explicitly refreshed
-    if (lastFetchedHandle === handle && gitHubData.user && gitHubData.user.login.toLowerCase() === handle.toLowerCase()) {
-      console.log('refreshGitHubDataInternal - Already have data for handle:', handle);
-      setLoading(false); // Ensure loading is false if data is already present
+    // Only prevent re-fetch if we have data and the handle and installation ID haven't changed
+    if (lastFetchedHandle === handle && gitHubData.user && gitHubData.user.login.toLowerCase() === handle.toLowerCase() && developerProfile?.github_installation_id) {
+      console.log('refreshGitHubDataInternal - Already have data for handle and installation ID:', handle);
+      setLoading(false);
       return;
     }
 
     try {
       setFetchInProgress(true);
-      setLoading(true); // Start loading
-      setError(null); // Clear any previous errors
+      setLoading(true);
+      setError(null);
 
       console.log('refreshGitHubDataInternal - Fetching data for:', handle);
+      // ADDED LOG: Check the developerProfile right before reading installationId
+      console.log('refreshGitHubDataInternal - Current developerProfile state:', JSON.stringify(developerProfile, null, 2));
 
-      // Get the GitHub installation ID from the developer profile
       const installationId = developerProfile?.github_installation_id;
       console.log('Using GitHub installation ID:', installationId || 'not available');
 
-      // Call the Supabase Edge Function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
 
@@ -148,7 +145,6 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
             errorMessage = errorData.error;
           }
         } catch (e) {
-          // If parsing fails, use the raw text
           if (errorText) {
             errorMessage = errorText;
           }
@@ -163,11 +159,12 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         user: data.user?.login,
         reposCount: data.repos?.length || 0,
         languagesCount: Object.keys(data.languages || {}).length,
-        totalStars: data.totalStars
+        totalStars: data.totalStars,
+        contributionsCount: data.contributions?.length || 0 // Added contributions count for better logging
       });
 
       setGitHubData({
-        user: data.user || null, // Ensure user is null if not provided
+        user: data.user || null,
         repos: data.repos || [],
         languages: data.languages || {},
         totalStars: data.totalStars || 0,
@@ -175,23 +172,20 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
       setLastFetchedHandle(handle);
 
-      // Automatically sync data to profile
-      if (handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) { // Added user?.id check
+      if (handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         await syncLanguagesToProfile();
         await syncProjectsToProfile();
       }
 
     } catch (err: any) {
       console.error('Error in refreshGitHubDataInternal:', err.message || err);
-      setError(err); // Set the error state
-      // Do not clear githubData here, keep previous valid data if any
+      setError(err);
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
       setFetchInProgress(false);
     }
-  }, [developerProfile, user, gitHubData.user, lastFetchedHandle]); // Added gitHubData.user and lastFetchedHandle to dependencies
+  }, [developerProfile, user, gitHubData.user, lastFetchedHandle]);
 
-  // Use useCallback for refreshGitHubData as well
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
     if (!handleToUse) {
@@ -201,9 +195,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // This check is now mostly handled by refreshGitHubDataInternal's internal logic
-    // but keep it as a guard for external calls
-    if (fetchInProgress && lastFetchedHandle === handleToUse) { // Use lastFetchedHandle here
+    if (fetchInProgress && lastFetchedHandle === handleToUse) {
       console.log('refreshGitHubData - Fetch already in progress for handle:', handleToUse);
       return;
     }
@@ -212,14 +204,14 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]);
 
 
-  // Initial fetch when developerProfile is loaded or changes
+  // MODIFIED EFFECT: Trigger refresh when handle OR installation ID changes
   useEffect(() => {
     if (developerProfile?.github_handle) {
-      console.log('useGitHub - GitHub handle found in developer profile:', developerProfile.github_handle);
+      console.log('useGitHub - GitHub handle or installation ID changed in developer profile, triggering refresh.');
       refreshGitHubData(developerProfile.github_handle);
-    } else if (!authLoading && !developerProfile?.github_handle) { // Only set error if auth is done and no handle
+    } else if (!authLoading && !developerProfile?.github_handle) {
       console.log('useGitHub - No GitHub handle found in developer profile');
-      setGitHubData({ // Clear data and set error if no GitHub handle
+      setGitHubData({
         user: null,
         repos: [],
         languages: {},
@@ -229,9 +221,8 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setError(new Error('No GitHub handle provided in your profile. Please add it.'));
     }
-  }, [developerProfile?.github_handle, authLoading, refreshGitHubData]); // Added authLoading to dependencies
+  }, [developerProfile?.github_handle, developerProfile?.github_installation_id, authLoading, refreshGitHubData]); // Added github_installation_id
 
-  // Memoized helper functions
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     console.log('getTopLanguages - Languages data:', Object.keys(gitHubData.languages).length);
     return Object.entries(gitHubData.languages)
@@ -249,7 +240,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [gitHubData.repos]);
 
   const syncLanguagesToProfile = useCallback(async () => {
-    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) { // Check user and lastFetchedHandle
+    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
       console.log('syncLanguagesToProfile - Skipping, profile missing, loading, or handle mismatch');
       return;
     }
@@ -266,10 +257,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('syncLanguagesToProfile - Updated profile with languages:', mergedLanguages.length);
     }
-  }, [developerProfile, loading, user, lastFetchedHandle, getTopLanguages, updateDeveloperProfile]); // Added dependencies
+  }, [developerProfile, loading, user, lastFetchedHandle, getTopLanguages, updateDeveloperProfile]);
 
   const syncProjectsToProfile = useCallback(async () => {
-    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) { // Check user and lastFetchedHandle
+    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
       console.log('syncProjectsToProfile - Skipping, profile missing, loading, or handle mismatch');
       return;
     }
@@ -286,13 +277,13 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('syncProjectsToProfile - Updated profile with projects:', uniqueProjects.length);
     }
-  }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]); // Added dependencies
+  }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
 
 
   const value = {
-    gitHubData, // Expose the combined data object
-    loading, // Expose loading state
-    error, // Expose error state
+    gitHubData,
+    loading,
+    error,
     refreshGitHubData,
     getTopLanguages,
     getTopRepos,
