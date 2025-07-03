@@ -5,7 +5,7 @@ import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null>(null);
@@ -253,9 +253,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        // This is the standard redirect for OAuth.
-        // GitHub App installation will be a separate step triggered by a button.
-        redirectTo: `${window.location.origin}/github-setup`,
+        // CHANGED: Redirect directly to the developer dashboard after OAuth
+        redirectTo: `${window.location.origin}/developer`, // Changed this line
         scopes: 'read:user user:email'
       },
     });
