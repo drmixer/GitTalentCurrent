@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase'; // Import supabase directly for this component
+import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
@@ -10,7 +10,8 @@ export const GitHubAppSetup = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
   const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +32,6 @@ export const GitHubAppSetup = () => {
     const installation_id_param = params.get('installation_id');
     const setup_action = params.get('setup_action');
 
-    // Attempt to parse installation_id as a number
     const parsedInstallationId = installation_id_param ? parseInt(installation_id_param, 10) : null;
     const isValidInstallationId = parsedInstallationId !== null && !isNaN(parsedInstallationId);
 
@@ -39,36 +39,35 @@ export const GitHubAppSetup = () => {
     console.log('GitHubAppSetup useEffect - Parsed installationId:', parsedInstallationId);
     console.log('GitHubAppSetup useEffect - Found setup_action:', setup_action);
 
-    // This condition is for when GitHub directly redirects after an App installation
-    // It should ONLY trigger if installation_id and setup_action are present (from a direct GitHub App install flow)
     if (isValidInstallationId && setup_action === 'install') {
-      setInstallationIdFromUrl(String(parsedInstallationId)); // Store as string for display
+      setInstallationIdFromUrl(String(parsedInstallationId));
       console.log('GitHubAppSetup useEffect - Valid Installation ID and setup_action "install" found. Saving and completing setup...');
-      saveInstallationIdAndCompleteSetup(String(parsedInstallationId)); // Pass as string
+      saveInstallationIdAndCompleteSetup(String(parsedInstallationId));
     } else if (setup_action === 'update') {
       console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.');
-      // For updates, the ID might not be explicitly passed, just refresh profile
       completeSetup();
     } else {
       // This path is hit if installation_id or setup_action are missing or invalid.
       // This is expected if the user just signed in via standard OAuth and hasn't installed the app yet.
       console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation. This is expected if only OAuth occurred.');
       setLoading(false);
-      setError('GitHub App installation ID not found in the URL. If you intended to connect the GitHub App, please use the "Connect App" button on your dashboard.');
+      setIsError(false); // It's not an error, it's an instruction
+      setMessage(
+        "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account/give permissions."
+      );
     }
   }, [location, user, navigate, refreshProfile, authLoading]);
 
-  // Function to directly save installation ID to Supabase and then complete setup
   const saveInstallationIdAndCompleteSetup = async (id: string) => {
     try {
       setLoading(true);
-      setError('');
+      setMessage('');
+      setIsError(false);
 
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
 
-      // Directly update the developer profile with the installation ID
       const { error: updateError } = await supabase
         .from('developers')
         .update({ github_installation_id: id })
@@ -80,11 +79,12 @@ export const GitHubAppSetup = () => {
       }
       console.log('✅ GitHub installation ID saved directly to Supabase.');
 
-      await completeSetup(); // Now proceed with the rest of the setup (profile refresh, redirect)
+      await completeSetup();
 
     } catch (err: any) {
       console.error('GitHubAppSetup Error saving installation ID and completing setup:', err);
-      setError(err.message || 'Failed to save GitHub installation ID and complete setup');
+      setMessage(err.message || 'Failed to save GitHub installation ID and complete setup');
+      setIsError(true);
     } finally {
       setLoading(false);
     }
@@ -94,9 +94,10 @@ export const GitHubAppSetup = () => {
   const completeSetup = async () => {
     try {
       setLoading(true);
-      setError('');
+      setMessage('');
+      setIsError(false);
       console.log('GitHubAppSetup completeSetup - Initiating profile refresh...');
-      await refreshProfile(); // This will ensure AuthContext has the latest profile data
+      await refreshProfile();
 
       setSuccess(true);
       console.log('GitHubAppSetup completeSetup - Setup successful, redirecting to dashboard...');
@@ -106,7 +107,8 @@ export const GitHubAppSetup = () => {
 
     } catch (err: any) {
       console.error('GitHubAppSetup Error completing GitHub App setup:', err);
-      setError(err.message || 'Failed to complete GitHub App setup');
+      setMessage(err.message || 'Failed to complete GitHub App setup');
+      setIsError(true);
     } finally {
       setLoading(false);
     }
@@ -151,10 +153,14 @@ export const GitHubAppSetup = () => {
           </div>
         )}
 
-        {error && (
+        {message && (
           <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 mb-6">{error}</p>
+            {isError ? (
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            ) : (
+              <CheckCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+            )}
+            <p className={`${isError ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             <button
               onClick={() => navigate('/developer')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
