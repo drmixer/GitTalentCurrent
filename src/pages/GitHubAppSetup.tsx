@@ -102,7 +102,7 @@ export const GitHubAppSetup = () => {
       setSuccess(true);
       console.log('GitHubAppSetup completeSetup - Setup successful, redirecting to dashboard...');
       setTimeout(() => {
-        navigate('/developer', { replace: true });
+        navigate('/developer?tab=github-activity', { replace: true });
       }, 2000);
 
     } catch (err: any) {
@@ -162,7 +162,7 @@ export const GitHubAppSetup = () => {
             )}
             <p className={`${isError ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             <button
-              onClick={() => navigate('/developer')}
+              onClick={() => navigate('/developer?tab=github-activity')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
             >
               <ArrowLeft className="w-4 h-4 mr-2 inline" />

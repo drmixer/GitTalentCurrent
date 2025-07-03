@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { 
@@ -89,7 +90,7 @@ interface MessageThread {
 
 export const DeveloperDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'portfolio' | 'github' | 'messages' | 'jobs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'portfolio' | 'github-activity' | 'messages' | 'jobs'>('overview');
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [messages, setMessages] = useState<MessageThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
@@ -102,6 +103,9 @@ export const DeveloperDashboard: React.FC = () => {
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
   const [showGitHubConnectPrompt, setShowGitHubConnectPrompt] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Define renderJobSearch function before it's used in the return statement
   const renderJobSearch = () => {
@@ -170,6 +174,35 @@ export const DeveloperDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    // Check for tab parameter in URL
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    
+    if (tabParam) {
+      // Map URL parameter to tab state
+      switch (tabParam) {
+        case 'profile':
+          setActiveTab('profile');
+          break;
+        case 'portfolio':
+          setActiveTab('portfolio');
+          break;
+        case 'github-activity':
+          setActiveTab('github-activity');
+          break;
+        case 'messages':
+          setActiveTab('messages');
+          break;
+        case 'jobs':
+          setActiveTab('jobs');
+          break;
+        default:
+          setActiveTab('overview');
+      }
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     if (user) {
       fetchDeveloperData();
       fetchMessages();
@@ -177,6 +210,15 @@ export const DeveloperDashboard: React.FC = () => {
       fetchFeaturedPortfolioItem();
     }
   }, [user]);
+
+  // Update URL when tab changes
+  useEffect(() => {
+    if (activeTab !== 'overview') {
+      navigate(`/developer?tab=${activeTab}`, { replace: true });
+    } else {
+      navigate('/developer', { replace: true });
+    }
+  }, [activeTab, navigate]);
 
   const fetchDeveloperData = async () => {
     if (!user) return;
@@ -197,7 +239,7 @@ export const DeveloperDashboard: React.FC = () => {
       // Check if GitHub App is not connected but GitHub handle exists
       if (data && data.github_handle && !data.github_installation_id) {
         setShowGitHubConnectPrompt(true);
-      }
+      } 
     } catch (error) {
       console.error('Error fetching developer data:', error);
     }
@@ -611,7 +653,7 @@ export const DeveloperDashboard: React.FC = () => {
               { id: 'overview', name: 'Overview', icon: TrendingUp },
               { id: 'profile', name: 'Profile', icon: User },
               { id: 'portfolio', name: 'Portfolio', icon: Briefcase },
-              { id: 'github', name: 'GitHub Activity', icon: Github },
+              { id: 'github-activity', name: 'GitHub Activity', icon: Github },
               { id: 'messages', name: 'Messages', icon: MessageSquare },
               { id: 'jobs', name: 'Job Search', icon: Search },
             ].map((tab) => {
@@ -648,7 +690,7 @@ export const DeveloperDashboard: React.FC = () => {
           {activeTab === 'portfolio' && developer && (
             <PortfolioManager developerId={developer.user_id} isEditable={true} />
           )}
-          {activeTab === 'github' && developer?.github_handle && (
+          {activeTab === 'github-activity' && developer?.github_handle && (
             <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
           )}
           {activeTab === 'messages' && renderMessages()}

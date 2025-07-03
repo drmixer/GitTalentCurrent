@@ -10,7 +10,7 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
   const navigate = useNavigate();
 
   const handleGoToGitHubActivity = () => {
-    navigate('/developer?tab=github-activity'); // Assuming your dashboard supports tabs via query params
+    navigate('/developer?tab=github-activity'); // Navigate to developer dashboard with github-activity tab
     onClose(); // Close the prompt after navigating
   };
 

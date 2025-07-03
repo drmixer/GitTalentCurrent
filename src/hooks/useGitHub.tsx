@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '../lib/supabase';
+import { calculateContributionStats } from '../utils/githubUtils';
 
 interface GitHubRepo {
   id: number;
@@ -158,16 +159,19 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         user: data.user?.login,
         reposCount: data.repos?.length || 0,
         languagesCount: Object.keys(data.languages || {}).length,
-        totalStars: data.totalStars,
+        totalStars: data.totalStars || 0,
         contributionsCount: data.contributions?.length || 0
       });
+
+      // Calculate contribution statistics
+      const contributionStats = calculateContributionStats(data.contributions || []);
 
       setGitHubData({
         user: data.user || null,
         repos: data.repos || [],
         languages: data.languages || {},
         totalStars: data.totalStars || 0,
-        contributions: data.contributions || [],
+        contributions: data.contributions || []
       });
       setLastFetchedHandle(handle);
 
