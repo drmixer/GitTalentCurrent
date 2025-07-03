@@ -40,6 +40,7 @@ export const GitHubAppSetup = () => {
     console.log('GitHubAppSetup useEffect - Found setup_action:', setup_action);
 
     // This condition is for when GitHub directly redirects after an App installation
+    // It should ONLY trigger if installation_id and setup_action are present (from a direct GitHub App install flow)
     if (isValidInstallationId && setup_action === 'install') {
       setInstallationIdFromUrl(String(parsedInstallationId)); // Store as string for display
       console.log('GitHubAppSetup useEffect - Valid Installation ID and setup_action "install" found. Saving and completing setup...');
@@ -49,10 +50,11 @@ export const GitHubAppSetup = () => {
       // For updates, the ID might not be explicitly passed, just refresh profile
       completeSetup();
     } else {
-      // This path is hit if installation_id or setup_action are missing or invalid (e.g., from OAuth flow)
-      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation.');
+      // This path is hit if installation_id or setup_action are missing or invalid.
+      // This is expected if the user just signed in via standard OAuth and hasn't installed the app yet.
+      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation. This is expected if only OAuth occurred.');
       setLoading(false);
-      setError('GitHub App installation ID not found in the URL. Please ensure you installed the app or try connecting your GitHub account again.');
+      setError('GitHub App installation ID not found in the URL. If you intended to connect the GitHub App, please use the "Connect App" button on your dashboard.');
     }
   }, [location, user, navigate, refreshProfile, authLoading]);
 
@@ -87,6 +89,7 @@ export const GitHubAppSetup = () => {
       setLoading(false);
     }
   };
+
 
   const completeSetup = async () => {
     try {
