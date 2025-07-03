@@ -127,38 +127,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (githubUsername && userRole === 'developer') {
-        let githubInstallationId: string | null = null;
-        // Check common top-level keys
-        if (authUser.user_metadata?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.installation_id);
-        } else if (authUser.user_metadata?.app_installation_id) {
-          githubInstallationId = String(authUser.user_metadata.app_installation_id);
-        }
-        // Check for nested 'github' object
-        else if (authUser.user_metadata?.github?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.github.installation_id);
-        }
-        // If the installation_id is part of raw_user_meta_data (stringified JSON)
-        else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
-          try {
-            const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
-            if (rawMetaData.installation_id) {
-              githubInstallationId = String(rawMetaData.installation_id);
-            } else if (rawMetaData.app_installation_id) {
-              githubInstallationId = String(rawMetaData.app_installation_id);
-            }
-          } catch (parseError) {
-            console.warn('Could not parse raw_user_meta_data for installation_id:', parseError);
-          }
-        }
-
-        if (!githubInstallationId) {
-          console.warn('⚠️ GitHub Installation ID NOT found in user_metadata after all checks.');
-        } else {
-          console.log('✅ GitHub Installation ID found:', githubInstallationId);
-        }
-
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
+        // Pass null for installationId - this will be set later by GitHubAppSetup component
+        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, null);
       }
     } catch (error) {
       console.error('❌ Error in handleGitHubSignIn:', error);
@@ -252,8 +222,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        // REVERTED: Removed ?installation_id=true from here.
-        // Supabase will handle the redirect to this URL after OAuth.
         redirectTo: `${window.location.origin}/github-setup`,
         scopes: 'read:user user:email'
       },
@@ -386,29 +354,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // Create developer profile if needed
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
-        let githubInstallationId: string | null = null;
-        if (authUser.user_metadata?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.installation_id);
-        } else if (authUser.user_metadata?.app_installation_id) {
-          githubInstallationId = String(authUser.user_metadata.app_installation_id);
-        }
-        else if (authUser.user_metadata?.github?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.github.installation_id);
-        }
-        else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
-          try {
-            const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
-            if (rawMetaData.installation_id) {
-              githubInstallationId = String(rawMetaData.installation_id);
-            } else if (rawMetaData.app_installation_id) {
-              githubInstallationId = String(rawMetaData.app_installation_id);
-            }
-          } catch (parseError) {
-            console.warn('Could not parse raw_user_meta_data for installation_id during creation:', parseError);
-          }
-        }
-
         const { error: devError } = await supabase
           .from('developers')
           .insert({
@@ -421,12 +368,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             location: authUser.user_metadata?.location || '',
             experience_years: 0,
             desired_salary: 0,
-            profile_pic_url: avatarUrl,
-            github_installation_id: githubInstallationId
+            profile_pic_url: avatarUrl
           });
 
         if (devError) {
           console.error('❌ Error creating developer profile:', devError);
+          // Don't fail the whole process if developer profile creation fails
         } else {
           console.log('✅ Developer profile created successfully');
         }
@@ -539,8 +486,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('✅ Developer profile created successfully');
 
+      // Calculate and update profile strength
       await updateProfileStrength();
 
+      // Refresh profiles after creation 
       await fetchUserProfile(user);
       return true;
     } catch (error) {
@@ -555,6 +504,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('🔄 Updating developer profile for:', user.id);
 
+      // Convert empty strings to null for nullable fields
       const cleanedData = {
         ...profileData,
         bio: profileData.bio?.trim() || null,
@@ -578,8 +528,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('✅ Developer profile updated successfully');
 
+      // Calculate and update profile strength
       await updateProfileStrength();
 
+      // Refresh profiles after update 
       await fetchUserProfile(user);
       return true;
     } catch (error) {
@@ -640,7 +592,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('job_roles')
         .update(jobData)
         .eq('id', jobId)
-        .eq('recruiter_id', user.id);
+        .eq('recruiter_id', user.id); // Ensure user can only update their own jobs
 
       if (error) {
         console.error('❌ Error updating job role:', error);
