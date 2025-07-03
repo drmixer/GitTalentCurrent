@@ -303,8 +303,6 @@ export const AuthProvider = ({ children }: { ReactNode }) => {
         p_desired_salary: profileData.desired_salary || 0,
         p_profile_pic_url: profileData.profile_pic_url || null,
         p_github_installation_id: profileData.github_installation_id || null
-        p_profile_pic_url: profileData.profile_pic_url || null,
-        p_github_installation_id: profileData.github_installation_id || null
       });
 
       if (error) {
