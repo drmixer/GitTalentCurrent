@@ -443,17 +443,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
-    
-    // Store information about the auth flow
-    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
-    const requiresGitHubInstall = localStorage.getItem('requiresGitHubInstall') === 'true';
-    console.log('signInWithGitHub: Is new signup?', isNewSignup, 'Requires GitHub install?', requiresGitHubInstall);
-    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github', 
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'read:user user:email repo admin:repo_hook',
+        scopes: 'read:user user:email repo',
       },
     });
     if (error) {

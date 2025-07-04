@@ -3,10 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 
-// Log the Supabase configuration for debugging
-console.log(`Supabase URL: ${supabaseUrl ? 'Set' : 'Not set'}`);
-console.log(`Supabase Anon Key: ${supabaseAnonKey ? 'Set' : 'Not set'}`);
-
 // Create Supabase client with explicit auth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -15,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     storageKey: 'gittalent-auth-token',
     flowType: 'pkce',
-    debug: true // Enable debug mode for auth issues
+    debug: false
   }
 });
 
@@ -37,8 +33,6 @@ export const signOut = async () => {
     localStorage.removeItem('gittalent-auth-token');
     localStorage.removeItem('supabase.auth.token');
     localStorage.removeItem('pendingEmail');
-    localStorage.removeItem('isNewSignup');
-    localStorage.removeItem('requiresGitHubInstall');
     localStorage.removeItem('pendingGitHubName');
     
     // Clear any cookies by setting them to expire

@@ -17,9 +17,8 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
-    const requiresGitHubInstall = localStorage.getItem('requiresGitHubInstall') === 'true';
     
-    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error, requiresGitHubInstall });
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
     
     // Handle errors first
     if (error) {
@@ -56,20 +55,7 @@ export const AuthCallback: React.FC = () => {
     }
 
     // Scenario 2: Regular GitHub OAuth login (user is not null, no installationId)
-    // Check if developerProfile is loaded and if GitHub App installation is required
-    if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
-      console.log('AuthCallback: GitHub user and requiresGitHubInstall flag is true. Redirecting to GitHub setup.');
-      // Clear the flags as we are handling the redirect
-      localStorage.removeItem('isNewSignup');
-      localStorage.removeItem('requiresGitHubInstall');
-
-      setStatus('redirect');
-      setMessage('Redirecting to GitHub setup...');
-      navigate('/github-setup', { replace: true });
-      return;
-    }
-
-    // Scenario 3: User is authenticated, no GitHub App installation needed, profile should be loaded
+    // User is authenticated, profile should be loaded
     if (userProfile) {
       console.log('AuthCallback: User profile loaded. Authentication successful!');
       setStatus('success');
