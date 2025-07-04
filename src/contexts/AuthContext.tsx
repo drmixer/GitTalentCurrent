@@ -387,7 +387,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     
-    // Get signup data from localStorage to pass in state parameter
+    // Store any signup data from localStorage in the state parameter
     const name = localStorage.getItem('gittalent_signup_name');
     const role = localStorage.getItem('gittalent_signup_role');
     
@@ -399,7 +399,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?github_app_setup=true`,
+        redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'read:user user:email',
         state: stateParam
       },

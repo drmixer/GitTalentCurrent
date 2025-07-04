@@ -15,35 +15,16 @@ export const AuthCallback: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
-    const githubAppSetup = params.get('github_app_setup');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
     
-    console.log('AuthCallback: URL params:', { code, githubAppSetup, installationId, setupAction, error });
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
     
     // Handle errors first
     if (error) {
       setStatus('error');
       setMessage(`Authentication error: ${params.get('error_description') || error}`);
-      return;
-    }
-
-    // If this is a GitHub App setup flow, redirect to GitHub App setup page
-    if (githubAppSetup === 'true' && user) {
-      console.log('AuthCallback: GitHub App setup flow detected, redirecting...');
-      setStatus('redirect');
-      setMessage('GitHub authentication successful, redirecting to GitHub App setup...');
-      navigate('/github-setup', { replace: true });
-      return;
-    }
-
-    // If this is a GitHub App setup flow, redirect to GitHub App setup page
-    if (githubAppSetup === 'true' && user) {
-      console.log('AuthCallback: GitHub App setup flow detected, redirecting...');
-      setStatus('redirect');
-      setMessage('GitHub authentication successful, redirecting to GitHub App setup...');
-      navigate('/github-setup', { replace: true });
       return;
     }
 
@@ -88,19 +69,21 @@ export const AuthCallback: React.FC = () => {
       // If we have a user but no profile, wait a bit longer
       if (waitTime < maxWaitTime) {
         setWaitTime(prev => prev + 1000);
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           setStatus('loading');
           setMessage('Loading your profile...');
         }, 1000);
+        return () => clearTimeout(timer);
         return;
       }
 
       // If we've waited too long, just go to dashboard
       setStatus('success');
       setMessage('Authentication successful! Redirecting to dashboard...');
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         navigate('/dashboard', { replace: true });
       }, 1000);
+      return () => clearTimeout(timer);
       return;
     }
     

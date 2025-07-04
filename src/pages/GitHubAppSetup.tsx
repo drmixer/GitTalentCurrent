@@ -8,6 +8,7 @@ export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
@@ -79,7 +80,6 @@ export const GitHubAppSetup = () => {
     const errorParam = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
     const state = searchParams.get('state');
-    const [retryCount, setRetryCount] = useState(0);
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -105,11 +105,10 @@ export const GitHubAppSetup = () => {
       } else {
         setUiState('loading');
         setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-        
-        // Increment retry count
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-        }, 2000);
+
+        // Set a timeout to increment retry count
+        const timer = setTimeout(() => setRetryCount(prev => prev + 1), 2000);
+        return () => clearTimeout(timer);
       }
       return;
     }
@@ -251,6 +250,11 @@ export const GitHubAppSetup = () => {
                 <p className="text-sm text-gray-600">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                   This is a one-time setup process.
+                  {retryCount > 0 && (
+                    <span className="block mt-2 text-xs text-gray-500">
+                      Retry attempt {retryCount} of {maxRetries}
+                    </span>
+                  )}
                 </p>
                 <button
                   onClick={redirectToGitHubAppInstall}
