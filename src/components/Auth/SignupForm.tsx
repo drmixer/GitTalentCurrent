@@ -94,6 +94,7 @@ export const SignupForm = () => {
 
     setError('');
     setGithubLoading(true);
+    try {
       console.log('Storing pendingEmail:', formData.email);
       
       await signInWithGitHub();
