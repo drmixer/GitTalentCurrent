@@ -10,8 +10,6 @@ export const GitHubAppSetup = () => {
   const location = useLocation();
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
@@ -255,7 +253,7 @@ export const GitHubAppSetup = () => {
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
             >
               Go to Dashboard Now
-            </button>
+              {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
           </div>
         )}
 
@@ -306,14 +304,31 @@ export const GitHubAppSetup = () => {
                   Try Again
                 </button>
               )}
-              <button
-                onClick={() => navigate('/developer?tab=github-activity')}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                Go to Dashboard
-              </button>
+              <>
+                <button
+                  onClick={redirectToGitHubAppInstall}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4"
+                >
+                  <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
+                  Connect GitHub App
+                </button>
+                {retryCount > 0 && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    Retry attempt {retryCount} of {maxRetries}
+                  </p>
+                )}
+              </>
             </div>
+            
+            {uiState === 'error' && (
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium block mx-auto"
+              >
+                <RefreshCw className="w-4 h-4 mr-2 inline" aria-hidden="true" />
+                Refresh Page
+              </button>
+            )}
           </div>
         )}
       </div>
