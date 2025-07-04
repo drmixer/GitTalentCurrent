@@ -30,12 +30,6 @@ export const Dashboard = () => {
       }, 2000);
       
       return () => clearTimeout(timer);
-      // Add a delay to allow database operations to complete
-      const timer = setTimeout(() => {
-        refreshProfile();
-      }, 2000);
-      
-      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, refreshProfile]);
 
