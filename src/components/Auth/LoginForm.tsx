@@ -48,9 +48,10 @@ export const LoginForm = () => {
     setError('');
     setGithubLoading(true);
     
-    // Store the email in localStorage to use after GitHub auth
+    // Store email in localStorage to use after GitHub auth
     if (email) {
       localStorage.setItem('pendingEmail', email);
+      console.log('Storing pendingEmail for login:', email);
     }
     
     try {
@@ -125,7 +126,7 @@ export const LoginForm = () => {
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
                 Connecting to GitHub...
               </div>
-            ) : ( 
+            ) : (
               <>
                 <Github className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
                 Continue with GitHub

@@ -13,7 +13,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [mounted, setMounted] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null); 
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let currentMounted = true;
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('Hash content:', window.location.hash);
     console.log('-----------------------------');
 
-    async function handleAuthRedirect(retryCount = 0) {
+    async function handleAuthRedirect() {
       console.log('🔄 AuthProvider: Checking for auth redirect parameters...');
       try {
         // First check if we have a hash with auth parameters
@@ -39,45 +40,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check for code in query params (PKCE flow)
           const urlParams = new URLSearchParams(window.location.search);
           const code = urlParams.get('code');
+          const error = urlParams.get('error');
+          const error_description = urlParams.get('error_description');
+          
+          if (error || error_description) {
+            console.error('❌ AuthProvider: OAuth error in URL:', error_description || error);
+            setAuthError(`Authentication error: ${error_description || error}`);
+            setLoading(false);
+            
+            // Clear the error from URL
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState(null, '', cleanUrl);
+            return true;
+          }
           
           if (code) {
-            console.log('Found code parameter in URL, handling PKCE flow');
-            // The supabase client should handle this automatically
-            // Just need to wait for the session to be established
+            console.log('Found code parameter in URL:', code.substring(0, 8) + '..., handling PKCE flow');
+            
+            // The supabase client will handle the code exchange automatically
+            // We just need to wait for the session to be established
             
             // Get current session after a short delay to allow auth to complete
-            setTimeout(async () => {
-              try {
-                const { data, error } = await supabase.auth.getSession();
-                
-                if (error) {
-                  console.error('❌ Error getting session after code exchange:', error);
-                  setAuthError(`Error getting session: ${error.message}`);
-                  if (currentMounted) setLoading(false);
-                  return;
-                }
-                
-                if (data?.session) {
-                  console.log('✅ Session established after code exchange:', data.session.user.id);
-                  if (currentMounted) {
-                    setUser(data.session.user);
-                    await fetchUserProfile(data.session.user);
-                  }
-                } else if (retryCount < 3) {
-                  console.log(`Session not found after code exchange, retrying (${retryCount + 1}/3)...`);
-                  // Retry after a delay
-                  setTimeout(() => handleAuthRedirect(retryCount + 1), 1000);
-                } else {
-                  console.error('❌ Failed to establish session after multiple retries');
-                  setAuthError('Failed to establish session after authentication');
-                  if (currentMounted) setLoading(false);
-                }
-              } catch (error) {
-                console.error('❌ Error in code exchange handling:', error);
-                setAuthError(`Error in code exchange: ${error instanceof Error ? error.message : String(error)}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
+              const { data, error } = await supabase.auth.getSession();
+              
+              if (error) {
+                console.error('❌ Error getting session after code exchange:', error);
+                setAuthError(`Error getting session: ${error.message}`);
                 if (currentMounted) setLoading(false);
+                return true;
               }
-            }, 1000);
+              
+              if (data?.session) {
+                console.log('✅ Session established after code exchange:', data.session.user.id);
+                if (currentMounted) {
+                  setUser(data.session.user);
+                  await fetchUserProfile(data.session.user);
+                }
+                return true;
+              } else {
+                console.log('Session not found after code exchange, will retry in useEffect');
+                setRetryCount(prev => prev + 1);
+              }
+            } catch (error) {
+              console.error('❌ Error in code exchange handling:', error);
+              setAuthError(`Error in code exchange: ${error instanceof Error ? error.message : String(error)}`);
+              if (currentMounted) setLoading(false);
+            }
             
             // Clean up the URL
             const cleanUrl = window.location.pathname;
@@ -89,58 +100,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return false;
         }
         
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        console.log('Hash params:', Object.fromEntries(hashParams.entries()));
-        
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        const expiresIn = hashParams.get('expires_in');
-        const tokenType = hashParams.get('token_type');
-
-        if (accessToken && refreshToken && expiresIn && tokenType) {
-          setLoading(true); // Ensure loading is true while handling redirect
-          console.log('🚀 AuthProvider: Detected URL parameters for session, setting session...');
-          
-          try {
-            console.log('Setting session with tokens...');
-            const { data: { session }, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (error) {
-              console.error('❌ AuthProvider: Error setting session from URL params:', error);
-              setAuthError(`Failed to set session: ${error.message}`);
-              // If setting session fails, clear the URL hash to prevent infinite loops
-              setLoading(false);
-              window.location.hash = '';
-              return false;
-            }
-
-            if (session) {
-              console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
-              console.log('Session object:', JSON.stringify(session, null, 2));
-              
-              // Set user state before clearing hash
-              setUser(session.user);
-              
-              // Clear the URL hash to clean up the URL
-              const cleanUrl = window.location.pathname + window.location.search;
-              window.history.replaceState(null, '', cleanUrl);
-              
-              // Immediately fetch user profile after setting session
-              await fetchUserProfile(session.user);
-              return true; // Return true to indicate redirect was handled
-            }
-          } catch (sessionError) {
-            console.error('❌ AuthProvider: Exception setting session:', sessionError);
-            setAuthError(`Exception setting session: ${sessionError instanceof Error ? sessionError.message : String(sessionError)}`);
-            setLoading(false);
-            return false;
-          }
-        }
-        
         // Also check for error in hash params
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const errorDescription = hashParams.get('error_description');
         if (errorDescription) {
           console.error('❌ AuthProvider: OAuth error in URL:', errorDescription);
@@ -150,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Clear the error from URL
           const cleanUrl = window.location.pathname + window.location.search;
           window.history.replaceState(null, '', cleanUrl);
-          return true; // We handled the redirect (even though it was an error)
+          return true;
         }
         
         return false; // Return false to indicate no redirect was handled
@@ -159,6 +120,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthError(`Error handling redirect: ${error instanceof Error ? error.message : String(error)}`);
         if (currentMounted) setLoading(false);
         return false;
+      }
+    }
+
+    // Function to retry session check after code exchange
+    async function retrySessionCheck() {
+      if (retryCount > 0 && retryCount < 5) {
+        console.log(`Session check retry attempt ${retryCount}/5`);
+        
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('❌ Error getting session during retry:', error);
+            if (retryCount >= 4) {
+              setAuthError(`Failed to establish session: ${error.message}`);
+              setLoading(false);
+            }
+            return;
+          }
+          
+          if (data?.session) {
+            console.log('✅ Session found during retry:', data.session.user.id);
+            setUser(data.session.user);
+            await fetchUserProfile(data.session.user);
+            return;
+          } else if (retryCount >= 4) {
+            console.error('❌ Failed to establish session after multiple retries');
+            setAuthError('Failed to establish session after authentication');
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('❌ Error in retry session check:', error);
+          if (retryCount >= 4) {
+            setAuthError(`Error checking session: ${error instanceof Error ? error.message : String(error)}`);
+            setLoading(false);
+          }
+        }
       }
     }
 
@@ -225,7 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoading(true); // Ensure loading is true during auth flow
         }
         
-        const redirectHandled = await handleAuthRedirect(0);
+        const redirectHandled = await handleAuthRedirect();
         console.log('Redirect handled:', redirectHandled);
         
         // Only initialize auth if no redirect was handled
@@ -238,6 +236,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     })();
+
+    // Effect for retrying session check
+    if (retryCount > 0) {
+      retrySessionCheck();
+    }
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -286,7 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       currentMounted = false;
       subscription.unsubscribe();
     };
-  }, [signingOut]);
+  }, [signingOut, retryCount]);
 
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
@@ -294,11 +297,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 handleGitHubSignIn: GitHub user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
       const pendingName = localStorage.getItem('pendingGitHubName');
+      const pendingEmail = localStorage.getItem('pendingEmail');
       localStorage.removeItem('pendingGitHubName');
+      localStorage.removeItem('pendingEmail');
 
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = pendingName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
+      const email = pendingEmail || authUser.email;
 
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.installation_id) {
@@ -330,7 +336,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase.rpc('create_user_profile', {
           user_id: authUser.id,
-          user_email: authUser.email!,
+          user_email: email || authUser.email!,
           user_name: fullName,
           user_role: userRole,
           company_name: authUser.user_metadata?.company_name || ''
@@ -505,7 +511,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         if (success) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Give DB more time to sync
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Give DB a moment to sync
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
             .select('*')
@@ -563,18 +569,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
       console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
+      // Get name from localStorage or metadata
+      const pendingName = localStorage.getItem('pendingGitHubName');
+      const pendingEmail = localStorage.getItem('pendingEmail');
+      
       // Extract role with fallbacks
       const userRole = authUser.user_metadata?.role || 
                       (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
       
       // Extract name with fallbacks
-      const userName = authUser.user_metadata?.full_name || 
+      const userName = pendingName || 
+                      authUser.user_metadata?.full_name || 
                       authUser.user_metadata?.name || 
                       authUser.user_metadata?.user_name ||
                       'User';
                       
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
+      const email = pendingEmail || authUser.email;
 
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.installation_id) {
@@ -602,7 +614,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('users')
         .insert({
           id: authUser.id, 
-          email: authUser.email || 'unknown@example.com', 
+          email: email || authUser.email || 'unknown@example.com', 
           name: userName || authUser.email?.split('@')[0] || 'User', 
           role: userRole, 
           is_approved: userRole === 'developer' || userRole === 'admin' 
@@ -759,8 +771,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
-    try { 
+    try {
       console.log('🔄 createDeveloperProfile: Creating developer profile for:', user.id);
+      console.log('🔄 createDeveloperProfile: Profile data:', JSON.stringify(profileData, null, 2));
 
       const { data, error } = await supabase.rpc('create_developer_profile', {
         p_user_id: user.id,
@@ -772,8 +785,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_location: profileData.location || '',
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
-        p_profile_pic_url: profileData.profile_pic_url || null,
-        p_github_installation_id: profileData.github_installation_id || null 
+        p_profile_pic_url: profileData.profile_pic_url || null, 
+        p_github_installation_id: profileData.github_installation_id || null
       });
 
       if (error) {
@@ -796,8 +809,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
-    try { 
+    try {
       console.log('🔄 updateDeveloperProfile: Updating developer profile for:', user.id);
+      console.log('🔄 updateDeveloperProfile: Profile data:', JSON.stringify(profileData, null, 2));
 
       const cleanedData = {
         ...profileData,
@@ -807,7 +821,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         linked_projects: profileData.linked_projects?.filter(p => p && p.trim()) || [],
         top_languages: profileData.top_languages?.filter(l => l && l.trim()) || [],
         profile_pic_url: profileData.profile_pic_url?.trim() || null,
-        github_installation_id: profileData.github_installation_id || null
+        github_installation_id: profileData.github_installation_id || null 
       };
       
       console.log('🔄 updateDeveloperProfile: Updating developer profile with:', cleanedData);

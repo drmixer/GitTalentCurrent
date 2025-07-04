@@ -89,16 +89,20 @@ export const SignupForm = () => {
   const handleGitHubSignUp = async () => {
     if (!formData.name.trim()) {
       setError('Please enter your name first');
-      return; 
+      return;
     }
 
     setError('');
     setGithubLoading(true);
 
     try {
-      // Store the name in localStorage to use after GitHub auth
+      // Store the name and email in localStorage to use after GitHub auth
       localStorage.setItem('pendingGitHubName', formData.name);
       localStorage.setItem('pendingEmail', formData.email);
+      
+      console.log('Storing pendingGitHubName:', formData.name);
+      console.log('Storing pendingEmail:', formData.email);
+      
       await signInWithGitHub();
       // Navigation will be handled by the redirect
     } catch (error: any) {
@@ -295,7 +299,7 @@ export const SignupForm = () => {
                   <div className="text-center text-sm text-gray-600 mt-4">
                     <p>Developers must sign up with GitHub to verify their identity and sync their coding activity.</p>
                   </div>
-                </div> 
+                </div>
               ) : (
                 // For recruiters, show email/password signup form
                 <>
