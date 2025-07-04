@@ -13,7 +13,6 @@ export const AuthCallback: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 5;
   const [manualRetry, setManualRetry] = useState(false);
-  const maxRetries = 5;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -57,11 +56,6 @@ export const AuthCallback: React.FC = () => {
         setTimeout(() => {
           setRetryCount(prev => prev + 1);
         }, 2000);
-      }
-        setMessage('Authentication is taking too long. Please try again.');
-      } else {
-        setStatus('loading');
-        setMessage('Verifying authentication...');
       }
       return;
     }
@@ -110,34 +104,30 @@ export const AuthCallback: React.FC = () => {
 
     // If we reach here, user is authenticated but userProfile is still null.
     if (retryCount < maxRetries) {
-      console.log(`AuthCallback: User authenticated but profile not yet loaded. Retry ${retryCount + 1}/${maxRetries}`);
-    console.log(`AuthCallback: User authenticated but profile not yet loaded. Waiting for profile... (Retry: ${retryCount}/${maxRetries})`);
+      console.log(`AuthCallback: User authenticated but profile not yet loaded. Waiting for profile... (Retry: ${retryCount}/${maxRetries})`);
     
-    if (retryCount > maxRetries && !manualRetry) {
-      console.log('AuthCallback: Max retries reached, showing error with manual retry option');
-      setStatus('error');
-      setMessage('We had trouble loading your profile. Please try again.');
-    } else {
-      setStatus('loading');
-      setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
-      
-      // Try to manually refresh the profile
-      refreshProfile?.();
-      
-      // Increment retry count
-      setTimeout(() => {
-        setRetryCount(prev => prev + 1);
-      }, 2000);
-    }
+      if (retryCount > maxRetries && !manualRetry) {
+        console.log('AuthCallback: Max retries reached, showing error with manual retry option');
+        setStatus('error');
+        setMessage('We had trouble loading your profile. Please try again.');
+      } else {
+        setStatus('loading');
+        setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
+        
+        // Try to manually refresh the profile
+        refreshProfile?.();
+        
+        // Increment retry count
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, 2000);
+      }
     
-    // If we have an auth error, show it
-    if (authError) {
-      setStatus('error');
-      setMessage(authError);
-    }
-      // Increment retry count and manually refresh profile
-      setRetryCount(retryCount + 1);
-      refreshProfile?.();
+      // If we have an auth error, show it
+      if (authError) {
+        setStatus('error');
+        setMessage(authError);
+      }
     } else {
       // After max retries, show error with manual refresh option
       console.log('AuthCallback: Max retries reached, showing error');
@@ -177,12 +167,8 @@ export const AuthCallback: React.FC = () => {
                     setRetryCount(0);
                   }}
                   className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center mx-auto"
-                    setRetryCount(0);
-                  }}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center mx-auto"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Retry Loading Profile
                   Retry Loading Profile
                 </button>
               </div>
@@ -221,20 +207,6 @@ export const AuthCallback: React.FC = () => {
                   setManualRetry(true);
                   setRetryCount(0);
                   setStatus('loading');
-                  setMessage('Trying again...');
-                }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
-              </button>
-              <button
-                onClick={() => navigate('/login')}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-              >
-                Return to Login
-              </button>
-            </div>
                   setMessage('Trying again...');
                 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
