@@ -90,10 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (currentMounted) setLoading(false);
             }
             
-            // Clean up the URL
-            const cleanUrl = window.location.pathname;
-            window.history.replaceState(null, '', cleanUrl);
-            
+            // Don't clean up the URL here - let the callback page handle it
             return true;
           }
           
@@ -444,7 +441,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github', 
       options: {
-        redirectTo: `${window.location.origin}/github-setup`,
+        redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'read:user user:email repo'
       },
     });
@@ -463,7 +460,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
         options: {
-          redirectTo: `${window.location.origin}/github-setup`,
+          redirectTo: `${window.location.origin}/auth/callback`,
           data: {
             name: userData.name,
             role: userData.role, 

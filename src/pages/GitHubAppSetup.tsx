@@ -59,13 +59,12 @@ export const GitHubAppSetup = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const oauthCode = params.get('code');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
 
-    console.log('GitHubAppSetup: URL params:', { oauthCode, installationId, setupAction, errorParam, errorDescription });
+    console.log('GitHubAppSetup: URL params:', { installationId, setupAction, errorParam, errorDescription });
 
     // Immediately handle GitHub errors
     if (errorParam) {
@@ -73,34 +72,22 @@ export const GitHubAppSetup = () => {
       return;
     }
 
-    // If auth is still loading and there's no OAuth code to process, wait.
-    if (authLoading && !oauthCode) {
+    // If auth is still loading, wait.
+    if (authLoading) {
       console.log('GitHubAppSetup: Auth context loading, waiting...');
       setUiState('loading');
       setMessage('Verifying authentication...');
       return;
     }
 
-    // If there's an oauthCode, AuthProvider needs to process it.
-    // We wait for 'user' to be populated by AuthProvider.
-    if (oauthCode && !user) {
-      console.log('GitHubAppSetup: OAuth code present, waiting for AuthProvider to establish session...');
-      setUiState('loading');
-      setMessage('Finalizing authentication...');
-      // AuthProvider will eventually set the user or trigger an error.
-      return;
-    }
-    
-    // If no user and no means to get one (no oauthCode), redirect to login.
-    if (!user && !oauthCode) {
-      console.log('GitHubAppSetup: No user and no OAuth code, redirecting to login.');
+    // If no user, redirect to login
+    if (!user) {
+      console.log('GitHubAppSetup: No user, redirecting to login.');
       navigate('/login', { replace: true });
       return;
     }
 
-    // At this point, if there was an oauthCode, AuthProvider should have processed it and `user` should be available.
-
-    // Scenario 1: Combined OAuth + App Install OR App Install/Reconfigure for an existing user
+    // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading');
       setMessage('Connecting GitHub App...');
@@ -116,7 +103,6 @@ export const GitHubAppSetup = () => {
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
-          cleanUrl.searchParams.delete('code');
           window.history.replaceState({}, '', cleanUrl.toString());
         })
         .catch(err => {
@@ -125,31 +111,16 @@ export const GitHubAppSetup = () => {
       return;
     }
 
-    // Scenario 2: OAuth completed, user is present, but no installation_id in this redirect.
-    if (user && oauthCode && !installationId) {
-      console.log(`GitHubAppSetup: User ${user.id} present from OAuth, but no installation_id in this redirect.`);
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('code'); 
-      window.history.replaceState({}, '', cleanUrl.toString());
+    // Scenario 2: User is logged in but no installation_id in URL
+    if (user && !installationId) {
+      console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
 
       if (developerProfile?.github_installation_id) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
-        handleSuccess('GitHub account re-authenticated. App is already connected.', 1000);
-      } else {
-        console.log('GitHubAppSetup: Authentication successful. Redirecting to GitHub App installation...');
-        // Instead of showing info message, automatically redirect to GitHub App installation
-        redirectToGitHubAppInstall();
-      }
-      return;
-    }
-    
-    // Scenario 3: User is logged in, no specific GitHub action parameters in URL
-    if (user && !oauthCode && !installationId && !setupAction) {
-      console.log(`GitHubAppSetup: User ${user.id} present, no specific GitHub action params.`);
-      if (developerProfile?.github_installation_id) {
-        handleSuccess('GitHub App is connected.', 1000);
+        handleSuccess('GitHub App is already connected.', 1000);
       } else {
         console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
+        // Instead of showing info message, automatically redirect to GitHub App installation
         redirectToGitHubAppInstall();
       }
       return;
