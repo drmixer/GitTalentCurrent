@@ -1,146 +1,180 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, refreshProfile, loading: authLoading } = useAuth();
+  const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState(false);
-  const [message, setMessage] = useState('');
-  const [isError, setIsError] = useState(false);
-  const [installationIdFromUrl, setInstallationIdFromUrl] = useState<string | null>(null);
+
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info'>('loading');
+  const [message, setMessage] = useState('Connecting GitHub...');
+
+  const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
+    console.log('GitHubAppSetup: Success -', successMessage);
+    setUiState('success');
+    setMessage(successMessage);
+    setTimeout(() => {
+      navigate('/developer?tab=github-activity', { replace: true });
+    }, redirectDelay);
+  }, [navigate]);
+
+  const handleError = useCallback((errorMessage: string) => {
+    console.error('GitHubAppSetup: Error -', errorMessage);
+    setUiState('error');
+    setMessage(errorMessage);
+  }, []);
+
+  const handleInfo = useCallback((infoMessage: string) => {
+    console.log('GitHubAppSetup: Info -', infoMessage);
+    setUiState('info');
+    setMessage(infoMessage);
+  }, []);
+
+  const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
+    console.log(`GitHubAppSetup: Saving installation ID ${id} for user ${currentUserId}`);
+    const { error: updateError } = await supabase
+      .from('developers')
+      .update({ github_installation_id: id })
+      .eq('user_id', currentUserId);
+
+    if (updateError) {
+      throw new Error(`Failed to save GitHub installation ID: ${updateError.message}`);
+    }
+    console.log('GitHubAppSetup: GitHub installation ID saved successfully in DB.');
+    // After saving, refresh profile to get the latest state including the new installation ID
+    await refreshProfile();
+  }, [refreshProfile]);
+
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const installation_id_param = params.get('installation_id');
-    const setup_action = params.get('setup_action');
-    const code_param = params.get('code');
-    
-    console.log('GitHubAppSetup useEffect - URL params:', { 
-      installation_id: installation_id_param,
-      setup_action,
-      code: code_param ? 'present' : 'absent'
-    });
+    const oauthCode = params.get('code');
+    const installationId = params.get('installation_id');
+    const setupAction = params.get('setup_action');
+    const errorParam = params.get('error');
+    const errorDescription = params.get('error_description');
 
-    if (authLoading && !user) {
-      console.log('GitHubAppSetup useEffect - Auth still loading, waiting...');
+    console.log('GitHubAppSetup: URL params:', { oauthCode, installationId, setupAction, errorParam, errorDescription });
+
+    // Immediately handle GitHub errors
+    if (errorParam) {
+      handleError(`GitHub Error: ${errorDescription || errorParam}`);
       return;
     }
 
-    // If we have a code but no user yet, wait a bit longer
-    if (!user && code_param) {
-      console.log('GitHubAppSetup useEffect - Have code but no user yet, waiting...');
-      setTimeout(() => {
-        refreshProfile();
-      }, 2000);
+    // If auth is still loading and there's no OAuth code to process, wait.
+    // If there is an oauthCode, AuthProvider will handle it and update 'user' and 'authLoading'.
+    if (authLoading && !oauthCode) {
+      console.log('GitHubAppSetup: Auth context loading, waiting...');
+      setUiState('loading');
+      setMessage('Verifying authentication...');
       return;
-    } else if (!user) {
-      console.log('GitHubAppSetup useEffect - User not authenticated, redirecting to login.');
+    }
+
+    // If there's an oauthCode, AuthProvider needs to process it.
+    // We wait for 'user' to be populated by AuthProvider.
+    if (oauthCode && !user) {
+      console.log('GitHubAppSetup: OAuth code present, waiting for AuthProvider to establish session...');
+      setUiState('loading');
+      setMessage('Finalizing authentication...');
+      // AuthProvider will eventually set the user or trigger an error.
+      // The useEffect will re-run when 'user' or 'authLoading' changes.
+      return;
+    }
+
+    // If no user and no means to get one (no oauthCode), redirect to login.
+    if (!user && !oauthCode) {
+      console.log('GitHubAppSetup: No user and no OAuth code, redirecting to login.');
       navigate('/login', { replace: true });
       return;
     }
 
-    const parsedInstallationId = installation_id_param ? parseInt(installation_id_param, 10) : null; 
-    const isValidInstallationId = parsedInstallationId !== null && !isNaN(parsedInstallationId);
+    // At this point, if there was an oauthCode, AuthProvider should have processed it and `user` should be available.
+    // Or, the user was already logged in.
 
-    console.log('GitHubAppSetup useEffect - Found installation_id_param:', installation_id_param);
-    console.log('GitHubAppSetup useEffect - Parsed installationId:', parsedInstallationId);
-    console.log('GitHubAppSetup useEffect - Found setup_action:', setup_action);
-
-    // If we have a valid installation ID, save it
-    if (isValidInstallationId) {
-      setInstallationIdFromUrl(String(parsedInstallationId));
-      console.log('GitHubAppSetup useEffect - Valid Installation ID found:', parsedInstallationId);
+    // Scenario 1: Combined OAuth + App Install OR App Install/Reconfigure for an existing user
+    if (user && installationId) {
+      setUiState('loading');
+      setMessage('Connecting GitHub App...');
+      console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
       
-      if (setup_action === 'install') {
-        console.log('GitHubAppSetup useEffect - Setup action is "install", saving installation ID...');
-        saveInstallationIdAndCompleteSetup(String(parsedInstallationId));
+      saveInstallationId(installationId, user.id)
+        .then(() => {
+          // The refreshProfile() called within saveInstallationId will update developerProfile.
+          // We might want to wait for that update if further checks on developerProfile are needed here.
+          // For now, assume it's updated for the success message.
+          if (setupAction === 'install') {
+            handleSuccess('GitHub App successfully installed and connected!');
+          } else {
+            handleSuccess('GitHub App connection updated successfully!');
+          }
+          // Clean installation_id and setup_action from URL after processing
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('installation_id');
+          cleanUrl.searchParams.delete('setup_action');
+          // Also clean 'code' if it was part of this redirect (combined flow)
+          cleanUrl.searchParams.delete('code');
+          window.history.replaceState({}, '', cleanUrl.toString());
+        })
+        .catch(err => {
+          handleError(err.message || 'Failed to save GitHub installation.');
+        });
+      return;
+    }
+
+    // Scenario 2: OAuth completed, user is present, but no installation_id in this redirect.
+    // This means the App was not installed in *this specific GitHub interaction*.
+    if (user && oauthCode && !installationId) {
+      console.log(`GitHubAppSetup: User ${user.id} present from OAuth, but no installation_id in this redirect.`);
+      // AuthProvider has handled the code. The URL should be cleaned by AuthProvider or here.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('code'); // Ensure code is removed
+      window.history.replaceState({}, '', cleanUrl.toString());
+
+      // Check if the app was already installed (e.g., user re-authed but app was already connected)
+      if (developerProfile?.github_installation_id) {
+        console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
+        handleSuccess('GitHub account re-authenticated. App is already connected.', 1000);
       } else {
-        console.log('GitHubAppSetup useEffect - No setup_action "install", but saving installation ID anyway...');
-        saveInstallationIdAndCompleteSetup(String(parsedInstallationId));
+        console.log('GitHubAppSetup: Authentication successful. GitHub App not yet installed.');
+        handleInfo(
+          "Authentication successful! To complete setup, please install the GitTalent GitHub App. You can usually do this from your dashboard or profile settings."
+        );
       }
-    } else if (setup_action === 'update') {
-      console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.'); 
-      completeSetup();
-    } else if (code_param) {
-      // This is the OAuth redirect, just complete setup
-      console.log('GitHubAppSetup useEffect - Found code parameter, completing setup...');
-      completeSetup();
-    } else {
-      // This path is hit if installation_id or setup_action are missing or invalid.
-      // This is expected if the user just signed in via standard OAuth and hasn't installed the app yet.
-      console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation. This is expected if only OAuth occurred.');
-      setLoading(false);
-      setIsError(false); // It's not an error, it's an instruction
-      setMessage(
-        "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account/give permissions."
-      );
+      return;
     }
-  }, [location, user, navigate, refreshProfile, authLoading]);
 
-  const saveInstallationIdAndCompleteSetup = async (id: string) => {
-    try {
-      setLoading(true);
-      setMessage('');
-      setIsError(false);
-      
-      if (!user) {
-        console.error('GitHubAppSetup saveInstallationIdAndCompleteSetup - No user found');
-        throw new Error('User not authenticated');
+    // Scenario 3: User is logged in, no specific GitHub action parameters in URL (e.g., direct navigation, or refresh after setup)
+    if (user && !oauthCode && !installationId && !setupAction) {
+      console.log(`GitHubAppSetup: User ${user.id} present, no specific GitHub action params.`);
+      if (developerProfile?.github_installation_id) {
+        handleSuccess('GitHub App is connected.', 1000);
+      } else {
+        // This case might occur if the user lands here after OAuth and URL cleaning, but before installing.
+        handleInfo("Connect your GitHub App from the dashboard to see your activity.");
       }
-
-      console.log('GitHubAppSetup saveInstallationIdAndCompleteSetup - Saving installation ID:', id, 'for user:', user.id);
-      
-      const { error: updateError } = await supabase
-        .from('developers')
-        .update({ github_installation_id: id })
-        .eq('user_id', user.id); 
-
-      if (updateError) {
-        console.error('GitHubAppSetup saveInstallationIdAndCompleteSetup - Error saving GitHub installation ID:', updateError);
-        throw updateError;
-      }
-      console.log('GitHubAppSetup saveInstallationIdAndCompleteSetup - GitHub installation ID saved successfully');
-
-      await completeSetup();
-
-    } catch (err: any) {
-      console.error('GitHubAppSetup Error saving installation ID and completing setup:', err);
-      setMessage(err.message || 'Failed to save GitHub installation ID and complete setup');
-      setIsError(true);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
 
+    // Fallback loading message if none of the conditions are met yet, but should be brief.
+    setUiState('loading');
+    setMessage('Please wait...');
 
-  const completeSetup = async () => {
-    try {
-      setLoading(true);
-      setMessage('');
-      setIsError(false);
-      
-      console.log('GitHubAppSetup completeSetup - Initiating profile refresh for user:', user?.id); 
-      await refreshProfile();
-
-      setSuccess(true);
-      console.log('GitHubAppSetup completeSetup - Setup successful, redirecting to dashboard...');
-      setTimeout(() => {
-        navigate('/developer?tab=github-activity', { replace: true });
-      }, 2000);
-
-    } catch (err: any) {
-      console.error('GitHubAppSetup Error completing GitHub App setup:', err);
-      setMessage(err.message || 'Failed to complete GitHub App setup');
-      setIsError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [
+    user,
+    developerProfile,
+    authLoading,
+    location.search, // React to full search string changes
+    navigate,
+    refreshProfile,
+    handleSuccess,
+    handleError,
+    handleInfo,
+    saveInstallationId
+  ]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
