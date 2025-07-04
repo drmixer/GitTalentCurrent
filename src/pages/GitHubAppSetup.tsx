@@ -11,7 +11,7 @@ export const GitHubAppSetup = () => {
   const [retryCount, setRetryCount] = useState<number>(0);
   const maxRetries = 3;
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading'); 
   const [message, setMessage] = useState('Connecting GitHub...');
 
   // Function to redirect to GitHub App installation
@@ -45,16 +45,22 @@ export const GitHubAppSetup = () => {
     setMessage(errorMessage);
   }, []);
 
-  const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
+  const saveInstallationId = useCallback(async (id: string, currentUserId: string) => { 
     try {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabase 
         .rpc('update_github_installation_id', {
-          installation_id: id,
-          user_id: currentUserId
+          p_user_id: currentUserId,
+          p_installation_id: id
         });
+
+      if (updateError) {
+        throw new Error(`Failed to save installation ID: ${updateError.message}`);
+      }
       
       // After saving, refresh profile to get the latest state including the new installation ID
-      await refreshProfile(); 
+      if (refreshProfile) {
+        await refreshProfile();
+      }
       return true;
     } catch (error) {
       console.error('Error saving installation ID:', error instanceof Error ? error.message : error);
@@ -63,121 +69,130 @@ export const GitHubAppSetup = () => {
   }, [refreshProfile]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const installationId = searchParams.get('installation_id');
-    const setupAction = searchParams.get('setup_action');
-    const code = searchParams.get('code');
-    const errorParam = searchParams.get('error') || '';
-    const errorDescription = searchParams.get('error_description');
-    const state = searchParams.get('state');
-
-    // Reset retry count when params change
-    if (installationId || errorParam) {
-      setRetryCount(0);
-    }
-
-    console.log('GitHubAppSetup: URL params:', { 
-      installationId, 
-      setupAction, 
-      code,
-      errorParam, 
-      errorDescription,
-      state
-    });
-
-    // Immediately handle GitHub errors
-    if (errorParam) {
-      handleError(`GitHub Error: ${errorDescription || errorParam}`);
-      return;
-    }
-
-    // If auth is still loading, wait.
-    if (authLoading) {
-      console.log('GitHubAppSetup: Auth context loading, waiting...');
-
-      if (retryCount > maxRetries) {
-        setUiState('error');
-        setMessage('Authentication is taking too long. Please try again.');
-      } else {
-        setUiState('loading');
-        setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-
-        // Set a timeout to increment retry count
-        const timer = setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          refreshProfile?.();
-        }, 2000);
-        return () => clearTimeout(timer);
+    const handleSetup = async () => {
+      const searchParams = new URLSearchParams(location.search);
+      const installationId = searchParams.get('installation_id');
+      const setupAction = searchParams.get('setup_action');
+      const code = searchParams.get('code');
+      const errorParam = searchParams.get('error') || '';
+      const errorDescription = searchParams.get('error_description');
+      const state = searchParams.get('state');
+  
+      // Reset retry count when params change
+      if (installationId || errorParam) {
+        setRetryCount(0);
       }
-      return;
-    }
-
-    // If no user after auth loading is complete, redirect to login
-    if (!user) {
-      console.log('GitHubAppSetup: No user, redirecting to login.');
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    // Scenario 1: App Install/Reconfigure for an existing user
-    if (user && installationId) {
-      setUiState('loading'); 
-      setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
-      console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
-
-      saveInstallationId(installationId, user.id)
-        .then(() => {
+  
+      console.log('GitHubAppSetup: URL params:', { 
+        installationId, 
+        setupAction, 
+        code,
+        errorParam, 
+        errorDescription,
+        state
+      });
+  
+      // Handle errors first
+      if (errorParam) {
+        handleError(`GitHub Error: ${errorDescription || errorParam}`);
+        return;
+      }
+  
+      // If auth is still loading, wait.
+      if (authLoading) {
+        console.log('GitHubAppSetup: Auth context loading, waiting...');
+  
+        if (retryCount > maxRetries) {
+          setUiState('error');
+          setMessage('Authentication is taking too long. Please try again.');
+        } else {
+          setUiState('loading');
+          setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
+  
+          // Set a timeout to increment retry count
+          const timer = setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            if (refreshProfile) {
+              refreshProfile();
+            }
+          }, 2000);
+          return () => clearTimeout(timer);
+        }
+        return;
+      }
+  
+      // If no user after auth loading is complete, redirect to login
+      if (!user) {
+        console.log('GitHubAppSetup: No user, redirecting to login.');
+        navigate('/login', { replace: true });
+        return;
+      }
+  
+      // Scenario 1: App Install/Reconfigure for an existing user
+      if (user && installationId) {
+        setUiState('loading'); 
+        setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
+        console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
+  
+        try {
+          await saveInstallationId(installationId, user.id);
+          
           if (setupAction === 'install') {
             handleSuccess('GitHub App successfully installed and connected!');
           } else {
             handleSuccess('GitHub App connection updated successfully!');
           }
+          
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
           window.history.replaceState({}, '', cleanUrl.toString());
-        })
-        .catch(err => {
-          handleError(err.message || 'Failed to save GitHub installation.');
-        });
-    }
-
-    // Scenario 2: User is logged in but no installation_id in URL
-    if (user && !installationId) {
-      console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-      console.log('Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
-      
-      // Check if developer profile has installation ID
-      const hasInstallationId = developerProfile?.github_installation_id && 
-                               developerProfile.github_installation_id !== '';
-                               
-      if (hasInstallationId) {
-        console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
-        handleSuccess('GitHub App is already connected.', 1000);
-      } else {
-        // Check if we need to wait for profile to load
-        if (!developerProfile && retryCount < maxRetries) { 
-          console.log('GitHubAppSetup: Waiting for developer profile to load...');
-          setUiState('loading');
-          setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
-          
-          // Increment retry count and try to refresh profile
-          setTimeout(() => {
-            refreshProfile?.();
-            setRetryCount(prev => prev + 1);
-          }, 2000);
-        } else {
-          console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
-          setUiState('info');
-          setMessage('Connect your GitHub account to display your contributions and repositories.');
+        } catch (err) {
+          handleError(err instanceof Error ? err.message : 'Failed to save GitHub installation.');
         }
+        return;
       }
-      return;
-    }
-    
-    setUiState('loading'); 
-    setMessage('Please wait...');
+  
+      // Scenario 2: User is logged in but no installation_id in URL
+      if (user && !installationId) {
+        console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
+        console.log('Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
+        
+        // Check if developer profile has installation ID
+        const hasInstallationId = developerProfile?.github_installation_id && 
+                                 developerProfile.github_installation_id !== '';
+                                 
+        if (hasInstallationId) {
+          console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
+          handleSuccess('GitHub App is already connected.', 1000);
+        } else {
+          // Check if we need to wait for profile to load
+          if (!developerProfile && retryCount < maxRetries) { 
+            console.log('GitHubAppSetup: Waiting for developer profile to load...');
+            setUiState('loading');
+            setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
+            
+            // Increment retry count and try to refresh profile
+            setTimeout(() => {
+              if (refreshProfile) {
+                refreshProfile();
+              }
+              setRetryCount(prev => prev + 1);
+            }, 2000);
+          } else {
+            console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
+            setUiState('info');
+            setMessage('Connect your GitHub account to display your contributions and repositories.');
+          }
+        }
+        return;
+      }
+      
+      setUiState('loading'); 
+      setMessage('Please wait...');
+    };
 
+    handleSetup();
   }, [user, developerProfile, authLoading, location.search, navigate, refreshProfile, 
       handleSuccess, handleError, saveInstallationId, redirectToGitHubAppInstall, retryCount]);
 
