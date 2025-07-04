@@ -89,7 +89,6 @@ export const SignupForm = () => {
   const handleGitHubSignUp = async () => {
     if (!formData.name.trim()) {
       setError('Please enter your name first');
-      setGithubLoading(false);
       return;
     }
 
@@ -97,7 +96,11 @@ export const SignupForm = () => {
     setGithubLoading(true);
     
     try {
-      console.log('Starting GitHub signup for:', formData.name);
+      console.log('Starting GitHub signup for:', formData.name, 'with role:', formData.role);
+      
+      // Store the name in localStorage so we can use it after redirect
+      localStorage.setItem('gittalent_signup_name', formData.name);
+      localStorage.setItem('gittalent_signup_role', formData.role);
       
       await signInWithGitHub();
       // Navigation will be handled by the redirect

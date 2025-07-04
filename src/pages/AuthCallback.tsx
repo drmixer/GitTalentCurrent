@@ -8,7 +8,7 @@ export const AuthCallback: React.FC = () => {
   const { user, userProfile, developerProfile, loading: authLoading, refreshProfile, authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'creating_profile'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 5;
@@ -20,13 +20,14 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
+    const state = params.get('state');
     
     console.log('AuthCallback: URL params:', { 
       code, 
       installationId, 
       setupAction, 
       error,
-      state: params.get('state')
+      state
     });
     
     // Reset retry count when params change
@@ -41,6 +42,20 @@ export const AuthCallback: React.FC = () => {
       return;
     }
 
+    // Try to parse state parameter if it exists
+    if (state) {
+      try {
+        const stateObj = JSON.parse(state);
+        console.log('AuthCallback: Parsed state:', stateObj);
+        
+        // Store in localStorage for use after redirect
+        if (stateObj.name) localStorage.setItem('gittalent_signup_name', stateObj.name);
+        if (stateObj.role) localStorage.setItem('gittalent_signup_role', stateObj.role);
+      } catch (e) {
+        console.log('AuthCallback: Could not parse state parameter:', state);
+      }
+    }
+
     // If auth is still loading, wait.
     if (authLoading) {
       console.log(`AuthCallback: Auth context loading, waiting... (Retry: ${retryCount}/${maxRetries})`);
@@ -48,7 +63,7 @@ export const AuthCallback: React.FC = () => {
       if (retryCount > maxRetries && !manualRetry) {
         setStatus('error');
         setMessage('Authentication is taking too long. Please try again.');
-      } else {
+      } else { 
         setStatus('loading');
         setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
         
@@ -61,7 +76,7 @@ export const AuthCallback: React.FC = () => {
     }
 
     // If no user after auth loading is complete, redirect to login
-    if (!user) {
+    if (!user && retryCount > 2) {
       console.log('AuthCallback: No user, redirecting to login.');
       navigate('/login', { replace: true });
       return;
@@ -69,6 +84,7 @@ export const AuthCallback: React.FC = () => {
 
     // User is authenticated (user is not null)
     console.log('AuthCallback: User is authenticated:', user.id);
+    console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
 
     // GitHub App installation flow
     if (installationId) {
@@ -76,6 +92,18 @@ export const AuthCallback: React.FC = () => {
       setMessage(`GitHub App installation detected (ID: ${installationId}), redirecting...`);
       // Redirect to GitHub setup page with the installation parameters
       navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
+      return;
+    }
+
+    // If we have a user but no profile, we need to create one
+    if (user && !userProfile && retryCount <= 2) {
+      console.log('AuthCallback: User exists but no profile yet, waiting for profile creation...');
+      setStatus('creating_profile');
+      setMessage('Creating your profile...');
+      
+      // Try to refresh the profile
+      refreshProfile?.();
+      setTimeout(() => setRetryCount(prev => prev + 1), 2000);
       return;
     }
 
@@ -109,7 +137,7 @@ export const AuthCallback: React.FC = () => {
       if (retryCount > maxRetries && !manualRetry) {
         console.log('AuthCallback: Max retries reached, showing error with manual retry option');
         setStatus('error');
-        setMessage('We had trouble loading your profile. Please try again.');
+        setMessage('We had trouble loading your profile. Please try refreshing or logging in again.');
       } else {
         setStatus('loading');
         setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
@@ -173,6 +201,16 @@ export const AuthCallback: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {status === 'creating_profile' && (
+          <div className="text-center">
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">{message}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              We're setting up your account with your GitHub information...
+            </p>
           </div>
         )}
 

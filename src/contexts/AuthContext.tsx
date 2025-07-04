@@ -71,16 +71,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
+    
+    // Get stored signup data if available
+    const signupName = localStorage.getItem('gittalent_signup_name');
+    const signupRole = localStorage.getItem('gittalent_signup_role') || 'developer';
+    
+    // Create state object with role information
+    const stateObj = {
+      source: 'signup',
+      role: signupRole,
+      name: signupName
+    };
+    
+    console.log('🔄 signInWithGitHub: Using state:', stateObj);
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github', 
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'read:user user:email repo', 
         queryParams: {
-          state: JSON.stringify({
-            source: 'signup',
-            role: 'developer'
-          })
+          state: JSON.stringify(stateObj)
         }
       },
     });
@@ -286,26 +297,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id, authUser.email);
-      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', authUser.user_metadata);
+      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 handleGitHubSignIn: GitHub app metadata:', JSON.stringify(authUser.app_metadata));
 
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const email = authUser.email;
       
-      // Try to extract state information
-      let role = 'developer';
+      // Try to extract state information from app_metadata
+      let role = 'developer'; 
+      let stateName = '';
+      
       try {
-        const stateParam = authUser.app_metadata?.provider_token || '';
-        if (stateParam) {
-          const stateObj = JSON.parse(stateParam);
-          if (stateObj && stateObj.role) {
-            role = stateObj.role;
+        // Try to parse state from various possible locations
+        let stateString = '';
+        
+        if (authUser.app_metadata?.provider_token) {
+          stateString = authUser.app_metadata.provider_token;
+        } else if (authUser.app_metadata?.state) {
+          stateString = authUser.app_metadata.state;
+        }
+        
+        if (stateString) {
+          try {
+            const stateObj = JSON.parse(stateString);
+            if (stateObj) {
+              if (stateObj.role) role = stateObj.role;
+              if (stateObj.name) stateName = stateObj.name;
+            }
+          } catch (e) {
+            console.log('Could not parse state as JSON:', stateString);
           }
         }
       } catch (e) {
         console.log('Could not parse state parameter, using default role');
       }
+      
+      // Also check localStorage as a fallback
+      const storedName = localStorage.getItem('gittalent_signup_name');
+      const storedRole = localStorage.getItem('gittalent_signup_role');
+      
+      if (storedRole) role = storedRole;
+      if (stateName === '' && storedName) stateName = storedName;
+      
+      // Clear localStorage items
+      localStorage.removeItem('gittalent_signup_name');
+      localStorage.removeItem('gittalent_signup_role');
 
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.installation_id) {
@@ -314,18 +352,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         githubInstallationId = String(authUser.user_metadata.app_installation_id);
       }
       
-      console.log('🔄 handleGitHubSignIn: Extracted data:', {
+      const { data: userResult, error: insertUserError } = await supabase
         githubUsername,
         fullName,
+        stateName,
         email,
         role,
         githubInstallationId
       });
 
-      console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', role, 'with name:', fullName);
+      // Use stored name if available, otherwise use name from GitHub
+      const finalName = stateName || fullName;
+      console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', role, 'with name:', finalName);
 
       // Always create or update the GitHub developer profile
-      await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername || '', avatarUrl, authUser.user_metadata, githubInstallationId);
+      await createOrUpdateGitHubDeveloperProfile(
+        authUser.id, 
+        githubUsername || '', 
+        avatarUrl, 
+        { 
+          ...authUser.user_metadata,
+          name: finalName,
+          role: role
+        }, 
+        githubInstallationId
+      );
 
       await fetchUserProfile(authUser);
     } catch (error) {
@@ -338,23 +389,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
     try {
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
-      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername || 'none', 'Installation ID:', installationId || 'none');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername || 'none');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Installation ID:', installationId || 'none');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Metadata:', JSON.stringify(githubMetadata));
 
       // First ensure user profile exists
-      const { error: userError } = await supabase.rpc('create_user_profile', {
+      const { data: userResult, error: userError } = await supabase.rpc('create_user_profile', {
         user_id: userId,
         user_email: githubMetadata?.email || 'unknown@example.com',
-        user_name: githubMetadata?.name || githubUsername || 'GitHub User',
-        user_role: 'developer',
+        user_name: githubMetadata?.name || githubMetadata?.full_name || githubUsername || 'GitHub User',
+        user_role: githubMetadata?.role || 'developer',
         company_name: ''
       });
       
       if (userError) {
-        console.warn('⚠️ Error creating user profile:', userError);
+        console.warn('⚠️ Error creating user profile:', userError.message);
+      } else {
+        console.log('✅ User profile created/updated successfully:', userResult);
       }
 
       // Then create/update developer profile
-      const { error: devError } = await supabase.rpc('create_developer_profile', {
+      const { data: devResult, error: devError } = await supabase.rpc('create_developer_profile', {
         p_user_id: userId,
         p_github_handle: githubUsername || '',
         p_bio: githubMetadata?.bio || '',
@@ -370,7 +425,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (devError) {
         console.error('Error creating/updating developer profile:', devError);
-        throw devError;
+      } else {
+        console.log('✅ Developer profile created/updated successfully:', devResult);
       }
 
       console.log('✅ createOrUpdateGitHubDeveloperProfile: GitHub developer profile created/updated successfully in DB');
@@ -415,36 +471,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
-      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', authUser.user_metadata);
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 createUserProfileFromAuth: Auth app metadata:', JSON.stringify(authUser.app_metadata));
       
-      // Try to extract state information for role
-      let stateRole = '';
+      // Try to extract state information
+      let role = 'developer';
+      let stateName = '';
+      
       try {
-        const stateParam = authUser.app_metadata?.provider_token || '';
-        if (stateParam) {
-          const stateObj = JSON.parse(stateParam);
-          if (stateObj && stateObj.role) {
-            stateRole = stateObj.role;
+        // Try to parse state from various possible locations
+        let stateString = '';
+        
+        if (authUser.app_metadata?.provider_token) {
+          stateString = authUser.app_metadata.provider_token;
+        } else if (authUser.app_metadata?.state) {
+          stateString = authUser.app_metadata.state;
+        }
+        
+        if (stateString) {
+          try {
+            const stateObj = JSON.parse(stateString);
+            if (stateObj) {
+              if (stateObj.role) role = stateObj.role;
+              if (stateObj.name) stateName = stateObj.name;
+            }
+          } catch (e) {
+            console.log('Could not parse state as JSON:', stateString);
           }
         }
       } catch (e) {
         console.log('Could not parse state parameter');
       }
       
-      // Extract role with fallbacks
-      const userRole = stateRole || 
-                      authUser.user_metadata?.role || 
-                      (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
+      // Also check localStorage as a fallback
+      const storedName = localStorage.getItem('gittalent_signup_name');
+      const storedRole = localStorage.getItem('gittalent_signup_role');
+      
+      if (storedRole) role = storedRole;
+      if (stateName === '' && storedName) stateName = storedName;
+      
+      // Clear localStorage items
+      localStorage.removeItem('gittalent_signup_name');
+      localStorage.removeItem('gittalent_signup_role');
       
       // Extract name with fallbacks
-      const userName = authUser.user_metadata?.full_name || 
-                      authUser.user_metadata?.name || 
-                      authUser.user_metadata?.user_name ||
-                      'User';
+      const userName = stateName || 
+                       authUser.user_metadata?.full_name || 
+                       authUser.user_metadata?.name || 
+                       authUser.user_metadata?.user_name ||
+                       'User';
                       
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const email = authUser.email;
+      
+      console.log('🔄 createUserProfileFromAuth: Final values:', {
+        role,
+        userName,
+        email
+      });
 
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.installation_id || authUser.user_metadata?.app_installation_id) {
@@ -457,7 +542,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           user_id: authUser.id,
           user_email: authUser.email || email || 'unknown@example.com',
           user_name: userName || authUser.email?.split('@')[0] || 'User',
-          user_role: userRole,
+          user_role: role,
           company_name: companyName
         });
 
@@ -468,10 +553,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.warn('⚠️ createUserProfileFromAuth: User profile already exists (unique constraint violation). Treating as success.');
           return true;
         }
+        setAuthError('Failed to create user profile. Please try again.');
         return false;
       } else {
         console.log('✅ createUserProfileFromAuth: User profile created successfully:', userResult);
-      }
+      } 
 
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
         if (authUser.user_metadata?.installation_id) {
