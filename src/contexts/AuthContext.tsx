@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User, Developer, JobRole, Assignment, Hire, AuthContextType, Message } from '../types';
+import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('-----------------------------');
 
     async function handleAuthRedirect() {
+      console.log('🔄 AuthProvider: Checking for auth redirect parameters...');
       try {
         const params = new URLSearchParams(window.location.hash.substring(1)); // Check hash for tokens
         const accessToken = params.get('access_token');
@@ -34,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const tokenType = params.get('token_type');
 
         if (accessToken && refreshToken && expiresIn && tokenType) {
+          setLoading(true); // Ensure loading is true while handling redirect
           console.log('🚀 AuthProvider: Detected URL parameters for session, setting session...');
           const { data: { session }, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -43,6 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (error) {
             console.error('❌ AuthProvider: Error setting session from URL params:', error);
             // If setting session fails, clear the URL hash to prevent infinite loops
+            setLoading(false);
             window.location.hash = '';
             return;
           }
@@ -50,18 +53,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (session) {
             console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
             // Clear the URL hash to clean up the URL
+            setUser(session.user);
             window.location.hash = '';
-            return; // Exit, session handled - onAuthStateChange will handle the rest
+            
+            // Immediately fetch user profile after setting session
+            await fetchUserProfile(session.user);
+            return true; // Return true to indicate redirect was handled
           }
         }
+        return false; // Return false to indicate no redirect was handled
       } catch (error) {
         console.error('❌ AuthProvider: Error in handleAuthRedirect:', error);
         if (currentMounted) setLoading(false);
+        return false;
       }
     }
-
-    // Check for auth redirect parameters
-    handleAuthRedirect();
 
     // Initialize auth state
     const initializeAuth = async () => {
@@ -71,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (error) {
           console.error('❌ Error getting session:', error);
-          if (currentMounted) {
+          if (currentMounted && loading) {
             setLoading(false);
           }
           return;
@@ -84,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await fetchUserProfile(session.user);
           } else {
             console.log('ℹ️ No session found');
-            setLoading(false);
+            if (loading) setLoading(false);
           }
         }
       } catch (error) {
@@ -95,8 +101,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Initialize auth after checking for redirect
-    initializeAuth();
+    // First check for auth redirect parameters, then initialize auth
+    (async () => {
+      const redirectHandled = await handleAuthRedirect();
+      
+      // Only initialize auth if no redirect was handled
+      if (!redirectHandled) {
+        await initializeAuth();
+      }
+    })();
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -119,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log(`✅ AuthProvider: User signed in/session active (${event}), fetching profile for:`, newUser.id);
           if (newUser.app_metadata?.provider === 'github') {
             await handleGitHubSignIn(newUser);
-          }
+          } 
           await fetchUserProfile(newUser); // Fetch profile for any user-present event
         } else if (event === 'SIGNED_OUT') {
           console.log('🔄 AuthProvider: User signed out, clearing auth state...');
@@ -130,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSigningOut(false);
         } else {
           console.log('ℹ️ AuthProvider: No user in session after auth state change, setting loading to false.');
-          setLoading(false);
+          if (loading) setLoading(false);
         }
       } catch (error) {
         console.error('❌ AuthProvider: Error in onAuthStateChange listener:', error);
@@ -181,7 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 handleGitHubSignIn: GitHub installation ID (from metadata):', githubInstallationId || 'not found');
 
       const userRole = authUser.user_metadata?.role || 'developer';
-      console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', userRole);
+      console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', userRole, 'with name:', fullName);
 
       try {
         const { data, error } = await supabase.rpc('create_user_profile', {
@@ -339,6 +352,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
       await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+      
+      let userProfileFound = false;
 
       const { data: userProfileData, error: userError } = await supabase
         .from('users')
@@ -362,6 +377,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (retryError) {
             console.error('❌ fetchUserProfile: Error fetching user profile after creation attempt:', retryError);
             if (mounted) {
+              console.log('❌ fetchUserProfile: Setting profile to null and needsOnboarding to true after retry error');
               setUserProfile(null);
               setDeveloperProfile(null);
               setNeedsOnboarding(true);
@@ -369,6 +385,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             return;
           }
+          userProfileFound = !!retryUserData;
           if (mounted) {
             setUserProfile(retryUserData);
             await checkForRoleSpecificProfile(retryUserData, authUser.id);
@@ -376,6 +393,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.error('❌ fetchUserProfile: Failed to create user profile from auth data.');
           if (mounted) {
+            console.log('❌ fetchUserProfile: Setting profile to null and needsOnboarding to true after creation failure');
             setUserProfile(null);
             setDeveloperProfile(null);
             setNeedsOnboarding(true);
@@ -384,6 +402,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
       } else {
+        userProfileFound = true;
         console.log('✅ fetchUserProfile: User profile found in DB:', userProfileData.role);
         if (mounted) {
           setUserProfile(userProfileData);
@@ -393,6 +412,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('❌ fetchUserProfile: Unhandled error in fetchUserProfile:', error);
       if (mounted) {
+        console.log('❌ fetchUserProfile: Setting profile to null after unhandled error');
         setUserProfile(null);
         setDeveloperProfile(null);
         setLoading(false);
@@ -422,7 +442,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (insertUserError) {
         console.error('❌ createUserProfileFromAuth: User profile creation failed:', insertUserError);
         if (insertUserError.code === '23505') {
-          console.warn('⚠️ createUserProfileFromAuth: User profile already exists (unique constraint violation).');
+          console.warn('⚠️ createUserProfileFromAuth: User profile already exists (unique constraint violation). Treating as success.');
           return true;
         }
         return false;
@@ -470,7 +490,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (devError) {
           console.error('❌ createUserProfileFromAuth: Error creating developer profile:', devError);
           if (devError.code === '23505') {
-            console.warn('⚠️ createUserProfileFromAuth: Developer profile already exists (unique constraint violation).');
+            console.warn('⚠️ createUserProfileFromAuth: Developer profile already exists (unique constraint violation). Treating as success.');
             return true;
           }
           return false;
@@ -488,7 +508,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (recError) {
           console.error('❌ createUserProfileFromAuth: Error creating recruiter profile:', recError);
           if (recError.code === '23505') {
-            console.warn('⚠️ createUserProfileFromAuth: Recruiter profile already exists (unique constraint violation).');
+            console.warn('⚠️ createUserProfileFromAuth: Recruiter profile already exists (unique constraint violation). Treating as success.');
             return true;
           }
           return false;
@@ -520,6 +540,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!devProfileData) {
           console.log('⚠️ checkForRoleSpecificProfile: Developer profile not found, needs onboarding (or still being created).');
+          console.log('⚠️ checkForRoleSpecificProfile: Setting needsOnboarding to true for developer');
           setDeveloperProfile(null);
           setNeedsOnboarding(true);
         } else {
@@ -528,6 +549,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (!devProfileData.github_installation_id && devProfileData.github_handle) {
             console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer.');
+            // This is where the UI should prompt the user to connect the GitHub App
           }
           setNeedsOnboarding(false);
         }
@@ -544,6 +566,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!recProfileData) {
           console.log('⚠️ checkForRoleSpecificProfile: Recruiter profile not found, needs onboarding.');
+          console.log('⚠️ checkForRoleSpecificProfile: Setting needsOnboarding to true for recruiter');
           setNeedsOnboarding(true);
         } else {
           console.log('✅ checkForRoleSpecificProfile: Recruiter profile found.');
@@ -554,9 +577,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setDeveloperProfile(null);
       }
+      console.log('✅ checkForRoleSpecificProfile: Completed profile check, setting loading to false');
     } catch (error) {
       console.error('❌ checkForRoleSpecificProfile: Error checking role-specific profile:', error);
       setNeedsOnboarding(false);
+      console.log('❌ checkForRoleSpecificProfile: Setting loading to false after error');
     } finally {
       setLoading(false);
     }
@@ -784,8 +809,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile: async () => {
       if (user) {
         console.log('🔄 refreshProfile: Refreshing profile...');
-        setLoading(true);
+        setLoading(true); // Set loading to true before refreshing
         await fetchUserProfile(user);
+        // No need to set loading to false here as fetchUserProfile will handle it
       }
     },
     createDeveloperProfile,
