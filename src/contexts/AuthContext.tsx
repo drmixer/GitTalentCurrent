@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let currentMounted = true;
     setMounted(true); // Ensure mounted is true on effect run
-    
+
     // Log the current environment and URL for debugging
     console.log('--- AuthProvider Init Debug ---');
     console.log('Current window.location.origin:', window.location.origin);
@@ -29,12 +29,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('Hash content:', window.location.hash);
     console.log('-----------------------------');
 
-    async function handleAuthRedirect() {
+    async function handleAuthRedirect(retryCount = 0) {
       console.log('🔄 AuthProvider: Checking for auth redirect parameters...');
       try {
         // First check if we have a hash with auth parameters
         if (!window.location.hash) {
           console.log('No hash parameters found in URL');
+          
+          // Check for code in query params (PKCE flow)
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get('code');
+          
+          if (code) {
+            console.log('Found code parameter in URL, handling PKCE flow');
+            // The supabase client should handle this automatically
+            // Just need to wait for the session to be established
+            
+            // Get current session after a short delay to allow auth to complete
+            setTimeout(async () => {
+              try {
+                const { data, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                  console.error('❌ Error getting session after code exchange:', error);
+                  setAuthError(`Error getting session: ${error.message}`);
+                  if (currentMounted) setLoading(false);
+                  return;
+                }
+                
+                if (data?.session) {
+                  console.log('✅ Session established after code exchange:', data.session.user.id);
+                  if (currentMounted) {
+                    setUser(data.session.user);
+                    await fetchUserProfile(data.session.user);
+                  }
+                } else if (retryCount < 3) {
+                  console.log(`Session not found after code exchange, retrying (${retryCount + 1}/3)...`);
+                  // Retry after a delay
+                  setTimeout(() => handleAuthRedirect(retryCount + 1), 1000);
+                } else {
+                  console.error('❌ Failed to establish session after multiple retries');
+                  setAuthError('Failed to establish session after authentication');
+                  if (currentMounted) setLoading(false);
+                }
+              } catch (error) {
+                console.error('❌ Error in code exchange handling:', error);
+                setAuthError(`Error in code exchange: ${error instanceof Error ? error.message : String(error)}`);
+                if (currentMounted) setLoading(false);
+              }
+            }, 1000);
+            
+            // Clean up the URL
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState(null, '', cleanUrl);
+            
+            return true;
+          }
+          
           return false;
         }
         
@@ -164,7 +215,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // First check for auth redirect parameters, then initialize auth
     (async () => {
       try {
-        const redirectHandled = await handleAuthRedirect();
+        // Check if we're in the middle of an auth flow
+        const isAuthFlow = window.location.hash.includes('access_token=') || 
+                          window.location.hash.includes('error=') ||
+                          window.location.search.includes('code=');
+        
+        if (isAuthFlow) {
+          console.log('Detected auth flow parameters in URL');
+          setLoading(true); // Ensure loading is true during auth flow
+        }
+        
+        const redirectHandled = await handleAuthRedirect(0);
         console.log('Redirect handled:', redirectHandled);
         
         // Only initialize auth if no redirect was handled
@@ -340,7 +401,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       setSigningOut(true);
-      console.log('🔄 signOut: Starting sign out process...');
+      console.log('🔄 signOut: Starting sign out process...'); 
 
       setUser(null);
       setUserProfile(null);
@@ -351,7 +412,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('❌ signOut: Error during sign out:', error);
         throw error;
-      }
+      } 
 
       console.log('✅ signOut: Sign out API call successful');
 
@@ -366,7 +427,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     console.log('🔄 signIn: Signing in with email...');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    if (error) { 
       console.error('❌ signIn: Sign in error:', error);
       throw error;
     }
@@ -375,10 +436,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
+      provider: 'github', 
       options: {
-        redirectTo: `${window.location.origin}/developer`,
-        scopes: 'read:user user:email'
+        redirectTo: `${window.location.origin}/github-setup`,
+        scopes: 'read:user user:email repo'
       },
     });
     if (error) {
@@ -390,7 +451,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
       console.log('🔄 signUp: Signing up user...');
-      console.log('🔄 signUp: User data for signup:', userData);
+      console.log('🔄 signUp: User data for signup:', userData); 
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -399,7 +460,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           redirectTo: `${window.location.origin}/github-setup`,
           data: {
             name: userData.name,
-            role: userData.role,
+            role: userData.role, 
             company_name: userData.role === 'recruiter' ? (userData as any).company_name : undefined,
           }
         }
@@ -408,7 +469,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       if (data?.user) {
-        console.log('✅ signUp: User signed up successfully:', data.user.id, 'with role:', userData.role);
+        console.log('✅ signUp: User signed up successfully:', data.user.id, 'with role:', userData.role); 
       }
     } catch (error) {
       console.error('❌ signUp: Signup error:', error);
@@ -419,9 +480,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 fetchUserProfile: Fetching user profile for:', authUser.id, 'Email:', authUser.email);
-      console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
       
-      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+      await new Promise(resolve => setTimeout(resolve, 500)); // Slightly longer delay
       
       let userProfileFound = false;
 
@@ -434,10 +495,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userError || !userProfileData) {
         console.log('⚠️ fetchUserProfile: User profile not found in DB for:', authUser.id, userError?.message);
         console.log('🔄 fetchUserProfile: Attempting to create user profile from auth data...');
-        const success = await createUserProfileFromAuth(authUser);
+        
+        // Try to create the user profile
+        let success = false;
+        try {
+          success = await createUserProfileFromAuth(authUser);
+        } catch (createError) {
+          console.error('❌ fetchUserProfile: Error in createUserProfileFromAuth:', createError);
+        }
         
         if (success) {
-          await new Promise(resolve => setTimeout(resolve, 500)); // Give DB a moment to sync
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Give DB more time to sync
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
             .select('*')
@@ -493,9 +561,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
 
-      const userRole = authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
-      const userName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'User';
+      // Extract role with fallbacks
+      const userRole = authUser.user_metadata?.role || 
+                      (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
+      
+      // Extract name with fallbacks
+      const userName = authUser.user_metadata?.full_name || 
+                      authUser.user_metadata?.name || 
+                      authUser.user_metadata?.user_name ||
+                      'User';
+                      
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
@@ -503,7 +580,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (authUser.user_metadata?.installation_id) {
         githubInstallationId = String(authUser.user_metadata.installation_id);
       } else if (authUser.user_metadata?.app_installation_id) {
-        githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        githubInstallationId = String(authUser.user_metadata.app_installation_id); 
       }
       else if (authUser.user_metadata?.github?.installation_id) {
         githubInstallationId = String(authUser.user_metadata.github.installation_id);
@@ -524,11 +601,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { error: insertUserError } = await supabase
         .from('users')
         .insert({
-          id: authUser.id,
-          email: authUser.email || 'unknown@example.com',
-          name: userName || authUser.email?.split('@')[0] || 'User',
-          role: userRole,
-          is_approved: userRole === 'developer' || userRole === 'admin'
+          id: authUser.id, 
+          email: authUser.email || 'unknown@example.com', 
+          name: userName || authUser.email?.split('@')[0] || 'User', 
+          role: userRole, 
+          is_approved: userRole === 'developer' || userRole === 'admin' 
         });
 
       if (insertUserError) {
@@ -543,12 +620,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
         let githubInstallationId: string | null = null;
         if (authUser.user_metadata?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.installation_id);
+          githubInstallationId = String(authUser.user_metadata.installation_id); 
         } else if (authUser.user_metadata?.app_installation_id) {
-          githubInstallationId = String(authUser.user_metadata.app_installation_id);
+          githubInstallationId = String(authUser.user_metadata.app_installation_id); 
         }
         else if (authUser.user_metadata?.github?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.github.installation_id);
+          githubInstallationId = String(authUser.user_metadata.github.installation_id); 
         }
         else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
           try {
@@ -566,17 +643,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { error: devError } = await supabase
           .from('developers')
           .insert({
-            user_id: authUser.id,
-            github_handle: authUser.user_metadata?.user_name || '',
-            bio: authUser.user_metadata?.bio || '',
-            availability: true,
-            top_languages: [],
-            linked_projects: [],
-            location: authUser.user_metadata?.location || '',
-            experience_years: 0,
-            desired_salary: 0,
-            profile_pic_url: avatarUrl,
-            github_installation_id: githubInstallationId
+            user_id: authUser.id, 
+            github_handle: authUser.user_metadata?.user_name || '', 
+            bio: authUser.user_metadata?.bio || '', 
+            availability: true, 
+            top_languages: [], 
+            linked_projects: [], 
+            location: authUser.user_metadata?.location || '', 
+            experience_years: 0, 
+            desired_salary: 0, 
+            profile_pic_url: avatarUrl, 
+            github_installation_id: githubInstallationId 
           });
 
         if (devError) {
@@ -620,7 +697,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       if (userProfile.role === 'developer') {
-        const { data: devProfileData, error: devError } = await supabase
+        const { data: devProfileData, error: devError } = await supabase 
           .from('developers')
           .select('*')
           .eq('user_id', userId)
@@ -648,7 +725,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else if (userProfile?.role === 'recruiter') {
         const { data: recProfileData, error: recError } = await supabase
           .from('recruiters')
-          .select('*')
+          .select('*') 
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -682,7 +759,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
-    try {
+    try { 
       console.log('🔄 createDeveloperProfile: Creating developer profile for:', user.id);
 
       const { data, error } = await supabase.rpc('create_developer_profile', {
@@ -696,7 +773,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
         p_profile_pic_url: profileData.profile_pic_url || null,
-        p_github_installation_id: profileData.github_installation_id || null
+        p_github_installation_id: profileData.github_installation_id || null 
       });
 
       if (error) {
@@ -719,7 +796,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
-    try {
+    try { 
       console.log('🔄 updateDeveloperProfile: Updating developer profile for:', user.id);
 
       const cleanedData = {

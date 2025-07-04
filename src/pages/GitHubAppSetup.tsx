@@ -17,7 +17,7 @@ export const GitHubAppSetup = () => {
   useEffect(() => {
     console.log('GitHubAppSetup useEffect - Current URL search params:', location.search);
 
-    if (authLoading) {
+    if (authLoading && !user) {
       console.log('GitHubAppSetup useEffect - Auth still loading, waiting...');
       return;
     }
@@ -32,7 +32,23 @@ export const GitHubAppSetup = () => {
     const installation_id_param = params.get('installation_id');
     const setup_action = params.get('setup_action');
 
-    const parsedInstallationId = installation_id_param ? parseInt(installation_id_param, 10) : null;
+    // Also check for code parameter (from OAuth flow)
+    const code_param = params.get('code');
+    
+    if (code_param && !installation_id_param) {
+      console.log('GitHubAppSetup useEffect - Found code parameter but no installation_id, waiting for auth to complete...');
+      // This is likely the OAuth redirect, wait for auth to complete
+      if (user) {
+        console.log('GitHubAppSetup useEffect - User is authenticated, redirecting to dashboard');
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/developer?tab=github-activity', { replace: true });
+        }, 2000);
+      }
+      return;
+    }
+
+    const parsedInstallationId = installation_id_param ? parseInt(installation_id_param, 10) : null; 
     const isValidInstallationId = parsedInstallationId !== null && !isNaN(parsedInstallationId);
 
     console.log('GitHubAppSetup useEffect - Found installation_id_param:', installation_id_param);
@@ -44,7 +60,7 @@ export const GitHubAppSetup = () => {
       console.log('GitHubAppSetup useEffect - Valid Installation ID and setup_action "install" found. Saving and completing setup...');
       saveInstallationIdAndCompleteSetup(String(parsedInstallationId));
     } else if (setup_action === 'update') {
-      console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.');
+      console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.'); 
       completeSetup();
     } else {
       // This path is hit if installation_id or setup_action are missing or invalid.
@@ -63,7 +79,7 @@ export const GitHubAppSetup = () => {
       setLoading(true);
       setMessage('');
       setIsError(false);
-
+      
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
@@ -71,7 +87,7 @@ export const GitHubAppSetup = () => {
       const { error: updateError } = await supabase
         .from('developers')
         .update({ github_installation_id: id })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id); 
 
       if (updateError) {
         console.error('Error saving GitHub installation ID directly:', updateError);
@@ -96,7 +112,7 @@ export const GitHubAppSetup = () => {
       setLoading(true);
       setMessage('');
       setIsError(false);
-      console.log('GitHubAppSetup completeSetup - Initiating profile refresh...');
+      console.log('GitHubAppSetup completeSetup - Initiating profile refresh...'); 
       await refreshProfile();
 
       setSuccess(true);
@@ -145,7 +161,7 @@ export const GitHubAppSetup = () => {
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">
-              Your GitHub account has been successfully connected to GitTalent!
+              Your GitHub account has been successfully connected to GitTalent! 
             </p>
             <p className="text-sm text-gray-500">
               Redirecting you to your dashboard...
