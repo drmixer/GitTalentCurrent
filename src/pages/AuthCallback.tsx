@@ -7,7 +7,7 @@ export const AuthCallback: React.FC = () => {
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
 
   useEffect(() => {
@@ -16,6 +16,8 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
+    
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
     
     // Handle errors first
     if (error) {
@@ -28,20 +30,18 @@ export const AuthCallback: React.FC = () => {
       try {
         // If we have a code, the auth is being handled by Supabase auth
         if (code) {
-          setMessage('Finalizing authentication...');
+          setMessage('Authentication successful, finalizing...');
           
           // If we also have an installation_id, this is a GitHub App installation
           if (installationId) {
-            setMessage('GitHub App installation detected...');
+            setStatus('redirect');
+            setMessage('GitHub App installation detected, redirecting...');
             
-            // Wait for user to be available (auth to complete)
-            if (!user) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              await refreshProfile();
-            }
-            
-            // Redirect to GitHub setup page with the installation parameters
-            navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
+            // Short delay to ensure UI updates before redirect
+            setTimeout(() => {
+              // Redirect to GitHub setup page with the installation parameters
+              navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
+            }, 500);
             return;
           }
           
@@ -49,10 +49,13 @@ export const AuthCallback: React.FC = () => {
           if (user) {
             setStatus('success');
             setMessage('Authentication successful!');
+            
             setTimeout(() => {
               navigate('/dashboard', { replace: true });
             }, 1500);
-          } else {
+                setStatus('redirect');
+                setMessage('Redirecting to GitHub setup...');
+                navigate('/github-setup', { replace: true });
             // Wait a bit longer for auth to complete
             setTimeout(async () => {
               await refreshProfile();
@@ -79,7 +82,14 @@ export const AuthCallback: React.FC = () => {
           setMessage('Invalid authentication callback. Missing parameters.');
         }
       } catch (error) {
-        console.error('Error in auth callback:', error);
+                  // Check if user needs to connect GitHub App
+                  if (user.app_metadata?.provider === 'github') {
+                    setStatus('redirect');
+                    setMessage('Redirecting to GitHub setup...');
+                    navigate('/github-setup', { replace: true });
+                  } else {
+                    navigate('/dashboard', { replace: true });
+                  }
         setStatus('error');
         setMessage(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -100,6 +110,7 @@ export const AuthCallback: React.FC = () => {
         <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
           {status === 'loading' && 'Processing Authentication'}
           {status === 'success' && 'Authentication Successful!'}
+          {status === 'redirect' && 'Redirecting...'}
           {status === 'error' && 'Authentication Error'}
         </h1>
 
@@ -107,6 +118,16 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">{message}</p>
+          </div>
+        )}
+
+        {status === 'redirect' && (
+          <div className="text-center">
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600 mb-4">{message}</p>
+            <p className="text-sm text-gray-500">
+              Please wait while we redirect you...
+            </p>
           </div>
         )}
 

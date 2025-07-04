@@ -9,7 +9,7 @@ export const GitHubAppSetup = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info'>('loading');
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
 
   // Function to redirect to GitHub App installation
@@ -17,8 +17,14 @@ export const GitHubAppSetup = () => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
     
-    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
-    window.location.href = githubAppInstallUrl;
+    console.log('GitHubAppSetup: Redirecting to GitHub App installation');
+    setUiState('redirect');
+    setMessage('Redirecting to GitHub App installation page...');
+    
+    // Short delay to ensure UI updates before redirect
+    setTimeout(() => {
+      window.location.href = githubAppInstallUrl;
+    }, 500);
   }, []);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
@@ -64,7 +70,14 @@ export const GitHubAppSetup = () => {
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
 
-    console.log('GitHubAppSetup: URL params:', { installationId, setupAction, errorParam, errorDescription });
+    console.log('GitHubAppSetup: URL params:', { 
+      installationId, 
+      setupAction, 
+      errorParam, 
+      errorDescription,
+      pathname: location.pathname,
+      search: location.search
+    });
 
     // Immediately handle GitHub errors
     if (errorParam) {
@@ -90,7 +103,7 @@ export const GitHubAppSetup = () => {
     // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading');
-      setMessage('Connecting GitHub App...');
+      setMessage(`Connecting GitHub App (Installation ID: ${installationId})...`);
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
       
       saveInstallationId(installationId, user.id)
@@ -114,13 +127,14 @@ export const GitHubAppSetup = () => {
     // Scenario 2: User is logged in but no installation_id in URL
     if (user && !installationId) {
       console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
+      console.log('Developer profile:', developerProfile);
 
       if (developerProfile?.github_installation_id) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
-        console.log('GitHubAppSetup: No installation ID found. Showing info message...');
-        handleInfo('You need to connect the GitHub App to access all features. Click the button below to connect.');
+        console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
+        redirectToGitHubAppInstall();
       }
       return;
     }
@@ -155,6 +169,7 @@ export const GitHubAppSetup = () => {
           {uiState === 'loading' && 'Connecting GitHub...'}
           {uiState === 'success' && 'GitHub Connected!'}
           {uiState === 'error' && 'Connection Error'}
+          {uiState === 'redirect' && 'Redirecting...'}
           {uiState === 'info' && 'GitHub Connection Action Needed'}
         </h1>
 
@@ -164,6 +179,16 @@ export const GitHubAppSetup = () => {
             <p className="text-gray-600">{message}</p>
             <p className="text-sm text-gray-500 mt-2">
               This allows us to sync your repository data and showcase your contributions.
+            </p>
+          </div>
+        )}
+
+        {uiState === 'redirect' && (
+          <div className="text-center">
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
+            <p className="text-gray-600 mb-4">{message}</p>
+            <p className="text-sm text-gray-500">
+              Please wait while we redirect you...
             </p>
           </div>
         )}

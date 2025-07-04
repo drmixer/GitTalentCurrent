@@ -97,9 +97,8 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   };
 
   const handleConnectGitHub = () => {
-    // Redirect to GitHub App installation page
-    const githubAppUrl = `https://github.com/apps/gittalentapp/installations/new`;
-    window.location.href = githubAppUrl;
+    // Navigate to GitHub setup page
+    window.location.href = '/github-setup';
   };
 
   // Generate profile strength suggestions based on missing data

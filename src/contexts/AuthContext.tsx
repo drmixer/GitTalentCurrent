@@ -707,6 +707,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       if (userProfile.role === 'developer') {
+        console.log('checkForRoleSpecificProfile: Checking for developer profile for user:', userId);
         const { data: devProfileData, error: devError } = await supabase
           .from('developers')
           .select('*')
@@ -716,8 +717,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (devError) {
           console.error('❌ checkForRoleSpecificProfile: Error fetching developer profile:', devError);
         }
-        
-        console.log('Developer profile data:', devProfileData);
+
+        console.log('checkForRoleSpecificProfile: Developer profile data:', devProfileData);
 
         if (!devProfileData) {
           console.log('⚠️ checkForRoleSpecificProfile: Developer profile not found, needs onboarding (or still being created).');
@@ -729,13 +730,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDeveloperProfile(devProfileData);
 
           if (!devProfileData.github_installation_id && devProfileData.github_handle) {
-            console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer. Redirecting to GitHub setup.');
-            // Redirect to GitHub setup page
-            if (window.location.pathname !== '/github-setup') {
-              window.location.href = '/github-setup';
-              return;
+            console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer.');
+            
+            // Only redirect if we're not already on the GitHub setup page or auth callback
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/github-setup' && 
+                currentPath !== '/auth/callback' && 
+                !currentPath.includes('/onboarding')) {
+              console.log('Redirecting to GitHub setup page from:', currentPath);
+              setTimeout(() => {
+                window.location.href = '/github-setup';
+              }, 500);
             }
-            // This is where the UI should prompt the user to connect the GitHub App
           }
           setNeedsOnboarding(false);
         }
@@ -776,6 +782,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
+    console.log('createDeveloperProfile: Creating profile with data:', profileData);
+
     try {
       console.log('🔄 createDeveloperProfile: Creating developer profile for:', user.id);
       console.log('🔄 createDeveloperProfile: Profile data:', JSON.stringify(profileData, null, 2));
@@ -791,7 +799,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         p_experience_years: profileData.experience_years || 0,
         p_desired_salary: profileData.desired_salary || 0,
         p_profile_pic_url: profileData.profile_pic_url || null, 
-        p_github_installation_id: profileData.github_installation_id || null
+        p_github_installation_id: profileData.github_installation_id || null,
+        p_public_profile_slug: null // Let the database generate this
       });
 
       if (error) {
@@ -814,6 +823,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateDeveloperProfile = async (profileData: Partial<Developer>): Promise<boolean> => {
     if (!user) return false;
 
+    console.log('updateDeveloperProfile: Updating profile with data:', profileData);
+
     try {
       console.log('🔄 updateDeveloperProfile: Updating developer profile for:', user.id);
       console.log('🔄 updateDeveloperProfile: Profile data:', JSON.stringify(profileData, null, 2));
@@ -826,7 +837,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         linked_projects: profileData.linked_projects?.filter(p => p && p.trim()) || [],
         top_languages: profileData.top_languages?.filter(l => l && l.trim()) || [],
         profile_pic_url: profileData.profile_pic_url?.trim() || null,
-        github_installation_id: profileData.github_installation_id || null 
+        github_installation_id: profileData.github_installation_id || null,
+        public_profile_slug: profileData.public_profile_slug || null
       };
       
       console.log('🔄 updateDeveloperProfile: Updating developer profile with:', cleanedData);
