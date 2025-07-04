@@ -186,9 +186,10 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   };
 
   const handleConnectGitHub = () => {
+    // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
     
-    // Navigate to GitHub setup page without any localStorage flags
+    // Navigate to GitHub setup page
     navigate('/github-setup');
   };
 

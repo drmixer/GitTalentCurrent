@@ -8,7 +8,7 @@ export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [retryCount, setRetryCount] = useState(0);
+  const navigate = useNavigate();
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
@@ -71,16 +71,6 @@ export const GitHubAppSetup = () => {
       console.error('Error saving installation ID:', error instanceof Error ? error.message : error);
       throw error;
     }
-  }, [refreshProfile]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const installationId = params.get('installation_id');
-    const setupAction = params.get('setup_action');
-    const errorParam = params.get('error');
-    const errorDescription = params.get('error_description');
-    const state = params.get('state');
-
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
       setupAction, 
@@ -108,6 +98,8 @@ export const GitHubAppSetup = () => {
         
         // Increment retry count
         setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, 2000);
           setRetryCount(prev => prev + 1);
         }, 2000);
       }
@@ -251,6 +243,7 @@ export const GitHubAppSetup = () => {
                 <p className="text-sm text-gray-600">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                   This is a one-time setup process.
+                  This is a one-time setup process.
                 </p>
                 <button
                   onClick={redirectToGitHubAppInstall}
@@ -259,10 +252,10 @@ export const GitHubAppSetup = () => {
                   <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
                   Connect GitHub App
                 </button>
-                {retryCount > 0 && (
-                  <p className="text-sm text-gray-500 mb-4">
-                    Retry attempt {retryCount} of {maxRetries}
-                  </p>
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
+              </button>
                 )}
               </div>
             )}
@@ -295,9 +288,6 @@ export const GitHubAppSetup = () => {
                 onClick={() => navigate('/developer')}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
               >
-                {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
-              </button>
-            </div>
             
             {uiState === 'error' && (
               <button
