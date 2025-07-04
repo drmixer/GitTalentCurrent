@@ -31,25 +31,6 @@ export const GitHubAppSetup = () => {
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
     
-    setUiState('info');
-    setMessage('Redirecting to GitHub App installation page...');
-    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
-    const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
-    
-    // Add a state parameter to track the installation flow
-    const state = btoa(JSON.stringify({
-      userId: user?.id,
-      timestamp: Date.now(),
-      returnUrl: `${window.location.origin}/auth/callback`
-    }));
-    
-    // Include the return URL as a parameter to ensure GitHub redirects back to our callback
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}&return_to=${returnUrl}`;
-    
-    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
-    setUiState('redirect');
-    setMessage('Redirecting to GitHub App installation page...');
-    
     // Short delay to ensure UI updates before redirect
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
