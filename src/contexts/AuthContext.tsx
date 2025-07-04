@@ -122,7 +122,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
-      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', authUser.user_metadata ? 'Present' : 'Missing');
+      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', 
+        authUser.user_metadata ? 'Present' : 'Missing');
       
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
@@ -140,11 +141,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', userRole, 'with name:', fullName);
 
       if (githubUsername && userRole === 'developer') {
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, userName, avatarUrl, authUser.user_metadata, githubInstallationId);
+        // Create or update the developer profile
+        const profileCreated = await createOrUpdateGitHubDeveloperProfile(
+          authUser.id, 
+          githubUsername, 
+          userName, 
+          avatarUrl, 
+          authUser.user_metadata, 
+          githubInstallationId
+        );
+        
+        // If profile creation failed, set an error
+        if (!profileCreated) {
+          setAuthError('Failed to create developer profile. Please try again.');
+        }
       }
+      
+      // Fetch the user profile regardless of whether the developer profile was created
       await fetchUserProfile(authUser);
     } catch (error) {
       console.error('❌ handleGitHubSignIn: Error handling GitHub sign in:', error);
+      setAuthError('Error during GitHub sign in. Please try again.');
       setLoading(false);
     }
   };
@@ -152,7 +169,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, userName: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
     try {
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
-      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername, 'Installation ID:', installationId || 'none');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', 
+        githubUsername, 'Installation ID:', installationId || 'none');
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: User name:', userName);
 
       const { data: existingProfile } = await supabase
@@ -201,6 +219,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.error('Error updating developer profile:', updateError);
         } else {
           console.log('✅ Developer profile updated successfully');
+          return true;
         }
       } else {
         console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating new developer profile');
@@ -218,6 +237,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
           if (userError) {
             console.error('Error creating user profile:', userError);
+            return false;
           }
           
           // Then create developer profile
@@ -227,15 +247,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
           if (devError) {
             console.error('Error creating developer profile:', devError);
+            return false;
           } else {
             console.log('✅ Developer profile created successfully');
+            return true;
           }
         } catch (err) {
           console.error('Error creating developer profile:', err);
+          return false;
         }
       }
+      
+      return true;
     } catch (error) {
       console.error('❌ createOrUpdateGitHubDeveloperProfile: Error in createOrUpdateGitHubDeveloperProfile:', error);
+      return false;
     }
   };
 

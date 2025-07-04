@@ -7,6 +7,7 @@ import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut, XCircle
 export const Dashboard = () => {
   const { user, userProfile, developerProfile, needsOnboarding, loading, authError, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [waitTime, setWaitTime] = useState(0);
 
   console.log('🔍 Dashboard state:', {
     user: !!user,
@@ -20,14 +21,20 @@ export const Dashboard = () => {
   useEffect(() => {
     console.log('Dashboard useEffect - user:', !!user, 'userProfile:', !!userProfile, 'loading:', loading);
     
-    // If we have a user but no profile and we're not already loading, try to refresh the profile
-    if (user && !userProfile && !loading) {
+    // If we have a user but no profile and we're not already loading, try to refresh the profile with a delay
+    if (user && !userProfile && !loading && !needsOnboarding) {
       console.log('🔄 Dashboard: User exists but no profile, refreshing profile...');
 
-      // Refresh the profile immediately
-      refreshProfile();
+      // Increment wait time
+      const timer = setTimeout(() => {
+        setWaitTime(prev => prev + 1000);
+        refreshProfile();
+      }, 1000);
+      
+      // Clean up the timer when the component unmounts
+      return () => clearTimeout(timer);
     }
-  }, [user, userProfile, loading, refreshProfile]);
+  }, [user, userProfile, loading, refreshProfile, needsOnboarding, waitTime]);
 
   // If there's an auth error, show it
   if (authError) {

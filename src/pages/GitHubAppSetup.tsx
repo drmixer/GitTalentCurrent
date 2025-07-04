@@ -9,13 +9,13 @@ export const GitHubAppSetup = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState(0); 
+  const navigate = useNavigate();
+  const location = useLocation();
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
 
-  // Function to redirect to GitHub App installation
-  const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
     const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install&redirect_uri=${returnUrl}`;
