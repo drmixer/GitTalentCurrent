@@ -67,15 +67,25 @@ export const GitHubAppSetup = () => {
       console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.'); 
       completeSetup();
     } else if (code_param) {
-      // This is the OAuth redirect, just complete setup
-      console.log('GitHubAppSetup useEffect - Found code parameter, completing setup...');
-      completeSetup();
+      // This is the OAuth redirect, just complete authentication without waiting for installation_id
+      console.log('GitHubAppSetup useEffect - Found code parameter, completing authentication...');
+      setLoading(false);
+      setIsError(false);
+      setSuccess(true);
+      setMessage(
+        "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account."
+      );
+      
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/developer?tab=github-activity', { replace: true });
+      }, 3000);
     } else {
       // This path is hit if installation_id or setup_action are missing or invalid.
       // This is expected if the user just signed in via standard OAuth and hasn't installed the app yet.
       console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation. This is expected if only OAuth occurred.');
       setLoading(false);
-      setIsError(false); // It's not an error, it's an instruction
+      setIsError(false);
       setMessage(
         "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account/give permissions."
       );
