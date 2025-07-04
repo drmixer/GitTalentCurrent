@@ -6,6 +6,8 @@ import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from '
 
 export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [retryCount, setRetryCount] = useState(0); 
   const maxRetries = 3;
 
@@ -83,11 +85,6 @@ export const GitHubAppSetup = () => {
     if (installationId || errorParam) {
       setRetryCount(0);
     }
-    
-    // Reset retry count when params change
-    if (installationId || errorParam) {
-      setRetryCount(0);
-    }
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -107,16 +104,6 @@ export const GitHubAppSetup = () => {
     if (authLoading) {
       console.log('GitHubAppSetup: Auth context loading, waiting...');
       
-      if (retryCount > maxRetries) {
-        setUiState('error');
-        setMessage('Authentication is taking too long. Please try again.');
-      } else {
-        setUiState('loading');
-        setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-        
-        // Increment retry count
-        setTimeout(() => setRetryCount(prev => prev + 1), 2000);
-      }
       if (retryCount > maxRetries) {
         setUiState('error');
         setMessage('Authentication is taking too long. Please try again.');
@@ -250,7 +237,7 @@ export const GitHubAppSetup = () => {
               onClick={() => navigate('/developer?tab=github-activity')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
             >
-              {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
+              Go to Dashboard
             </button>
           </div>
         )}
@@ -302,18 +289,10 @@ export const GitHubAppSetup = () => {
                   Try Again
                 </button>
               )}
-              <>
-                <button
-                  onClick={redirectToGitHubAppInstall}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4"
-                >
-                  <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                  Connect GitHub App
-                </button>
-                {retryCount > 0 && (
-                  <p className="text-sm text-gray-500 mb-4">
-                    Retry attempt {retryCount} of {maxRetries}
-                  </p>
+              
+              <button
+                onClick={() => navigate('/developer')}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
               >
                 {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
               </button>
