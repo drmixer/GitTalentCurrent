@@ -24,12 +24,14 @@ export const Dashboard = () => {
     if (user && !userProfile && !loading) {
       console.log('🔄 Dashboard: User exists but no profile, refreshing profile...');
       
-      // Add a delay to allow database operations to complete
-      const timer = setTimeout(() => {
-        refreshProfile();
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      // Use useEffect for the timer to avoid React hook rules violation
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          refreshProfile();
+        }, 2000);
+        
+        return () => clearTimeout(timer);
+      }, [refreshProfile]);
     }
   }, [user, userProfile, loading, refreshProfile]);
 
