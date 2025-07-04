@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth'; 
 import { Navigate, useNavigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
