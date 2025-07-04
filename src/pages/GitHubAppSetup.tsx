@@ -9,8 +9,6 @@ export const GitHubAppSetup = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState(0); 
-  const navigate = useNavigate();
-  const location = useLocation();
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
