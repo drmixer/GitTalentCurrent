@@ -803,8 +803,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     session,
     userProfile,
-    developerP
-}rofile,
+    developerProfile,
     loading,
     signingOut,
     authError,
