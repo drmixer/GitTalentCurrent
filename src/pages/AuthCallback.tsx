@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Loader, CheckCircle, AlertCircle, Github } from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
 export const AuthCallback: React.FC = () => {
-  const { user, userProfile, developerProfile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, userProfile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
-  const [waitCount, setWaitCount] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 5;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -30,8 +31,13 @@ export const AuthCallback: React.FC = () => {
     // If auth is still loading, wait.
     if (authLoading) {
       console.log('AuthCallback: Auth context loading, waiting...');
-      setStatus('loading');
-      setMessage('Verifying authentication...');
+      if (retryCount > maxRetries) {
+        setStatus('error');
+        setMessage('Authentication is taking too long. Please try again.');
+      } else {
+        setStatus('loading');
+        setMessage('Verifying authentication...');
+      }
       return;
     }
 
@@ -45,7 +51,7 @@ export const AuthCallback: React.FC = () => {
     // User is authenticated (user is not null)
     console.log('AuthCallback: User is authenticated:', user.id);
 
-    // Scenario 1: GitHub App installation flow
+    // GitHub App installation flow
     if (installationId) {
       setStatus('redirect');
       setMessage('GitHub App installation detected, redirecting...');
@@ -54,7 +60,7 @@ export const AuthCallback: React.FC = () => {
       return;
     }
 
-    // Scenario 2: Regular GitHub OAuth login (user is not null, no installationId)
+    // Regular GitHub OAuth login (user is not null, no installationId)
     // User is authenticated, profile should be loaded
     if (userProfile) {
       console.log('AuthCallback: User profile loaded. Authentication successful!');
@@ -67,13 +73,22 @@ export const AuthCallback: React.FC = () => {
     }
 
     // If we reach here, user is authenticated but userProfile is still null.
-    // This means the profile is still being fetched or created by AuthContext.
-    // Keep showing loading and let AuthContext update the state.
-    console.log('AuthCallback: User authenticated but profile not yet loaded. Waiting for profile...');
-    setStatus('loading');
-    setMessage('Loading your profile...');
+    if (retryCount < maxRetries) {
+      console.log(`AuthCallback: User authenticated but profile not yet loaded. Retry ${retryCount + 1}/${maxRetries}`);
+      setStatus('loading');
+      setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
+      
+      // Increment retry count and manually refresh profile
+      setRetryCount(retryCount + 1);
+      refreshProfile?.();
+    } else {
+      // After max retries, show error with manual refresh option
+      console.log('AuthCallback: Max retries reached, showing error');
+      setStatus('error');
+      setMessage('We had trouble loading your profile. Please try refreshing or logging in again.');
+    }
 
-  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, refreshProfile]);
+  }, [user, userProfile, authLoading, navigate, location.search, refreshProfile, retryCount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
@@ -95,14 +110,18 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">{message}</p>
-            {status === 'waiting' && (
+            {retryCount > 2 && (
               <div className="mt-4">
                 <p className="text-sm text-gray-500">This is taking longer than expected...</p>
-                <button 
-                  onClick={() => navigate('/login', { replace: true })}
-                  className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+                <button
+                  onClick={() => {
+                    refreshProfile?.();
+                    setRetryCount(0);
+                  }}
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center mx-auto"
                 >
-                  Return to login
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Loading Profile
                 </button>
               </div>
             )}
@@ -133,15 +152,29 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-600 mb-6">{message}</p>
-            <button
-              onClick={() => navigate('/login')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-            >
-              Return to Login
-            </button>
+            <div className="flex flex-col space-y-3">
+              <button
+                onClick={() => {
+                  refreshProfile?.();
+                  setRetryCount(0);
+                  setStatus('loading');
+                  setMessage('Trying again...');
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+              >
+                Return to Login
+              </button>
+            </div>
+          </div>
           </div>
         )}
-      </div>
     </div>
   );
 };

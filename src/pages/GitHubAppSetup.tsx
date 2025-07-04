@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft } from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
@@ -15,7 +15,6 @@ export const GitHubAppSetup = () => {
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
-    const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
@@ -26,7 +25,7 @@ export const GitHubAppSetup = () => {
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
-  }, [user]);
+  }, []);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
     console.log('GitHubAppSetup: Success -', successMessage);
@@ -46,23 +45,33 @@ export const GitHubAppSetup = () => {
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
     try {
       const { error: updateError } = await supabase
-        .from('developers')
-        .update({ github_installation_id: id })
-        .eq('user_id', currentUserId);
-      // After saving, refresh profile to get the latest state including the new installation ID
-      await refreshProfile(); 
+        .rpc('create_developer_profile', {
+          p_user_id: currentUserId,
+          p_github_handle: developerProfile?.github_handle || '',
+          p_bio: developerProfile?.bio || '',
+          p_availability: developerProfile?.availability ?? true,
+          p_top_languages: developerProfile?.top_languages || [],
+          p_linked_projects: developerProfile?.linked_projects || [],
+          p_location: developerProfile?.location || '',
+          p_experience_years: developerProfile?.experience_years || 0,
+          p_desired_salary: developerProfile?.desired_salary || 0,
+          p_profile_pic_url: developerProfile?.profile_pic_url || null,
+          p_github_installation_id: id
+        });
+
       if (updateError) {
-        throw new Error(`Failed to save GitHub installation ID: ${updateError.message}`);
+        throw updateError;
       }
+      
       console.log('GitHubAppSetup: GitHub installation ID saved successfully in DB.');
       // After saving, refresh profile to get the latest state including the new installation ID
       await refreshProfile(); 
       return true;
     } catch (error) {
-      console.error('Error saving installation ID:', error);
+      console.error('Error saving installation ID:', error instanceof Error ? error.message : error);
       throw error;
     }
-  }, [refreshProfile]);
+  }, [refreshProfile, developerProfile]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -104,7 +113,7 @@ export const GitHubAppSetup = () => {
     // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading');
-      setMessage(`Connecting GitHub App...`);
+      setMessage('Connecting GitHub App...');
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
       
       saveInstallationId(installationId, user.id)
@@ -205,9 +214,15 @@ export const GitHubAppSetup = () => {
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mb-4">
               Redirecting you to your dashboard...
             </p>
+            <button
+              onClick={() => navigate('/developer?tab=github-activity')}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Go to Dashboard Now
+            </button>
           </div>
         )}
 
@@ -221,22 +236,50 @@ export const GitHubAppSetup = () => {
             <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             
             {uiState === 'info' && (
-              <button
-                onClick={redirectToGitHubAppInstall}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4"
-              >
-                <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                Connect GitHub App
-              </button>
+              <div className="space-y-4 mb-4">
+                <p className="text-sm text-gray-600">
+                  Connecting the GitHub App allows us to display your contributions and repositories.
+                </p>
+                <button
+                  onClick={redirectToGitHubAppInstall}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
+                  Connect GitHub App
+                </button>
+              </div>
             )}
             
-            <button
-              onClick={() => navigate('/developer?tab=github-activity')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-              Go to Dashboard
-            </button>
+            <div className="space-y-3">
+              {uiState === 'error' && (
+                <button
+                  onClick={() => {
+                    refreshProfile?.();
+                    setUiState('loading');
+                    setMessage('Refreshing your profile...');
+                    setTimeout(() => {
+                      if (developerProfile?.github_installation_id) {
+                        handleSuccess('GitHub App is connected!');
+                      } else {
+                        setUiState('info');
+                        setMessage('Connect your GitHub account to display your contributions and repositories.');
+                      }
+                    }, 2000);
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Retry Connection
+                </button>
+              )}
+              <button
+                onClick={() => navigate('/developer?tab=github-activity')}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2 inline" aria-hidden="true" />
+                Go to Dashboard
+              </button>
+            </div>
           </div>
         )}
       </div>

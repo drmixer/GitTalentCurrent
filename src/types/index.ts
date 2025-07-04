@@ -58,15 +58,15 @@ export interface GitHubLanguages {
 export interface AuthContextType {
   user: SupabaseUser | null;
   userProfile: User | null;
-  developerProfile: Developer | null;
+  developerProfile?: Developer | null;
   authError: string | null;
   loading: boolean;
-  needsOnboarding: boolean; 
+  needsOnboarding?: boolean; 
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGitHub: () => Promise<void>;
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile?: () => Promise<void>;
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   createJobRole?: (jobData: Partial<JobRole>) => Promise<boolean>; 

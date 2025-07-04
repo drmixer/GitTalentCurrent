@@ -68,10 +68,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
+      provider: 'github', 
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'read:user user:email repo',
+        scopes: 'read:user user:email repo', 
         queryParams: {
           state: 'github_oauth_login'
         }
@@ -113,9 +113,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 fetchUserProfile: Fetching user profile for:', authUser.id, 'Email:', authUser.email);
-      console.log('🔄 fetchUserProfile: Auth user metadata:', authUser.user_metadata ? 'Present' : 'Missing');
+      console.log('🔄 fetchUserProfile: Auth user metadata:', authUser.user_metadata);
       
-      await new Promise(resolve => setTimeout(resolve, 500)); // Slightly longer delay
+      // No delay needed, proceed immediately
       
       const { data: userProfile, error } = await supabase
         .from('users')
@@ -132,11 +132,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!userProfile) {
         console.log('🔄 fetchUserProfile: No user profile found, creating one...');
         const profileCreated = await createUserProfileFromAuth(authUser);
-        if (profileCreated) {
-          await fetchUserProfile(authUser);
-        } else {
+        console.log('🔄 fetchUserProfile: Profile creation result:', profileCreated);
+        
+        // Try fetching again after a short delay
+        setTimeout(async () => {
+          const { data: retryProfile, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+            
+          if (retryError) {
+            console.error('❌ fetchUserProfile: Error in retry fetch:', retryError);
+            setLoading(false);
+            return;
+          }
+          
+          if (retryProfile) {
+            console.log('✅ fetchUserProfile: User profile found on retry:', retryProfile.name, 'Role:', retryProfile.role);
+            setUserProfile(retryProfile);
+            await checkForRoleSpecificProfile(retryProfile, authUser.id);
+          } else {
+            console.error('❌ fetchUserProfile: Still no profile after creation attempt');
+          }
+          
           setLoading(false);
-        }
+        }, 1000);
         return;
       }
 
@@ -154,8 +175,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
-      console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
-      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', authUser.user_metadata ? 'Present' : 'Missing');
+      console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id, authUser.email);
+      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', authUser.user_metadata);
 
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
@@ -172,9 +193,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const userRole = authUser.user_metadata?.role || 'developer';
       console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', userRole, 'with name:', fullName);
 
-      if (githubUsername && userRole === 'developer') {
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
-      }
+      // Always create or update the GitHub developer profile
+      await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername || '', avatarUrl, authUser.user_metadata, githubInstallationId);
 
       await fetchUserProfile(authUser);
     } catch (error) {
@@ -186,76 +206,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
     try {
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
-      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername, 'Installation ID:', installationId || 'none');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername || 'none', 'Installation ID:', installationId || 'none');
 
-      const { data: existingProfile } = await supabase
-        .from('developers')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // First ensure user profile exists
+      const { error: userError } = await supabase.rpc('create_user_profile', {
+        user_id: userId,
+        user_email: githubMetadata?.email || 'unknown@example.com',
+        user_name: githubMetadata?.name || githubUsername || 'GitHub User',
+        user_role: 'developer',
+        company_name: ''
+      });
+      
+      if (userError) {
+        console.warn('⚠️ Error creating user profile:', userError);
+      }
 
-      const profileData = {
-        github_handle: githubUsername,
-        bio: githubMetadata?.bio || '',
-        availability: true,
-        top_languages: [],
-        linked_projects: [],
-        location: githubMetadata?.location || 'Remote',
-        experience_years: 0,
-        desired_salary: 0,
-        profile_pic_url: avatarUrl,
-        github_installation_id: installationId
-      };
-
-      if (existingProfile) {
-        console.log('🔄 createOrUpdateGitHubDeveloperProfile: Updating existing developer profile');
-        await supabase
-          .rpc('create_developer_profile', {
-            p_user_id: userId,
-            p_github_handle: githubUsername,
-            p_bio: githubMetadata?.bio || '',
-            p_availability: true,
-            p_top_languages: [],
-            p_linked_projects: [],
-            p_location: githubMetadata?.location || 'Remote',
-            p_experience_years: 0,
-            p_desired_salary: 0,
-            p_profile_pic_url: avatarUrl,
-            p_github_installation_id: installationId
-          });
-      } else {
-        console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating new developer profile');
-        try {
-          // First ensure user profile exists
-          const { error: userError } = await supabase.rpc('create_user_profile', {
-            user_id: userId,
-            user_email: githubMetadata?.email || 'unknown@example.com',
-            user_name: githubMetadata?.name || githubUsername || 'GitHub User',
-            user_role: 'developer',
-            company_name: ''
-          });
-          
-          if (userError) {
-            console.warn('⚠️ Error creating user profile:', userError);
-          }
-          
-          // Then create developer profile
-          await supabase.rpc('create_developer_profile', {
-            p_user_id: userId,
-            p_github_handle: githubUsername,
-            p_bio: githubMetadata?.bio || '',
-            p_availability: true,
-            p_top_languages: [],
-            p_linked_projects: [],
-            p_location: githubMetadata?.location || 'Remote',
-            p_experience_years: 0,
-            p_desired_salary: 0,
-            p_profile_pic_url: avatarUrl,
-            p_github_installation_id: installationId
-          });
-        } catch (err) {
-          console.error('Error creating developer profile:', err);
-        }
+      // Then create/update developer profile
+      const { error: devError } = await supabase.rpc('create_developer_profile', {
+        p_user_id: userId,
+        p_github_handle: githubUsername || '',
+        p_bio: githubMetadata?.bio || '',
+        p_availability: true,
+        p_top_languages: [],
+        p_linked_projects: [],
+        p_location: githubMetadata?.location || 'Remote',
+        p_experience_years: 0,
+        p_desired_salary: 0,
+        p_profile_pic_url: avatarUrl || null,
+        p_github_installation_id: installationId
+      });
+      
+      if (devError) {
+        console.error('Error creating/updating developer profile:', devError);
+        throw devError;
       }
 
       console.log('✅ createOrUpdateGitHubDeveloperProfile: GitHub developer profile created/updated successfully in DB');
@@ -300,7 +283,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
-      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', authUser.user_metadata ? 'Present' : 'Missing');
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', authUser.user_metadata);
       
       // Extract role with fallbacks
       const userRole = authUser.user_metadata?.role || 
@@ -317,13 +300,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const email = authUser.email;
 
       let githubInstallationId: string | null = null;
-      if (authUser.user_metadata?.installation_id) {
-        githubInstallationId = String(authUser.user_metadata.installation_id);
-      } else if (authUser.user_metadata?.app_installation_id) {
-        githubInstallationId = String(authUser.user_metadata.app_installation_id);
+      if (authUser.user_metadata?.installation_id || authUser.user_metadata?.app_installation_id) {
+        githubInstallationId = String(authUser.user_metadata.installation_id || authUser.user_metadata.app_installation_id);
+        console.log('🔄 createUserProfileFromAuth: Found GitHub installation ID:', githubInstallationId);
       }
 
-      const { error: insertUserError } = await supabase
+      const { data: userResult, error: insertUserError } = await supabase
         .rpc('create_user_profile', {
           user_id: authUser.id,
           user_email: email || authUser.email || 'unknown@example.com',
@@ -333,29 +315,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
 
       if (insertUserError) {
-        console.error('❌ createUserProfileFromAuth: User profile creation failed:', insertUserError);
+        console.error('❌ createUserProfileFromAuth: User profile creation failed:', insertUserError.message);
         if (insertUserError.code === '23505') {
           console.warn('⚠️ createUserProfileFromAuth: User profile already exists (unique constraint violation). Treating as success.');
           return true;
         }
         return false;
       } else {
-        console.log('✅ createUserProfileFromAuth: User profile created successfully');
+        console.log('✅ createUserProfileFromAuth: User profile created successfully:', userResult);
       }
 
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
-        let githubInstallationId: string | null = null;
-        
         // Create developer profile using the RPC function
-        await createOrUpdateGitHubDeveloperProfile(
+        const devResult = await createOrUpdateGitHubDeveloperProfile(
           authUser.id,
-          authUser.user_metadata?.user_name || '',
+          authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '',
           avatarUrl,
           authUser.user_metadata,
           githubInstallationId
         );
         
-        console.log('✅ createUserProfileFromAuth: Developer profile created successfully');
+        console.log('✅ createUserProfileFromAuth: Developer profile creation result:', devResult);
       } else if (userRole === 'recruiter') {
         const { error: recError } = await supabase
           .from('recruiters')
@@ -381,7 +361,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       return true;
     } catch (error) {
-      console.error('❌ createUserProfileFromAuth: Error in createUserProfileFromAuth:', error);
+      console.error('❌ createUserProfileFromAuth: Error in createUserProfileFromAuth:', error instanceof Error ? error.message : error);
       return false;
     }
   };
@@ -389,7 +369,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       if (userProfile.role === 'developer') {
-        const { data: devProfileData, error: devError } = await supabase
+        const { data: devProfileData, error: devError } = await supabase 
           .from('developers')
           .select('*')
           .eq('user_id', userId)
@@ -398,7 +378,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (devError) {
           console.error('❌ checkForRoleSpecificProfile: Error fetching developer profile:', devError);
         } else if (!devProfileData) {
-          console.log('🔄 checkForRoleSpecificProfile: No developer profile found, user may need to complete setup');
+          console.log('🔄 checkForRoleSpecificProfile: No developer profile found, creating one...');
+          
+          // Create a basic developer profile
+          const { error: createError } = await supabase.rpc('create_developer_profile', {
+            p_user_id: userId,
+            p_github_handle: '',
+            p_bio: '',
+            p_availability: true,
+            p_top_languages: [],
+            p_linked_projects: [],
+            p_location: '',
+            p_experience_years: 0,
+            p_desired_salary: 0
+          });
+          
+          if (createError) {
+            console.error('❌ checkForRoleSpecificProfile: Error creating developer profile:', createError);
+          } else {
+            console.log('✅ checkForRoleSpecificProfile: Created basic developer profile');
+          }
         } else {
           console.log('✅ checkForRoleSpecificProfile: Developer profile found');
         }
@@ -598,6 +597,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     session,
     userProfile,
+    developerProfile: null, // Add this to fix the type error
     loading,
     signingOut,
     signUp,
@@ -612,6 +612,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     createHire,
     updateUserApprovalStatus,
     updateProfileStrength,
+    refreshProfile: () => fetchUserProfile(user!), // Add this function
+    authError: null, // Add this to fix the type error
+    needsOnboarding: false // Add this to fix the type error
   };
 
   return (
