@@ -314,6 +314,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
         options: {
           redirectTo: `${window.location.origin}/github-setup`,
+          data: {
             name: userData.name,
             role: userData.role,
             company_name: userData.role === 'recruiter' ? (userData as any).company_name : undefined,
