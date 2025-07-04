@@ -16,7 +16,6 @@ export const AuthCallback: React.FC = () => {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const githubAppSetup = params.get('github_app_setup');
-    const githubAppSetup = params.get('github_app_setup');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
