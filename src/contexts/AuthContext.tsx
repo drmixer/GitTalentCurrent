@@ -543,8 +543,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshProfile = async () => {
     if (user) {
-      const profile = await fetchUserProfile(user);
-      return profile;
+      console.log('🔄 AuthContext: Refreshing user profile for:', user.id);
+      try {
+        const profile = await fetchUserProfile(user);
+        console.log('✅ AuthContext: Profile refreshed successfully:', profile ? 'Found' : 'Not found');
+        return profile;
+      } catch (error) {
+        console.error('❌ AuthContext: Error refreshing profile:', error);
+        return null;
+      }
     }
     return null;
   };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth'; 
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
 // GitHub App slug - must match exactly what's configured in GitHub
@@ -14,6 +14,7 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds 
+  const [processingInstallation, setProcessingInstallation] = useState(false);
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
@@ -37,9 +38,10 @@ export const AuthCallback: React.FC = () => {
       const code = params.get('code');
       const installationId = params.get('installation_id');
       const setupAction = params.get('setup_action');
+      const state = params.get('state');
       const error = params.get('error');
     
-      console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
+      console.log('AuthCallback: URL params:', { code, installationId, setupAction, state, error });
     
       // Handle errors first
       if (error) {
@@ -50,11 +52,58 @@ export const AuthCallback: React.FC = () => {
 
       // GitHub App installation flow
       if (installationId) {
-        setStatus('redirect');
-        setMessage('GitHub App installation detected, redirecting...');
-        // Redirect to GitHub setup page with the installation parameters
-        navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
-        return;
+        // Only process installation if we have a user and haven't processed it yet
+        if (user && !processingInstallation) {
+          setProcessingInstallation(true);
+          setStatus('loading');
+          setMessage('GitHub App installation detected, saving installation ID...');
+          
+          try {
+            // Save the installation ID directly here
+            const { error: updateError } = await supabase
+              .rpc('update_github_installation_id', {
+                p_user_id: user.id,
+                p_installation_id: installationId
+              });
+              
+            if (updateError) {
+              console.error('Error saving installation ID:', updateError);
+              setStatus('error');
+              setMessage(`Failed to save GitHub installation: ${updateError.message}`);
+              return;
+            }
+            
+            console.log('Successfully saved installation ID:', installationId);
+            
+            // Refresh the profile to get the updated installation ID
+            await refreshProfile?.();
+            
+            // Clear the installation_id from URL to prevent reprocessing
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('installation_id');
+            cleanUrl.searchParams.delete('setup_action');
+            window.history.replaceState({}, '', cleanUrl.toString());
+            
+            setStatus('success');
+            setMessage('GitHub App successfully connected! Redirecting to dashboard...');
+            
+            // Redirect to GitHub activity tab after a short delay
+            setTimeout(() => {
+              navigate('/developer?tab=github-activity', { replace: true });
+            }, 1500);
+            return;
+          } catch (error) {
+            console.error('Error processing GitHub installation:', error);
+            setStatus('error');
+            setMessage(`Error connecting GitHub App: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return;
+          }
+        } else if (!user) {
+          // If we don't have a user yet but have installation_id, wait for auth to complete
+          setStatus('loading');
+          setMessage('Waiting for authentication to complete before processing GitHub installation...');
+          return;
+        }
       }
 
       // If we have a user but no specific flow detected, proceed to dashboard or onboarding
@@ -123,6 +172,27 @@ export const AuthCallback: React.FC = () => {
         }, 1000);
         return;
       }
+    } catch (error) {
+      console.error('Error in AuthCallback useEffect:', error);
+      setStatus('error');
+      setMessage('An unexpected error occurred during authentication.');
+    }
+    
+    // Cleanup function to clear any timeouts
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };  
+  }, [user, userProfile, authLoading, navigate, location.search, waitTime, processingInstallation, refreshProfile]);
+
+  // Add a separate effect to handle the case where we have a user but no installation_id in URL
+  useEffect(() => {
+    if (user && userProfile?.role === 'developer' && developerProfile && !processingInstallation) {
+      // If developer has no GitHub installation ID, suggest connecting
+      if (!developerProfile.github_installation_id && developerProfile.github_handle) {
+        console.log('Developer has GitHub handle but no installation ID, suggesting connection');
+        setStatus('info');
+        setMessage('Your GitHub account is connected, but you need to install the GitHub App to see your contributions.');
+      }
     
       // If auth is still loading, wait
       if (authLoading) {
@@ -146,8 +216,8 @@ export const AuthCallback: React.FC = () => {
     // Cleanup function to clear any timeouts
     return () => {
       if (timeoutId) window.clearTimeout(timeoutId);
-    };  
-  }, [user, userProfile, authLoading, navigate, location.search, waitTime]);
+    };
+  }, [user, userProfile, developerProfile, processingInstallation]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
