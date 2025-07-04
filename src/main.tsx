@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { GitHubProvider } from './hooks/useGitHub.tsx';
+import { GitHubProvider } from './hooks/useGitHub.tsx';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -11,6 +12,8 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <GitHubProvider>
+          <App />
+        </GitHubProvider>
           <App />
         </GitHubProvider>
       </AuthProvider>
