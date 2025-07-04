@@ -48,9 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setAuthError(`Authentication error: ${error_description || error}`);
             setLoading(false);
             
-            // Clear the error from URL
-            const cleanUrl = window.location.pathname;
-            window.history.replaceState(null, '', cleanUrl);
+            // Don't clean up the URL here - let the callback page handle it
             return true;
           }
           
@@ -105,9 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setAuthError(`Authentication error: ${errorDescription}`);
           setLoading(false);
           
-          // Clear the error from URL
-          const cleanUrl = window.location.pathname + window.location.search;
-          window.history.replaceState(null, '', cleanUrl);
+          // Don't clean up the URL here - let the callback page handle it
           return true;
         }
         
