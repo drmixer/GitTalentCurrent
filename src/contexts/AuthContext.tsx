@@ -123,15 +123,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
       console.log('🔄 handleGitHubSignIn: GitHub user metadata:', 
+        JSON.stringify(authUser.user_metadata || {}, null, 2));
         authUser.user_metadata ? 'Present' : 'Missing');
       
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
       const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
+      // Check if we have an installation_id in the user metadata
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.app_installation_id) {
         githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        console.log('🔄 handleGitHubSignIn: Found GitHub installation ID in metadata:', githubInstallationId);
       }
 
       // Try to get role from localStorage (set during signup)
@@ -755,7 +758,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signUp,
     signIn,
     signInWithGitHub,
-    signInWithGitHubApp: connectGitHubApp,
+    connectGitHubApp,
     signOut,
     createDeveloperProfile,
     updateDeveloperProfile,

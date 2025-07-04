@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
+// GitHub App slug - must match exactly what's configured in GitHub
+const GITHUB_APP_SLUG = 'GitTalentApp';
+
 export const AuthCallback: React.FC = () => {
   const { user, userProfile, loading: authLoading, authError } = useAuth();
   const navigate = useNavigate();
@@ -11,6 +14,19 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
+
+  // Function to redirect to GitHub App installation
+  const redirectToGitHubAppInstall = useCallback(() => {
+    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install&redirect_uri=${returnUrl}`;
+    
+    console.log('AuthCallback: Redirecting to GitHub App installation:', githubAppInstallUrl);
+    setStatus('redirect');
+    setMessage('Redirecting to GitHub App installation page...');
+    
+    // Short delay to ensure UI updates before redirect
+    window.location.href = githubAppInstallUrl;
+  }, []);
 
   useEffect(() => {
     // Clear any previous timeouts
@@ -44,6 +60,7 @@ export const AuthCallback: React.FC = () => {
       // If we have a user but no specific flow detected, proceed to dashboard or onboarding
       if (user) {
         console.log('AuthCallback: User authenticated:', user.id);
+        console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
       
         // If we also have a profile, we can navigate to the dashboard
         if (userProfile) {
@@ -51,14 +68,27 @@ export const AuthCallback: React.FC = () => {
           setStatus('success');
           setMessage('Authentication successful! Redirecting to dashboard...');
 
-          // Redirect to appropriate page based on role and approval status
+          // For developers, check if GitHub App is connected
+          if (userProfile.role === 'developer') {
+            // Check if GitHub App is connected
+            if (!userProfile.github_installation_id) {
+              console.log('AuthCallback: Developer needs to connect GitHub App');
+              timeoutId = window.setTimeout(() => {
+                redirectToGitHubAppInstall();
+              }, 1500);
+              return;
+            }
+          }
+
+          // Otherwise, redirect to appropriate dashboard based on role
           timeoutId = window.setTimeout(() => {
             if (userProfile.role === 'developer') {
-              // Check if GitHub App is connected
-              if (userProfile.role === 'developer' && !userProfile.github_installation_id) {
-                navigate('/github-setup', { replace: true });
+              navigate('/developer', { replace: true });
+            } else if (userProfile.role === 'recruiter') {
+              if (userProfile.is_approved) {
+                navigate('/recruiter', { replace: true });
               } else {
-                navigate('/developer', { replace: true });
+                navigate('/dashboard', { replace: true });
               }
             } else if (userProfile.role === 'recruiter') {
               if (userProfile.is_approved) {
@@ -74,7 +104,7 @@ export const AuthCallback: React.FC = () => {
           }, 1500);
           return;
         }
-
+        
         // If we have a user but no profile, wait a bit longer
         if (waitTime < maxWaitTime) {
           setWaitTime(prev => prev + 1000);
@@ -116,7 +146,7 @@ export const AuthCallback: React.FC = () => {
     // Cleanup function to clear any timeouts
     return () => {
       if (timeoutId) window.clearTimeout(timeoutId);
-    };
+    };  
   }, [user, userProfile, authLoading, navigate, location.search, waitTime]);
 
   return (
@@ -142,7 +172,7 @@ export const AuthCallback: React.FC = () => {
             {waitTime > 3000 && (
               <div className="mt-4">
                 <p className="text-sm text-gray-500">This is taking longer than expected...</p>
-                <button 
+                <button
                   onClick={() => navigate('/dashboard', { replace: true })}
                   className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
@@ -160,6 +190,9 @@ export const AuthCallback: React.FC = () => {
             <p className="text-sm text-gray-500">
               Please wait while we redirect you...
             </p>
+            <button onClick={() => window.location.reload()} className="mt-4 text-sm text-blue-600 hover:underline">
+              Click here if you're not redirected automatically
+            </button>
           </div>
         )}
 
@@ -168,10 +201,10 @@ export const AuthCallback: React.FC = () => {
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
-              Redirecting you to your dashboard...
-              <span className="block mt-2 text-xs text-gray-400">
-                If you're not redirected automatically, click the button below.
-              </span>
+              Redirecting you to your dashboard in a moment...
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              If you're not redirected automatically, click the button below.
             </p>
             <button
               onClick={() => navigate('/dashboard', { replace: true })}
@@ -202,6 +235,12 @@ export const AuthCallback: React.FC = () => {
               >
                 <RefreshCw className="w-4 h-4 mr-2 inline" />
                 Refresh Page
+              </button>
+              <button
+                onClick={redirectToGitHubAppInstall}
+                className="mt-4 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium"
+              >
+                Connect GitHub App
               </button>
             </div>
           </div>

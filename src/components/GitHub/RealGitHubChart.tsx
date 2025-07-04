@@ -13,7 +13,7 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
   const { gitHubData, loading, error } = useGitHub();
   const { developerProfile } = useAuth();
 
-  const GITHUB_APP_SLUG = 'gittalentapp'; // IMPORTANT: Confirm this is your actual GitHub App slug
+  const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly
   const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
 
   const isGitHubAppInstalled = !!developerProfile?.github_installation_id;

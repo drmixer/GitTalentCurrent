@@ -16,7 +16,7 @@ export const GitHubAppSetup = () => {
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
-    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
+    const GITHUB_APP_SLUG = 'GitTalentApp'; // Your GitHub App slug
     const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install&redirect_uri=${returnUrl}`;
     
