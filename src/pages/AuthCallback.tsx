@@ -15,7 +15,6 @@ export const AuthCallback: React.FC = () => {
     const code = params.get('code');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
-    const setupAction = params.get('setup_action');
     const error = params.get('error');
     
     // Handle errors first
