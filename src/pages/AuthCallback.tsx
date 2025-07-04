@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
@@ -13,93 +13,110 @@ export const AuthCallback: React.FC = () => {
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const code = params.get('code');
-    const installationId = params.get('installation_id');
-    const setupAction = params.get('setup_action');
-    const error = params.get('error');
+    // Clear any previous timeouts
+    let timeoutId: number;
     
-    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
+    try {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+      const installationId = params.get('installation_id');
+      const setupAction = params.get('setup_action');
+      const error = params.get('error');
     
-    // Handle errors first
-    if (error) {
-      setStatus('error');
-      setMessage(`Authentication error: ${params.get('error_description') || error}`);
-      return;
-    }
+      console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
+    
+      // Handle errors first
+      if (error) {
+        setStatus('error');
+        setMessage(`Authentication error: ${params.get('error_description') || error}`);
+        return;
+      }
 
-    // GitHub App installation flow
-    if (installationId) {
-      setStatus('redirect');
-      setMessage('GitHub App installation detected, redirecting...');
-      // Redirect to GitHub setup page with the installation parameters
-      navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
-      return;
-    }
+      // GitHub App installation flow
+      if (installationId) {
+        setStatus('redirect');
+        setMessage('GitHub App installation detected, redirecting...');
+        // Redirect to GitHub setup page with the installation parameters
+        navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
+        return;
+      }
 
-    // If we have a user but no specific flow detected, proceed to dashboard or onboarding
-    if (user) {
-      console.log('AuthCallback: User authenticated:', user.id);
+      // If we have a user but no specific flow detected, proceed to dashboard or onboarding
+      if (user) {
+        console.log('AuthCallback: User authenticated:', user.id);
       
-      // If we also have a profile, we can navigate to the dashboard
-      if (userProfile) {
-      setMessage('Authentication successful! Redirecting to dashboard...');
-        setStatus('success');
-        setMessage('Authentication successful!');
+        // If we also have a profile, we can navigate to the dashboard
+        if (userProfile) {
+          console.log('AuthCallback: User profile loaded:', userProfile.id);
+          setStatus('success');
+          setMessage('Authentication successful! Redirecting to dashboard...');
 
-        // Redirect to appropriate page based on role and approval status
-        setTimeout(() => {
-          if (userProfile.role === 'developer') {
-            navigate('/developer', { replace: true });
-          } else if (userProfile.role === 'recruiter') {
-            if (userProfile.is_approved) {
-              navigate('/recruiter', { replace: true });
+          // Redirect to appropriate page based on role and approval status
+          timeoutId = window.setTimeout(() => {
+            if (userProfile.role === 'developer') {
+              // Check if GitHub App is connected
+              if (userProfile.role === 'developer' && !userProfile.github_installation_id) {
+                navigate('/github-setup', { replace: true });
+              } else {
+                navigate('/developer', { replace: true });
+              }
+            } else if (userProfile.role === 'recruiter') {
+              if (userProfile.is_approved) {
+                navigate('/recruiter', { replace: true });
+              } else {
+                navigate('/dashboard', { replace: true });
+              }
+            } else if (userProfile.role === 'admin') {
+              navigate('/admin', { replace: true });
             } else {
               navigate('/dashboard', { replace: true });
             }
-          } else if (userProfile.role === 'admin') {
-            navigate('/admin', { replace: true });
-          } else {
-            navigate('/dashboard', { replace: true });
-          }
-        }, 1500);
-        return;
-      }
+          }, 1500);
+          return;
+        }
 
-      // If we have a user but no profile, wait a bit longer
-      if (waitTime < maxWaitTime) {
-        setWaitTime(prev => prev + 1000);
-        const timer = setTimeout(() => {
-          setStatus('loading');
-          setMessage('Loading your profile...');
+        // If we have a user but no profile, wait a bit longer
+        if (waitTime < maxWaitTime) {
+          setWaitTime(prev => prev + 1000);
+          timeoutId = window.setTimeout(() => {
+            setStatus('loading');
+            setMessage(`Loading your profile... (${Math.round(waitTime/1000)}s)`);
+          }, 1000);
+          return;
+        }
+
+        // If we've waited too long, just go to dashboard
+        setStatus('success');
+        setMessage('Authentication successful! Redirecting to dashboard...');
+        timeoutId = window.setTimeout(() => {
+          navigate('/dashboard', { replace: true });
         }, 1000);
-        return () => clearTimeout(timer);
         return;
       }
-
-      // If we've waited too long, just go to dashboard
-      setStatus('success');
-      setMessage('Authentication successful! Redirecting to dashboard...');
-      const timer = setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 1000);
-      return () => clearTimeout(timer);
-      return;
-    }
     
-    // If auth is still loading, wait
-    if (authLoading) {
-      setStatus('loading');
-      setMessage('Verifying authentication...');
-      return;
-    }
+      // If auth is still loading, wait
+      if (authLoading) {
+        setStatus('loading');
+        setMessage('Verifying authentication...');
+        return;
+      }
     
-    // If we don't have a user and auth is not loading, redirect to login
-    if (!user && !authLoading) {
+      // If we don't have a user and auth is not loading, redirect to login
+      if (!user && !authLoading) {
+        setStatus('error');
+        setMessage('Authentication failed. Please try again.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error in AuthCallback useEffect:', error);
       setStatus('error');
-      setMessage('Authentication failed. Please try again.');
-      return;
+      setMessage('An unexpected error occurred during authentication.');
     }
+    
+    // Cleanup function to clear any timeouts
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, [user, userProfile, authLoading, navigate, location.search, waitTime]);
 
   return (
