@@ -74,7 +74,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 AuthProvider: Fetching user profile for:', authUser.id);
-            
+      
+      // Clear any previous errors
+      setAuthError(null);
+      
       const { data: userProfile, error } = await supabase
         .from('users')
         .select('*')
@@ -84,6 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) {
         console.error('❌ AuthProvider: Error fetching user profile:', error);
         setLoading(false);
+        setAuthError('Failed to load user profile. Please try again.');
         return null;
       }
 
@@ -93,6 +97,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (profileCreated) {
           await fetchUserProfile(authUser);
         } else {
+          setAuthError('Failed to create user profile. Please try again.');
           setLoading(false); 
         }
         return;
@@ -103,11 +108,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       const devProfile = await checkForRoleSpecificProfile(userProfile, authUser.id);
       
+      // Set loading to false even if we couldn't get the developer profile
       setLoading(false);
       return userProfile;
     } catch (error) {
       console.error('❌ AuthProvider: Error in fetchUserProfile:', error);
+      setAuthError('An unexpected error occurred while loading your profile.');
       setLoading(false); 
+      return null;
     }
   };
 
@@ -409,7 +417,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
-      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata));
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', 
+        authUser.user_metadata ? 'Present' : 'Missing');
       
       // Extract role with fallbacks
       // Try to get role from localStorage first (set during signup)
@@ -443,6 +452,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (userError) {
         console.error('❌ createUserProfileFromAuth: Error creating user profile:', userError);
+        setAuthError('Failed to create user profile. Please try again.');
         return false;
       }
 
@@ -466,6 +476,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return true;
     } catch (error) {
       console.error('❌ createUserProfileFromAuth: Error creating user profile from auth:', error);
+      setAuthError('Failed to create user profile. Please try again.');
       return false;
     }
   };

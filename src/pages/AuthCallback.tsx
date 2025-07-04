@@ -10,6 +10,7 @@ export const AuthCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
+  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -66,7 +67,7 @@ export const AuthCallback: React.FC = () => {
       }
       
       // If we have a user but no profile, wait a bit longer
-      if (waitTime < 5000) {
+      if (waitTime < maxWaitTime) {
         setWaitTime(prev => prev + 1000);
         setTimeout(() => {
           setStatus('loading');
@@ -77,10 +78,10 @@ export const AuthCallback: React.FC = () => {
       
       // If we've waited too long, just go to dashboard
       setStatus('success');
-      setMessage('Authentication successful, but profile loading is taking longer than expected.');
+      setMessage('Authentication successful! Redirecting to dashboard...');
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
-      }, 1500);
+      }, 1000);
       return;
     }
 
@@ -149,7 +150,16 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
               Redirecting you to your dashboard...
+              <span className="block mt-2 text-xs text-gray-400">
+                If you're not redirected automatically, click the button below.
+              </span>
             </p>
+            <button
+              onClick={() => navigate('/dashboard', { replace: true })}
+              className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Go to Dashboard
+            </button>
           </div>
         )}
 

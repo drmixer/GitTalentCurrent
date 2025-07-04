@@ -18,8 +18,19 @@ export const GitHubAppSetup = () => {
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
     const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
+    // Navigate to GitHub App installation page
+    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
+    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install&redirect_uri=${returnUrl}`;
     
+    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
+    setUiState('redirect');
+    setMessage('Redirecting to GitHub App installation page...');
+    
+    // Short delay to ensure UI updates before redirect
+    setTimeout(() => {
+      window.location.href = githubAppInstallUrl;
+    }, 1000);
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
@@ -255,6 +266,7 @@ export const GitHubAppSetup = () => {
               <div className="space-y-4 mb-4">
                 <p className="text-sm text-gray-600">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
+                  This is a one-time setup process.
                 </p>
                 <button
                   onClick={redirectToGitHubAppInstall}
@@ -294,7 +306,7 @@ export const GitHubAppSetup = () => {
                 onClick={() => navigate('/developer')}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
               >
-                {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
+                Return to Dashboard
               </button>
             </div>
             

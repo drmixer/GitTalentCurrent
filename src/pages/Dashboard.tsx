@@ -20,17 +20,12 @@ export const Dashboard = () => {
   useEffect(() => {
     console.log('Dashboard useEffect - user:', !!user, 'userProfile:', !!userProfile, 'loading:', loading);
     
-    // If we have a user but no profile and we're not already loading, try to refresh the profile with a delay
-    if (user && !userProfile && !loading && !needsOnboarding) {
+    // If we have a user but no profile and we're not already loading, try to refresh the profile
+    if (user && !userProfile && !loading) {
       console.log('🔄 Dashboard: User exists but no profile, refreshing profile...');
 
-      // Set up a timer to refresh the profile
-      let timer = setTimeout(() => {
-        refreshProfile();
-      }, 2000);
-      
-      // Clean up the timer when the component unmounts
-      return () => clearTimeout(timer);
+      // Refresh the profile immediately
+      refreshProfile();
     }
   }, [user, userProfile, loading, refreshProfile]);
 
@@ -70,15 +65,30 @@ export const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="text-center max-w-md mx-auto px-4">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading your profile...</p>
-          <p className="text-gray-500 text-sm mt-2">Verifying your account status...</p>
+          <p className="text-gray-600 font-medium">Loading your profile... ({Math.round(waitTime/1000)}s)</p>
+          <p className="text-gray-500 text-sm mt-2">This may take a few moments...</p>
           
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
-            <p className="text-sm text-blue-800 font-medium mb-2">What's happening?</p>
-            <p className="text-sm text-blue-700">
-              We're verifying your authentication status and loading your profile data to ensure you're directed to the right dashboard.
-            </p>
-          </div>
+          {waitTime > 5000 && (
+            <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+              <p className="text-sm text-blue-800 font-medium mb-2">Taking longer than expected?</p>
+              <div className="flex space-x-4 mt-4">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Refresh page
+                </button>
+                <button
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                >
+                  <LogOut className="w-3 h-3 mr-1" />
+                  Back to login
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
