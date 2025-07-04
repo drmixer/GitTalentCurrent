@@ -26,7 +26,7 @@ export const GitHubAppSetup = () => {
       code: code_param ? 'present' : 'absent'
     });
 
-    if (authLoading && !user) {
+    if (authLoading) {
       console.log('GitHubAppSetup useEffect - Auth still loading, waiting...');
       return;
     }
@@ -67,13 +67,15 @@ export const GitHubAppSetup = () => {
       console.log('GitHubAppSetup useEffect - Setup action is "update", refreshing profile.'); 
       completeSetup();
     } else if (code_param) {
-      // This is the OAuth redirect, just complete authentication without waiting for installation_id
+      // This is the OAuth redirect, but no installation_id yet
       console.log('GitHubAppSetup useEffect - Found code parameter, completing authentication...');
+      
+      // Just show success message and redirect to dashboard
       setLoading(false);
       setIsError(false);
       setSuccess(true);
       setMessage(
-        "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account."
+        "Account Successfully Authenticated! You'll now be redirected to the GitHub Activity tab where you can connect the GitHub App to display your contributions."
       );
       
       // Redirect to dashboard after a short delay
@@ -85,10 +87,15 @@ export const GitHubAppSetup = () => {
       // This is expected if the user just signed in via standard OAuth and hasn't installed the app yet.
       console.log('GitHubAppSetup useEffect - No valid installation ID or setup_action found in URL for installation. This is expected if only OAuth occurred.');
       setLoading(false);
-      setIsError(false);
+      setIsError(false); // It's not an error, it's an instruction
       setMessage(
         "Account Successfully Authenticated! To connect and display your real GitHub activity, please proceed to the dashboard, go to the GitHub Activity tab and connect your account/give permissions."
       );
+      
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/developer?tab=github-activity', { replace: true });
+      }, 3000);
     }
   }, [location, user, navigate, refreshProfile, authLoading]);
 
@@ -137,6 +144,12 @@ export const GitHubAppSetup = () => {
 
       setSuccess(true);
       console.log('GitHubAppSetup completeSetup - Setup successful, redirecting to dashboard...');
+      
+      // Set success message
+      setMessage("GitHub App successfully connected! You'll now be redirected to your dashboard.");
+      setLoading(false);
+      
+      // Redirect after a short delay
       setTimeout(() => {
         navigate('/developer?tab=github-activity', { replace: true });
       }, 2000);
@@ -167,7 +180,7 @@ export const GitHubAppSetup = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600">
-              Connecting your GitHub account to GitTalent...
+              {installationIdFromUrl ? 'Connecting your GitHub App to GitTalent...' : 'Processing your GitHub authentication...'}
             </p>
             <p className="text-sm text-gray-500 mt-2">
               This will allow us to showcase your repositories and contributions.
@@ -175,7 +188,7 @@ export const GitHubAppSetup = () => {
           </div>
         )}
 
-        {success && (
+        {success && !message && (
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">
