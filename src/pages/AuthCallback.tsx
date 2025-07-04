@@ -7,8 +7,9 @@ export const AuthCallback: React.FC = () => {
   const { user, userProfile, developerProfile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
+  const [waitCount, setWaitCount] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -108,6 +109,17 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">{message}</p>
+            {status === 'waiting' && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-500">This is taking longer than expected...</p>
+                <button 
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Return to login
+                </button>
+              </div>
+            )}
           </div>
         )}
 

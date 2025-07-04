@@ -361,8 +361,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, bio: string, location: string, githubMetadata: any, installationId: string | null = null) => {
     try {
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
-      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername);
-      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Installation ID (to save):', installationId);
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername, 'Avatar URL:', avatarUrl ? 'Set' : 'Not set');
+      console.log('🔄 createOrUpdateGitHubDeveloperProfile: Bio:', bio ? 'Set' : 'Not set', 'Location:', location ? 'Set' : 'Not set');
 
       const { data: existingProfile } = await supabase
         .from('developers')
@@ -402,6 +402,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ createOrUpdateGitHubDeveloperProfile: GitHub developer profile created/updated successfully in DB');
     } catch (error) {
       console.error('❌ createOrUpdateGitHubDeveloperProfile: Error in createOrUpdateGitHubDeveloperProfile:', error);
+      // Don't rethrow - we want to continue authentication even if profile creation fails
     }
   };
 

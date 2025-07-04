@@ -48,6 +48,10 @@ export const LoginForm = () => {
     setError('');
     setGithubLoading(true);
     
+    // Mark this as NOT a new signup
+    localStorage.removeItem('isNewSignup');
+    localStorage.removeItem('requiresGitHubInstall');
+    
     // Store email in localStorage to use after GitHub auth
     if (email) {
       localStorage.setItem('pendingEmail', email);
@@ -56,7 +60,6 @@ export const LoginForm = () => {
     
     try {
       await signInWithGitHub();
-      // Navigation will happen via redirect URL, no need to handle here
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
