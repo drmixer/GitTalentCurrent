@@ -436,6 +436,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
+    
+    // Check if this is a new signup
+    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
+    console.log('signInWithGitHub: Is new signup?', isNewSignup);
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github', 
       options: {

@@ -15,7 +15,15 @@ export const GitHubAppSetup = () => {
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
+    
+    // Add a state parameter to track the installation flow
+    const state = btoa(JSON.stringify({
+      userId: user?.id,
+      timestamp: Date.now(),
+      returnUrl: `${window.location.origin}/github-setup`
+    }));
+    
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
@@ -25,7 +33,7 @@ export const GitHubAppSetup = () => {
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
-  }, []);
+  }, [user]);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
     console.log('GitHubAppSetup: Success -', successMessage);
@@ -69,12 +77,14 @@ export const GitHubAppSetup = () => {
     const setupAction = params.get('setup_action');
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
+    const state = params.get('state');
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
       setupAction, 
       errorParam, 
       errorDescription,
+      state,
       pathname: location.pathname,
       search: location.search
     });
@@ -127,17 +137,24 @@ export const GitHubAppSetup = () => {
     // Scenario 2: User is logged in but no installation_id in URL
     if (user && !installationId) {
       console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-      console.log('Developer profile:', developerProfile);
+      console.log('Developer profile:', JSON.stringify(developerProfile, null, 2));
 
       if (developerProfile?.github_installation_id) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
-        console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
-        // Redirect to GitHub App installation after a short delay
-        setTimeout(() => {
-          redirectToGitHubAppInstall();
-        }, 1000);
+        // Check if we need to wait for profile to load
+        if (!developerProfile && authLoading) {
+          console.log('GitHubAppSetup: Waiting for developer profile to load...');
+          setUiState('loading');
+          setMessage('Loading your profile...');
+        } else {
+          console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
+          // Redirect to GitHub App installation after a short delay
+          setTimeout(() => {
+            redirectToGitHubAppInstall();
+          }, 1000);
+        }
       }
       return;
     }

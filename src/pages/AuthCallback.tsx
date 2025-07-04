@@ -16,8 +16,9 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
+    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
     
-    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error, isNewSignup });
     
     // Handle errors first
     if (error) {
@@ -52,7 +53,10 @@ export const AuthCallback: React.FC = () => {
             
             if (user) {
               // For GitHub users, always redirect to GitHub setup
-              if (user.app_metadata?.provider === 'github') {
+              if (user.app_metadata?.provider === 'github' || isNewSignup) {
+                // Clear the isNewSignup flag
+                localStorage.removeItem('isNewSignup');
+                
                 setStatus('redirect');
                 setMessage('Redirecting to GitHub setup...');
                 setTimeout(() => {
@@ -70,7 +74,10 @@ export const AuthCallback: React.FC = () => {
               setTimeout(async () => {
                 await refreshProfile();
                 if (user) {
-                  if (user.app_metadata?.provider === 'github') {
+                  if (user.app_metadata?.provider === 'github' || isNewSignup) {
+                    // Clear the isNewSignup flag
+                    localStorage.removeItem('isNewSignup');
+                    
                     setStatus('redirect');
                     setMessage('Redirecting to GitHub setup...');
                     navigate('/github-setup', { replace: true });
