@@ -2,17 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 export const AuthCallback: React.FC = () => {
-  const { user, userProfile, developerProfile, loading: authLoading, refreshProfile, authError } = useAuth();
+  const { user, userProfile, loading: authLoading, authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'creating_profile'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 5;
-  const [manualRetry, setManualRetry] = useState(false);
+  const [waitTime, setWaitTime] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -20,20 +17,8 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
-    const state = params.get('state');
     
-    console.log('AuthCallback: URL params:', { 
-      code, 
-      installationId, 
-      setupAction, 
-      error,
-      state
-    });
-    
-    // Reset retry count when params change
-    if (code || installationId || error) {
-      setRetryCount(0);
-    }
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error });
     
     // Handle errors first
     if (error) {
@@ -42,128 +27,77 @@ export const AuthCallback: React.FC = () => {
       return;
     }
 
-    // Try to parse state parameter if it exists
-    if (state) {
-      try {
-        const stateObj = JSON.parse(state);
-        console.log('AuthCallback: Parsed state:', stateObj);
-        
-        // Store in localStorage for use after redirect
-        if (stateObj.name) localStorage.setItem('gittalent_signup_name', stateObj.name);
-        if (stateObj.role) localStorage.setItem('gittalent_signup_role', stateObj.role);
-      } catch (e) {
-        console.log('AuthCallback: Could not parse state parameter:', state);
-      }
-    }
-
-    // If auth is still loading, wait.
-    if (authLoading) {
-      console.log(`AuthCallback: Auth context loading, waiting... (Retry: ${retryCount}/${maxRetries})`);
-      
-      if (retryCount > maxRetries && !manualRetry) {
-        setStatus('error');
-        setMessage('Authentication is taking too long. Please try again.');
-      } else { 
-        setStatus('loading');
-        setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-        
-        // Increment retry count
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-        }, 2000);
-      }
-      return;
-    }
-
-    // If no user after auth loading is complete, redirect to login
-    if (!user && retryCount > 2) {
-      console.log('AuthCallback: No user, redirecting to login.');
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    // User is authenticated (user is not null)
-    console.log('AuthCallback: User is authenticated:', user.id);
-    console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
-
     // GitHub App installation flow
     if (installationId) {
       setStatus('redirect');
-      setMessage(`GitHub App installation detected (ID: ${installationId}), redirecting...`);
+      setMessage('GitHub App installation detected, redirecting...');
       // Redirect to GitHub setup page with the installation parameters
       navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
       return;
     }
 
-    // If we have a user but no profile, we need to create one
-    if (user && !userProfile && retryCount <= 2) {
-      console.log('AuthCallback: User exists but no profile yet, waiting for profile creation...');
-      setStatus('creating_profile');
-      setMessage('Creating your profile...');
+    // If we have a user, proceed to dashboard or onboarding
+    if (user) {
+      console.log('AuthCallback: User authenticated:', user.id);
       
-      // Try to refresh the profile
-      refreshProfile?.();
-      setTimeout(() => setRetryCount(prev => prev + 1), 2000);
-      return;
-    }
-
-    // Regular GitHub OAuth login (user is not null, no installationId)
-    // User is authenticated, profile should be loaded
-    if (userProfile) {
-      console.log('AuthCallback: User profile loaded. Authentication successful!');
-      
-      // Check if this is a developer who needs to complete onboarding
-      if (userProfile.role === 'developer' && (!developerProfile || !developerProfile.github_handle)) {
-        console.log('AuthCallback: Developer needs to complete onboarding');
-        setStatus('success');
-        setMessage('Authentication successful! Redirecting to complete your profile...');
-        setTimeout(() => {
-          navigate('/onboarding', { replace: true });
-        }, 1500);
-      } else {
+      // If we also have a profile, we can navigate to the dashboard
+      if (userProfile) {
+        console.log('AuthCallback: User profile loaded:', userProfile.id);
         setStatus('success');
         setMessage('Authentication successful!');
+        
+        // Redirect to appropriate page based on role and approval status
         setTimeout(() => {
-          navigate('/dashboard', { replace: true });
+          if (userProfile.role === 'developer') {
+            navigate('/developer', { replace: true });
+          } else if (userProfile.role === 'recruiter') {
+            if (userProfile.is_approved) {
+              navigate('/recruiter', { replace: true });
+            } else {
+              navigate('/dashboard', { replace: true });
+            }
+          } else if (userProfile.role === 'admin') {
+            navigate('/admin', { replace: true });
+          } else {
+            navigate('/dashboard', { replace: true });
+          }
         }, 1500);
+        return;
       }
+      
+      // If we have a user but no profile, wait a bit longer
+      if (waitTime < 5000) {
+        setWaitTime(prev => prev + 1000);
+        setTimeout(() => {
+          setStatus('loading');
+          setMessage('Loading your profile...');
+        }, 1000);
+        return;
+      }
+      
+      // If we've waited too long, just go to dashboard
+      setStatus('success');
+      setMessage('Authentication successful, but profile loading is taking longer than expected.');
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 1500);
       return;
     }
 
-    // If we reach here, user is authenticated but userProfile is still null.
-    if (retryCount < maxRetries) {
-      console.log(`AuthCallback: User authenticated but profile not yet loaded. Waiting for profile... (Retry: ${retryCount}/${maxRetries})`);
-    
-      if (retryCount > maxRetries && !manualRetry) {
-        console.log('AuthCallback: Max retries reached, showing error with manual retry option');
-        setStatus('error');
-        setMessage('We had trouble loading your profile. Please try refreshing or logging in again.');
-      } else {
-        setStatus('loading');
-        setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
-        
-        // Try to manually refresh the profile
-        refreshProfile?.();
-        
-        // Increment retry count
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-        }, 2000);
-      }
-    
-      // If we have an auth error, show it
-      if (authError) {
-        setStatus('error');
-        setMessage(authError);
-      }
-    } else {
-      // After max retries, show error with manual refresh option
-      console.log('AuthCallback: Max retries reached, showing error');
-      setStatus('error');
-      setMessage('We had trouble loading your profile. Please try refreshing or logging in again.');
+    // If auth is still loading, wait
+    if (authLoading) {
+      setStatus('loading');
+      setMessage('Verifying authentication...');
+      return;
     }
-
-  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, refreshProfile, retryCount, authError, manualRetry]);
+    
+    // If we don't have a user and auth is not loading, redirect to login
+    if (!user && !authLoading) {
+      setStatus('error');
+      setMessage('Authentication failed. Please try again.');
+      return;
+    }
+  }, [user, userProfile, authLoading, navigate, location.search, waitTime]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
@@ -185,32 +119,17 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">{message}</p>
-            {retryCount > 2 && (
+            {waitTime > 3000 && (
               <div className="mt-4">
                 <p className="text-sm text-gray-500">This is taking longer than expected...</p>
-                <button
-                  onClick={() => {
-                    refreshProfile?.();
-                    setManualRetry(true);
-                    setRetryCount(0);
-                  }}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center mx-auto"
+                <button 
+                  onClick={() => navigate('/dashboard', { replace: true })}
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Retry Loading Profile
+                  Go to Dashboard
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {status === 'creating_profile' && (
-          <div className="text-center">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600">{message}</p>
-            <p className="text-sm text-gray-500 mt-2">
-              We're setting up your account with your GitHub information...
-            </p>
           </div>
         )}
 
@@ -238,25 +157,22 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-600 mb-6">{message}</p>
+            {authError && (
+              <p className="text-sm text-red-500 mb-4">{authError}</p>
+            )}
             <div className="flex flex-col space-y-3">
               <button
-                onClick={() => {
-                  refreshProfile?.();
-                  setManualRetry(true);
-                  setRetryCount(0);
-                  setStatus('loading');
-                  setMessage('Trying again...');
-                }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
-              </button>
-              <button
                 onClick={() => navigate('/login')}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
               >
                 Return to Login
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                <RefreshCw className="w-4 h-4 mr-2 inline" />
+                Refresh Page
               </button>
             </div>
           </div>
