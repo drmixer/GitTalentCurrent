@@ -97,9 +97,8 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   };
 
   const handleConnectGitHub = () => {
-    // Navigate to GitHub setup page
+    // Navigate to GitHub setup page instead of direct GitHub App URL
     window.location.href = '/github-setup';
-  };
 
   // Generate profile strength suggestions based on missing data
   const generateProfileSuggestions = (): string[] => {

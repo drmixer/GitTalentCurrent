@@ -165,9 +165,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const handleConnectGitHub = () => {
     setConnectingGitHub(true);
     
-    // Navigate to GitHub setup page
+    // Navigate to GitHub setup page instead of direct GitHub App URL
     window.location.href = '/github-setup';
-  };
 
   const addLanguage = (language?: string) => {
     const langToAdd = language || newLanguage.trim();

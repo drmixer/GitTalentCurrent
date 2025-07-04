@@ -30,6 +30,12 @@ export const Dashboard = () => {
       }, 2000);
       
       return () => clearTimeout(timer);
+      // Add a delay to allow database operations to complete
+      const timer = setTimeout(() => {
+        refreshProfile();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, refreshProfile]);
 
@@ -92,6 +98,20 @@ export const Dashboard = () => {
   // If user exists but no profile, show error with retry option
   if (!userProfile) {
     console.log('❌ User exists but no profile found');
+    
+    // If we're still loading or it's been less than 5 seconds since mount, show loading
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+          <div className="text-center">
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">Loading your profile...</p>
+            <p className="text-gray-500 text-sm mt-2">This may take a few moments...</p>
+          </div>
+        </div>
+      );
+    }
+    
     
     // If we're still loading or it's been less than 5 seconds since mount, show loading
     if (loading) {
