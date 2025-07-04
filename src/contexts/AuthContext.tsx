@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
       console.log('🔄 handleGitHubSignIn: GitHub user metadata:', 
-        JSON.stringify(authUser.user_metadata || {}, null, 2));
+        JSON.stringify(authUser.user_metadata || {}, null, 2),
         authUser.user_metadata ? 'Present' : 'Missing');
       
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
@@ -306,6 +306,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     } catch (error) {
       console.error('❌ checkForRoleSpecificProfile: Error in checkForRoleSpecificProfile:', error);
+      return null;
     }
   };
 
