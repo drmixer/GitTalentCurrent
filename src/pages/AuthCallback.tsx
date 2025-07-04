@@ -16,9 +16,9 @@ export const AuthCallback: React.FC = () => {
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
     const error = params.get('error');
-    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
+    const requiresGitHubInstall = localStorage.getItem('requiresGitHubInstall') === 'true';
     
-    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error, isNewSignup });
+    console.log('AuthCallback: URL params:', { code, installationId, setupAction, error, requiresGitHubInstall });
     
     // Handle errors first
     if (error) {
@@ -49,13 +49,16 @@ export const AuthCallback: React.FC = () => {
           // Just authentication without app installation
           // Wait for user to be available
           setTimeout(async () => {
+            console.log('AuthCallback: Waiting for user data to be available...');
             await refreshProfile();
             
             if (user) {
+              console.log('AuthCallback: User found, checking if GitHub app installation is needed');
               // For GitHub users, always redirect to GitHub setup
-              if (user.app_metadata?.provider === 'github' || isNewSignup) {
-                // Clear the isNewSignup flag
+              if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
+                // Clear the flags
                 localStorage.removeItem('isNewSignup');
+                localStorage.removeItem('requiresGitHubInstall');
                 
                 setStatus('redirect');
                 setMessage('Redirecting to GitHub setup...');
@@ -73,10 +76,13 @@ export const AuthCallback: React.FC = () => {
               // Wait a bit longer for auth to complete
               setTimeout(async () => {
                 await refreshProfile();
+                console.log('AuthCallback: Final check for user after delay');
                 if (user) {
-                  if (user.app_metadata?.provider === 'github' || isNewSignup) {
-                    // Clear the isNewSignup flag
+                  console.log('AuthCallback: User found in final check, provider:', user.app_metadata?.provider);
+                  if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
+                    // Clear the flags
                     localStorage.removeItem('isNewSignup');
+                    localStorage.removeItem('requiresGitHubInstall');
                     
                     setStatus('redirect');
                     setMessage('Redirecting to GitHub setup...');

@@ -100,9 +100,11 @@ export const SignupForm = () => {
       localStorage.setItem('pendingGitHubName', formData.name);
       localStorage.setItem('pendingEmail', formData.email);
       localStorage.setItem('isNewSignup', 'true');
+      localStorage.setItem('requiresGitHubInstall', 'true');
       
       console.log('Storing pendingGitHubName:', formData.name);
       console.log('Storing pendingEmail:', formData.email);
+      console.log('Setting isNewSignup and requiresGitHubInstall flags');
       
       await signInWithGitHub();
       // Navigation will be handled by the redirect

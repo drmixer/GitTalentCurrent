@@ -21,17 +21,16 @@ export const Dashboard = () => {
     console.log('Dashboard useEffect - user:', !!user, 'userProfile:', !!userProfile, 'loading:', loading);
     
     // If we have a user but no profile and we're not already loading, try to refresh the profile with a delay
-    if (user && !userProfile && !loading) {
+    if (user && !userProfile && !loading && !needsOnboarding) {
       console.log('🔄 Dashboard: User exists but no profile, refreshing profile...');
       
-      // Use useEffect for the timer to avoid React hook rules violation
-      useEffect(() => {
-        const timer = setTimeout(() => {
-          refreshProfile();
-        }, 2000);
-        
-        return () => clearTimeout(timer);
-      }, [refreshProfile]);
+      // Create a timer to refresh the profile after a delay
+      const timer = setTimeout(() => {
+        refreshProfile();
+      }, 2000);
+      
+      // Clean up the timer when the component unmounts
+      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, refreshProfile]);
 

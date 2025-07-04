@@ -6,11 +6,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 // Create Supabase client with explicit auth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true, 
-    autoRefreshToken: true, 
-    detectSessionInUrl: true, 
-    storageKey: 'gittalent-auth-token', 
-    flowType: 'pkce' 
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'gittalent-auth-token',
+    flowType: 'pkce',
+    debug: true // Enable debug mode for auth issues
   }
 });
 

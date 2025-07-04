@@ -15,15 +15,17 @@ export const GitHubAppSetup = () => {
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
+    const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
     
     // Add a state parameter to track the installation flow
     const state = btoa(JSON.stringify({
       userId: user?.id,
       timestamp: Date.now(),
-      returnUrl: `${window.location.origin}/github-setup`
+      returnUrl: `${window.location.origin}/auth/callback`
     }));
     
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
+    // Include the return URL as a parameter to ensure GitHub redirects back to our callback
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}&return_to=${returnUrl}`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
@@ -78,6 +80,7 @@ export const GitHubAppSetup = () => {
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
     const state = params.get('state');
+    const source = params.get('source');
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -85,6 +88,7 @@ export const GitHubAppSetup = () => {
       errorParam, 
       errorDescription,
       state,
+      source,
       pathname: location.pathname,
       search: location.search
     });
@@ -113,7 +117,7 @@ export const GitHubAppSetup = () => {
     // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading');
-      setMessage(`Connecting GitHub App (Installation ID: ${installationId})...`);
+      setMessage(`Connecting GitHub App...`);
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
       
       saveInstallationId(installationId, user.id)
@@ -139,7 +143,13 @@ export const GitHubAppSetup = () => {
       console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
       console.log('Developer profile:', JSON.stringify(developerProfile, null, 2));
 
-      if (developerProfile?.github_installation_id) {
+      // If coming from a specific source (like profile or prompt), always show the installation button
+      if (source) {
+        console.log(`GitHubAppSetup: Source parameter detected: ${source}, showing installation button`);
+        setUiState('info');
+        setMessage('Connect your GitHub account to display your contributions and repositories.');
+      }
+      else if (developerProfile?.github_installation_id) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
@@ -152,6 +162,8 @@ export const GitHubAppSetup = () => {
           console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
           // Redirect to GitHub App installation after a short delay
           setTimeout(() => {
+            // Set a flag to indicate we're in the installation process
+            localStorage.setItem('requiresGitHubInstall', 'true');
             redirectToGitHubAppInstall();
           }, 1000);
         }
