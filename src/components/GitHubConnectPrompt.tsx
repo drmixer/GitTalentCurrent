@@ -10,7 +10,7 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
   const navigate = useNavigate();
 
   const handleGoToGitHubActivity = () => {
-    navigate('/developer?tab=github-activity'); // Navigate to developer dashboard with github-activity tab
+    navigate('/github-setup'); // Navigate to GitHub setup page instead
     onClose(); // Close the prompt after navigating
   };
 
@@ -27,14 +27,14 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
           Welcome to GitTalent!
         </h2>
         <p className="text-gray-700 text-center mb-6">
-          To unlock your personalized GitHub activity chart and showcase your contributions, please connect your GitHub account.
+          To unlock your personalized GitHub activity chart and showcase your contributions, you need to connect the GitHub App.
         </p>
         <div className="flex justify-center">
           <button
             onClick={handleGoToGitHubActivity}
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg"
           >
-            Connect GitHub Activity
+            Connect GitHub App
           </button>
         </div>
       </div>
