@@ -298,6 +298,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const fullName = pendingName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const email = pendingEmail || authUser.email;
+      const bio = authUser.user_metadata?.bio || '';
+      const location = authUser.user_metadata?.location || '';
 
       let githubInstallationId: string | null = null;
       if (authUser.user_metadata?.installation_id) {
@@ -343,14 +345,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (githubUsername && userRole === 'developer') {
-        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, authUser.user_metadata, githubInstallationId);
+        await createOrUpdateGitHubDeveloperProfile(authUser.id, githubUsername, avatarUrl, bio, location, authUser.user_metadata, githubInstallationId);
       }
     } catch (error) {
       console.error('❌ handleGitHubSignIn: Error in handleGitHubSignIn:', error);
     }
   };
 
-  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, githubMetadata: any, installationId: string | null = null) => {
+  const createOrUpdateGitHubDeveloperProfile = async (userId: string, githubUsername: string, avatarUrl: string, bio: string, location: string, githubMetadata: any, installationId: string | null = null) => {
     try {
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Creating/updating GitHub developer profile for:', userId);
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername);
@@ -364,11 +366,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const profileData = {
         github_handle: githubUsername,
-        bio: githubMetadata?.bio || '',
+        bio: bio || '',
         availability: true,
         top_languages: [],
         linked_projects: [],
-        location: githubMetadata?.location || '',
+        location: location || '',
         experience_years: 0,
         desired_salary: 0,
         profile_pic_url: avatarUrl,
@@ -438,7 +440,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       provider: 'github', 
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'read:user user:email repo'
+        scopes: 'read:user user:email repo',
       },
     });
     if (error) {
@@ -450,7 +452,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
       console.log('🔄 signUp: Signing up user...');
-      console.log('🔄 signUp: User data for signup:', userData); 
+      console.log('🔄 signUp: User data for signup:', userData);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -481,7 +483,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 fetchUserProfile: Fetching user profile for:', authUser.id, 'Email:', authUser.email);
       console.log('🔄 fetchUserProfile: Auth user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
       
-      await new Promise(resolve => setTimeout(resolve, 500)); // Slightly longer delay
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Longer delay to ensure DB operations complete
       
       let userProfileFound = false;
 
@@ -495,7 +497,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('⚠️ fetchUserProfile: User profile not found in DB for:', authUser.id, userError?.message);
         console.log('🔄 fetchUserProfile: Attempting to create user profile from auth data...');
         
-        // Try to create the user profile
+        // Try to create the user profile with a longer timeout
         let success = false;
         try {
           success = await createUserProfileFromAuth(authUser);
@@ -504,7 +506,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         if (success) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Give DB a moment to sync
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Give DB more time to sync
           const { data: retryUserData, error: retryError } = await supabase
             .from('users')
             .select('*')
@@ -574,11 +576,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userName = pendingName || 
                       authUser.user_metadata?.full_name || 
                       authUser.user_metadata?.name || 
-                      authUser.user_metadata?.user_name ||
+                      authUser.user_metadata?.user_name || 
+                      authUser.user_metadata?.preferred_username ||
                       'User';
                       
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
+      const bio = authUser.user_metadata?.bio || '';
+      const location = authUser.user_metadata?.location || '';
       const email = pendingEmail || authUser.email;
 
       let githubInstallationId: string | null = null;
@@ -625,12 +630,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
         let githubInstallationId: string | null = null;
         if (authUser.user_metadata?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.installation_id); 
+          githubInstallationId = String(authUser.user_metadata.installation_id);
         } else if (authUser.user_metadata?.app_installation_id) {
-          githubInstallationId = String(authUser.user_metadata.app_installation_id); 
+          githubInstallationId = String(authUser.user_metadata.app_installation_id);
         }
         else if (authUser.user_metadata?.github?.installation_id) {
-          githubInstallationId = String(authUser.user_metadata.github.installation_id); 
+          githubInstallationId = String(authUser.user_metadata.github.installation_id);
         }
         else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
           try {
@@ -648,17 +653,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { error: devError } = await supabase
           .from('developers')
           .insert({
-            user_id: authUser.id, 
-            github_handle: authUser.user_metadata?.user_name || '', 
-            bio: authUser.user_metadata?.bio || '', 
-            availability: true, 
-            top_languages: [], 
-            linked_projects: [], 
-            location: authUser.user_metadata?.location || '', 
-            experience_years: 0, 
-            desired_salary: 0, 
-            profile_pic_url: avatarUrl, 
-            github_installation_id: githubInstallationId 
+            user_id: authUser.id,
+            github_handle: authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '',
+            bio: bio,
+            availability: true,
+            top_languages: [],
+            linked_projects: [],
+            location: location,
+            experience_years: 0,
+            desired_salary: 0,
+            profile_pic_url: avatarUrl,
+            github_installation_id: githubInstallationId
           });
 
         if (devError) {
@@ -702,7 +707,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkForRoleSpecificProfile = async (userProfile: User, userId: string) => {
     try {
       if (userProfile.role === 'developer') {
-        const { data: devProfileData, error: devError } = await supabase 
+        const { data: devProfileData, error: devError } = await supabase
           .from('developers')
           .select('*')
           .eq('user_id', userId)
@@ -711,6 +716,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (devError) {
           console.error('❌ checkForRoleSpecificProfile: Error fetching developer profile:', devError);
         }
+        
+        console.log('Developer profile data:', devProfileData);
 
         if (!devProfileData) {
           console.log('⚠️ checkForRoleSpecificProfile: Developer profile not found, needs onboarding (or still being created).');
@@ -722,7 +729,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDeveloperProfile(devProfileData);
 
           if (!devProfileData.github_installation_id && devProfileData.github_handle) {
-            console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer.');
+            console.log('⚠️ checkForRoleSpecificProfile: GitHub App not installed, but GitHub handle exists for developer. Redirecting to GitHub setup.');
+            // Redirect to GitHub setup page
+            if (window.location.pathname !== '/github-setup') {
+              window.location.href = '/github-setup';
+              return;
+            }
             // This is where the UI should prompt the user to connect the GitHub App
           }
           setNeedsOnboarding(false);

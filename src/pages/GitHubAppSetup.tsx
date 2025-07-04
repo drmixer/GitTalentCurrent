@@ -12,6 +12,15 @@ export const GitHubAppSetup = () => {
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
 
+  // Function to redirect to GitHub App installation
+  const redirectToGitHubAppInstall = useCallback(() => {
+    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
+    
+    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
+    window.location.href = githubAppInstallUrl;
+  }, []);
+
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
     console.log('GitHubAppSetup: Success -', successMessage);
     setUiState('success');
@@ -48,15 +57,6 @@ export const GitHubAppSetup = () => {
     await refreshProfile(); 
   }, [refreshProfile]);
 
-  // Function to redirect to GitHub App installation
-  const redirectToGitHubAppInstall = useCallback(() => {
-    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
-    
-    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
-    window.location.href = githubAppInstallUrl;
-  }, []);
-
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const installationId = params.get('installation_id');
@@ -80,7 +80,7 @@ export const GitHubAppSetup = () => {
       return;
     }
 
-    // If no user, redirect to login
+    // If no user after auth loading is complete, redirect to login
     if (!user) {
       console.log('GitHubAppSetup: No user, redirecting to login.');
       navigate('/login', { replace: true });
@@ -119,9 +119,8 @@ export const GitHubAppSetup = () => {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
-        console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
-        // Instead of showing info message, automatically redirect to GitHub App installation
-        redirectToGitHubAppInstall();
+        console.log('GitHubAppSetup: No installation ID found. Showing info message...');
+        handleInfo('You need to connect the GitHub App to access all features. Click the button below to connect.');
       }
       return;
     }
@@ -187,6 +186,17 @@ export const GitHubAppSetup = () => {
               <CheckCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" aria-hidden="true" />
             )}
             <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
+            
+            {uiState === 'info' && (
+              <button
+                onClick={redirectToGitHubAppInstall}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4"
+              >
+                <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
+                Connect GitHub App
+              </button>
+            )}
+            
             <button
               onClick={() => navigate('/developer?tab=github-activity')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"

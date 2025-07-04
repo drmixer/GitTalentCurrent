@@ -15,6 +15,7 @@ export const AuthCallback: React.FC = () => {
     const code = params.get('code');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
+    const setupAction = params.get('setup_action');
     const error = params.get('error');
     
     // Handle errors first
@@ -32,7 +33,7 @@ export const AuthCallback: React.FC = () => {
           
           // If we also have an installation_id, this is a GitHub App installation
           if (installationId) {
-            setMessage('Connecting GitHub App...');
+            setMessage('GitHub App installation detected...');
             
             // Wait for user to be available (auth to complete)
             if (!user) {
@@ -41,7 +42,7 @@ export const AuthCallback: React.FC = () => {
             }
             
             // Redirect to GitHub setup page with the installation parameters
-            navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}&code=${code}`, { replace: true });
+            navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
             return;
           }
           
@@ -60,7 +61,12 @@ export const AuthCallback: React.FC = () => {
                 setStatus('success');
                 setMessage('Authentication successful!');
                 setTimeout(() => {
-                  navigate('/dashboard', { replace: true });
+                  // Check if user needs to connect GitHub App
+                  if (user.app_metadata?.provider === 'github') {
+                    navigate('/github-setup', { replace: true });
+                  } else {
+                    navigate('/dashboard', { replace: true });
+                  }
                 }, 1500);
               } else {
                 setStatus('error');
