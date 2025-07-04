@@ -153,8 +153,7 @@ export const GitHubAppSetup = () => {
 
         <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
           {loading ? 'Connecting GitHub...' :
-            success ? 'GitHub Connected!' :
-            'GitHub Connection'}
+            success ? 'GitHub Connected!' : 'GitHub Connection'}
         </h1>
 
         {loading && (
