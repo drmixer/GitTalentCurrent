@@ -6,9 +6,7 @@ import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from '
 
 export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [retryCount, setRetryCount] = useState(0);
+  const [retryCount, setRetryCount] = useState(0); 
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
@@ -146,7 +144,7 @@ export const GitHubAppSetup = () => {
       setUiState('loading'); 
       setMessage(`Connecting GitHub App... (ID: ${installationId})`);
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
-      
+
       saveInstallationId(installationId, user.id)
         .then(() => {
           if (setupAction === 'install') {
@@ -316,8 +314,9 @@ export const GitHubAppSetup = () => {
                   <p className="text-sm text-gray-500 mb-4">
                     Retry attempt {retryCount} of {maxRetries}
                   </p>
-                )}
-              </>
+              >
+                {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
+              </button>
             </div>
             
             {uiState === 'error' && (
