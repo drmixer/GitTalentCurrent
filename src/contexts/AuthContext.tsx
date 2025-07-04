@@ -352,15 +352,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         githubInstallationId = String(authUser.user_metadata.app_installation_id);
       }
       
-      const { data: userResult, error: insertUserError } = await supabase
-        githubUsername,
-        fullName,
-        stateName,
-        email,
-        role,
-        githubInstallationId
-      });
-
       // Use stored name if available, otherwise use name from GitHub
       const finalName = stateName || fullName;
       console.log('🔄 handleGitHubSignIn: Determined role for GitHub user:', role, 'with name:', finalName);
