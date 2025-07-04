@@ -26,23 +26,11 @@ export const GitHubAppSetup = () => {
     
     // Include the return URL as a parameter to ensure GitHub redirects back to our callback
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}&return_to=${returnUrl}`;
-    const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
-    
-    // Add a state parameter to track the installation flow
-    const state = btoa(JSON.stringify({
-      userId: user?.id,
-      timestamp: Date.now(),
-      returnUrl: `${window.location.origin}/auth/callback`
-    }));
-    
-    // Include the return URL as a parameter to ensure GitHub redirects back to our callback
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}&return_to=${returnUrl}`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
     
-      window.location.href = githubAppInstallUrl;
     setUiState('info');
     setMessage('Redirecting to GitHub App installation page...');
     
@@ -67,8 +55,7 @@ export const GitHubAppSetup = () => {
     setMessage(errorMessage);
   }, []);
 
-        .eq('user_id', currentUserId);
-
+  const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
     try {
       const { error: updateError } = await supabase
         .from('developers')
@@ -86,6 +73,7 @@ export const GitHubAppSetup = () => {
     } catch (error) {
       console.error('Error saving installation ID:', error);
       throw error;
+    }
   }, [refreshProfile]);
 
   useEffect(() => {
@@ -96,17 +84,6 @@ export const GitHubAppSetup = () => {
     const errorDescription = params.get('error_description');
     const state = params.get('state');
     const source = params.get('source');
-
-    console.log('GitHubAppSetup: URL params:', { 
-      installationId, 
-      setupAction, 
-      errorParam, 
-      errorDescription,
-      state,
-      source,
-      pathname: location.pathname,
-      search: location.search
-    });
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -176,12 +153,6 @@ export const GitHubAppSetup = () => {
         setUiState('info');
         setMessage('Connect your GitHub account to display your contributions and repositories.');
       }
-      // If coming from a specific source (like profile or prompt), always show the installation button
-      if (source) {
-        console.log(`GitHubAppSetup: Source parameter detected: ${source}, showing installation button`);
-        setUiState('info');
-        setMessage('Connect your GitHub account to display your contributions and repositories.');
-      }
       else if (developerProfile?.github_installation_id) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
@@ -189,17 +160,6 @@ export const GitHubAppSetup = () => {
         // Check if we need to wait for profile to load
         if (!developerProfile && authLoading) {
           console.log('GitHubAppSetup: Waiting for developer profile to load...');
-          setUiState('loading');
-          setMessage('Loading your profile...');
-        } else {
-          console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
-          // Redirect to GitHub App installation after a short delay
-          setTimeout(() => {
-            // Set a flag to indicate we're in the installation process
-            localStorage.setItem('requiresGitHubInstall', 'true');
-            redirectToGitHubAppInstall();
-          }, 1000);
-        }
           setUiState('loading');
           setMessage('Loading your profile...');
         } else {
@@ -237,6 +197,7 @@ export const GitHubAppSetup = () => {
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
             <Github className="w-10 h-10 text-white" aria-hidden="true" />
+          </div>
         </div>
 
         <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
@@ -285,16 +246,6 @@ export const GitHubAppSetup = () => {
               <CheckCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" aria-hidden="true" />
             )}
             <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
-            
-            {uiState === 'info' && (
-              <button
-                onClick={redirectToGitHubAppInstall}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4"
-              >
-                <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                Connect GitHub App
-              </button>
-            )}
             
             {uiState === 'info' && (
               <button
