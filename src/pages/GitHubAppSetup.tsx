@@ -8,6 +8,8 @@ export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
@@ -15,7 +17,8 @@ export const GitHubAppSetup = () => {
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install`;
+    const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=github_app_install&redirect_uri=${returnUrl}`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
@@ -45,22 +48,13 @@ export const GitHubAppSetup = () => {
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
     try {
       const { error: updateError } = await supabase
-        .rpc('create_developer_profile', {
+        .rpc('update_github_installation_id', {
           p_user_id: currentUserId,
-          p_github_handle: developerProfile?.github_handle || '',
-          p_bio: developerProfile?.bio || '',
-          p_availability: developerProfile?.availability ?? true,
-          p_top_languages: developerProfile?.top_languages || [],
-          p_linked_projects: developerProfile?.linked_projects || [],
-          p_location: developerProfile?.location || '',
-          p_experience_years: developerProfile?.experience_years || 0,
-          p_desired_salary: developerProfile?.desired_salary || 0,
-          p_profile_pic_url: developerProfile?.profile_pic_url || null,
-          p_github_installation_id: id
+          p_installation_id: id
         });
 
       if (updateError) {
-        throw updateError;
+        throw new Error(`Failed to save installation ID: ${updateError.message}`);
       }
       
       console.log('GitHubAppSetup: GitHub installation ID saved successfully in DB.');
@@ -80,6 +74,11 @@ export const GitHubAppSetup = () => {
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
     const state = params.get('state');
+    
+    // Reset retry count when params change
+    if (installationId || errorParam) {
+      setRetryCount(0);
+    }
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -98,8 +97,19 @@ export const GitHubAppSetup = () => {
     // If auth is still loading, wait.
     if (authLoading) {
       console.log('GitHubAppSetup: Auth context loading, waiting...');
-      setUiState('loading');
-      setMessage('Verifying authentication...');
+      
+      if (retryCount > maxRetries) {
+        setUiState('error');
+        setMessage('Authentication is taking too long. Please try again.');
+      } else {
+        setUiState('loading');
+        setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
+        
+        // Increment retry count
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, 2000);
+      }
       return;
     }
 
@@ -113,7 +123,7 @@ export const GitHubAppSetup = () => {
     // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading');
-      setMessage('Connecting GitHub App...');
+      setMessage(`Connecting GitHub App... (ID: ${installationId})`);
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
       
       saveInstallationId(installationId, user.id)
@@ -137,17 +147,27 @@ export const GitHubAppSetup = () => {
     // Scenario 2: User is logged in but no installation_id in URL
     if (user && !installationId) {
       console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-      console.log('Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
+      console.log('Developer profile:', developerProfile ? 'Loaded' : 'Not loaded', developerProfile);
       
-      if (developerProfile?.github_installation_id) {
+      // Check if developer profile has installation ID
+      const hasInstallationId = developerProfile?.github_installation_id && 
+                               developerProfile.github_installation_id !== '';
+                               
+      if (hasInstallationId) {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
         // Check if we need to wait for profile to load
-        if (!developerProfile && authLoading) {
+        if (!developerProfile && retryCount < maxRetries) {
           console.log('GitHubAppSetup: Waiting for developer profile to load...');
           setUiState('loading');
-          setMessage('Loading your profile...');
+          setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`);
+          
+          // Increment retry count and try to refresh profile
+          setTimeout(() => {
+            refreshProfile?.();
+            setRetryCount(prev => prev + 1);
+          }, 2000);
         } else {
           console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
           setUiState('info');
@@ -160,18 +180,8 @@ export const GitHubAppSetup = () => {
     setUiState('loading');
     setMessage('Please wait...');
 
-  }, [
-    user, 
-    developerProfile, 
-    authLoading, 
-    location.search, 
-    navigate, 
-    refreshProfile, 
-    handleSuccess, 
-    handleError,
-    saveInstallationId,
-    redirectToGitHubAppInstall
-  ]);
+  }, [user, developerProfile, authLoading, location.search, navigate, refreshProfile, 
+      handleSuccess, handleError, saveInstallationId, redirectToGitHubAppInstall, retryCount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
@@ -223,6 +233,12 @@ export const GitHubAppSetup = () => {
             >
               Go to Dashboard Now
             </button>
+            <button
+              onClick={() => navigate('/developer?tab=github-activity')}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Go to Dashboard Now
+            </button>
           </div>
         )}
 
@@ -238,7 +254,7 @@ export const GitHubAppSetup = () => {
             {uiState === 'info' && (
               <div className="space-y-4 mb-4">
                 <p className="text-sm text-gray-600">
-                  Connecting the GitHub App allows us to display your contributions and repositories.
+                  Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                 </p>
                 <button
                   onClick={redirectToGitHubAppInstall}
@@ -249,7 +265,7 @@ export const GitHubAppSetup = () => {
                 </button>
               </div>
             )}
-            
+
             <div className="space-y-3">
               {uiState === 'error' && (
                 <button
@@ -257,6 +273,7 @@ export const GitHubAppSetup = () => {
                     refreshProfile?.();
                     setUiState('loading');
                     setMessage('Refreshing your profile...');
+                    setRetryCount(0);
                     setTimeout(() => {
                       if (developerProfile?.github_installation_id) {
                         handleSuccess('GitHub App is connected!');
@@ -269,7 +286,7 @@ export const GitHubAppSetup = () => {
                   className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Retry Connection
+                  Try Again
                 </button>
               )}
               <button
