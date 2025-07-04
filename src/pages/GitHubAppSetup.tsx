@@ -49,6 +49,9 @@ export const GitHubAppSetup = () => {
     try {
       const { error: updateError } = await supabase
         .rpc('update_github_installation_id', {
+          installation_id: id,
+          user_id: currentUserId
+        });
       
       // After saving, refresh profile to get the latest state including the new installation ID
       await refreshProfile(); 
@@ -64,7 +67,6 @@ export const GitHubAppSetup = () => {
     const installationId = searchParams.get('installation_id');
     const setupAction = searchParams.get('setup_action');
     const code = searchParams.get('code');
-    const code = searchParams.get('code');
     const errorParam = searchParams.get('error') || '';
     const errorDescription = searchParams.get('error_description');
     const state = searchParams.get('state');
@@ -77,7 +79,6 @@ export const GitHubAppSetup = () => {
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
       setupAction, 
-      code,
       code,
       errorParam, 
       errorDescription,
@@ -139,10 +140,7 @@ export const GitHubAppSetup = () => {
         .catch(err => {
           handleError(err.message || 'Failed to save GitHub installation.');
         });
-
-      if (updateError) { 
-        console.error('Error updating installation ID:', updateError);
-        throw new Error(`Failed to save installation ID: ${updateError.message}`);
+    }
 
     // Scenario 2: User is logged in but no installation_id in URL
     if (user && !installationId) {
