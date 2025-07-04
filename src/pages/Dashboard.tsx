@@ -31,13 +31,6 @@ export const Dashboard = () => {
       
       // Clean up the timer when the component unmounts
       return () => clearTimeout(timer);
-      // Create a timer to refresh the profile after a delay
-      const timer = setTimeout(() => {
-        refreshProfile();
-      }, 2000);
-      
-      // Clean up the timer when the component unmounts
-      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, refreshProfile]);
 

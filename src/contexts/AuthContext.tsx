@@ -769,16 +769,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 window.location.href = '/github-setup';
               }, 500);
             }
-            // Only redirect if we're not already on the GitHub setup page or auth callback
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/github-setup' && 
-                currentPath !== '/auth/callback' && 
-                !currentPath.includes('/onboarding')) {
-              console.log('Redirecting to GitHub setup page from:', currentPath);
-              setTimeout(() => {
-                window.location.href = '/github-setup';
-              }, 500);
-            }
           }
           setNeedsOnboarding(false);
         }
