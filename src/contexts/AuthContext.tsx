@@ -387,7 +387,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     
-    // Store any signup data from localStorage in the state parameter
+    // Get signup data from localStorage to pass in state parameter
     const name = localStorage.getItem('gittalent_signup_name');
     const role = localStorage.getItem('gittalent_signup_role');
     
@@ -399,7 +399,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?github_app_setup=true`,
         scopes: 'read:user user:email',
         state: stateParam
       },
@@ -412,7 +412,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { error: null };
   };
 
-  const signInWithGitHubApp = async () => {
+  const connectGitHubApp = async () => {
     try {
       setAuthError(null);
       console.log('🔄 AuthProvider: Signing in with GitHub App');
@@ -420,7 +420,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/github-app-setup`,
+          redirectTo: `${window.location.origin}/github-setup`,
           scopes: 'read:user user:email'
         }
       });
@@ -431,7 +431,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { error };
       }
 
-      return { data, error: null };
+      return { data, error: null, success: true };
     } catch (error) {
       console.error('❌ AuthProvider: Unexpected GitHub App sign in error:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -755,7 +755,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signUp,
     signIn,
     signInWithGitHub,
-    signInWithGitHubApp,
+    signInWithGitHubApp: connectGitHubApp,
     signOut,
     createDeveloperProfile,
     updateDeveloperProfile,
