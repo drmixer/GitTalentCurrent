@@ -48,20 +48,14 @@ export const GitHubAppSetup = () => {
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
     try {
       const { error: updateError } = await supabase
-        .from('developers')
-        .update({ github_installation_id: id })
-        .eq('user_id', currentUserId);
-
-      if (updateError) {
-        console.error('Error updating installation ID directly:', updateError);
-        
-        // Try using the RPC function as a fallback
-        const { error: rpcError } = await supabase.rpc('update_github_installation_id', {
+        .rpc('update_github_installation_id', {
           p_user_id: currentUserId,
           p_installation_id: id
         });
-        
-        if (rpcError) throw new Error(`Failed to save installation ID: ${rpcError.message}`);
+
+      if (updateError) { 
+        console.error('Error updating installation ID:', updateError);
+        throw new Error(`Failed to save installation ID: ${updateError.message}`);
       }
       
       // After saving, refresh profile to get the latest state including the new installation ID
@@ -77,6 +71,7 @@ export const GitHubAppSetup = () => {
     const searchParams = new URLSearchParams(location.search);
     const installationId = searchParams.get('installation_id');
     const setupAction = searchParams.get('setup_action');
+    const code = searchParams.get('code');
     const errorParam = searchParams.get('error') || '';
     const errorDescription = searchParams.get('error_description');
     const state = searchParams.get('state');
@@ -89,6 +84,7 @@ export const GitHubAppSetup = () => {
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
       setupAction, 
+      code,
       errorParam, 
       errorDescription,
       state
@@ -103,7 +99,7 @@ export const GitHubAppSetup = () => {
     // If auth is still loading, wait.
     if (authLoading) {
       console.log('GitHubAppSetup: Auth context loading, waiting...');
-      
+
       if (retryCount > maxRetries) {
         setUiState('error');
         setMessage('Authentication is taking too long. Please try again.');
@@ -131,7 +127,7 @@ export const GitHubAppSetup = () => {
     // Scenario 1: App Install/Reconfigure for an existing user
     if (user && installationId) {
       setUiState('loading'); 
-      setMessage(`Connecting GitHub App... (ID: ${installationId})`);
+      setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
       console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
 
       saveInstallationId(installationId, user.id)

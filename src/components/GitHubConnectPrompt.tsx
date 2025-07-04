@@ -10,8 +10,8 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
   const navigate = useNavigate();
 
   const handleGoToGitHubActivity = () => {
-    // Navigate to GitHub setup page
-    navigate('/github-setup', { replace: true });
+    // Navigate to GitHub setup page instead of direct GitHub App URL
+    navigate('/github-setup');
     onClose(); // Close the prompt after navigating
   };
 

@@ -131,7 +131,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       // If we don't have an installation ID and this isn't the initial data load, we should prompt for installation
       if (!installationId && hasExistingData) {
         console.log('No GitHub installation ID but we have data - user needs to install the GitHub App');
-        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your contributions.'));
+        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
         setLoading(false);
         setFetchInProgress(false);
         return;
@@ -235,10 +235,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       console.log('useGitHub - GitHub handle changed in profile:', developerProfile.github_handle);
       console.log('useGitHub - Installation ID:', developerProfile.github_installation_id || 'not available');
       
-      // Add a delay to ensure developerProfile is fully updated in AuthContext
-      const timer = setTimeout(() => {
+      // Add a small delay to ensure developerProfile is fully updated in AuthContext
+      const timer = setTimeout(() => { 
         refreshGitHubData(developerProfile.github_handle);
-      }, 500);
+      }, 300);
 
       return () => clearTimeout(timer); // Cleanup timer if component unmounts or deps change
     } else if (!authLoading && !developerProfile?.github_handle) {
@@ -246,7 +246,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setGitHubData({
         user: null,
         repos: [],
-        languages: {},
+        languages: {}, 
         totalStars: 0,
         contributions: [],
       });

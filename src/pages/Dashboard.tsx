@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth'; 
 import { Navigate, useNavigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
 import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut, XCircle } from 'lucide-react';

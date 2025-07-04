@@ -13,7 +13,7 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
   const { gitHubData, loading, error } = useGitHub();
   const { developerProfile } = useAuth();
 
-  const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly
+  const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly 
   const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
 
   const isGitHubAppInstalled = !!developerProfile?.github_installation_id;
@@ -30,7 +30,7 @@ export const RealGitHubChart = ({ githubHandle, className = '' }) => {
   if (!isGitHubAppInstalled) {
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
-        <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+        <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" /> 
         <h2 className="text-xl font-semibold text-gray-800 mb-2">GitHub App Not Connected</h2>
         <p className="text-gray-600 mb-4">
           To display your real contribution data and unlock full features, please connect the GitHub App.

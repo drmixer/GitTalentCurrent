@@ -13,7 +13,7 @@ export const AuthCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
-  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
+  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds 
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {

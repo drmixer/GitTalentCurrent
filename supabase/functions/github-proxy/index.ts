@@ -45,12 +45,12 @@ Deno.serve(async (req: Request) => {
     // Determine if we should use GitHub App authentication or public access
     let headers: Record<string, string> = {
       "Accept": "application/vnd.github.v3+json",
-      "User-Agent": "GitTalent-App",
+      "User-Agent": "GitTalent-App", 
     };
 
     // If we have GitHub App credentials and an installation ID, use GitHub App authentication
     if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
-      console.log("Using GitHub App authentication");
+      console.log("Using GitHub App authentication with installation ID:", installationId);
       
       try {
         // Generate a JWT for the GitHub App
@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
         
         // Use the installation token for subsequent requests
         headers["Authorization"] = `token ${token}`;
-        console.log("Successfully obtained installation access token");
+        console.log("Successfully obtained installation access token for installation ID:", installationId);
       } catch (error) {
         console.error("Error generating GitHub App token:", error);
         // Fall back to public access if token generation fails
