@@ -11,7 +11,6 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
-  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
