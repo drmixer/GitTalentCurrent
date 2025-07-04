@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; 
+import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
 // GitHub App slug - must match exactly what's configured in GitHub
 const GITHUB_APP_SLUG = 'GitTalentApp';
 
 export const AuthCallback: React.FC = () => {
-  const { user, userProfile, loading: authLoading, authError } = useAuth();
+  const { user, userProfile, developerProfile, loading: authLoading, authError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
@@ -30,6 +31,7 @@ export const AuthCallback: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const handleAuthCallback = async () => {
     // Clear any previous timeouts
     let timeoutId: number;
     
@@ -120,7 +122,7 @@ export const AuthCallback: React.FC = () => {
           // For developers, check if GitHub App is connected
           if (userProfile.role === 'developer') {
             // Check if GitHub App is connected
-            if (!userProfile.github_installation_id) {
+            if (!developerProfile?.github_installation_id) {
               console.log('AuthCallback: Developer needs to connect GitHub App');
               timeoutId = window.setTimeout(() => {
                 redirectToGitHubAppInstall();
@@ -133,12 +135,6 @@ export const AuthCallback: React.FC = () => {
           timeoutId = window.setTimeout(() => {
             if (userProfile.role === 'developer') {
               navigate('/developer', { replace: true });
-            } else if (userProfile.role === 'recruiter') {
-              if (userProfile.is_approved) {
-                navigate('/recruiter', { replace: true });
-              } else {
-                navigate('/dashboard', { replace: true });
-              }
             } else if (userProfile.role === 'recruiter') {
               if (userProfile.is_approved) {
                 navigate('/recruiter', { replace: true });
@@ -181,11 +177,17 @@ export const AuthCallback: React.FC = () => {
     // Cleanup function to clear any timeouts
     return () => {
       if (timeoutId) window.clearTimeout(timeoutId);
-    };  
+    };
+    };
+    
+    handleAuthCallback();
   }, [user, userProfile, authLoading, navigate, location.search, waitTime, processingInstallation, refreshProfile]);
 
   // Add a separate effect to handle the case where we have a user but no installation_id in URL
   useEffect(() => {
+    let timeoutId: number;
+    
+    try {
     if (user && userProfile?.role === 'developer' && developerProfile && !processingInstallation) {
       // If developer has no GitHub installation ID, suggest connecting
       if (!developerProfile.github_installation_id && developerProfile.github_handle) {
@@ -193,6 +195,7 @@ export const AuthCallback: React.FC = () => {
         setStatus('info');
         setMessage('Your GitHub account is connected, but you need to install the GitHub App to see your contributions.');
       }
+    }
     
       // If auth is still loading, wait
       if (authLoading) {
