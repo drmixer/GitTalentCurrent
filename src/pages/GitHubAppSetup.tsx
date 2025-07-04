@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -8,7 +8,7 @@ export const GitHubAppSetup = () => {
   const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [retryCount, setRetryCount] = useState(0);
+  const [retryCount, setRetryCount] = useState<number>(0);
   const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
@@ -77,9 +77,14 @@ export const GitHubAppSetup = () => {
     const searchParams = new URLSearchParams(location.search);
     const installationId = searchParams.get('installation_id');
     const setupAction = searchParams.get('setup_action');
-    const errorParam = searchParams.get('error');
+    const errorParam = searchParams.get('error') || '';
     const errorDescription = searchParams.get('error_description');
     const state = searchParams.get('state');
+
+    // Reset retry count when params change
+    if (installationId || errorParam) {
+      setRetryCount(0);
+    }
 
     console.log('GitHubAppSetup: URL params:', { 
       installationId, 
@@ -107,7 +112,10 @@ export const GitHubAppSetup = () => {
         setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
 
         // Set a timeout to increment retry count
-        const timer = setTimeout(() => setRetryCount(prev => prev + 1), 2000);
+        const timer = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          refreshProfile?.();
+        }, 2000);
         return () => clearTimeout(timer);
       }
       return;
@@ -181,7 +189,7 @@ export const GitHubAppSetup = () => {
     setMessage('Please wait...');
 
   }, [user, developerProfile, authLoading, location.search, navigate, refreshProfile, 
-      handleSuccess, handleError, saveInstallationId, redirectToGitHubAppInstall]);
+      handleSuccess, handleError, saveInstallationId, redirectToGitHubAppInstall, retryCount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
