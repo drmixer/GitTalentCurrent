@@ -11,10 +11,12 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
+  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
+    const githubAppSetup = params.get('github_app_setup');
     const githubAppSetup = params.get('github_app_setup');
     const installationId = params.get('installation_id');
     const setupAction = params.get('setup_action');
@@ -26,6 +28,15 @@ export const AuthCallback: React.FC = () => {
     if (error) {
       setStatus('error');
       setMessage(`Authentication error: ${params.get('error_description') || error}`);
+      return;
+    }
+
+    // If this is a GitHub App setup flow, redirect to GitHub App setup page
+    if (githubAppSetup === 'true' && user) {
+      console.log('AuthCallback: GitHub App setup flow detected, redirecting...');
+      setStatus('redirect');
+      setMessage('GitHub authentication successful, redirecting to GitHub App setup...');
+      navigate('/github-setup', { replace: true });
       return;
     }
 
@@ -53,7 +64,7 @@ export const AuthCallback: React.FC = () => {
       
       // If we also have a profile, we can navigate to the dashboard
       if (userProfile) {
-        console.log('AuthCallback: User profile loaded:', userProfile.id);
+      setMessage('Authentication successful! Redirecting to dashboard...');
         setStatus('success');
         setMessage('Authentication successful!');
 
