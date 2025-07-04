@@ -48,6 +48,9 @@ interface GitHubData {
   languages: GitHubLanguages;
   totalStars: number;
   contributions: GitHubContribution[];
+  currentStreak?: number;
+  longestStreak?: number;
+  averageContributions?: number;
 }
 
 interface GitHubContextType {
@@ -171,7 +174,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         repos: data.repos || [],
         languages: data.languages || {},
         totalStars: data.totalStars || 0,
-        contributions: data.contributions || []
+        contributions: data.contributions || [],
+        currentStreak: contributionStats.currentStreak,
+        longestStreak: contributionStats.longestStreak,
+        averageContributions: contributionStats.averagePerDay
       });
       setLastFetchedHandle(handle);
 
