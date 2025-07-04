@@ -47,14 +47,16 @@ export const LoginForm = () => {
   const handleGitHubSignIn = async () => {
     setError('');
     setGithubLoading(true);
-    
+
     try {
       await signInWithGitHub();
       // Navigation will happen via redirect URL
     } catch (error: any) {
       console.error('GitHub login error:', error);
       setError(error.message || 'An error occurred with GitHub login');
-      setGithubLoading(false);
+      setTimeout(() => {
+        setGithubLoading(false);
+      }, 500);
     }
   };
 

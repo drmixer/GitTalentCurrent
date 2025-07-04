@@ -6,12 +6,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 // Create Supabase client with explicit auth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
     autoRefreshToken: true,
+    persistSession: true,
     detectSessionInUrl: true,
-    storageKey: 'gittalent-auth-token',
-    flowType: 'pkce',
-    debug: false
+    flowType: 'pkce'
   }
 });
 
@@ -31,7 +29,7 @@ export const signOut = async () => {
     
     // Clear any local storage items that might be causing issues
     localStorage.removeItem('gittalent-auth-token');
-    localStorage.removeItem('sb-rsfebnaixdwkqxzadvub-auth-token');
+    localStorage.removeItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
     
     // Clear any cookies by setting them to expire
     document.cookie.split(';').forEach(cookie => {

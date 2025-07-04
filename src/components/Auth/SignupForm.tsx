@@ -89,20 +89,24 @@ export const SignupForm = () => {
   const handleGitHubSignUp = async () => {
     if (!formData.name.trim()) {
       setError('Please enter your name first');
+      setGithubLoading(false);
       return;
     }
 
     setError('');
     setGithubLoading(true);
+    
     try {
-      console.log('Storing pendingEmail:', formData.email);
+      console.log('Starting GitHub signup for:', formData.name);
       
       await signInWithGitHub();
       // Navigation will be handled by the redirect
     } catch (error: any) {
       console.error('GitHub signup error:', error);
       setError(error.message || 'An error occurred with GitHub signup');
-      setGithubLoading(false);
+      setTimeout(() => {
+        setGithubLoading(false);
+      }, 500);
     }
   };
 
