@@ -23,9 +23,9 @@ export const Dashboard = () => {
     // If we have a user but no profile and we're not already loading, try to refresh the profile with a delay
     if (user && !userProfile && !loading && !needsOnboarding) {
       console.log('🔄 Dashboard: User exists but no profile, refreshing profile...');
-      
-      // Create a timer to refresh the profile after a delay
-      const timer = setTimeout(() => {
+
+      // Set up a timer to refresh the profile
+      let timer = setTimeout(() => {
         refreshProfile();
       }, 2000);
       

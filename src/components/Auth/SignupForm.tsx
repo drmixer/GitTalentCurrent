@@ -94,13 +94,6 @@ export const SignupForm = () => {
 
     setError('');
     setGithubLoading(true);
-
-    try {
-      // Store the name and email in localStorage to use after GitHub auth
-      localStorage.setItem('pendingGitHubName', formData.name);
-      localStorage.setItem('pendingEmail', formData.email);
-      
-      console.log('Storing pendingGitHubName:', formData.name);
       console.log('Storing pendingEmail:', formData.email);
       
       await signInWithGitHub();

@@ -47,12 +47,6 @@ export const LoginForm = () => {
   const handleGitHubSignIn = async () => {
     setError('');
     setGithubLoading(true);
-
-    // Store email in localStorage to use after GitHub auth
-    if (email) {
-      localStorage.setItem('pendingEmail', email);
-      console.log('Storing pendingEmail for login:', email);
-    }
     
     try {
       await signInWithGitHub();

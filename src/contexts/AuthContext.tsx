@@ -287,18 +287,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 handleGitHubSignIn: Processing GitHub user:', authUser.id);
-      const metadataStr = JSON.stringify(authUser.user_metadata, null, 2);
-      console.log('🔄 handleGitHubSignIn: GitHub user metadata:', metadataStr.length > 500 ? `${metadataStr.substring(0, 500)}...` : metadataStr);
-
-      const pendingName = localStorage.getItem('pendingGitHubName');
-      const pendingEmail = localStorage.getItem('pendingEmail');
-      localStorage.removeItem('pendingGitHubName');
-      localStorage.removeItem('pendingEmail');
 
       const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
-      const fullName = pendingName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
+      const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
-      const email = pendingEmail || authUser.email;
+      const email = authUser.email;
       const bio = authUser.user_metadata?.bio || '';
       const location = authUser.user_metadata?.location || '';
 
@@ -444,7 +437,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithGitHub = async () => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'github', 
+      provider: 'github',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: 'read:user user:email repo',
@@ -565,24 +558,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
-    try {
-      console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
-      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata, null, 2));
-      
-      // Always clear these flags after processing
-      localStorage.removeItem('requiresGitHubInstall');
-
-      // Get name from localStorage or metadata
-      const pendingName = localStorage.getItem('pendingGitHubName');
-      const pendingEmail = localStorage.getItem('pendingEmail');
       
       // Extract role with fallbacks
       const userRole = authUser.user_metadata?.role || 
                       (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
       
       // Extract name with fallbacks
-      const userName = pendingName || 
-                      authUser.user_metadata?.full_name || 
+      const userName = authUser.user_metadata?.full_name || 
                       authUser.user_metadata?.name || 
                       authUser.user_metadata?.user_name || 
                       authUser.user_metadata?.preferred_username ||
@@ -592,7 +574,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const bio = authUser.user_metadata?.bio || '';
       const location = authUser.user_metadata?.location || '';
-      const email = pendingEmail || authUser.email;
+      const email = authUser.email;
 
       let githubInstallationId: string | null = null;
       

@@ -31,9 +31,7 @@ export const signOut = async () => {
     
     // Clear any local storage items that might be causing issues
     localStorage.removeItem('gittalent-auth-token');
-    localStorage.removeItem('supabase.auth.token');
-    localStorage.removeItem('pendingEmail');
-    localStorage.removeItem('pendingGitHubName');
+    localStorage.removeItem('sb-rsfebnaixdwkqxzadvub-auth-token');
     
     // Clear any cookies by setting them to expire
     document.cookie.split(';').forEach(cookie => {
