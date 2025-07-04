@@ -121,6 +121,7 @@ export const GitHubAppSetup = () => {
         // Increment retry count
         setTimeout(() => setRetryCount(prev => prev + 1), 2000);
       }
+      if (retryCount > maxRetries) {
         setUiState('error');
         setMessage('Authentication is taking too long. Please try again.');
       } else {
