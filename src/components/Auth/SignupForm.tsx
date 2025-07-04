@@ -98,7 +98,7 @@ export const SignupForm = () => {
     try {
       console.log('Starting GitHub signup for:', formData.name, 'with role:', formData.role);
       
-      // Store the name in localStorage so we can use it after redirect
+      // Store the name and role in localStorage so we can use it after redirect
       localStorage.setItem('gittalent_signup_name', formData.name);
       localStorage.setItem('gittalent_signup_role', formData.role);
       
