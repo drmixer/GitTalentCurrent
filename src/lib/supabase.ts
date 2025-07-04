@@ -12,6 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: 'gittalent-auth-token',
     flowType: 'pkce',
     debug: true // Enable debug mode for auth issues
+    debug: true // Enable debug mode for auth issues
   }
 });
 

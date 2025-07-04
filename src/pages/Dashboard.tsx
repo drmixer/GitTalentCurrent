@@ -31,6 +31,13 @@ export const Dashboard = () => {
       
       // Clean up the timer when the component unmounts
       return () => clearTimeout(timer);
+      // Create a timer to refresh the profile after a delay
+      const timer = setTimeout(() => {
+        refreshProfile();
+      }, 2000);
+      
+      // Clean up the timer when the component unmounts
+      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, refreshProfile]);
 
@@ -123,39 +130,28 @@ export const Dashboard = () => {
     
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md mx-auto text-center px-4">
-          <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="w-8 h-8 text-red-600" />
-            </div>
-            <h1 className="text-2xl font-black text-gray-900 mb-4">Profile Not Found</h1>
-            <p className="text-gray-600 mb-6">
-              We couldn't load your profile data. This might be a temporary issue with the database connection.
-            </p>
-            <div className="space-y-3">
+        <div className="text-center max-w-md mx-auto px-4">
+          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading your profile...</p>
+          <p className="text-gray-500 text-sm mt-2">This may take a few moments...</p>
+          
+          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+            <p className="text-sm text-blue-800 font-medium mb-2">Still having trouble?</p>
+            <div className="flex space-x-4">
               <button
                 onClick={refreshProfile}
-                className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Refresh profile
               </button>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => {
-                    console.log('Signing out from error state...');
-                    signOut().then(() => {
-                      navigate('/login', { replace: true });
-                    }).catch(() => {
-                      navigate('/login', { replace: true });
-                    });
-                  }}
-                  className="w-full flex items-center justify-center px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Back to Login
-                </button>
-              </div>
+              <button
+                onClick={() => navigate('/login', { replace: true })}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+              >
+                <LogOut className="w-3 h-3 mr-1" />
+                Back to login
+              </button>
             </div>
           </div>
         </div>

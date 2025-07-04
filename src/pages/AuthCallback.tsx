@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Loader, CheckCircle, AlertCircle, Github } from 'lucide-react';
 
 export const AuthCallback: React.FC = () => {
-  const { user, refreshProfile } = useAuth();
+  const { user, userProfile, developerProfile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect'>('loading');
@@ -27,92 +27,66 @@ export const AuthCallback: React.FC = () => {
       return;
     }
 
-    const processAuth = async () => {
-      try {
-        // If we have a code, the auth is being handled by Supabase auth
-        if (code) {
-          setMessage('Authentication successful, finalizing...');
-          
-          // If we also have an installation_id, this is a GitHub App installation
-          if (installationId) {
-            setStatus('redirect');
-            setMessage('GitHub App installation detected, redirecting...');
-            
-            // Short delay to ensure UI updates before redirect
-            setTimeout(() => {
-              // Redirect to GitHub setup page with the installation parameters
-              navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
-            }, 500);
-            return;
-          }
-          
-          // Just authentication without app installation
-          // Wait for user to be available
-          setTimeout(async () => {
-            console.log('AuthCallback: Waiting for user data to be available...');
-            await refreshProfile();
-            
-            if (user) {
-              console.log('AuthCallback: User found, checking if GitHub app installation is needed');
-              // For GitHub users, always redirect to GitHub setup
-              if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
-                // Clear the flags
-                localStorage.removeItem('isNewSignup');
-                localStorage.removeItem('requiresGitHubInstall');
-                
-                setStatus('redirect');
-                setMessage('Redirecting to GitHub setup...');
-                setTimeout(() => {
-                  navigate('/github-setup', { replace: true });
-                }, 1000);
-              } else {
-                setStatus('success');
-                setMessage('Authentication successful!');
-                setTimeout(() => {
-                  navigate('/dashboard', { replace: true });
-                }, 1500);
-              }
-            } else {
-              // Wait a bit longer for auth to complete
-              setTimeout(async () => {
-                await refreshProfile();
-                console.log('AuthCallback: Final check for user after delay');
-                if (user) {
-                  console.log('AuthCallback: User found in final check, provider:', user.app_metadata?.provider);
-                  if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
-                    // Clear the flags
-                    localStorage.removeItem('isNewSignup');
-                    localStorage.removeItem('requiresGitHubInstall');
-                    
-                    setStatus('redirect');
-                    setMessage('Redirecting to GitHub setup...');
-                    navigate('/github-setup', { replace: true });
-                  } else {
-                    setStatus('success');
-                    setMessage('Authentication successful!');
-                    navigate('/dashboard', { replace: true });
-                  }
-                } else {
-                  setStatus('error');
-                  setMessage('Authentication failed. Please try again.');
-                }
-              }, 3000);
-            }
-          }, 2000);
-        } else {
-          // No code parameter, something went wrong
-          setStatus('error');
-          setMessage('Invalid authentication callback. Missing parameters.');
-        }
-      } catch (error) {
-        console.error('Error in auth callback:', error);
-        setStatus('error');
-        setMessage(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+    // If auth is still loading, wait.
+    if (authLoading) {
+      console.log('AuthCallback: Auth context loading, waiting...');
+      setStatus('loading');
+      setMessage('Verifying authentication...');
+      return;
+    }
 
-    processAuth();
-  }, [user, navigate, location.search, refreshProfile]);
+    // If no user after auth loading is complete, redirect to login
+    if (!user) {
+      console.log('AuthCallback: No user, redirecting to login.');
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    // User is authenticated (user is not null)
+    console.log('AuthCallback: User is authenticated:', user.id);
+
+    // Scenario 1: GitHub App installation flow
+    if (installationId) {
+      setStatus('redirect');
+      setMessage('GitHub App installation detected, redirecting...');
+      // Redirect to GitHub setup page with the installation parameters
+      navigate(`/github-setup?installation_id=${installationId}&setup_action=${setupAction || 'install'}`, { replace: true });
+      return;
+    }
+
+    // Scenario 2: Regular GitHub OAuth login (user is not null, no installationId)
+    // Check if developerProfile is loaded and if GitHub App installation is required
+    if (user.app_metadata?.provider === 'github' && requiresGitHubInstall) {
+      console.log('AuthCallback: GitHub user and requiresGitHubInstall flag is true. Redirecting to GitHub setup.');
+      // Clear the flags as we are handling the redirect
+      localStorage.removeItem('isNewSignup');
+      localStorage.removeItem('requiresGitHubInstall');
+
+      setStatus('redirect');
+      setMessage('Redirecting to GitHub setup...');
+      navigate('/github-setup', { replace: true });
+      return;
+    }
+
+    // Scenario 3: User is authenticated, no GitHub App installation needed, profile should be loaded
+    if (userProfile) {
+      console.log('AuthCallback: User profile loaded. Authentication successful!');
+      setStatus('success');
+      setMessage('Authentication successful!');
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 1500);
+      return;
+    }
+
+    // If we reach here, user is authenticated but userProfile is still null.
+    // This means the profile is still being fetched or created by AuthContext.
+    // Keep showing loading and let AuthContext update the state.
+    console.log('AuthCallback: User authenticated but profile not yet loaded. Waiting for profile...');
+    setStatus('loading');
+    setMessage('Loading your profile...');
+
+  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, refreshProfile]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
