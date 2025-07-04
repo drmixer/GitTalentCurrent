@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github, CheckCircle, RefreshCw } from 'lucide-react';
 
 export const SignupForm = () => {
   const [formData, setFormData] = useState({
@@ -16,8 +16,15 @@ export const SignupForm = () => {
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [success, setSuccess] = useState('');
-  const { signUp, signInWithGitHub, user, userProfile, loading: authLoading } = useAuth();
+  const { signUp, signInWithGitHub, user, userProfile, loading: authLoading, authError } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // If there's an auth error from the context, show it
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
@@ -164,6 +171,17 @@ export const SignupForm = () => {
                   <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
                   <p className="text-sm font-medium text-red-800">{error}</p>
                 </div>
+                {error && error.includes('session') && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Refresh page to try again
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

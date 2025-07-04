@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader, GitBranch } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader, GitBranch, RefreshCw } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +10,7 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
-  const { signIn, signInWithGitHub, user, loading: authLoading } = useAuth();
+  const { signIn, signInWithGitHub, user, loading: authLoading, authError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,6 +19,13 @@ export const LoginForm = () => {
       navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    // If there's an auth error from the context, show it
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +48,11 @@ export const LoginForm = () => {
     setError('');
     setGithubLoading(true);
 
+      
+      // Store the name in localStorage to use after GitHub auth
+      if (email) {
+        localStorage.setItem('pendingEmail', email);
+      }
     try {
       await signInWithGitHub();
       // Navigation will happen via redirect URL, no need to handle here
@@ -134,6 +146,17 @@ export const LoginForm = () => {
             <div className="relative flex justify-center text-sm">
               <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
             </div>
+            {error && error.includes('session') && (
+              <div className="mt-2">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Refresh page to try again
+                </button>
+              </div>
+            )}
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit}>

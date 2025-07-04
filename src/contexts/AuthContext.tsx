@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types';
+import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types'; 
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [mounted, setMounted] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let currentMounted = true;
@@ -23,47 +24,88 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('Current window.location.origin:', window.location.origin);
     console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
     console.log('Supabase client instance:', supabase); // Check if supabase is initialized
+    console.log('Current URL:', window.location.href);
+    console.log('Has hash:', !!window.location.hash);
+    console.log('Hash content:', window.location.hash);
     console.log('-----------------------------');
 
     async function handleAuthRedirect() {
       console.log('🔄 AuthProvider: Checking for auth redirect parameters...');
       try {
-        const params = new URLSearchParams(window.location.hash.substring(1)); // Check hash for tokens
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const expiresIn = params.get('expires_in');
-        const tokenType = params.get('token_type');
+        // First check if we have a hash with auth parameters
+        if (!window.location.hash) {
+          console.log('No hash parameters found in URL');
+          return false;
+        }
+        
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        console.log('Hash params:', Object.fromEntries(hashParams.entries()));
+        
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const expiresIn = hashParams.get('expires_in');
+        const tokenType = hashParams.get('token_type');
 
         if (accessToken && refreshToken && expiresIn && tokenType) {
           setLoading(true); // Ensure loading is true while handling redirect
           console.log('🚀 AuthProvider: Detected URL parameters for session, setting session...');
-          const { data: { session }, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+          
+          try {
+            console.log('Setting session with tokens...');
+            const { data: { session }, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
 
-          if (error) {
-            console.error('❌ AuthProvider: Error setting session from URL params:', error);
-            // If setting session fails, clear the URL hash to prevent infinite loops
+            if (error) {
+              console.error('❌ AuthProvider: Error setting session from URL params:', error);
+              setAuthError(`Failed to set session: ${error.message}`);
+              // If setting session fails, clear the URL hash to prevent infinite loops
+              setLoading(false);
+              window.location.hash = '';
+              return false;
+            }
+
+            if (session) {
+              console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
+              console.log('Session object:', JSON.stringify(session, null, 2));
+              
+              // Set user state before clearing hash
+              setUser(session.user);
+              
+              // Clear the URL hash to clean up the URL
+              const cleanUrl = window.location.pathname + window.location.search;
+              window.history.replaceState(null, '', cleanUrl);
+              
+              // Immediately fetch user profile after setting session
+              await fetchUserProfile(session.user);
+              return true; // Return true to indicate redirect was handled
+            }
+          } catch (sessionError) {
+            console.error('❌ AuthProvider: Exception setting session:', sessionError);
+            setAuthError(`Exception setting session: ${sessionError instanceof Error ? sessionError.message : String(sessionError)}`);
             setLoading(false);
-            window.location.hash = '';
-            return;
-          }
-
-          if (session) {
-            console.log('✅ AuthProvider: Session successfully set from URL params. User ID:', session.user.id);
-            // Clear the URL hash to clean up the URL
-            setUser(session.user);
-            window.location.hash = '';
-            
-            // Immediately fetch user profile after setting session
-            await fetchUserProfile(session.user);
-            return true; // Return true to indicate redirect was handled
+            return false;
           }
         }
+        
+        // Also check for error in hash params
+        const errorDescription = hashParams.get('error_description');
+        if (errorDescription) {
+          console.error('❌ AuthProvider: OAuth error in URL:', errorDescription);
+          setAuthError(`Authentication error: ${errorDescription}`);
+          setLoading(false);
+          
+          // Clear the error from URL
+          const cleanUrl = window.location.pathname + window.location.search;
+          window.history.replaceState(null, '', cleanUrl);
+          return true; // We handled the redirect (even though it was an error)
+        }
+        
         return false; // Return false to indicate no redirect was handled
       } catch (error) {
         console.error('❌ AuthProvider: Error in handleAuthRedirect:', error);
+        setAuthError(`Error handling redirect: ${error instanceof Error ? error.message : String(error)}`);
         if (currentMounted) setLoading(false);
         return false;
       }
@@ -73,21 +115,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initializeAuth = async () => {
       try {
         console.log('🔄 Initializing auth... Checking for existing session');
-        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // Get current session
+        const { data, error } = await supabase.auth.getSession();
+        const session = data?.session;
 
         if (error) {
           console.error('❌ Error getting session:', error);
+          setAuthError(`Error getting session: ${error.message}`);
           if (currentMounted && loading) {
             setLoading(false);
           }
           return;
         }
 
+        console.log('Session from getSession():', session ? 'Found' : 'Not found');
+        if (session) {
+          console.log('Session user ID:', session.user.id);
+        }
+
         if (currentMounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
+          const sessionUser = session?.user ?? null;
+          setUser(sessionUser);
+          
+          if (sessionUser) {
             console.log('✅ Session found for user:', session.user.id);
-            await fetchUserProfile(session.user);
+            try {
+              await fetchUserProfile(sessionUser);
+            } catch (profileError) {
+              console.error('❌ Error fetching user profile:', profileError);
+              setAuthError(`Error fetching profile: ${profileError instanceof Error ? profileError.message : String(profileError)}`);
+              setLoading(false);
+            }
           } else {
             console.log('ℹ️ No session found');
             if (loading) setLoading(false);
@@ -95,6 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error('❌ Error initializing auth:', error);
+        setAuthError(`Error initializing auth: ${error instanceof Error ? error.message : String(error)}`);
         if (currentMounted) {
           setLoading(false);
         }
@@ -103,11 +163,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // First check for auth redirect parameters, then initialize auth
     (async () => {
-      const redirectHandled = await handleAuthRedirect();
-      
-      // Only initialize auth if no redirect was handled
-      if (!redirectHandled) {
-        await initializeAuth();
+      try {
+        const redirectHandled = await handleAuthRedirect();
+        console.log('Redirect handled:', redirectHandled);
+        
+        // Only initialize auth if no redirect was handled
+        if (!redirectHandled) {
+          await initializeAuth();
+        }
+      } catch (error) {
+        console.error('❌ Fatal error in auth initialization:', error);
+        setAuthError(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+        setLoading(false);
       }
     })();
 
@@ -116,7 +183,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!currentMounted) return;
 
       console.log('🔄 AuthProvider: Auth state changed event:', event);
-      console.log('🔄 AuthProvider: Session object from onAuthStateChange:', JSON.stringify(session, null, 2));
+      console.log('🔄 AuthProvider: Session object from onAuthStateChange:', session ? 'Found' : 'Not found');
+      if (session) {
+        console.log('Session user ID:', session.user.id);
+      }
       console.log('🔄 AuthProvider: User ID from onAuthStateChange:', session?.user?.id, 'Signing out:', signingOut);
       
       if (signingOut && event !== 'SIGNED_OUT') {
@@ -822,6 +892,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     userProfile,
     developerProfile,
+    authError,
     loading,
     needsOnboarding,
     signIn,
@@ -847,7 +918,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

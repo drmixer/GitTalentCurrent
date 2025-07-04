@@ -58,7 +58,8 @@ export interface GitHubLanguages {
 export interface AuthContextType {
   user: SupabaseUser | null;
   userProfile: User | null;
-  developerProfile: Developer | null; 
+  developerProfile: Developer | null;
+  authError: string | null;
   loading: boolean;
   needsOnboarding: boolean; 
   signIn: (email: string, password: string) => Promise<void>;

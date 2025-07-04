@@ -2,10 +2,10 @@ import React, { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { DeveloperOnboarding } from '../components/Onboarding/DeveloperOnboarding';
-import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut } from 'lucide-react';
+import { Loader, AlertCircle, RefreshCw, Code, Building, Shield, LogOut, XCircle } from 'lucide-react';
 
 export const Dashboard = () => {
-  const { user, userProfile, developerProfile, needsOnboarding, loading, refreshProfile, signOut } = useAuth();
+  const { user, userProfile, developerProfile, needsOnboarding, loading, authError, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
 
   console.log('🔍 Dashboard state:', {
@@ -26,6 +26,36 @@ export const Dashboard = () => {
       refreshProfile();
     }
   }, [user, userProfile, loading, refreshProfile]);
+
+  // If there's an auth error, show it
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md mx-auto text-center px-4">
+          <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <XCircle className="w-8 h-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-black text-gray-900 mb-4">Authentication Error</h1>
+            <p className="text-gray-600 mb-6">
+              {authError}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  window.location.href = '/login';
+                }}
+                className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Return to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state while auth is being determined
   if (loading) {
