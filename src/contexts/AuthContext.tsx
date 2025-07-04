@@ -814,7 +814,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signInWithGitHubApp,
     signOut,
     createDeveloperProfile,
-    updateDeveloperProfile,
+    
+  }
+}updateDeveloperProfile,
     createJobRole,
     updateJobRole,
     createAssignment,
