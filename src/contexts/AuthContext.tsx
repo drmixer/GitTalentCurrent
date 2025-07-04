@@ -429,6 +429,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
+      let githubInstallationId: string | null = null;
+      if (authUser.user_metadata?.installation_id) {
+        githubInstallationId = String(authUser.user_metadata.installation_id);
+      } else if (authUser.user_metadata?.app_installation_id) {
+        githubInstallationId = String(authUser.user_metadata.app_installation_id);
+      }
+      else if (authUser.user_metadata?.github?.installation_id) {
+        githubInstallationId = String(authUser.user_metadata.github.installation_id);
+      }
+      else if (typeof authUser.user_metadata?.raw_user_meta_data === 'string') {
+        try {
+          const rawMetaData = JSON.parse(authUser.user_metadata.raw_user_meta_data);
+          if (rawMetaData.installation_id) {
+            githubInstallationId = String(rawMetaData.installation_id);
+          } else if (rawMetaData.app_installation_id) {
+            githubInstallationId = String(rawMetaData.app_installation_id);
+          }
+        } catch (parseError) {
+          console.warn('⚠️ createUserProfileFromAuth: Could not parse raw_user_meta_data for installation_id during creation:', parseError);
+        }
+      }
+
       const { error: insertUserError } = await supabase
         .from('users')
         .insert({
