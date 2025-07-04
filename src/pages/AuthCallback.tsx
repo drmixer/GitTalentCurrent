@@ -46,50 +46,53 @@ export const AuthCallback: React.FC = () => {
           }
           
           // Just authentication without app installation
-          if (user) {
-            setStatus('success');
-            setMessage('Authentication successful!');
+          // Wait for user to be available
+          setTimeout(async () => {
+            await refreshProfile();
             
-            setTimeout(() => {
-              navigate('/dashboard', { replace: true });
-            }, 1500);
+            if (user) {
+              // For GitHub users, always redirect to GitHub setup
+              if (user.app_metadata?.provider === 'github') {
                 setStatus('redirect');
                 setMessage('Redirecting to GitHub setup...');
-                navigate('/github-setup', { replace: true });
-            // Wait a bit longer for auth to complete
-            setTimeout(async () => {
-              await refreshProfile();
-              if (user) {
+                setTimeout(() => {
+                  navigate('/github-setup', { replace: true });
+                }, 1000);
+              } else {
                 setStatus('success');
                 setMessage('Authentication successful!');
                 setTimeout(() => {
-                  // Check if user needs to connect GitHub App
+                  navigate('/dashboard', { replace: true });
+                }, 1500);
+              }
+            } else {
+              // Wait a bit longer for auth to complete
+              setTimeout(async () => {
+                await refreshProfile();
+                if (user) {
                   if (user.app_metadata?.provider === 'github') {
+                    setStatus('redirect');
+                    setMessage('Redirecting to GitHub setup...');
                     navigate('/github-setup', { replace: true });
                   } else {
+                    setStatus('success');
+                    setMessage('Authentication successful!');
                     navigate('/dashboard', { replace: true });
                   }
-                }, 1500);
-              } else {
-                setStatus('error');
-                setMessage('Authentication failed. Please try again.');
-              }
-            }, 3000);
-          }
+                } else {
+                  setStatus('error');
+                  setMessage('Authentication failed. Please try again.');
+                }
+              }, 3000);
+            }
+          }, 2000);
         } else {
           // No code parameter, something went wrong
           setStatus('error');
           setMessage('Invalid authentication callback. Missing parameters.');
         }
       } catch (error) {
-                  // Check if user needs to connect GitHub App
-                  if (user.app_metadata?.provider === 'github') {
-                    setStatus('redirect');
-                    setMessage('Redirecting to GitHub setup...');
-                    navigate('/github-setup', { replace: true });
-                  } else {
-                    navigate('/dashboard', { replace: true });
-                  }
+        console.error('Error in auth callback:', error);
         setStatus('error');
         setMessage(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }

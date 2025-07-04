@@ -17,14 +17,14 @@ export const GitHubAppSetup = () => {
     const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
     
-    console.log('GitHubAppSetup: Redirecting to GitHub App installation');
+    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
     
     // Short delay to ensure UI updates before redirect
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
-    }, 500);
+    }, 1000);
   }, []);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
@@ -42,25 +42,25 @@ export const GitHubAppSetup = () => {
     setMessage(errorMessage);
   }, []);
 
-  const handleInfo = useCallback((infoMessage: string) => {
-    console.log('GitHubAppSetup: Info -', infoMessage);
-    setUiState('info');
-    setMessage(infoMessage);
-  }, []);
-
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => {
     console.log(`GitHubAppSetup: Saving installation ID ${id} for user ${currentUserId}`);
-    const { error: updateError } = await supabase
-      .from('developers')
-      .update({ github_installation_id: id })
-      .eq('user_id', currentUserId);
+    try {
+      const { error: updateError } = await supabase
+        .from('developers')
+        .update({ github_installation_id: id })
+        .eq('user_id', currentUserId);
 
-    if (updateError) {
-      throw new Error(`Failed to save GitHub installation ID: ${updateError.message}`);
+      if (updateError) {
+        throw new Error(`Failed to save GitHub installation ID: ${updateError.message}`);
+      }
+      console.log('GitHubAppSetup: GitHub installation ID saved successfully in DB.');
+      // After saving, refresh profile to get the latest state including the new installation ID
+      await refreshProfile(); 
+      return true;
+    } catch (error) {
+      console.error('Error saving installation ID:', error);
+      throw error;
     }
-    console.log('GitHubAppSetup: GitHub installation ID saved successfully in DB.');
-    // After saving, refresh profile to get the latest state including the new installation ID
-    await refreshProfile(); 
   }, [refreshProfile]);
 
   useEffect(() => {
@@ -134,7 +134,10 @@ export const GitHubAppSetup = () => {
         handleSuccess('GitHub App is already connected.', 1000);
       } else {
         console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
-        redirectToGitHubAppInstall();
+        // Redirect to GitHub App installation after a short delay
+        setTimeout(() => {
+          redirectToGitHubAppInstall();
+        }, 1000);
       }
       return;
     }
@@ -150,8 +153,7 @@ export const GitHubAppSetup = () => {
     navigate, 
     refreshProfile, 
     handleSuccess, 
-    handleError, 
-    handleInfo,
+    handleError,
     saveInstallationId,
     redirectToGitHubAppInstall
   ]);
