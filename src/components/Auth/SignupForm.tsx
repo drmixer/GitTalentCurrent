@@ -391,7 +391,7 @@ export const SignupForm = () => {
                       )}
                     </button>
                   </div>
-                </div> 
+                </>
               )}
             </div>
 
