@@ -48,6 +48,14 @@ export const GitHubAppSetup = () => {
     await refreshProfile(); 
   }, [refreshProfile]);
 
+  // Function to redirect to GitHub App installation
+  const redirectToGitHubAppInstall = useCallback(() => {
+    const GITHUB_APP_SLUG = 'gittalentapp'; // Your GitHub App slug
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
+    
+    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
+    window.location.href = githubAppInstallUrl;
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -66,7 +74,6 @@ export const GitHubAppSetup = () => {
     }
 
     // If auth is still loading and there's no OAuth code to process, wait.
-    // If there is an oauthCode, AuthProvider will handle it and update 'user' and 'authLoading'.
     if (authLoading && !oauthCode) {
       console.log('GitHubAppSetup: Auth context loading, waiting...');
       setUiState('loading');
@@ -81,7 +88,6 @@ export const GitHubAppSetup = () => {
       setUiState('loading');
       setMessage('Finalizing authentication...');
       // AuthProvider will eventually set the user or trigger an error.
-      // The useEffect will re-run when 'user' or 'authLoading' changes.
       return;
     }
     
@@ -93,7 +99,6 @@ export const GitHubAppSetup = () => {
     }
 
     // At this point, if there was an oauthCode, AuthProvider should have processed it and `user` should be available.
-    // Or, the user was already logged in.
 
     // Scenario 1: Combined OAuth + App Install OR App Install/Reconfigure for an existing user
     if (user && installationId) {
@@ -131,10 +136,9 @@ export const GitHubAppSetup = () => {
         console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
         handleSuccess('GitHub account re-authenticated. App is already connected.', 1000);
       } else {
-        console.log('GitHubAppSetup: Authentication successful. GitHub App not yet installed.');
-        handleInfo(
-          "Authentication successful! To complete setup, please install the GitTalent GitHub App. You can usually do this from your dashboard or profile settings."
-        );
+        console.log('GitHubAppSetup: Authentication successful. Redirecting to GitHub App installation...');
+        // Instead of showing info message, automatically redirect to GitHub App installation
+        redirectToGitHubAppInstall();
       }
       return;
     }
@@ -145,7 +149,8 @@ export const GitHubAppSetup = () => {
       if (developerProfile?.github_installation_id) {
         handleSuccess('GitHub App is connected.', 1000);
       } else {
-        handleInfo("Connect your GitHub App from the dashboard to see your activity.");
+        console.log('GitHubAppSetup: No installation ID found. Redirecting to GitHub App installation...');
+        redirectToGitHubAppInstall();
       }
       return;
     }
@@ -163,7 +168,8 @@ export const GitHubAppSetup = () => {
     handleSuccess, 
     handleError, 
     handleInfo,
-    saveInstallationId
+    saveInstallationId,
+    redirectToGitHubAppInstall
   ]);
 
   return (
