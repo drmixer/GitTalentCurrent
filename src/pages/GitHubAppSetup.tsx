@@ -122,11 +122,9 @@ export const GitHubAppSetup = () => {
       console.error('GitHubAppSetup Error saving installation ID and completing setup:', err);
       setMessage(err.message || 'Failed to save GitHub installation ID and complete setup');
       setIsError(true);
-    } finally {
       setLoading(false);
     }
   };
-
 
   const completeSetup = async () => {
     try {
@@ -147,7 +145,6 @@ export const GitHubAppSetup = () => {
       console.error('GitHubAppSetup Error completing GitHub App setup:', err);
       setMessage(err.message || 'Failed to complete GitHub App setup');
       setIsError(true);
-    } finally {
       setLoading(false);
     }
   };
