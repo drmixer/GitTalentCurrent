@@ -186,42 +186,40 @@ export const GitHubAppSetup = () => {
         </div>
 
         <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
-          {loading ? 'Connecting GitHub...' :
-            success ? 'GitHub Connected!' : 'GitHub Connection'}
+          {uiState === 'loading' && 'Connecting GitHub...'}
+          {uiState === 'success' && 'GitHub Connected!'}
+          {uiState === 'error' && 'Connection Error'}
+          {uiState === 'info' && 'GitHub Connection'}
         </h1>
 
-        {loading && (
+        {uiState === 'loading' && (
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-gray-600">
-              Connecting your GitHub account to GitTalent...
-            </p>
+            <p className="text-gray-600">{message}</p>
             <p className="text-sm text-gray-500 mt-2">
               This will allow us to showcase your repositories and contributions.
             </p>
           </div>
         )}
 
-        {success && (
+        {uiState === 'success' && (
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-gray-600 mb-4">
-              Your GitHub account has been successfully connected to GitTalent! 
-            </p>
+            <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
               Redirecting you to your dashboard...
             </p>
           </div>
         )}
 
-        {message && (
+        {(uiState === 'error' || uiState === 'info') && (
           <div className="text-center">
-            {isError ? (
+            {uiState === 'error' ? (
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
             ) : (
               <CheckCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" aria-hidden="true" />
             )}
-            <p className={`${isError ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
+            <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             <button
               onClick={() => navigate('/developer?tab=github-activity')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
