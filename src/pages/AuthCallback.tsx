@@ -43,8 +43,7 @@ export const AuthCallback: React.FC = () => {
       const stateParam = params.get('state');
       const errorParam = params.get('error');
     
-      console.log('AuthCallback: URL params:', { code, installationId, setupAction, stateParam, errorParam });
-      console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
+      console.log('AuthCallback: URL params:', { code, installationId, stateParam, errorParam });
       // Handle errors first
       if (errorParam) {
         setStatus('error');
@@ -229,13 +228,6 @@ export const AuthCallback: React.FC = () => {
       if (authLoading) {
         setStatus('loading');
         setMessage(`Verifying authentication... (Attempt ${retryCount + 1})`);
-        
-        // Set a timeout to retry
-        if (retryCount < 5) {
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, 1000);
-        }
         
         // Set a timeout to retry
         if (retryCount < 5) {
