@@ -37,12 +37,6 @@ export const SignupForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // For developers, only GitHub signup is allowed
-    if (formData.role === 'developer') {
-      handleGitHubSignUp();
-      return;
-    }
-    
     setError('');
     setSuccess('');
     setLoading(true);
@@ -61,6 +55,12 @@ export const SignupForm = () => {
       if (formData.role === 'recruiter' && !formData.company_name.trim()) {
         throw new Error('Company name is required for recruiters');
       }
+      
+      // For developers, only GitHub signup is allowed
+      if (formData.role === 'developer') {
+        handleGitHubSignUp();
+        return;
+      }
 
       const userData = {
         name: formData.name.trim(),
@@ -69,7 +69,7 @@ export const SignupForm = () => {
         company_name: formData.role === 'recruiter' ? formData.company_name.trim() : undefined,
       };
 
-      await signUp(formData.email.trim(), formData.password, userData);
+      await signUp(formData.email.trim(), formData.password, userData as any);
       
       if (formData.role === 'recruiter') {
         setSuccess('Your account has been created and is pending admin approval.');

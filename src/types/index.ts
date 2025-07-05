@@ -62,10 +62,10 @@ export interface AuthContextType {
   authError: string | null;
   loading: boolean;
   needsOnboarding?: boolean; 
-  signIn: (email: string, password: string) => Promise<void>;
-  signInWithGitHub: () => Promise<void>;
-  signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<any>;
+  signInWithGitHub: (stateParams?: Record<string, any>) => Promise<any>;
+  signUp: (email: string, password: string, userData: Partial<User>) => Promise<any>;
+  signOut: () => Promise<any>;
   refreshProfile?: () => Promise<void>;
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
