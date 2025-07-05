@@ -7,24 +7,29 @@ import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-reac
 // GitHub App slug - must match exactly what's configured in GitHub
 const GITHUB_APP_SLUG = 'GitTalentApp';
 
+interface StateData {
+  name?: string;
+  role?: string;
+  installation_id?: string;
+  redirect_uri?: string;
+  [key: string]: any;
+}
+
 export const AuthCallback: React.FC = () => {
   const { user, userProfile, developerProfile, loading: authLoading, authError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('waiting');
   const [message, setMessage] = useState('Processing authentication...');
-  const [waitTime, setWaitTime] = useState(0);
-  const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds 
   const [processingInstallation, setProcessingInstallation] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Function to redirect to GitHub App installation 
   const redirectToGitHubAppInstall = useCallback(() => {
-    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const stateParam = JSON.stringify({
       redirect_uri: `${window.location.origin}/github-setup`,
       installation_id: 'pending'
     });
+    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(stateParam)}&redirect_uri=${returnUrl}`;
     
     console.log('AuthCallback: Redirecting to GitHub App installation:', githubAppInstallUrl);
@@ -37,237 +42,193 @@ export const AuthCallback: React.FC = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => { 
-    // Variable to store timeout ID
-    let timeoutId: number | undefined;
-
-    setStatus('loading');
-    
-    try {
-      const params = new URLSearchParams(location.search);
-      const code = params.get('code');
-      const installationId = params.get('installation_id');
-      const stateParam = params.get('state');
-      const errorParam = params.get('error');
-    
-      console.log('AuthCallback: URL params:', { code, installationId, stateParam, errorParam });
+      // Variable to store timeout ID
+      let timeoutId: number | undefined;
       
-      // Handle errors first
-      if (errorParam) {
-        setStatus('error');
-        setMessage(`Authentication error: ${params.get('error_description') || errorParam}`);
-        return;
-      }
-
-      // GitHub App installation flow
-      if (installationId) {
-        // Only process installation if we have a user and haven't processed it yet
-        if (user?.id && !processingInstallation && developerProfile) {
-          setProcessingInstallation(true);
-          setStatus('loading'); 
-          setMessage('GitHub App installation detected, saving installation ID...');
-          
-          try {
-            // Save the installation ID directly here
-            const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
-              body: {
-                userId: user.id,
-                installationId: installationId
-              }
-            });
-              
-            if (updateError) {
-              console.error('Error saving installation ID:', updateError);
-              setStatus('error');
-              setMessage(`Failed to save GitHub installation: ${updateError.message}`);
-              return;
-            }
-            
-            console.log('Successfully saved installation ID:', installationId, data);
-            
-            // Refresh the profile to get the updated installation ID 
-            if (!refreshProfile) {
-              console.error('refreshProfile function is not available');
-              setStatus('error');
-              setMessage('Failed to refresh profile. Please try again.');
-              return;
-            }
-            await refreshProfile?.();
-            
-            // Clear the installation_id from URL to prevent reprocessing
-            const cleanUrl = new URL(window.location.href);
-            cleanUrl.searchParams.delete('installation_id');
-            cleanUrl.searchParams.delete('setup_action');
-            window.history.replaceState({}, '', cleanUrl.toString());
-            
-            setStatus('success'); 
-            setMessage('GitHub App successfully connected! Redirecting to dashboard...');
-            
-            // Redirect to GitHub activity tab after a short delay
-            timeoutId = window.setTimeout(() => {
-              navigate('/developer?tab=github-activity', { replace: true });
-            }, 2000);
-            return;
-          } catch (error) {
-            console.error('Error processing GitHub installation:', error); 
-            setStatus('error');
-            setMessage(`Error connecting GitHub App: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return;
-          }
-        } else if (!user) {
-          // If we don't have a user yet but have installation_id, wait for auth to complete
-          console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
-          setStatus('loading');
-          setMessage('Waiting for authentication to complete before processing GitHub installation...'); 
+      try {
+        setStatus('loading');
+        
+        const params = new URLSearchParams(location.search);
+        const code = params.get('code');
+        const installationId = params.get('installation_id');
+        const stateParam = params.get('state');
+        const errorParam = params.get('error');
+      
+        console.log('AuthCallback: URL params:', { code, installationId, stateParam, errorParam });
+        
+        // Handle errors first
+        if (errorParam) {
+          setStatus('error');
+          setMessage(`Authentication error: ${params.get('error_description') || errorParam}`);
           return;
         }
-      }
 
-      // If we have a user but no specific flow detected, proceed to dashboard or onboarding
-      if (user) {
-        console.log('AuthCallback: User authenticated:', user.id);
-        console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded', 'Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
-        
-        // If we have a stateParam, try to parse it for additional data
+        // Parse state parameter if present
+        let stateData: StateData = {};
         if (stateParam) {
           try {
-            const stateData = JSON.parse(decodeURIComponent(stateParam));
+            stateData = JSON.parse(decodeURIComponent(stateParam));
             console.log('AuthCallback: Parsed state data:', stateData);
             
             // Store relevant data in localStorage if available
             if (stateData.name) localStorage.setItem('gittalent_signup_name', stateData.name);
             if (stateData.role) localStorage.setItem('gittalent_signup_role', stateData.role);
-            if (stateData.installation_id) console.log('Found installation_id in state:', stateData.installation_id);
           } catch (parseError) {
             console.error('AuthCallback: Error parsing state parameter:', parseError);
           }
         }
-        
-        // If we have a user but no profile, try to refresh the profile
-        if (!userProfile && refreshProfile) {
-          console.log('AuthCallback: Refreshing profile...');
-          await refreshProfile();
-        }
-      
-        // If we also have a profile, we can navigate to the dashboard
-        if (userProfile) {
-          console.log('AuthCallback: User and profile loaded, preparing to redirect');
-          console.log('AuthCallback: User profile loaded:', userProfile.id);
-          setStatus('success');
-          setMessage('Authentication successful! Redirecting to dashboard...');
 
-          // For developers, check if GitHub App is connected
-          if (userProfile.role === 'developer') {
-            // Check if GitHub App is connected
-            if (developerProfile && !developerProfile.github_installation_id) {
-              console.log('AuthCallback: Developer needs to connect GitHub App');
+        // GitHub App installation flow
+        if (installationId) {
+          // Only process installation if we have a user and haven't processed it yet
+          if (user?.id && !processingInstallation && developerProfile) {
+            setProcessingInstallation(true);
+            setStatus('loading'); 
+            setMessage('GitHub App installation detected, saving installation ID...');
+            
+            try {
+              // Save the installation ID directly here
+              const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
+                body: {
+                  userId: user.id,
+                  installationId: installationId
+                }
+              });
+                
+              if (updateError) {
+                console.error('Error saving installation ID:', updateError);
+                setStatus('error');
+                setMessage(`Failed to save GitHub installation: ${updateError.message}`);
+                return;
+              }
+              
+              console.log('Successfully saved installation ID:', installationId, data);
+              
+              // Refresh the profile to get the updated installation ID 
+              if (!refreshProfile) {
+                console.error('refreshProfile function is not available');
+                setStatus('error');
+                setMessage('Failed to refresh profile. Please try again.');
+                return;
+              }
+              await refreshProfile?.();
+              
+              // Clear the installation_id from URL to prevent reprocessing
+              const cleanUrl = new URL(window.location.href);
+              cleanUrl.searchParams.delete('installation_id');
+              cleanUrl.searchParams.delete('setup_action');
+              window.history.replaceState({}, '', cleanUrl.toString());
+              
+              setStatus('success'); 
+              setMessage('GitHub App successfully connected! Redirecting to dashboard...');
+              
+              // Redirect to GitHub activity tab after a short delay
               timeoutId = window.setTimeout(() => {
-                redirectToGitHubAppInstall();
-              }, 1500);
+                navigate('/developer?tab=github-activity', { replace: true });
+              }, 2000);
+              return;
+            } catch (error) {
+              console.error('Error processing GitHub installation:', error); 
+              setStatus('error');
+              setMessage(`Error connecting GitHub App: ${error instanceof Error ? error.message : 'Unknown error'}`);
               return;
             }
+          } else if (!user) {
+            // If we don't have a user yet but have installation_id, wait for auth to complete
+            console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
+            setStatus('loading');
+            setMessage('Waiting for authentication to complete before processing GitHub installation...'); 
+            return;
           }
+        }
 
-          // Otherwise, redirect to appropriate dashboard based on role
-          timeoutId = window.setTimeout(() => {
+        // If we have a user but no specific flow detected, proceed to dashboard or onboarding
+        if (user) {
+          console.log('AuthCallback: User authenticated:', user.id);
+          console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded', 'Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
+          
+          // If we have a user but no profile, try to refresh the profile
+          if (!userProfile && refreshProfile) {
+            console.log('AuthCallback: Refreshing profile...');
+            await refreshProfile();
+          }
+        
+          // If we also have a profile, we can navigate to the dashboard
+          if (userProfile) {
+            console.log('AuthCallback: User and profile loaded, preparing to redirect');
+            console.log('AuthCallback: User profile loaded:', userProfile.id);
+            setStatus('success');
+            setMessage('Authentication successful! Redirecting to dashboard...');
+
+            // For developers, check if GitHub App is connected
             if (userProfile.role === 'developer') {
-              navigate('/developer', { replace: true });
-            } else if (userProfile.role === 'recruiter') {
-              if (userProfile.is_approved) {
-                navigate('/recruiter', { replace: true });
+              // Check if GitHub App is connected
+              if (developerProfile && !developerProfile.github_installation_id) {
+                console.log('AuthCallback: Developer needs to connect GitHub App');
+                timeoutId = window.setTimeout(() => {
+                  redirectToGitHubAppInstall();
+                }, 1500);
+                return;
+              }
+            }
+
+            // Otherwise, redirect to appropriate dashboard based on role
+            timeoutId = window.setTimeout(() => {
+              if (userProfile.role === 'developer') {
+                navigate('/developer', { replace: true });
+              } else if (userProfile.role === 'recruiter') {
+                if (userProfile.is_approved) {
+                  navigate('/recruiter', { replace: true });
+                } else {
+                  navigate('/dashboard', { replace: true });
+                }
+              } else if (userProfile.role === 'admin') {
+                navigate('/admin', { replace: true });
               } else {
                 navigate('/dashboard', { replace: true });
               }
-            } else if (userProfile.role === 'admin') {
-              navigate('/admin', { replace: true });
-            } else {
+            }, 1500);
+            return;
+          } else {
+            // If we have a user but still no profile after refresh, go to dashboard
+            // The dashboard will handle redirecting to onboarding if needed
+            console.log('AuthCallback: User authenticated but no profile loaded, redirecting to dashboard');
+            setStatus('success');
+            setMessage('Authentication successful! Redirecting to dashboard...');
+            timeoutId = window.setTimeout(() => {
               navigate('/dashboard', { replace: true });
-            }
-          }, 1500);
+            }, 1500);
+            return;
+          }
+        }
+        
+        // If we don't have a user yet, keep waiting
+        if (authLoading) {
+          setStatus('loading');
+          setMessage('Verifying authentication...');
           return;
         }
         
-        // If we have a user but no profile, wait a bit longer and try to refresh
-        if (waitTime < maxWaitTime) {
-          setWaitTime(prev => prev + 1000);
-          if (refreshProfile) {
-            await refreshProfile();
-          }
-          timeoutId = window.setTimeout(() => {
-            setStatus('loading');
-            setMessage(`Loading your profile... (${Math.round(waitTime/1000) + 1}s)`);
-          }, 1000);
+        // If auth is not loading and we still don't have a user, there was an error
+        if (!user && !authLoading) {
+          setStatus('error');
+          setMessage('Authentication failed. Please try again.');
           return;
         }
-
-        // If we've waited too long, just go to dashboard
-        setStatus('success'); 
-        setMessage('Authentication successful! Redirecting to dashboard...');
-        timeoutId = window.setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1000);
-        return;
+      } catch (error) {
+        console.error('Error in AuthCallback useEffect:', error); 
+        setStatus('error'); 
+        setMessage(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error in AuthCallback useEffect:', error); 
-      setStatus('error'); 
-      setMessage(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    
-    // Cleanup function to clear any timeouts
-    return () => {
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
+      
+      // Cleanup function to clear any timeouts
+      return () => {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      };
     };
     
     handleAuthCallback(); 
-  }, [user, userProfile, authLoading, navigate, location.search, waitTime, processingInstallation, refreshProfile]);
-
-  // Add a separate effect to handle the case where we have a user but no installation_id in URL
-  useEffect(() => {
-    let timeoutId: number;
-
-    try {
-      if (user && userProfile?.role === 'developer' && developerProfile && !processingInstallation) {
-        // If developer has no GitHub installation ID, suggest connecting
-        if (!developerProfile.github_installation_id && developerProfile.github_handle) {
-          console.log('Developer has GitHub handle but no installation ID, suggesting connection');
-          setStatus('info');
-          setMessage('Your GitHub account is connected, but you need to install the GitHub App to see your contributions.');
-        }
-      }
-      
-      // If auth is still loading, wait 
-      if (authLoading) {
-        setStatus('loading');
-        setMessage(`Verifying authentication... (Attempt ${retryCount + 1})`);
-        
-        // Set a timeout to retry
-        if (retryCount < 5) {
-          timeoutId = setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, 1000);
-        }
-        return;
-      }
-      
-      // If we don't have a user and auth is not loading, redirect to login
-      if (!user && !authLoading) {
-        setStatus('error');
-        setMessage('Authentication failed. Please try again.');
-        console.error('AuthCallback: No user and auth not loading - authentication failed');
-        return;
-      }
-    } catch (error) {
-      console.error('Error in AuthCallback useEffect:', error); 
-      setStatus('error');
-      setMessage('An unexpected error occurred during authentication.');
-    }
-    
-    // Cleanup function to clear any timeouts
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [user, userProfile, developerProfile, processingInstallation]);
+  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, processingInstallation, refreshProfile, redirectToGitHubAppInstall]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
@@ -289,17 +250,17 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">{message}</p>
-            {waitTime > 3000 && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-500">This is taking longer than expected... ({Math.round(waitTime/1000)}s)</p>
-                <button
-                  onClick={() => navigate('/dashboard', { replace: true })}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  Go to Dashboard
-                </button>
-              </div>
-            )}
+            <div className="mt-4">
+              <p className="text-sm text-gray-500">
+                {authLoading ? 'Verifying your authentication...' : 'Loading your profile...'}
+              </p>
+              <button
+                onClick={() => navigate('/dashboard', { replace: true })}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Go to Dashboard
+              </button>
+            </div>
           </div>
         )}
 
@@ -309,15 +270,7 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
               Please wait while we redirect you...
-            </p> 
-            <div className="mt-4">
-              <button 
-                onClick={() => window.location.reload()} 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Refresh Page
-              </button>
-            </div>
+            </p>
           </div>
         )}
 
@@ -327,10 +280,7 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
               Redirecting you to your dashboard in a moment...
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              If you're not redirected automatically, click the button below.
-            </p>
+            </p> 
             <button
               onClick={() => navigate('/dashboard', { replace: true })}
               className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"

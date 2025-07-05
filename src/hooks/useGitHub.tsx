@@ -92,11 +92,9 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const refreshGitHubDataInternal = useCallback(async (handle: string) => {
     if (!handle) {
       console.log('refreshGitHubDataInternal - No GitHub handle provided');
-      setTimeout(() => {
-        setLoading(false);
-        setError(new Error('No GitHub handle provided'));
-        setFetchInProgress(false);
-      }, 500);
+      setLoading(false);
+      setError(new Error('No GitHub handle provided'));
+      setFetchInProgress(false);
       return;
     }
 
@@ -108,7 +106,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     // Check if we already have data for this handle
     const hasExistingData = lastFetchedHandle === handle && 
                           gitHubData.user && 
-                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase();
+                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase() && gitHubData.contributions.length > 0;
     
     // Only prevent re-fetch if we have data and the installation ID is present
     if (hasExistingData && developerProfile?.github_installation_id) {
@@ -123,7 +121,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       console.log('refreshGitHubDataInternal - Fetching data for:', handle);
-      console.log('refreshGitHubDataInternal - Current developerProfile state:', JSON.stringify(developerProfile, null, 2));
+      console.log('refreshGitHubDataInternal - GitHub installation ID:', developerProfile?.github_installation_id || 'not available');
 
       const installationId = developerProfile?.github_installation_id;
       console.log('Using GitHub installation ID:', installationId || 'not available');
@@ -131,7 +129,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       // If we don't have an installation ID and this isn't the initial data load, we should prompt for installation
       if (!installationId && hasExistingData) {
         console.log('No GitHub installation ID but we have data - user needs to install the GitHub App');
-        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
+        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real contributions.'));
         setLoading(false);
         setFetchInProgress(false);
         return;
@@ -140,7 +138,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
 
-      console.log('Calling GitHub proxy at:', apiUrl);
+      console.log('Calling GitHub proxy at:', apiUrl, 'with handle:', handle);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -148,7 +146,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({
+        body: JSON.stringify({ 
+          // Send the GitHub username and installation ID to the proxy
+          // The proxy will use the installation ID to authenticate with GitHub
+          // if available, or fall back to public access
           handle,
           installationId // Pass the installation ID to the proxy
         })
@@ -175,7 +176,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json();
 
       console.log('refreshGitHubDataInternal - GitHub data fetched successfully:', {
-        user: data.user?.login,
+        user: data.user?.login || 'No user data',
         reposCount: data.repos?.length || 0,
         languagesCount: Object.keys(data.languages || {}).length,
         totalStars: data.totalStars || 0,
@@ -231,14 +232,14 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   // Trigger refresh when handle OR installation ID changes, with a delay
   useEffect(() => {
-    if (developerProfile?.github_handle) {
+    if (developerProfile?.github_handle && !authLoading) {
       console.log('useGitHub - GitHub handle changed in profile:', developerProfile.github_handle);
       console.log('useGitHub - Installation ID:', developerProfile.github_installation_id || 'not available');
       
       // Add a small delay to ensure developerProfile is fully updated in AuthContext
       const timer = setTimeout(() => { 
         refreshGitHubData(developerProfile.github_handle);
-      }, 300);
+      }, 500);
 
       return () => clearTimeout(timer); // Cleanup timer if component unmounts or deps change
     } else if (!authLoading && !developerProfile?.github_handle) {
@@ -253,7 +254,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       
       setLoading(false);
       setError(new Error('No GitHub handle provided in your profile. Please add it.'));
-    }
+    } 
   }, [developerProfile?.github_handle, developerProfile?.github_installation_id, authLoading, refreshGitHubData]);
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {

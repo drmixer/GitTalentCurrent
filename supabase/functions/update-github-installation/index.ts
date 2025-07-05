@@ -20,33 +20,29 @@ Deno.serve(async (req: Request) => {
     // Get the request body
     const { userId, installationId } = await req.json();
     
-    if (!userId || !installationId) {
-      return new Response(
-        JSON.stringify({ error: "userId and installationId are required" }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
+    // Validate required parameters
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "userId is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
+    }
+    
+    if (!installationId) {
+      return new Response(JSON.stringify({ error: "installationId is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
     }
 
     console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
     
     // Validate the installation ID
-    if (!installationId || installationId === 'pending') {
-      return new Response(
-        JSON.stringify({ error: "Invalid installation ID" }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
+    if (installationId === 'pending') {
+      return new Response(JSON.stringify({ error: "Invalid installation ID: 'pending' is not a valid ID" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
     }
 
     // Create a Supabase client with the Auth context of the user that called the function
@@ -133,7 +129,7 @@ Deno.serve(async (req: Request) => {
       if (!userData) {
         console.error('User not found:', userId);
         return new Response( 
-          JSON.stringify({ error: "User not found" }),
+          JSON.stringify({ error: `User not found with ID: ${userId}` }),
           {
             status: 404,
             headers: {
@@ -189,7 +185,7 @@ Deno.serve(async (req: Request) => {
     console.error('Error in update-github-installation function:', error);
     
     return new Response( 
-      JSON.stringify({ error: error.message || "An unexpected error occurred" }),
+      JSON.stringify({ error: error.message || "An unexpected error occurred during installation update" }),
       {
         status: 500,
         headers: {
