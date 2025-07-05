@@ -62,10 +62,10 @@ export interface AuthContextType {
   authError: string | null;
   loading: boolean;
   needsOnboarding?: boolean; 
-  signIn: (email: string, password: string) => Promise<any>;
-  signInWithGitHub: (stateParams?: Record<string, any>) => Promise<any>;
-  signUp: (email: string, password: string, userData: Partial<User>) => Promise<any>;
-  signOut: () => Promise<any>;
+  signIn: (email: string, password: string) => Promise<{ user: SupabaseUser | null, error: any | null }>;
+  signInWithGitHub: (stateParams?: Record<string, any>) => Promise<{ error: any | null }>;
+  signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ data?: any, error: any | null }>;
+  signOut: () => Promise<{ error: any | null }>;
   refreshProfile?: () => Promise<void>;
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 

@@ -49,10 +49,7 @@ export const LoginForm = () => {
     setGithubLoading(true);
 
     try {
-      const { error } = await signInWithGitHub();
-      if (error) {
-        throw error;
-      }
+      await signInWithGitHub();
       // Navigation will happen via redirect URL
     } catch (error: any) {
       console.error('GitHub login error:', error);

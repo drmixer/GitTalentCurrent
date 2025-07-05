@@ -58,9 +58,11 @@ export const GitHubAppSetup = () => {
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => { 
     try {
       const { error: updateError } = await supabase 
-        .rpc('update_github_installation_id', {
-          p_user_id: currentUserId,
-          p_installation_id: id
+        .functions.invoke('update-github-installation', {
+          body: { 
+            userId: currentUserId,
+            installationId: id
+          }
         });
 
       if (updateError) {
@@ -111,7 +113,7 @@ export const GitHubAppSetup = () => {
       // If auth is still loading, wait.
       if (authLoading) {
         console.log('GitHubAppSetup: Auth context loading, waiting...');
-
+        
         if (retryCount > maxRetries) {
           setUiState('error');
           setMessage('Authentication is taking too long. Please try again.');
@@ -141,7 +143,7 @@ export const GitHubAppSetup = () => {
       // Scenario 1: App Install/Reconfigure for an existing user
       if (user && installationId && installationId !== 'pending') {
         setUiState('loading'); 
-        setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
+        setMessage(`Connecting GitHub App...`);
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
   
         try {

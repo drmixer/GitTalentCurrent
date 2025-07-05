@@ -99,6 +99,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
+      console.log('🔄 fetchUserProfile: Auth user metadata:', 
+        authUser.user_metadata ? 'Present' : 'Missing');
       setAuthError(null);
       
       const { data: profile, error } = await supabase
@@ -352,8 +354,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error('❌ createUserProfileFromAuth: Error creating user profile from auth:', error);
       setAuthError('Failed to create user profile. Please try again.');
-      };
-  }
+      return false;
+    }
+  };
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
