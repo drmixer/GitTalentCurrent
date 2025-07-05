@@ -34,6 +34,20 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
+    
+    // Validate the installation ID
+    if (!installationId || installationId === 'pending') {
+      return new Response(
+        JSON.stringify({ error: "Invalid installation ID" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
+          },
+        }
+      );
+    }
 
     // Create a Supabase client with the Auth context of the user that called the function
     const supabaseClient = createClient(
@@ -47,7 +61,7 @@ Deno.serve(async (req: Request) => {
     );
 
     // First, check if the developer profile exists
-    const { data: developerData, error: developerError } = await supabaseClient
+    const { data: developerData, error: developerError } = await supabaseClient 
       .from('developers')
       .select('user_id')
       .eq('user_id', userId)
@@ -55,7 +69,7 @@ Deno.serve(async (req: Request) => {
 
     if (developerError) {
       console.error('Error checking developer profile:', developerError);
-      return new Response(
+      return new Response( 
         JSON.stringify({ error: `Error checking developer profile: ${developerError.message}` }),
         {
           status: 500,
@@ -70,6 +84,7 @@ Deno.serve(async (req: Request) => {
     let result;
     
     if (developerData) {
+      console.log('Developer profile found, updating installation ID');
       // Update the existing developer profile
       const { data, error } = await supabaseClient
         .from('developers')
@@ -79,7 +94,7 @@ Deno.serve(async (req: Request) => {
 
       if (error) {
         console.error('Error updating developer profile:', error);
-        return new Response(
+        return new Response( 
           JSON.stringify({ error: `Error updating developer profile: ${error.message}` }),
           {
             status: 500,
@@ -89,10 +104,11 @@ Deno.serve(async (req: Request) => {
             },
           }
         );
-      }
+      } 
       
       result = { updated: true, data };
     } else {
+      console.log('Developer profile not found, checking if user exists');
       // Check if user exists
       const { data: userData, error: userError } = await supabaseClient
         .from('users')
@@ -102,7 +118,7 @@ Deno.serve(async (req: Request) => {
 
       if (userError) {
         console.error('Error checking user:', userError);
-        return new Response(
+        return new Response( 
           JSON.stringify({ error: `Error checking user: ${userError.message}` }),
           {
             status: 500,
@@ -115,7 +131,8 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!userData) {
-        return new Response(
+        console.error('User not found:', userId);
+        return new Response( 
           JSON.stringify({ error: "User not found" }),
           {
             status: 404,
@@ -126,7 +143,8 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-
+      
+      console.log('User found, creating new developer profile with installation ID');
       // Create a new developer profile
       const { data, error } = await supabaseClient
         .from('developers')
@@ -141,7 +159,7 @@ Deno.serve(async (req: Request) => {
 
       if (error) {
         console.error('Error creating developer profile:', error);
-        return new Response(
+        return new Response( 
           JSON.stringify({ error: `Error creating developer profile: ${error.message}` }),
           {
             status: 500,
@@ -170,7 +188,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in update-github-installation function:', error);
     
-    return new Response(
+    return new Response( 
       JSON.stringify({ error: error.message || "An unexpected error occurred" }),
       {
         status: 500,
