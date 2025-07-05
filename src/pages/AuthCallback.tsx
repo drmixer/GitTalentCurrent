@@ -11,11 +11,12 @@ export const AuthCallback: React.FC = () => {
   const { user, userProfile, developerProfile, loading: authLoading, authError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('loading');
   const [message, setMessage] = useState('Processing authentication...');
   const [waitTime, setWaitTime] = useState(0);
   const [maxWaitTime] = useState(10000); // Maximum wait time in milliseconds 
   const [processingInstallation, setProcessingInstallation] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Function to redirect to GitHub App installation 
   const redirectToGitHubAppInstall = useCallback(() => {
@@ -41,9 +42,10 @@ export const AuthCallback: React.FC = () => {
       const installationId = params.get('installation_id');
       const setupAction = params.get('setup_action');
       const state = params.get('state');
+      const code = params.get('code');
       const error = params.get('error');
     
-      console.log('AuthCallback: URL params:', { code, installationId, setupAction, state, error });
+      console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
     
       // Handle errors first
       if (error) {
@@ -55,18 +57,19 @@ export const AuthCallback: React.FC = () => {
       // GitHub App installation flow
       if (installationId) {
         // Only process installation if we have a user and haven't processed it yet
-        if (user && !processingInstallation) {
+        if (user?.id && !processingInstallation) {
           setProcessingInstallation(true);
           setStatus('loading'); 
           setMessage('GitHub App installation detected, saving installation ID...');
           
           try {
             // Save the installation ID directly here
-            const { error: updateError } = await supabase
-              .rpc('update_github_installation_id', {
-                p_user_id: user.id, 
-                p_installation_id: installationId
-              });
+            const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
+              body: { 
+                userId: user.id,
+                installationId: installationId
+              }
+            });
               
             if (updateError) {
               console.error('Error saving installation ID:', updateError);
@@ -75,7 +78,7 @@ export const AuthCallback: React.FC = () => {
               return;
             }
             
-            console.log('Successfully saved installation ID:', installationId);
+            console.log('Successfully saved installation ID:', installationId, data);
             
             // Refresh the profile to get the updated installation ID 
             if (!refreshProfile) {
@@ -95,7 +98,7 @@ export const AuthCallback: React.FC = () => {
             // Redirect to GitHub activity tab after a short delay
             setTimeout(() => {
               navigate('/developer?tab=github-activity', { replace: true });
-            }, 1500);
+            }, 2000);
             return;
           } catch (error) {
             console.error('Error processing GitHub installation:', error); 
@@ -115,6 +118,12 @@ export const AuthCallback: React.FC = () => {
       if (user) {
         console.log('AuthCallback: User authenticated:', user.id);
         console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded'); 
+        
+        // If we have a user but no profile, try to refresh the profile
+        if (!userProfile && refreshProfile) {
+          console.log('AuthCallback: Refreshing profile...');
+          await refreshProfile();
+        }
       
         // If we also have a profile, we can navigate to the dashboard
         if (userProfile) {
@@ -125,7 +134,7 @@ export const AuthCallback: React.FC = () => {
           // For developers, check if GitHub App is connected
           if (userProfile.role === 'developer') {
             // Check if GitHub App is connected
-            if (!developerProfile?.github_installation_id) { 
+            if (developerProfile && !developerProfile.github_installation_id) { 
               console.log('AuthCallback: Developer needs to connect GitHub App');
               timeoutId = window.setTimeout(() => {
                 redirectToGitHubAppInstall();
@@ -155,7 +164,10 @@ export const AuthCallback: React.FC = () => {
         
         // If we have a user but no profile, wait a bit longer
         if (waitTime < maxWaitTime) {
-          setWaitTime(prev => prev + 1000); 
+          setWaitTime(prev => prev + 1000);
+          if (refreshProfile) {
+            await refreshProfile();
+          }
           timeoutId = window.setTimeout(() => {
             setStatus('loading');
             setMessage(`Loading your profile... (${Math.round(waitTime/1000)}s)`);
@@ -203,7 +215,21 @@ export const AuthCallback: React.FC = () => {
       // If auth is still loading, wait 
       if (authLoading) {
         setStatus('loading');
-        setMessage('Verifying authentication...');
+        setMessage(`Verifying authentication... (Attempt ${retryCount + 1})`);
+        
+        // Set a timeout to retry
+        if (retryCount < 5) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 1000);
+        }
+        
+        // Set a timeout to retry
+        if (retryCount < 5) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 1000);
+        }
         return;
       }
       
@@ -247,7 +273,7 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600">{message}</p>
             {waitTime > 3000 && (
               <div className="mt-4">
-                <p className="text-sm text-gray-500">This is taking longer than expected...</p>
+                <p className="text-sm text-gray-500">This is taking longer than expected... ({Math.round(waitTime/1000)}s)</p>
                 <button
                   onClick={() => navigate('/dashboard', { replace: true })}
                   className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
