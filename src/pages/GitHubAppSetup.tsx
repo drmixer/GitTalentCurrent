@@ -74,7 +74,7 @@ export const GitHubAppSetup = () => {
       const installationId = searchParams.get('installation_id');
       const setupAction = searchParams.get('setup_action');
       const code = searchParams.get('code');
-      const errorParam = searchParams.get('error') || '';
+      const errorParam = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
       const state = searchParams.get('state');
   
