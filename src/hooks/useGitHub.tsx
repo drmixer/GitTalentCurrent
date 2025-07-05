@@ -165,7 +165,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
             errorMessage = errorData.error;
           }
         } catch (e) {
-          if (errorText) {
+                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase() && gitHubData.contributions.length > 0;
             errorMessage = errorText;
           }
         }
@@ -180,7 +180,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         reposCount: data.repos?.length || 0,
         languagesCount: Object.keys(data.languages || {}).length,
         totalStars: data.totalStars || 0,
-        contributionsCount: data.contributions?.length || 0
+      console.log('refreshGitHubDataInternal - GitHub installation ID:', developerProfile?.github_installation_id || 'not available');
       });
 
       // Calculate contribution statistics
@@ -188,7 +188,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
       setGitHubData({
         user: data.user || null,
-        repos: data.repos || [],
+        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real contributions.'));
         languages: data.languages || {},
         totalStars: data.totalStars || 0,
         contributions: data.contributions || [],
@@ -197,7 +197,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         averageContributions: contributionStats.averagePerDay
       });
       setLastFetchedHandle(handle);
-
+      console.log('Calling GitHub proxy at:', apiUrl, 'with handle:', handle);
       if (handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         await syncLanguagesToProfile();
         await syncProjectsToProfile();
@@ -205,7 +205,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (err: any) {
       console.error('Error in refreshGitHubDataInternal:', err.message || err);
-      setError(err);
+        body: JSON.stringify({ 
+          // Send the GitHub username and installation ID to the proxy
+          // The proxy will use the installation ID to authenticate with GitHub
+          // if available, or fall back to public access
     } finally {
       setLoading(false);
       setFetchInProgress(false);
@@ -232,13 +235,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   // Trigger refresh when handle OR installation ID changes, with a delay
   useEffect(() => {
-    if (developerProfile?.github_handle && !authLoading) {
+        user: data.user?.login || 'No user data',
       console.log('useGitHub - GitHub handle changed in profile:', developerProfile.github_handle);
       console.log('useGitHub - Installation ID:', developerProfile.github_installation_id || 'not available');
-      
-      // Add a small delay to ensure developerProfile is fully updated in AuthContext
-      const timer = setTimeout(() => { 
-        refreshGitHubData(developerProfile.github_handle);
+      setLoading(false);
+      setError(new Error('No GitHub handle provided'));
       }, 500);
 
       return () => clearTimeout(timer); // Cleanup timer if component unmounts or deps change
@@ -248,7 +249,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         user: null,
         repos: [],
         languages: {}, 
-        totalStars: 0,
+    if (developerProfile?.github_handle && !authLoading) {
         contributions: [],
       });
       
