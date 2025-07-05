@@ -77,11 +77,13 @@ export const GitHubAppSetup = () => {
       
       // After saving, refresh profile to get the latest state including the new installation ID
       if (refreshProfile) {
+        await refreshProfile();
       }
       return true;
     } catch (error) {
       console.error('Error saving installation ID:', error instanceof Error ? error.message : error);
       throw error;
+    }
   }, [refreshProfile]);
 
   useEffect(() => {
