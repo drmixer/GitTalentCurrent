@@ -42,6 +42,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       async (event, session) => {
         console.log('🔄 AuthProvider: Auth state changed:', event, session ? 'Session exists' : 'No session');
         
+        // Check for GitHub installation_id in URL state parameter
+        try {
+          const url = new URL(window.location.href);
+          const stateParam = url.searchParams.get('state');
+          
+          if (stateParam && session?.user) {
+            try {
+              const stateObj = JSON.parse(stateParam);
+              if (stateObj.installation_id) {
+                console.log('🔄 AuthProvider: Found installation_id in state param:', stateObj.installation_id);
+                
+                // Only inject if not already present
+                if (!session.user.user_metadata?.app_installation_id) {
+                  console.log('🔄 AuthProvider: Injecting installation_id into user metadata');
+                  // We can't directly modify user metadata, but we'll use it in our profile update
+                }
+              }
+            } catch (e) {
+              console.log('🔄 AuthProvider: Error parsing state param:', e);
+            }
+          }
+        } catch (e) {
+          console.log('🔄 AuthProvider: Error processing URL params:', e);
+        }
+        
         setSession(session);
         const newUser = session?.user ?? null;
         setUser(newUser);
@@ -136,6 +161,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         githubInstallationId = String(authUser.user_metadata.app_installation_id);
         console.log('🔄 handleGitHubSignIn: Found GitHub installation ID in metadata:', githubInstallationId);
       }
+      let githubInstallationId: string | null = null;
+      if (authUser.user_metadata?.app_installation_id) {
+        githubInstallationId = String(authUser.user_metadata.app_installation_id);
+        console.log('🔄 handleGitHubSignIn: Found GitHub installation ID in metadata:', githubInstallationId);
+      }
 
       // Try to get role from localStorage (set during signup)
       const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || 'developer';
@@ -151,6 +181,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userName, 
           avatarUrl, 
           authUser.user_metadata, 
+          githubInstallationId
           githubInstallationId
         );
         
@@ -194,6 +225,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         desired_salary: 0,
         profile_pic_url: avatarUrl,
         github_installation_id: installationId
+        github_installation_id: installationId
       };
 
       const userProfileData = {
@@ -206,6 +238,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         experience_years: 0,
         desired_salary: 0,
         profile_pic_url: avatarUrl,
+        github_installation_id: installationId
         github_installation_id: installationId
       };
 
