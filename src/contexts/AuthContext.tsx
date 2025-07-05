@@ -150,10 +150,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 handleGitHubSignIn: GitHub user metadata:', 
         JSON.stringify(authUser.user_metadata || {}, null, 2),
         authUser.user_metadata ? 'Present' : 'Missing');
-      
-      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
-      const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
-      const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
       // Check if we have an installation_id in the user metadata
       let githubInstallationId: string | null = null;
@@ -161,11 +157,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         githubInstallationId = String(authUser.user_metadata.app_installation_id);
         console.log('🔄 handleGitHubSignIn: Found GitHub installation ID in metadata:', githubInstallationId);
       }
-      let githubInstallationId: string | null = null;
-      if (authUser.user_metadata?.app_installation_id) {
-        githubInstallationId = String(authUser.user_metadata.app_installation_id);
-        console.log('🔄 handleGitHubSignIn: Found GitHub installation ID in metadata:', githubInstallationId);
-      }
+      
+      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
+      const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
+      const avatarUrl = authUser.user_metadata?.avatar_url || '';
 
       // Try to get role from localStorage (set during signup)
       const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || 'developer';
@@ -181,7 +176,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userName, 
           avatarUrl, 
           authUser.user_metadata, 
-          githubInstallationId
           githubInstallationId
         );
         
@@ -225,7 +219,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         desired_salary: 0,
         profile_pic_url: avatarUrl,
         github_installation_id: installationId
-        github_installation_id: installationId
       };
 
       const userProfileData = {
@@ -238,7 +231,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         experience_years: 0,
         desired_salary: 0,
         profile_pic_url: avatarUrl,
-        github_installation_id: installationId
         github_installation_id: installationId
       };
 
