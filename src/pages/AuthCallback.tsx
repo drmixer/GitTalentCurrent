@@ -44,7 +44,7 @@ export const AuthCallback: React.FC = () => {
       const error = params.get('error');
     
       console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
-    
+      console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
       // Handle errors first
       if (error) {
         setStatus('error');
