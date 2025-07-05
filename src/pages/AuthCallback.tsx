@@ -33,22 +33,22 @@ export const AuthCallback: React.FC = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => { 
-    // Clear any previous timeouts
-    let timeoutId: number;
+    // Variable to store timeout ID
+    let timeoutId: number | undefined;
     
     try {
       const params = new URLSearchParams(location.search);
       const code = params.get('code');
       const installationId = params.get('installation_id');
-      const setupAction = params.get('setup_action');
-      const error = params.get('error');
+      const stateParam = params.get('state');
+      const errorParam = params.get('error');
     
-      console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
+      console.log('AuthCallback: URL params:', { code, installationId, setupAction, stateParam, errorParam });
       console.log('AuthCallback: URL params:', { installationId, setupAction, state, code, error });
       // Handle errors first
-      if (error) {
+      if (errorParam) {
         setStatus('error');
-        setMessage(`Authentication error: ${params.get('error_description') || error}`);
+        setMessage(`Authentication error: ${params.get('error_description') || errorParam}`);
         return;
       }
 
@@ -115,7 +115,22 @@ export const AuthCallback: React.FC = () => {
       // If we have a user but no specific flow detected, proceed to dashboard or onboarding
       if (user) {
         console.log('AuthCallback: User authenticated:', user.id);
-        console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded'); 
+        console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
+        
+        // If we have a stateParam, try to parse it for additional data
+        if (stateParam) {
+          try {
+            const stateData = JSON.parse(decodeURIComponent(stateParam));
+            console.log('AuthCallback: Parsed state data:', stateData);
+            
+            // Store relevant data in localStorage if available
+            if (stateData.name) localStorage.setItem('gittalent_signup_name', stateData.name);
+            if (stateData.role) localStorage.setItem('gittalent_signup_role', stateData.role);
+            if (stateData.installation_id) console.log('Found installation_id in state:', stateData.installation_id);
+          } catch (parseError) {
+            console.error('AuthCallback: Error parsing state parameter:', parseError);
+          }
+        }
         
         // If we have a user but no profile, try to refresh the profile
         if (!userProfile && refreshProfile) {
@@ -132,7 +147,7 @@ export const AuthCallback: React.FC = () => {
           // For developers, check if GitHub App is connected
           if (userProfile.role === 'developer') {
             // Check if GitHub App is connected
-            if (developerProfile && !developerProfile.github_installation_id) { 
+            if (!developerProfile?.github_installation_id) {
               console.log('AuthCallback: Developer needs to connect GitHub App');
               timeoutId = window.setTimeout(() => {
                 redirectToGitHubAppInstall();
@@ -189,7 +204,7 @@ export const AuthCallback: React.FC = () => {
     
     // Cleanup function to clear any timeouts
     return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
     };
     
@@ -201,7 +216,7 @@ export const AuthCallback: React.FC = () => {
     let timeoutId: number;
     
     try {
-    if (user && userProfile?.role === 'developer' && developerProfile && !processingInstallation) { 
+    if (user && userProfile?.role === 'developer' && developerProfile && !processingInstallation) {
       // If developer has no GitHub installation ID, suggest connecting
       if (!developerProfile.github_installation_id && developerProfile.github_handle) {
         console.log('Developer has GitHub handle but no installation ID, suggesting connection');
