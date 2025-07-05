@@ -211,11 +211,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: GitHub username:', githubUsername, 'Installation ID:', installationId || 'none');
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: User name:', userName, 'Avatar URL:', avatarUrl ? 'Present' : 'None');
 
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileError } = await supabase
         .from('developers')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+
+      if (profileError) {
+        console.error('❌ createOrUpdateGitHubDeveloperProfile: Error checking for existing profile:', profileError);
+        return false;
+      }
 
       console.log('🔄 createOrUpdateGitHubDeveloperProfile: Existing profile check result:', existingProfile ? 'Found' : 'Not found');
 
