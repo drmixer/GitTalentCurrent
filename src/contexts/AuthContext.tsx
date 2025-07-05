@@ -413,7 +413,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signInWithGitHub = async () => {
+  const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     console.log('🔄 signInWithGitHub: Signing in with GitHub...');
     
     // Store any signup data from localStorage in the state parameter
@@ -422,7 +422,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const stateParam = JSON.stringify({
       name,
-      role
+      role,
+      ...stateParams
     });
     
     const { error } = await supabase.auth.signInWithOAuth({
