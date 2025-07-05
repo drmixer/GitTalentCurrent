@@ -352,7 +352,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error('❌ createUserProfileFromAuth: Error creating user profile from auth:', error);
       setAuthError('Failed to create user profile. Please try again.');
-  };
+      };
+  }
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {
     try {
