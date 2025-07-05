@@ -17,6 +17,19 @@ export const GitHubAppSetup = () => {
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'GitTalentApp'; // Your GitHub App slug
+    const searchParams = new URLSearchParams(location.search);
+    const stateParam = searchParams.get('state');
+    
+    let stateObj = {};
+    if (stateParam) {
+      try {
+        stateObj = JSON.parse(decodeURIComponent(stateParam));
+        console.log('GitHubAppSetup: Parsed state:', stateObj);
+      } catch (e) {
+        console.error('GitHubAppSetup: Error parsing state:', e);
+      }
+    }
+    
     const state = JSON.stringify({
       installation_id: 'pending',
       stateParam,
@@ -33,7 +46,7 @@ export const GitHubAppSetup = () => {
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
-  }, []);
+  }, [location.search]);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
     console.log('GitHubAppSetup: Success - ', successMessage);
@@ -65,17 +78,7 @@ export const GitHubAppSetup = () => {
       // After saving, refresh profile to get the latest state including the new installation ID
       if (refreshProfile) {
         await refreshProfile();
-    const stateParam = searchParams.get('state');
-    
-    let stateObj = {};
-    if (stateParam) {
-      try {
-        stateObj = JSON.parse(decodeURIComponent(stateParam));
-        console.log('GitHubAppSetup: Parsed state:', stateObj);
-      } catch (e) {
-        console.error('GitHubAppSetup: Error parsing state:', e);
       }
-    }
       return true;
     } catch (error) {
       console.error('Error saving installation ID:', error instanceof Error ? error.message : error);
