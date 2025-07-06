@@ -381,19 +381,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let userProfileData: User | null = null;
       let profileError: any = null;
 
-      console.log(`🔄 handleGitHubSignIn: About to query 'users' table for user ${authUser.id}.`);
+      console.log(`🔄 handleGitHubSignIn: LOG POINT 1 - About to query 'users' table for user ${authUser.id}.`);
       try {
-        const { data, error: queryError } = await supabase // Renamed error to queryError to avoid conflict
+        console.log(`🔄 handleGitHubSignIn: LOG POINT 2 - Entering inner try for 'users' query for user ${authUser.id}.`);
+        const { data, error: queryError } = await supabase
           .from('users')
           .select('*')
           .eq('id', authUser.id)
           .single();
+        console.log(`🔄 handleGitHubSignIn: LOG POINT 3 - 'await' for 'users' query completed for user ${authUser.id}.`);
         userProfileData = data;
-        profileError = queryError; // Assign queryError to profileError
-        console.log(`🔄 handleGitHubSignIn: 'users' table query completed for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
-      } catch (e: unknown) { // Catch unknown for broader exception type
-        console.error(`❌ handleGitHubSignIn: CRITICAL EXCEPTION during 'users' table query for ${authUser.id}:`, e);
-        // Construct a more standard error object if it's not already one
+        profileError = queryError;
+        console.log(`🔄 handleGitHubSignIn: LOG POINT 4 - 'users' table query assignment done for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
+      } catch (e: unknown) {
+        console.error(`❌ handleGitHubSignIn: LOG POINT 5 - INNER CATCH TRIGGERED for 'users' query for ${authUser.id}:`, e);
         if (e instanceof Error) {
             profileError = e;
         } else {
@@ -401,6 +402,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         userProfileData = null;
       }
+      console.log(`🔄 handleGitHubSignIn: LOG POINT 6 - After inner try/catch for 'users' query for ${authUser.id}. userProfileData:`, userProfileData, `profileError:`, profileError);
 
       // Now, proceed using userProfileData and profileError from the try/catch block above.
 
