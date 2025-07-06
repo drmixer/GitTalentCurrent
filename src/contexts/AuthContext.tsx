@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
     setAuthError(null);
-    setLoading(true);
+    setLoading(true); // Ensure loading is true at the start of this operation
     try {
       console.log('🔄 fetchUserProfile: User metadata:', authUser.user_metadata);
 
@@ -247,65 +247,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to ensure a developer profile exists
   const ensureDeveloperProfile = async (authUser: SupabaseUser) => {
     try {
-      console.log('🔄 ensureDeveloperProfile: Checking/creating developer profile for:', authUser.id);
-      
-      // Check if developer profile exists
+    console.log(`🔄 ensureDeveloperProfile: Attempting for user: ${authUser.id}`);
+    try {
       const { data: existingProfile, error: checkError } = await supabase
         .from('developers')
         .select('*')
         .eq('user_id', authUser.id)
         .maybeSingle();
         
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ ensureDeveloperProfile: Error checking for existing profile:', checkError);
-        return false;
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means 0 rows, which is fine
+        console.error(`❌ ensureDeveloperProfile: Error checking for existing profile for user ${authUser.id}:`, checkError);
+        return false; // Indicate failure
       }
       
       if (existingProfile) {
-        console.log('✅ ensureDeveloperProfile: Developer profile already exists:', existingProfile);
+        console.log(`✅ ensureDeveloperProfile: Developer profile already exists for user ${authUser.id}:`, existingProfile);
+        console.log(`🔄 ensureDeveloperProfile: Calling setDeveloperProfile for user ${authUser.id} with existing dev profile.`);
         setDeveloperProfile(existingProfile);
-        return true;
+        console.log(`🔄 ensureDeveloperProfile: setDeveloperProfile call completed for user ${authUser.id}.`);
+        return true; // Indicate success
       }
       
-      // Extract GitHub data from user metadata
-      const githubUsername = authUser.user_metadata?.user_name || 
-                            authUser.user_metadata?.preferred_username || '';
+      console.log(`🔄 ensureDeveloperProfile: No existing developer profile for user ${authUser.id}. Creating new one.`);
+      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
       const githubInstallationId = authUser.user_metadata?.installation_id || null;
       
-      console.log('🔄 ensureDeveloperProfile: Creating new developer profile with GitHub handle:', githubUsername);
-      
-      // Create new developer profile
-      const { data: newDevProfile, error: createError } = await supabase
+      console.log(`🔄 ensureDeveloperProfile: Creating new developer profile for user ${authUser.id} with GitHub handle: ${githubUsername}`);
+      const { data: newDevProfileData, error: createError } = await supabase
         .from('developers')
         .insert({
-          user_id: authUser.id,
-          github_handle: githubUsername,
-          bio: userBio,
-          location: userLocation,
-          profile_pic_url: avatarUrl,
-          github_installation_id: githubInstallationId,
-          availability: true
+          user_id: authUser.id, github_handle: githubUsername, bio: userBio, location: userLocation,
+          profile_pic_url: avatarUrl, github_installation_id: githubInstallationId, availability: true
         })
-        .select();
+        .select() // Ensure we get the created row back
+        .single(); // Expecting a single row
 
       if (createError) {
-        console.error('❌ ensureDeveloperProfile: Error creating developer profile:', createError);
-        return false;
+        console.error(`❌ ensureDeveloperProfile: Error creating developer profile for user ${authUser.id}:`, createError);
+        return false; // Indicate failure
       }
       
-      console.log('✅ ensureDeveloperProfile: Developer profile created:', newDevProfile);
-      setDeveloperProfile(newDevProfile[0]);
-      return true;
+      if (!newDevProfileData) {
+        console.error(`❌ ensureDeveloperProfile: Developer profile creation seemed to succeed for user ${authUser.id} but no data returned.`);
+        return false; // Indicate failure
+      }
+
+      console.log(`✅ ensureDeveloperProfile: Developer profile created for user ${authUser.id}:`, newDevProfileData);
+      console.log(`🔄 ensureDeveloperProfile: Calling setDeveloperProfile for user ${authUser.id} with new dev profile.`);
+      setDeveloperProfile(newDevProfileData);
+      console.log(`🔄 ensureDeveloperProfile: setDeveloperProfile call completed for user ${authUser.id}.`);
+      return true; // Indicate success
+
     } catch (error) {
-      console.error('❌ ensureDeveloperProfile: Unexpected error:', error);
-      return false;
+      console.error(`❌ ensureDeveloperProfile: Unexpected error for user ${authUser.id}:`, error);
+      return false; // Indicate failure
     }
   };
 
+  // This function seems redundant if ensureDeveloperProfile is robust. Consider removing.
   const createDeveloperProfileFromAuth = async (authUser: SupabaseUser, userProfile: User) => {
+    console.log(`🔄 createDeveloperProfileFromAuth: Evaluating for user: ${authUser.id}. This function may be redundant.`);
+    // For now, let it delegate to ensureDeveloperProfile for safety, though it should ideally be consolidated.
+    return await ensureDeveloperProfile(authUser);
+    /*
     try {
       console.log('🔄 createDeveloperProfileFromAuth: Creating developer profile for:', authUser.id);
       
@@ -357,39 +364,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const fetchDeveloperProfile = async (userId: string) => {
+    console.log(`🔄 fetchDeveloperProfile: Attempting for user: ${userId}`);
     try {
-      console.log('🔄 fetchDeveloperProfile: Fetching developer profile for user:', userId);
-
       const { data: devProfile, error } = await supabase
         .from('developers')
         .select('*')
         .eq('user_id', userId) 
-        .single();
+        .single(); // Expect one row or error
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('❌ fetchDeveloperProfile: Error fetching developer profile:', error.message);
-        setDeveloperProfile(null);
-        return null;
+      if (error) {
+        if (error.code === 'PGRST116') { // Code for "Not Found" - 0 rows
+          console.log(`🤷 fetchDeveloperProfile: No developer profile found for user ${userId}.`);
+          console.log(`🔄 fetchDeveloperProfile: Calling setDeveloperProfile(null) for user ${userId}.`);
+          setDeveloperProfile(null);
+          console.log(`🔄 fetchDeveloperProfile: setDeveloperProfile(null) call completed for user ${userId}.`);
+          return null; // Explicitly return null if not found
+        } else {
+          console.error(`❌ fetchDeveloperProfile: Error fetching developer profile for user ${userId}:`, error.message);
+          console.log(`🔄 fetchDeveloperProfile: Calling setDeveloperProfile(null) due to error for user ${userId}.`);
+          setDeveloperProfile(null);
+          console.log(`🔄 fetchDeveloperProfile: setDeveloperProfile(null) call completed for user ${userId}.`);
+          return null; // Error occurred
+        }
       }
 
-      console.log('✅ fetchDeveloperProfile: Developer profile fetched:', devProfile);
-      setDeveloperProfile(devProfile || null);
+      console.log(`✅ fetchDeveloperProfile: Developer profile fetched for user ${userId}:`, devProfile);
+      console.log(`🔄 fetchDeveloperProfile: Calling setDeveloperProfile for user ${userId}.`);
+      setDeveloperProfile(devProfile); // devProfile should not be null here if no error
+      console.log(`🔄 fetchDeveloperProfile: setDeveloperProfile call completed for user ${userId}.`);
       return devProfile;
-    } catch (error) {
-      console.error('❌ fetchDeveloperProfile: Unexpected error:', error instanceof Error ? error.message : error);
+
+    } catch (error) { // Catch any unexpected errors
+      console.error(`❌ fetchDeveloperProfile: Unexpected error for user ${userId}:`, error instanceof Error ? error.message : error);
+      console.log(`🔄 fetchDeveloperProfile: Calling setDeveloperProfile(null) due to unexpected error for user ${userId}.`);
       setDeveloperProfile(null);
+      console.log(`🔄 fetchDeveloperProfile: setDeveloperProfile(null) call completed for user ${userId}.`);
       return null;
     }
   };
 
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
-    console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
+    console.log(`🔄 handleGitHubSignIn: Processing GitHub sign-in for user: ${authUser.id}`);
     setAuthError(null);
-    // setLoading(true) is typically set by the caller like onAuthStateChange
-    console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
+    // setLoading(true) is set by onAuthStateChange before calling this.
+    console.log(`🔄 handleGitHubSignIn: User metadata for ${authUser.id}:`, authUser.user_metadata);
+
+    // It's good practice to ensure loading is false at the end of this function,
+    // either on success or error. This will be done in a finally block.
+    // We will capture the profile states within the try block for logging in finally.
+    let finalAttemptedUserProfile: User | null = null;
+    let finalAttemptedDeveloperProfile: Developer | null = null;
 
     try {
-      const { data: existingProfile, error: profileError } = await supabase
+      const { data: existingUserProfile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', authUser.id)
