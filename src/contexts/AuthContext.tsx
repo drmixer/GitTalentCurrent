@@ -354,12 +354,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     setAuthError(null);
 
-    const name = localStorage.getItem('gittalent_signup_name');
-    const role = localStorage.getItem('gittalent_signup_role');
+    // Get stored values from localStorage
+    const name = localStorage.getItem('gittalent_signup_name') || '';
+    const role = localStorage.getItem('gittalent_signup_role') || 'developer';
 
     const stateObj = {
       name,
-      role: role || 'developer',
+      role,
       install_after_auth: true,
       ...(stateParams || {})
     };
@@ -371,7 +372,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         provider: 'github',
         options: {
           redirectTo,
-          scopes: 'read:user repo user:email',
+          scopes: 'read:user user:email',
           state: JSON.stringify(stateObj)
         }
       });
@@ -390,6 +391,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const connectGitHubApp = async (): Promise<{ error: any | null; success?: boolean }> => {
     try {
       setAuthError(null);
+      setLoading(true);
 
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
@@ -398,7 +400,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const GITHUB_APP_SLUG = 'GitTalentApp';
 
       const stateParam = encodeURIComponent(
-        JSON.stringify({
+        JSON.stringify({ 
           user_id: user.id,
           from_app: true,
           redirect_uri: `${window.location.origin}/github-setup`
@@ -412,6 +414,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       window.location.href = githubAppUrl;
 
       return { error: null, success: true };
+      
     } catch (error: any) {
       setAuthError('Failed to connect GitHub App. Please try again.');
       return { error };
@@ -640,7 +643,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshProfile = async () => {
     if (!user) return;
 
-    console.log('🔄 refreshProfile: Refreshing profiles for user:', user.id);
+    console.log('🔄 refreshProfile: Refreshing profiles for user:', user.id); 
 
     setLoading(true);
     await fetchUserProfile(user);

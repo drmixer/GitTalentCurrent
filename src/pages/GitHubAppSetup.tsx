@@ -19,7 +19,7 @@ export const GitHubAppSetup = () => {
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'GitTalentApp';
     
-    // Create a comprehensive state object with user ID and redirect info
+    // Create a state object with user ID and redirect info
     const stateObj = {
       redirect_uri: `${window.location.origin}/github-setup`,
       user_id: user?.id,
@@ -29,8 +29,8 @@ export const GitHubAppSetup = () => {
     console.log('GitHubAppSetup: Creating state object for GitHub App installation:', stateObj);
     const state = encodeURIComponent(JSON.stringify(stateObj));
     
-    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${state}&redirect_uri=${returnUrl}`;
+    const redirectUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
+    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${state}&redirect_uri=${redirectUrl}`;
     
     console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
@@ -65,8 +65,8 @@ export const GitHubAppSetup = () => {
       const installationId = searchParams.get('installation_id'); 
       const setupAction = searchParams.get('setup_action');
       const code = searchParams.get('code');
-      const errorParam = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
+      const errorParam = searchParams.get('error'); 
+      const errorDescription = searchParams.get('error_description'); 
       const state = searchParams.get('state');
       
       console.log('GitHubAppSetup: URL parameters:', { 
@@ -128,7 +128,7 @@ export const GitHubAppSetup = () => {
       // Scenario 1: App Install/Reconfigure for an existing user
       if (user && installationId && !processingInstallation) {
         setProcessingInstallation(true);
-        setUiState('loading'); 
+        setUiState('loading');
         console.log('GitHubAppSetup: Found installation_id in URL, processing installation');
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
@@ -137,22 +137,18 @@ export const GitHubAppSetup = () => {
           console.log('GitHubAppSetup: Calling update-github-installation function with:', {
             userId: user.id,
             installationId
-          });
+          }); 
           
           // Call the Edge Function to update the installation ID
-          const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
-            body: JSON.stringify({
-              userId: user.id,
-              installationId: installationId
-            })
-          });
+          const { error: updateError } = await supabase
+            .from('developers')
+            .update({ github_installation_id: installationId })
+            .eq('user_id', user.id);
           
-          console.log('GitHubAppSetup: Edge function response:', data);
-
           if (updateError) {
-            console.error('GitHubAppSetup: Error from update-github-installation:', updateError);
+            console.error('GitHubAppSetup: Error updating installation ID:', updateError);
             setProcessingInstallation(false);
-            handleError(`Failed to save GitHub installation: ${updateError.message}`);
+            handleError(`Failed to save GitHub installation: ${updateError.message || 'Database error'}`);
             return;
           }
           
@@ -197,7 +193,7 @@ export const GitHubAppSetup = () => {
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('GitHubAppSetup: Developer profile:', developerProfile); 
+        console.log('GitHubAppSetup: Developer profile:', developerProfile);
         if (developerProfile) {
           console.log('GitHub handle:', developerProfile.github_handle || 'none');
           console.log('Installation ID:', developerProfile.github_installation_id || 'none');
@@ -228,7 +224,7 @@ export const GitHubAppSetup = () => {
               setRetryCount(prev => prev + 1);
             }, 2000);
           } else {
-            console.log('GitHubAppSetup: No installation ID found. Showing GitHub App connection info...');
+            console.log('GitHubAppSetup: No installation ID found or max retries reached. Showing GitHub App connection info...');
             setUiState('info');
             setMessage('Connect your GitHub account to display your contributions and repositories.');
           }
@@ -237,7 +233,7 @@ export const GitHubAppSetup = () => {
       }
       
       setUiState('loading');
-      console.log('GitHubAppSetup: Default case - setting loading state with "Please wait..." message');
+      console.log('GitHubAppSetup: Default case - waiting for state to resolve');
       setMessage('Please wait...');
     };
 
@@ -313,11 +309,9 @@ export const GitHubAppSetup = () => {
                 <p className="text-sm text-gray-600 mb-6">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                   This is a one-time setup process that securely connects your GitHub account.
-                  {retryCount > 0 && (
-                    <span className="block mt-2 text-xs text-gray-500">
-                      Retry attempt {retryCount} of {maxRetries}
-                    </span>
-                  )}
+                  <span className="block mt-2 text-xs text-gray-500">
+                    {retryCount > 0 ? `Retry attempt ${retryCount} of ${maxRetries}` : 'No GitHub App connection detected'}
+                  </span>
                 </p>
                 <button
                   onClick={redirectToGitHubAppInstall}

@@ -9,7 +9,7 @@ interface GitHubConnectPromptProps {
 export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClose }) => {
   const navigate = useNavigate();
 
-  const handleGoToGitHubActivity = () => {
+  const handleConnectGitHub = () => {
     // Navigate to GitHub setup page instead of direct GitHub App URL
     navigate('/github-setup');
     onClose(); // Close the prompt after navigating
@@ -32,7 +32,7 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
         </p>
         <div className="flex justify-center">
           <button
-            onClick={handleGoToGitHubActivity}
+            onClick={handleConnectGitHub}
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg"
           >
             Connect GitHub App
