@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
-
 // GitHub App slug - must match exactly what's configured in GitHub
 const GITHUB_APP_SLUG = 'GitTalentApp';
 // Maximum number of retries for auth loading
@@ -34,7 +33,8 @@ export const AuthCallback: React.FC = () => {
     const stateObj = {
       user_id: user?.id,
       redirect_uri: `${window.location.origin}/github-setup`,
-      from_auth: true
+      from_auth: true,
+      timestamp: Date.now() // Add timestamp to prevent caching issues
     };
 
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
@@ -51,9 +51,6 @@ export const AuthCallback: React.FC = () => {
       console.log('🚀 AuthCallback: Executing redirect to GitHub App installation');
       window.location.href = githubAppInstallUrl;
     }, 500);
-    
-    // Also set the URL directly in case the timeout doesn't fire
-    window.location.href = githubAppInstallUrl;
   }, [user]);
 
   useEffect(() => {
@@ -65,7 +62,9 @@ export const AuthCallback: React.FC = () => {
         setStatus('loading');
         console.log('AuthCallback: Starting auth callback processing');
         console.log('AuthCallback: Auth loading state:', authLoading);
-        console.log('AuthCallback: User state:', user ? 'User exists' : 'No user');
+        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
+        console.log('AuthCallback: User profile:', userProfile ? `Exists (${userProfile.id})` : 'Not loaded');
+        console.log('AuthCallback: Developer profile:', developerProfile ? `Exists (${developerProfile.user_id})` : 'Not loaded');
         
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
@@ -130,22 +129,19 @@ export const AuthCallback: React.FC = () => {
                 console.error('Error saving installation ID:', updateError);
                 setStatus('error'); 
                 setMessage(`Failed to save GitHub installation: ${updateError.message}`);
+                setProcessingInstallation(false);
                 return;
               }
               
               console.log('Successfully saved installation ID:', installationId, data);
               console.log('AuthCallback: About to refresh profile to get updated installation ID');
 
-              // Reset processing flag after successful installation
-              setProcessingInstallation(false);
-              console.log('AuthCallback: Reset processingInstallation to false after successful save');
-              console.log('AuthCallback: Refreshing profile to get updated installation ID');
-
               // Refresh the profile to get the updated installation ID 
               if (!refreshProfile) {
                 console.error('refreshProfile function is not available');
                 setStatus('error');
                 setMessage('Failed to refresh profile. Please try again.');
+                setProcessingInstallation(false);
                 return;
               }
               await refreshProfile();
@@ -159,6 +155,10 @@ export const AuthCallback: React.FC = () => {
               
               setStatus('success'); 
               setMessage('GitHub App successfully connected! Redirecting to dashboard...');
+
+              // Reset processing flag after successful installation
+              setProcessingInstallation(false);
+              console.log('AuthCallback: Reset processingInstallation to false after successful save');
 
               // Redirect to GitHub activity tab
               console.log('AuthCallback: Redirecting to developer dashboard GitHub activity tab');
@@ -315,7 +315,7 @@ export const AuthCallback: React.FC = () => {
     };
     
     handleAuthCallback();
-  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, processingInstallation, refreshProfile, redirectToGitHubAppInstall]);
+  }, [user, userProfile, developerProfile, authLoading, navigate, location.search, processingInstallation, refreshProfile, redirectToGitHubAppInstall, retryCount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
@@ -339,14 +339,16 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600">{message}</p>
             <div className="mt-4">
               <p className="text-sm text-gray-500">
-                {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount}/${maxRetries})`}
+                {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`}
               </p>
-              <button
-                onClick={() => navigate('/dashboard', { replace: true })}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Go to Dashboard
-              </button>
+              {retryCount >= maxRetries / 2 && (
+                <button
+                  onClick={() => navigate('/dashboard', { replace: true })}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Go to Dashboard
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -373,7 +375,7 @@ export const AuthCallback: React.FC = () => {
             </p>
             <button
               onClick={() => navigate('/dashboard', { replace: true })}
-              className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
             >
               Go to Dashboard
             </button>

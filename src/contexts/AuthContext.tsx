@@ -175,8 +175,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     
-    console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
-    console.log('🔄 handleGitHubSignIn: App metadata:', authUser.app_metadata);
+    console.log('🔄 handleGitHubSignIn: User metadata:', JSON.stringify(authUser.user_metadata));
+    console.log('🔄 handleGitHubSignIn: App metadata:', JSON.stringify(authUser.app_metadata));
     
     // Clear any previous errors
     setAuthError(null);

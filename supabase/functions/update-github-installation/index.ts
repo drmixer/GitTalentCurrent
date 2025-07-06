@@ -18,10 +18,26 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Get the request body
-    const requestData = await req.json();
-    const { userId, installationId } = requestData;
+    const requestBody = await req.text();
+    console.log("Request body:", requestBody);
     
-    console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
+    let userId, installationId;
+    
+    try {
+      const parsedBody = JSON.parse(requestBody);
+      userId = parsedBody.userId;
+      installationId = parsedBody.installationId;
+      console.log("Parsed request:", { userId, installationId });
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        }
+      );
+    }
     
     // Validate userId parameter
     if (!userId) {
@@ -38,6 +54,8 @@ Deno.serve(async (req: Request) => {
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
     }
+    
+    console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
     
     // Validate the installation ID
     if (installationId === 'pending') {
@@ -61,7 +79,7 @@ Deno.serve(async (req: Request) => {
     // First, check if the developer profile exists
     const { data: developerData, error: developerError } = await supabaseClient 
       .from('developers')
-      .select('user_id')
+      .select('user_id, github_handle, github_installation_id')
       .eq('user_id', userId)
       .maybeSingle();
     
@@ -83,6 +101,9 @@ Deno.serve(async (req: Request) => {
     
     if (developerData) {
       console.log('Developer profile found, updating installation ID');
+      console.log('Current installation ID:', developerData.github_installation_id);
+      console.log('New installation ID:', installationId);
+      
       // Update the existing developer profile
       const { data, error } = await supabaseClient
         .from('developers')
@@ -105,12 +126,13 @@ Deno.serve(async (req: Request) => {
       } 
 
       result = { updated: true, data };
+      console.log('Developer profile updated successfully');
     } else {
       console.log('Developer profile not found, checking if user exists');
       // Check if user exists in the users table
       const { data: userData, error: userError } = await supabaseClient
         .from('users')
-        .select('id, role')
+        .select('id, role, name, email')
         .eq('id', userId)
         .maybeSingle();
       
@@ -143,6 +165,8 @@ Deno.serve(async (req: Request) => {
       }
 
       console.log('User found, creating new developer profile with installation ID');
+      console.log('User data:', userData);
+      
       // Create a new developer profile
       const { data, error } = await supabaseClient
         .from('developers')
@@ -170,6 +194,7 @@ Deno.serve(async (req: Request) => {
       }
 
       result = { created: true, data };
+      console.log('New developer profile created successfully');
     }
     
     // Return the result
