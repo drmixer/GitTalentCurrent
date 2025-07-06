@@ -429,7 +429,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     console.log('🔄 signInWithGitHub: Starting GitHub OAuth flow...');
     
-    // Clear any previous errors
+    // Clear any previous errors 
     setAuthError(null);
     
     // Get signup data from localStorage
@@ -453,11 +453,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo,
-          scopes: 'read:user user:email',
-          queryParams: {
-            state: JSON.stringify(stateObj)
-          }
+          redirectTo: redirectTo,
+          scopes: 'read:user repo user:email',
+          state: JSON.stringify(stateObj)
         }
       });
       
