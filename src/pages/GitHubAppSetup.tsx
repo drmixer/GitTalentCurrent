@@ -106,12 +106,14 @@ export const GitHubAppSetup = () => {
           setUiState('loading');
           setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
           
-          // Set a timeout to increment retry count and refresh profile
+          // Set a timeout to increment retry count.
+          // DO NOT call refreshProfile here; AuthContext handles its own loading cycle.
+          // GitHubAppSetup should wait for authLoading to become false.
           const timer = setTimeout(() => {
             setRetryCount(prev => prev + 1); 
-            if (refreshProfile) {
-              refreshProfile();
-            }
+            // if (refreshProfile) { // Removed refreshProfile call
+            //   refreshProfile();
+            // }
           }, 2000);
           return () => clearTimeout(timer);
         }
@@ -126,10 +128,28 @@ export const GitHubAppSetup = () => {
       }
   
       // Scenario 1: App Install/Reconfigure for an existing user
-      if (user && installationId && !processingInstallation) {
-        setProcessingInstallation(true);
+      // This block should now primarily react to developerProfile changes after refreshProfile is called once.
+      if (user && installationId && developerProfile?.github_installation_id === installationId) {
+        // If installationId is in URL AND it matches what's in the developerProfile, consider it done.
+        console.log(`GitHubAppSetup: Installation ID ${installationId} matches profile. Setup complete.`);
+        // Clear URL parameters
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('installation_id');
+        cleanUrl.searchParams.delete('setup_action');
+        cleanUrl.searchParams.delete('state');
+        window.history.replaceState({}, '', cleanUrl.toString());
+
+        if (setupAction === 'install') {
+          handleSuccess('GitHub App successfully installed and connected!');
+        } else {
+          handleSuccess('GitHub App connection updated successfully!');
+        }
+        return;
+
+      } else if (user && installationId && !processingInstallation) {
+        setProcessingInstallation(true); // Indicate processing has started
         setUiState('loading');
-        console.log('GitHubAppSetup: Found installation_id in URL, processing installation');
+        console.log('GitHubAppSetup: Found installation_id in URL, initiating processing with Edge Function');
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
@@ -139,12 +159,8 @@ export const GitHubAppSetup = () => {
             installationId
           });
           
-          // Call the Edge Function to update the installation ID
           const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
-            body: JSON.stringify({
-              userId: user.id,
-              installationId,
-            }),
+            body: JSON.stringify({ userId: user.id, installationId }),
           });
           
           if (updateError) {
@@ -155,17 +171,21 @@ export const GitHubAppSetup = () => {
           }
           
           console.log('GitHubAppSetup: Edge function response:', data);
-          console.log('GitHubAppSetup: Installation ID saved successfully');
+          console.log('GitHubAppSetup: Installation ID update requested via Edge Function.');
           
-          // Refresh the profile to get the updated installation ID
+          // Refresh the profile ONCE to get the updated installation ID
           if (refreshProfile) {
-            console.log('GitHubAppSetup: Refreshing profile to get updated installation ID');
+            console.log('GitHubAppSetup: Calling refreshProfile to get updated installation ID.');
             await refreshProfile();
-            console.log('GitHubAppSetup: Profile refreshed successfully');
-            console.log('GitHubAppSetup: Updated developer profile:', developerProfile);
+            // After this, useEffect will re-run. The condition above
+            // (developerProfile?.github_installation_id === installationId) should eventually be met.
+            console.log('GitHubAppSetup: refreshProfile call completed. Waiting for developerProfile update.');
           }
+          // Do not setProcessingInstallation(false) here immediately, let the effect re-evaluate with new profile
+          // Or, we can rely on the developerProfile change to trigger the success state.
+          // For now, let's allow the effect to re-run and hit the success condition.
           
-          // Clear URL parameters
+          // Clear URL parameters (moved to success block)
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
@@ -218,16 +238,17 @@ export const GitHubAppSetup = () => {
             setUiState('loading'); 
             setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
             
-            // Increment retry count and try to refresh profile
+            // Increment retry count. DO NOT call refreshProfile here.
+            // Wait for AuthContext to settle its loading state.
             setTimeout(() => {
-              if (refreshProfile) {
-                refreshProfile();
-              }
-              console.log(`GitHubAppSetup: Incrementing retry count to ${retryCount + 1}`);
+              // if (refreshProfile) { // Removed refreshProfile call
+              //  refreshProfile();
+              // }
+              console.log(`GitHubAppSetup: Incrementing retry count to ${retryCount + 1} while waiting for developer profile.`);
               setRetryCount(prev => prev + 1);
             }, 2000);
           } else {
-            console.log('GitHubAppSetup: No installation ID found or max retries reached. Showing GitHub App connection info...');
+            console.log('GitHubAppSetup: Developer profile not loaded after retries or no installation ID. Showing GitHub App connection info...');
             setUiState('info');
             setMessage('Connect the GitHub App to display your contributions and repositories.');
           }
