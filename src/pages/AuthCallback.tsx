@@ -22,7 +22,9 @@ export const AuthCallback: React.FC = () => {
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('waiting');
   const [message, setMessage] = useState('Processing authentication...');
+  const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 5;
 
   // Function to redirect to GitHub App installation page
   const redirectToGitHubAppInstall = useCallback(() => {
@@ -100,6 +102,7 @@ export const AuthCallback: React.FC = () => {
           if (user?.id && !processingInstallation) {
             setProcessingInstallation(true);
             setStatus('loading'); 
+            console.log('AuthCallback: Setting processingInstallation to true');
             console.log('AuthCallback: User ID for installation:', user.id);
             setMessage(`GitHub App installation detected (ID: ${installationId}), saving...`);
             console.log('AuthCallback: Processing GitHub App installation with ID:', installationId);
@@ -123,6 +126,10 @@ export const AuthCallback: React.FC = () => {
               
               console.log('Successfully saved installation ID:', installationId, data);
               console.log('AuthCallback: About to refresh profile to get updated installation ID');
+
+              // Reset processing flag after successful installation
+              setProcessingInstallation(false);
+              console.log('AuthCallback: Reset processingInstallation to false after successful save');
 
               // Refresh the profile to get the updated installation ID 
               if (!refreshProfile) {
@@ -151,6 +158,8 @@ export const AuthCallback: React.FC = () => {
               return;
             } catch (error) {
               console.error('Error processing GitHub installation:', error); 
+              setProcessingInstallation(false);
+              console.log('AuthCallback: Reset processingInstallation to false after error');
               setStatus('error');
               setMessage(`Error connecting GitHub App: ${error instanceof Error ? error.message : 'Unknown error'}`);
               return;
@@ -159,6 +168,7 @@ export const AuthCallback: React.FC = () => {
             // If we don't have a user yet but have installation_id, wait for auth to complete
             console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
             console.log('AuthCallback: Auth loading state:', authLoading);
+            console.log('AuthCallback: Will retry later, current retry count:', retryCount);
             setStatus('loading'); 
             setMessage('Waiting for authentication to complete before processing GitHub installation...'); 
             return;
@@ -247,7 +257,7 @@ export const AuthCallback: React.FC = () => {
         // If we don't have a user yet, keep waiting
         if (authLoading) {
           setStatus('loading');
-          console.log(`AuthCallback: Still waiting for auth to complete. Retry ${retryCount}/${maxRetries}`);
+          console.log(`AuthCallback: Still waiting for auth to complete. Retry ${retryCount + 1}/${maxRetries}`);
           console.log('AuthCallback: Auth still loading, waiting... (Retry count:', retryCount, ')');
           setMessage('Verifying authentication...');
           
@@ -270,8 +280,7 @@ export const AuthCallback: React.FC = () => {
         // Increment retry count if we're still waiting
         if (status === 'loading' || status === 'waiting') {
           setTimeout(() => {
-            const nextRetryCount = retryCount + 1;
-            console.log(`AuthCallback: Setting retry timeout. Next retry will be ${nextRetryCount}/${maxRetries}`);
+            console.log(`AuthCallback: Setting retry timeout. Next retry will be ${retryCount + 1}/${maxRetries}`);
             console.log('AuthCallback: Incrementing retry count:', retryCount + 1);
             setRetryCount(prev => prev + 1);
           }, 2000);

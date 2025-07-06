@@ -443,6 +443,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     console.log('🔄 signInWithGitHub: Starting GitHub OAuth flow...');
+    console.log('🔄 signInWithGitHub: Current user:', user?.id || 'Not logged in');
     
     // Clear any previous errors 
     setAuthError(null);
@@ -454,13 +455,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Create a state object with all necessary data for both auth and app installation
     const stateObj = {
       name,
-      role,
+      role: role || 'developer',
       install_after_auth: true, // Flag to indicate we should install the app after auth
       ...(stateParams || {})
     };
+    console.log('🔄 signInWithGitHub: State object being sent:', stateObj);
     
     // Use Supabase OAuth with GitHub
     const redirectTo = `${window.location.origin}/auth/callback`; 
+    console.log('🔄 signInWithGitHub: Redirect URL:', redirectTo);
+    console.log('🔄 signInWithGitHub: Requested scopes: read:user repo user:email');
     
     console.log('🔄 signInWithGitHub: Using Supabase OAuth with state:', stateObj);
     console.log('🔄 signInWithGitHub: Redirect URL:', redirectTo);
@@ -469,7 +473,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: redirectTo,
+          redirectTo,
           scopes: 'read:user repo user:email', // Required scopes for GitHub API access
           state: JSON.stringify(stateObj)
         }
@@ -477,6 +481,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (error) {
         console.error('❌ signInWithGitHub: Error with Supabase OAuth:', error);
+        console.log('❌ signInWithGitHub: Error message:', error.message);
         throw error;
       }
       
@@ -494,6 +499,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       console.log('🔄 connectGitHubApp: Initiating GitHub App connection');
       setAuthError(null);
+      console.log('🔄 connectGitHubApp: Current user:', user?.id || 'Not logged in');
       
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
@@ -505,6 +511,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Create state parameter with user ID and redirect URL 
       const stateParam = encodeURIComponent(JSON.stringify({
         user_id: user.id,
+        from_app: true,
         redirect_uri: `${window.location.origin}/github-setup`
       }));
       
@@ -514,6 +521,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Build the GitHub App installation URL
       const githubAppUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${redirectUrl}`;
       
+      console.log('🔄 connectGitHubApp: State parameter:', stateParam);
+      console.log('🔄 connectGitHubApp: Redirect URL:', redirectUrl);
       console.log('🔄 connectGitHubApp: Final GitHub App installation URL:', githubAppUrl);
       console.log('🔄 connectGitHubApp: Redirecting to GitHub App installation:', githubAppUrl);
       window.location.href = githubAppUrl;
