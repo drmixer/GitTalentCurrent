@@ -175,6 +175,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     
+    console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
+    console.log('🔄 handleGitHubSignIn: App metadata:', authUser.app_metadata);
+    
     // Clear any previous errors
     setAuthError(null);
     
@@ -190,16 +193,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Profile doesn't exist, create it
         console.log('🔄 handleGitHubSignIn: User profile not found, creating one');
         
+        // Check if we have GitHub metadata
+        if (!authUser.user_metadata?.user_name && !authUser.user_metadata?.preferred_username) {
+          console.warn('⚠️ handleGitHubSignIn: Missing GitHub username in user metadata');
+        }
+        
         // Extract data from GitHub metadata
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
         const avatarUrl = authUser.user_metadata?.avatar_url || null;
+        const installationId = authUser.user_metadata?.installation_id || null;
         
         // Try to get role from localStorage (set during signup)
         const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
         const userName = localStorage.getItem('gittalent_signup_name') || fullName;
         
         console.log('🔄 handleGitHubSignIn: Creating profile with name:', userName, 'role:', userRole);
+        console.log('🔄 handleGitHubSignIn: GitHub username:', githubUsername);
+        console.log('🔄 handleGitHubSignIn: Avatar URL:', avatarUrl);
+        console.log('🔄 handleGitHubSignIn: Installation ID:', installationId);
         
         // Create user profile
         const { data: createdProfile, error: createError } = await supabase
@@ -237,6 +249,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               bio: authUser.user_metadata?.bio || '',
               location: authUser.user_metadata?.location || 'Remote',
               profile_pic_url: avatarUrl
+              // Note: installation_id will be set later in the GitHub App setup flow
             });
           
           if (devCreateError) {
@@ -271,7 +284,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
-      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', authUser.user_metadata);
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', JSON.stringify(authUser.user_metadata));
       
       // Extract role with fallbacks
       // Try to get role from localStorage first (set during signup)
@@ -294,6 +307,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const githubHandle = authUser.user_metadata?.user_name || '';
       const githubInstallationId = authUser.user_metadata?.installation_id || null;
+      console.log('🔄 createUserProfileFromAuth: GitHub installation ID from metadata:', githubInstallationId);
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
 
@@ -330,6 +344,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             linked_projects: [],
             profile_pic_url: avatarUrl,
             github_installation_id: githubInstallationId
+            // Note: If installation_id is null here, it will be set later in the GitHub App setup flow
           });
 
         if (devError) {
@@ -445,16 +460,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     // Use Supabase OAuth with GitHub
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    const redirectTo = `${window.location.origin}/auth/callback`; 
     
     console.log('🔄 signInWithGitHub: Using Supabase OAuth with state:', stateObj);
+    console.log('🔄 signInWithGitHub: Redirect URL:', redirectTo);
     
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
           redirectTo: redirectTo,
-          scopes: 'read:user repo user:email',
+          scopes: 'read:user repo user:email', // Required scopes for GitHub API access
           state: JSON.stringify(stateObj)
         }
       });
@@ -463,6 +479,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('❌ signInWithGitHub: Error with Supabase OAuth:', error);
         throw error;
       }
+      
+      console.log('🔄 signInWithGitHub: OAuth redirect initiated successfully');
       
       return { error: null };
     } catch (error: any) {
@@ -475,7 +493,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const connectGitHubApp = async (): Promise<{ error: any | null, success?: boolean }> => {
     try {
       console.log('🔄 connectGitHubApp: Initiating GitHub App connection');
-      setAuthError(null); 
+      setAuthError(null);
       
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
@@ -496,6 +514,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Build the GitHub App installation URL
       const githubAppUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${redirectUrl}`;
       
+      console.log('🔄 connectGitHubApp: Final GitHub App installation URL:', githubAppUrl);
       console.log('🔄 connectGitHubApp: Redirecting to GitHub App installation:', githubAppUrl);
       window.location.href = githubAppUrl;
       
