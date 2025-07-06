@@ -34,12 +34,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('🔄 AuthProvider: Initializing auth state...');
     prevSessionRef.current = null;
 
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => { // Made this async
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('🔄 AuthProvider: Current session from getSession():', currentSession ? 'Found' : 'None');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
-      // Test Supabase client calls here, outside of onAuthStateChange
       if (currentSession?.user) {
         console.log('🔄 AuthProvider: DEBUG_EFFECT - User found in getSession(). Testing Supabase calls.');
         try {
@@ -66,13 +65,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.error('❌ AuthProvider: DEBUG_EFFECT - Test B: CRITICAL EXCEPTION during Supabase query:', e);
         }
       }
-      // End of new test calls
-
       if (!currentSession?.user) {
         setLoading(false);
       }
-      // Note: Original fetchUserProfile call from here was removed in previous steps.
-      // onAuthStateChange is now the sole trigger for profile loading.
     }).catch(error => {
       console.error('❌ AuthProvider: Error in getSession():', error);
       setLoading(false);
@@ -226,6 +221,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await new Promise(resolve => setTimeout(resolve, 50));
       console.log(`✅ handleGitHubSignIn: DEBUG Test 1 - After simple await setTimeout for user ${authUser.id}.`);
 
+      // Introduce a short delay before Supabase calls
+      console.log(`🔄 handleGitHubSignIn: DEBUG - Introducing short delay (20ms) before Supabase calls for user ${authUser.id}.`);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      console.log(`✅ handleGitHubSignIn: DEBUG - Short delay completed for user ${authUser.id}.`);
+
       console.log(`🔄 handleGitHubSignIn: DEBUG Test 2 - Before supabase.auth.getUser() for user ${authUser.id}.`);
       try {
         const { data: { user: authUserTest }, error: getUserError } = await supabase.auth.getUser();
@@ -268,8 +268,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Other methods like signUp, signIn, etc. are assumed to be here and correct
-  // For brevity, they are omitted from this overwrite but should be in the actual file.
+  // Other methods like signUp, signIn, etc.
   const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any; error: any | null }> => {
     try {
       setAuthError(null);
