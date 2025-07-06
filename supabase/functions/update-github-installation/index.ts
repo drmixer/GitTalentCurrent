@@ -209,10 +209,6 @@ Deno.serve(async (req: Request) => {
         message: 'GitHub installation ID updated successfully',
         data: result
       }),
-        success: true,
-        message: 'GitHub installation ID updated successfully',
-        data: result
-      }),
       {
         status: 200,
         headers: {
@@ -226,9 +222,6 @@ Deno.serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error.message || "An unexpected error occurred during installation update"
-      }),
         success: false,
         error: error.message || "An unexpected error occurred during installation update"
       }),
