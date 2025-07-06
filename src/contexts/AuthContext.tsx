@@ -26,39 +26,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     console.log('🔄 AuthProvider: Initializing auth state...');
+    prevSessionRef.current = null; // Initialize prevSessionRef for onAuthStateChange
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      console.log('🔄 AuthProvider: Initial session:', initialSession ? 'Found' : 'None');
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      setAuthError(null);
-      
-      // Store the initial session in the ref
-      prevSessionRef.current = initialSession;
-
-      if (initialSession?.user) {
-        fetchUserProfile(initialSession.user);
-      } else {
+    // Get current session for initial synchronous state, but don't trigger async profile loads from here.
+    // onAuthStateChange will handle profile loading.
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log('🔄 AuthProvider: Current session from getSession():', currentSession ? 'Found' : 'None');
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      // If no user is found by getSession, we can confidently say we are not loading a session.
+      // onAuthStateChange will take over if a sign-in occurs.
+      if (!currentSession?.user) {
         setLoading(false);
       }
+    }).catch(error => {
+      console.error('❌ AuthProvider: Error in getSession():', error);
+      setLoading(false); // Ensure loading is false if getSession fails
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('🔄 AuthProvider: Auth state changed:', event, newSession ? 'Session exists' : 'No session');
+      console.log(`🔄 AuthProvider: Auth state changed: ${event}`, newSession ? `Session for user ${newSession.user?.id}` : 'No session');
 
       if (isProcessingAuthStateChangeRef.current) {
         console.log('🔄 AuthProvider: Auth state change event ignored, already processing.');
         return;
       }
 
-      // Compare the new session with the previous one
       const prevSessionStr = JSON.stringify(prevSessionRef.current);
       const newSessionStr = JSON.stringify(newSession);
 
-      if (prevSessionStr === newSessionStr && event !== 'INITIAL_SESSION') { // Allow initial session to always process
-        console.log('🔄 AuthProvider: Session unchanged, skipping update');
-        // If session is truly unchanged, ensure loading is false if no user.
-        if (!newSession?.user && !user) setLoading(false);
+      // Skip if session is identical and it's not the initial auth event.
+      // INITIAL_SESSION should always be processed to ensure profile is loaded.
+      if (prevSessionStr === newSessionStr && event !== 'INITIAL_SESSION' && prevSessionRef.current !== null) {
+        console.log('🔄 AuthProvider: Session unchanged and not initial, skipping update. Current loading state:', loading);
+        // If session is unchanged and no user, ensure loading is false.
+        if (!newSession?.user && !user && loading) {
+            setLoading(false);
+        }
         return;
       }
       
@@ -66,42 +70,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 AuthProvider: Processing auth state change.');
 
       try {
-        // Update the ref with the new session before setting state
+        // Important: Update prevSessionRef *after* comparison and *before* async operations.
         prevSessionRef.current = newSession;
 
-        setSession(newSession);
-        const newUser = newSession?.user ?? null;
-        setUser(newUser);
-        setAuthError(null); // Clear previous errors on new auth event
+        const NUser = newSession?.user ?? null; // Renamed to avoid conflict with 'user' state in finally block
+        setSession(newSession); // Update session state
+        setUser(NUser);       // Update user state
+        setAuthError(null);   // Clear previous errors
 
-        if (newUser) {
-          // Always set loading to true when a user is present and we're about to fetch/process profiles
+        if (NUser) {
+          console.log(`🔄 AuthProvider: User ${NUser.id} detected. Event: ${event}. Setting loading true.`);
           setLoading(true);
+
+          // Determine action based on event type
           if (event === 'SIGNED_IN') {
-            if (newUser.app_metadata?.provider === 'github') {
+            if (NUser.app_metadata?.provider === 'github') {
               console.log('🔄 AuthProvider: GitHub sign-in detected, handling GitHub auth');
-              await handleGitHubSignIn(newUser);
+              await handleGitHubSignIn(NUser);
             } else {
               console.log('🔄 AuthProvider: Non-GitHub sign-in detected, fetching profile');
-              await fetchUserProfile(newUser);
+              await fetchUserProfile(NUser);
             }
-          } else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-            // For these events, it's usually good to re-fetch the profile to ensure data is fresh
-            console.log(`🔄 AuthProvider: Event ${event} detected, fetching profile`);
-            await fetchUserProfile(newUser);
-          } else if (event === 'SIGNED_OUT') {
-             // This case should ideally be handled by the 'else' block below (newUser is null)
-            console.log('🔄 AuthProvider: SIGNED_OUT event, clearing profiles');
+          } else if (event === 'INITIAL_SESSION' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+            console.log(`🔄 AuthProvider: Event ${event} for user ${NUser.id}, fetching profile`);
+            await fetchUserProfile(NUser);
+          } else if (event === 'SIGNED_OUT') { // Should be caught by NUser being null, but good for clarity
+            console.log('🔄 AuthProvider: SIGNED_OUT event explicitly handled, clearing profiles');
             setUserProfile(null);
             setDeveloperProfile(null);
-            setLoading(false);
+            setLoading(false); // Explicitly false on sign out.
           } else {
-            // For other events where user is present, fetch profile if not already loaded or to be safe
-            console.log(`🔄 AuthProvider: Auth state change (${event}), fetching profile`);
-            await fetchUserProfile(newUser);
+            // Default for other events if user is present (e.g., MFA_CHALLENGE if ever used)
+            // For safety, fetch profile if event type is unknown but user is present.
+            console.log(`🔄 AuthProvider: Unhandled event type ${event} with user, fetching profile.`);
+            await fetchUserProfile(NUser);
           }
-        } else { // No user
-          console.log('🔄 AuthProvider: No user after auth state change, clearing profiles');
+        } else { // No user (NUser is null, typically after SIGNED_OUT or session expiry)
+          console.log('🔄 AuthProvider: No user after auth state change, clearing profiles. Event:', event);
           setUserProfile(null);
           setDeveloperProfile(null);
           setLoading(false); // Definitely no loading if no user
@@ -112,12 +117,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false); // Ensure loading is false on error
       } finally {
         isProcessingAuthStateChangeRef.current = false;
-        console.log('🔄 AuthProvider: Finished processing auth state change.');
-        // Final check: if no user and profiles are null, ensure loading is false.
-        // This handles cases where an async operation might have set loading true, then user becomes null.
-        if (!user && !userProfile && !developerProfile) {
-            setLoading(false);
-        }
+        console.log('🔄 AuthProvider: Finished processing auth state change. Current loading state:', loading);
+        // Final check: if the user state (not NUser, but the actual state variable 'user') is null
+        // and profiles are null, ensure loading is false. This catches edge cases.
+        // This check might be too aggressive if a background process is still expected.
+        // Relying on setLoading(false) in specific paths (no user, error, end of fetch/handle) is better.
+        // If (!user && !userProfile && !developerProfile && loading) {
+        // console.log('🔄 AuthProvider: Final sanity check in finally - clearing loading for no user/profile.');
+        // setLoading(false);
+        // }
       }
     });
 

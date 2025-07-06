@@ -27,7 +27,7 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState<number>(0);
-  const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
+  // const [profileCreationAttempted, setProfileCreationAttempted] = useState(false); // No longer needed
   const maxRetries = 5;
   const [authCompleted, setAuthCompleted] = useState(false);
   const [authAttempted, setAuthAttempted] = useState(false);
@@ -70,7 +70,7 @@ export const AuthCallback: React.FC = () => {
         setUiState('loading');
         console.log('AuthCallback: Starting auth callback processing');
         console.log('AuthCallback: Auth loading state:', authLoading, 'Retry count:', retryCount);
-        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user', 'Profile creation attempted:', profileCreationAttempted);
+        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
         console.log('AuthCallback: User profile:', userProfile ? `Exists (${userProfile.id}, Role: ${userProfile.role})` : 'Not loaded');
         console.log('AuthCallback: Developer profile:', developerProfile ? 
           `Exists (GitHub handle: ${developerProfile.github_handle}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
@@ -254,39 +254,12 @@ export const AuthCallback: React.FC = () => {
           console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
           console.log('AuthCallback: Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
 
-          // If we have a user but no profile, try to create it
-          if (!userProfile && !profileCreationAttempted) {
-            console.log('AuthCallback: No user profile loaded, refreshing profile...');
-            setProfileCreationAttempted(true);
-            
-            // Try to create the profile via RPC
-            try {
-              const { data: rpcResult, error: rpcError } = await supabase.rpc(
-                'create_user_profile',
-                {
-                  user_id: user.id,
-                  user_email: user.email || 'unknown@example.com',
-                  user_name: user.user_metadata?.name || user.user_metadata?.full_name || 'GitHub User',
-                  user_role: 'developer',
-                  company_name: ''
-                }
-              );
-              
-              if (rpcError) {
-                console.error('AuthCallback: Error creating user profile via RPC:', rpcError);
-              } else {
-                console.log('AuthCallback: Profile creation RPC result:', rpcResult);
-              }
-            } catch (error) {
-              console.error('AuthCallback: Error in profile creation attempt:', error);
-            }
-            
-            console.log('AuthCallback: No user profile loaded, attempting to refresh profile...');
-            await refreshProfile(); 
-          }
+          // When authLoading is false and user exists, AuthContext should have already attempted
+          // to load or create the userProfile. We now trust its result.
+          // Profile creation responsibility is solely with AuthContext.
 
           if (userProfile) {
-            console.log('AuthCallback: User profile loaded:', userProfile.id, 'Role:', userProfile.role);
+            console.log('AuthCallback: User profile loaded by AuthContext:', userProfile.id, 'Role:', userProfile.role);
             setUiState('success');
             setMessage('Authentication successful! Redirecting to dashboard...');
             
@@ -372,7 +345,7 @@ export const AuthCallback: React.FC = () => {
     location.search,
     processingInstallation,
     refreshProfile,
-    profileCreationAttempted,
+    // profileCreationAttempted, // Removed
     redirectToGitHubAppInstall,
     authAttempted,
     retryCount,
