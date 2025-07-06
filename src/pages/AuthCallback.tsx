@@ -25,21 +25,18 @@ export const AuthCallback: React.FC = () => {
   const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 5;
+  const maxRetries = 5;
 
   // Function to redirect to GitHub App installation page
   const redirectToGitHubAppInstall = useCallback(() => {
-    // Create a state object with all necessary information
-    const stateObj = {
-      redirect_uri: `${window.location.origin}/github-setup`,
-      user_id: user?.id,
-      from_auth: true
-    };
+    // Create a state object with just the user ID
+    const stateObj = { user_id: user?.id };
 
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
     const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${returnUrl}`;
     
-    console.log('AuthCallback: Redirecting to GitHub App installation:', githubAppInstallUrl);
+    console.log('🚀 AuthCallback: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setStatus('redirect');
     setMessage('Redirecting to GitHub App installation page...');
 
@@ -54,6 +51,7 @@ export const AuthCallback: React.FC = () => {
       
       try {
         setStatus('loading');
+        console.log('AuthCallback: Starting auth callback processing');
         
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
@@ -93,6 +91,7 @@ export const AuthCallback: React.FC = () => {
             setProcessingInstallation(true);
             setStatus('loading'); 
             setMessage(`GitHub App installation detected (ID: ${installationId}), saving...`);
+            console.log('AuthCallback: Processing GitHub App installation with ID:', installationId);
 
             try {
               // Save the installation ID directly here
@@ -111,6 +110,7 @@ export const AuthCallback: React.FC = () => {
               }
               
               console.log('Successfully saved installation ID:', installationId, data);
+              console.log('AuthCallback: About to refresh profile to get updated installation ID');
 
               // Refresh the profile to get the updated installation ID 
               if (!refreshProfile) {
@@ -120,6 +120,7 @@ export const AuthCallback: React.FC = () => {
                 return;
               }
               await refreshProfile();
+              console.log('AuthCallback: Profile refreshed successfully');
               
               // Clear URL parameters
               const cleanUrl = new URL(window.location.href);
@@ -151,8 +152,8 @@ export const AuthCallback: React.FC = () => {
         }
 
         // Check if we need to redirect to GitHub App installation after auth
-        if (user && stateData && stateData.install_after_auth === true && !installationId) {
-          console.log('AuthCallback: User authenticated, install_after_auth flag detected, redirecting to GitHub App installation');
+        if (user && stateData && (stateData.install_after_auth === true || stateData.install_after_auth === 'true') && !installationId) {
+          console.log('🚀 AuthCallback: User authenticated, install_after_auth flag detected, redirecting to GitHub App installation');
           setStatus('redirect');
           setMessage('Authentication successful! Redirecting to GitHub App installation...'); 
           
@@ -170,6 +171,7 @@ export const AuthCallback: React.FC = () => {
           
           // If we have a user but no profile, try to refresh the profile 
           if (!userProfile && refreshProfile) {
+            console.log('AuthCallback: No user profile loaded, refreshing profile...');
             console.log('AuthCallback: Refreshing profile...');
             await refreshProfile(); 
           }
@@ -312,7 +314,7 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mb-6">
               Redirecting you to your dashboard in a moment...
             </p> 
             <button
@@ -331,7 +333,7 @@ export const AuthCallback: React.FC = () => {
             {authError && ( 
               <p className="text-sm text-red-500 mb-4">{authError}</p>
             )}
-            <div className="flex flex-col space-y-3">
+            <div className="flex flex-col space-y-3 mb-4">
               <button
                 onClick={() => navigate('/login')}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
@@ -345,9 +347,18 @@ export const AuthCallback: React.FC = () => {
                 <RefreshCw className="w-4 h-4 mr-2 inline" />
                 Refresh Page 
               </button>
+            </div>
+            <div>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                <RefreshCw className="w-4 h-4 mr-2 inline" />
+                Refresh Page 
+              </button>
               <button
                 onClick={redirectToGitHubAppInstall}
-                className="mt-4 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium"
+                className="px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium"
               >
                 Connect GitHub App
               </button>
