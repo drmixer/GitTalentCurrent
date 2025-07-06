@@ -111,9 +111,6 @@ Deno.serve(async (req: Request) => {
           github_installation_id: installationId,
           updated_at: new Date().toISOString()
         })
-          github_installation_id: installationId,
-          updated_at: new Date().toISOString()
-        })
         .eq('user_id', userId)
         .select();
       
@@ -214,10 +211,6 @@ Deno.serve(async (req: Request) => {
         success: true,
         message: 'GitHub installation ID updated successfully',
         data: result
-      JSON.stringify({
-        success: true,
-        message: 'GitHub installation ID updated successfully',
-        data: result
       }),
       {
         status: 200,
@@ -232,9 +225,6 @@ Deno.serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error.message || "An unexpected error occurred during installation update" 
-      }),
         success: false,
         error: error.message || "An unexpected error occurred during installation update"
       }),
