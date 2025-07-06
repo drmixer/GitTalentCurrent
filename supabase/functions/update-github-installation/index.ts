@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
     
     let userId, installationId;
     
-    try {
+    try { 
       const parsedBody = JSON.parse(requestBody);
       userId = parsedBody.userId;
       installationId = parsedBody.installationId;
@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
     
     // First, check if the developer profile exists
     const { data: developerData, error: developerError } = await supabaseClient 
-      .from('developers')
+      .from('developers') 
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
@@ -108,6 +108,8 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabaseClient
         .from('developers')
         .update({ 
+          github_installation_id: installationId,
+          updated_at: new Date().toISOString() })
           github_installation_id: installationId,
           updated_at: new Date().toISOString()
         })
@@ -172,13 +174,18 @@ Deno.serve(async (req: Request) => {
       
       // Create a new developer profile with the installation ID
       const { data, error } = await supabaseClient
-        .from('developers')
+        .from('developers') 
         .insert({
           user_id: userId,
           github_handle: '',
           bio: '',
           availability: true, 
           top_languages: [],
+          linked_projects: [],
+          profile_strength: 10,
+          github_installation_id: installationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
           linked_projects: [],
           profile_strength: 10,
           github_installation_id: installationId,
@@ -212,6 +219,10 @@ Deno.serve(async (req: Request) => {
         message: 'GitHub installation ID updated successfully',
         data: result
       }),
+      { 
+        message: 'GitHub installation ID updated successfully',
+        data: result
+      }),
       {
         status: 200,
         headers: {
@@ -225,6 +236,9 @@ Deno.serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ 
+        success: false,
+        error: error.message || "An unexpected error occurred during installation update"
+      }),
         success: false,
         error: error.message || "An unexpected error occurred during installation update"
       }),
