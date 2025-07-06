@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('✅ fetchUserProfile: Profile creation RPC result:', rpcResult);
         
         // Fetch the newly created profile
-        const { data: newlyCreatedProfile, error: fetchError } = await supabase
+        const { data: newProfile2, error: fetchError } = await supabase
           .from('users')
           .select('*')
           .eq('id', authUser.id)
@@ -142,16 +142,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return null;
         }
         
-        console.log('✅ fetchUserProfile: Newly created profile fetched:', newlyCreatedProfile);
-        setUserProfile(newlyCreatedProfile);
+        console.log('✅ fetchUserProfile: Newly created profile fetched:', newProfile2);
+        setUserProfile(newProfile2);
         
         // If it's a developer, ensure developer profile exists
-        if (newlyCreatedProfile.role === 'developer') {
-          await ensureDeveloperProfile(authUser, newlyCreatedProfile);
+        if (newProfile2.role === 'developer') {
+          await ensureDeveloperProfile(authUser, newProfile2);
         }
         
         setLoading(false);
-        return newlyCreatedProfile;
+        return newProfile2;
+        
+        console.log('✅ fetchUserProfile: User profile created:', newProfile);
+        setUserProfile(newProfile[0]);
+        
+        // If it's a developer, create developer profile
+        if (newProfile[0].role === 'developer') {
+          await createDeveloperProfileFromAuth(authUser, newProfile[0]);
+        }
+        
+        setLoading(false);
+        return newProfile[0];
       } else if (error) {
         console.error('❌ fetchUserProfile: Error fetching user profile:', error);
         setAuthError('Failed to load your profile. Please try again.');
@@ -165,10 +176,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (profile && profile.role === 'developer') {
         await fetchDeveloperProfile(authUser.id);
          
-        // If developer profile wasn't found, create it
-        if (!developerProfile) {
-          await ensureDeveloperProfile(authUser, profile);
-        }
+         // If developer profile wasn't found, create it
+         if (!developerProfile) {
+           await ensureDeveloperProfile(authUser, profile);
+         }
       }
 
       setLoading(false);
