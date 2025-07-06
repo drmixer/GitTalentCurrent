@@ -246,9 +246,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   // Function to ensure a developer profile exists
   const ensureDeveloperProfile = async (authUser: SupabaseUser) => {
-    try {
     console.log(`🔄 ensureDeveloperProfile: Attempting for user: ${authUser.id}`);
     try {
+      // Removed nested try here
       const { data: existingProfile, error: checkError } = await supabase
         .from('developers')
         .select('*')
