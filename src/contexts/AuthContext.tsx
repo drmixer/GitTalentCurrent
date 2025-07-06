@@ -364,19 +364,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // It's good practice to ensure loading is false at the end of this function,
     // either on success or error. This will be done in a finally block.
     // We will capture the profile states within the try block for logging in finally.
-    let finalAttemptedUserProfile: User | null = null;
-    let finalAttemptedDeveloperProfile: Developer | null = null;
+    // We will capture the profile states within the try block for logging in finally.
+    // let finalAttemptedUserProfile: User | null = null; // Not needed with direct state logging in finally
+    // let finalAttemptedDeveloperProfile: Developer | null = null; // Not needed with direct state logging in finally
 
     try {
-      const { data: existingUserProfile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      console.log(`🔄 handleGitHubSignIn: Entered TRY block for user ${authUser.id}.`);
+      let userProfileData: User | null = null; // Use this to hold the fetched/created user profile
+      let profileError: any = null;
 
-      if (profileError && profileError.code === 'PGRST116') {
-        // Profile doesn't exist, create it
-        console.log('🔄 handleGitHubSignIn: User profile not found, creating one');
+      console.log(`🔄 handleGitHubSignIn: About to query 'users' table for user ${authUser.id}.`);
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+        userProfileData = data; // Assign to userProfileData
+        profileError = error;
+        console.log(`🔄 handleGitHubSignIn: 'users' table query completed for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
+      } catch (e) {
+        console.error(`❌ handleGitHubSignIn: CRITICAL ERROR during 'users' table query for ${authUser.id}:`, e);
+        profileError = e; // Ensure profileError is set so logic below can handle it
+        // If this critical query fails, we likely can't proceed, so set userProfileData to null explicitly.
+        userProfileData = null;
+      }
+
+      // Removed the redundant, unwrapped call to fetch users table that was here.
+      // Now, proceed using userProfileData and profileError from the try/catch block above.
+
+      if (profileError && profileError.code === 'PGRST116') { // User profile doesn't exist based on error code
+        console.log(`🔄 handleGitHubSignIn: User profile not found for ${authUser.id} (PGRST116), creating one.`);
 
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
