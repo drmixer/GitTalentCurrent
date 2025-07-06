@@ -202,13 +202,26 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [location.search]);
 
+  // <-- UPDATED: Combined fetch calls and loading state management
   useEffect(() => {
-    if (user) {
-      fetchDeveloperData();
-      fetchMessages();
-      fetchRecommendedJobs();
-      fetchFeaturedPortfolioItem();
-    }
+    const fetchAllData = async () => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchDeveloperData(),
+          fetchMessages(),
+          fetchRecommendedJobs(),
+          fetchFeaturedPortfolioItem(),
+        ]);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
   }, [user]);
 
   // Update URL when tab changes
@@ -263,9 +276,8 @@ export const DeveloperDashboard: React.FC = () => {
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
     }
+    // <-- REMOVED setLoading(false) from here, now controlled centrally in useEffect
   };
 
   const fetchFeaturedPortfolioItem = async () => {
@@ -486,7 +498,7 @@ export const DeveloperDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">GitHub Activity</h3>
             <button
-              onClick={() => setActiveTab('github')}
+              onClick={() => setActiveTab('github-activity')}
               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
             >
               View Full Activity
@@ -496,7 +508,6 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Recommended Jobs */}
       {/* Featured Portfolio Item */}
       {featuredPortfolioItem && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -527,249 +538,135 @@ export const DeveloperDashboard: React.FC = () => {
             
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <h4 className="text-xl font-bold text-gray-900">{featuredPortfolioItem.title}</h4>
-                  <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                </div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800`}>
-                    <Briefcase className="w-3 h-3 mr-1" />
-                    <span className="capitalize">{featuredPortfolioItem.category}</span>
-                  </span>
-                </div>
+                <h4 className="text-lg font-semibold text-gray-900">{featuredPortfolioItem.title}</h4>
+                <p className="text-sm text-gray-700 mt-1">{featuredPortfolioItem.description}</p>
               </div>
             </div>
 
-            {featuredPortfolioItem.description && (
-              <p className="text-gray-600 text-sm mb-4 leading-relaxed">
-                {featuredPortfolioItem.description}
-              </p>
-            )}
-
-            {featuredPortfolioItem.technologies.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-4">
-                {featuredPortfolioItem.technologies.map((tech, index) => (
-                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {featuredPortfolioItem.url && (
-              <a
-                href={featuredPortfolioItem.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold"
-              >
-                View Project
-                <ExternalLink className="w-4 h-4 ml-1" />
-              </a>
-            )}
+            <div className="flex space-x-4 text-xs text-gray-600">
+              {featuredPortfolioItem.tech_stack?.map((tech: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md"
+                >
+                  {tech}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
-      
-      {/* Quick Job Stats */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Job Opportunities</h3>
-          <button
-            onClick={() => setActiveTab('jobs')}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-          >
-            Browse All Jobs
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">{recommendedJobs.length}</div>
-            <div className="text-sm font-semibold text-gray-600">Matching Jobs</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {recommendedJobs.filter(job => job.is_featured).length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">Featured Jobs</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-            <div className="text-2xl font-black text-gray-900 mb-1">
-              {recommendedJobs.filter(job => job.job_type === 'Remote' || job.location.toLowerCase().includes('remote')).length}
-            </div>
-            <div className="text-sm font-semibold text-gray-600">Remote Jobs</div>
-          </div>
-        </div>
-        
-        <div className="mt-6">
-          <button
-            onClick={() => setActiveTab('jobs')}
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-          >
-            Find Your Dream Job
-          </button>
-        </div>
-      </div>
     </div>
   );
 
-  const renderMessages = () => {
-    if (selectedThread) {
-      return (
-        <MessageThread
-          threadId={selectedThread}
-          onBack={() => setSelectedThread(null)}
-        />
-      );
-    }
-
-    return <MessageList onSelectThread={setSelectedThread} />;
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="flex justify-center items-center h-96">
+        <svg
+          className="animate-spin h-12 w-12 text-blue-600"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12" cy="12" r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8H4z"
+          ></path>
+        </svg>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Developer Dashboard</h1>
-          <p className="mt-2 text-gray-600">
-            Welcome back, {developer?.user?.name || user?.email}
-          </p>
-        </div>
+    <div className="px-6 py-8 max-w-7xl mx-auto">
+      {/* GitHub Connect Prompt */}
+      {showGitHubConnectPrompt && (
+        <GitHubConnectPrompt
+          githubHandle={developer?.github_handle || ''}
+          onClose={() => setShowGitHubConnectPrompt(false)}
+        />
+      )}
 
-        {/* Navigation Tabs */}
-        <div className="border-b border-gray-200 mb-8">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', icon: TrendingUp },
-              { id: 'profile', name: 'Profile', icon: User },
-              { id: 'portfolio', name: 'Portfolio', icon: Briefcase },
-              { id: 'github-activity', name: 'GitHub Activity', icon: Github },
-              { id: 'messages', name: 'Messages', icon: MessageSquare },
-              { id: 'jobs', name: 'Job Search', icon: Search },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className={`mr-2 h-5 w-5 ${
-                    activeTab === tab.id ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-                  }`} />
-                  {tab.name}
-                  {tab.id === 'messages' && messages.filter(m => !m.is_read && m.receiver_id === user?.id).length > 0 && (
-                    <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                      {messages.filter(m => !m.is_read && m.receiver_id === user?.id).length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'profile' && <DeveloperProfileForm />}
-          {activeTab === 'portfolio' && developer && (
-            <PortfolioManager developerId={developer.user_id} isEditable={true} />
-          )}
-          {activeTab === 'github-activity' && developer?.github_handle && (
-            <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
-          )}
-          {activeTab === 'messages' && renderMessages()}
-          {activeTab === 'jobs' && renderJobSearch()}
-        </div>
-
-        {/* Job Details Modal */}
-        {showJobDetailsModal && selectedJobForDetails && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <JobRoleDetails
-                jobRole={selectedJobForDetails}
-                jobRoleId={selectedJobForDetails.id}
-                onClose={handleCloseJobDetails}
-                onSendMessage={() => {
-                  handleMessageRecruiter(selectedJobForDetails.recruiter.id, selectedJobForDetails.title);
-                }}
-                onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
-                onExpressInterest={() => handleExpressInterest(selectedJobForDetails.id)}
-                isDeveloperView={true}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Job Search Modal */}
-        {showJobSearch && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">Browse Jobs</h2>
-                  <button
-                    onClick={() => setShowJobSearch(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <span className="sr-only">Close</span>
-                    ✕
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <JobSearchList 
-                  onViewDetails={(jobId) => {
-                    const job = recommendedJobs.find(j => j.id === jobId);
-                    if (job) {
-                      handleViewJobDetails(job);
-                    }
-                  }}
-                  onExpressInterest={(jobId) => {
-                    const job = recommendedJobs.find(j => j.id === jobId);
-                    if (job) {
-                      handleExpressInterest(job.id);
-                    }
-                  }}
-                  onViewRecruiter={handleViewRecruiter}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Recruiter Profile Modal */}
-        {showRecruiterProfile && selectedRecruiterId && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <RecruiterProfileDetails
-                recruiterId={selectedRecruiterId}
-                onClose={() => setShowRecruiterProfile(false)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* GitHub Connect Prompt */}
-        {showGitHubConnectPrompt && (
-          <GitHubConnectPrompt onClose={() => setShowGitHubConnectPrompt(false)} />
-        )}
+      {/* Tabs */}
+      <div className="mb-8 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          {['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as typeof activeTab)}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === tab
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ')}
+            </button>
+          ))}
+        </nav>
       </div>
+
+      {/* Main content */}
+      {activeTab === 'overview' && renderOverview()}
+
+      {activeTab === 'profile' && developer && (
+        <DeveloperProfileForm developer={developer} onUpdate={fetchDeveloperData} />
+      )}
+
+      {activeTab === 'portfolio' && (
+        <PortfolioManager developerId={user?.id || ''} />
+      )}
+
+      {activeTab === 'github-activity' && developer?.github_handle && (
+        <RealGitHubChart githubHandle={developer.github_handle} className="w-full" showFullView />
+      )}
+
+      {activeTab === 'messages' && (
+        <div className="flex space-x-6">
+          <MessageList
+            messages={messages}
+            onSelectThread={setSelectedThread}
+            selectedThreadId={selectedThread}
+          />
+          {selectedThread && (
+            <MessageThread threadId={selectedThread} />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'jobs' && (
+        <>
+          {renderJobSearch()}
+          
+          {showJobDetailsModal && selectedJobForDetails && (
+            <JobRoleDetails
+              job={selectedJobForDetails}
+              onClose={handleCloseJobDetails}
+              onExpressInterest={handleExpressInterest}
+              onViewRecruiter={handleViewRecruiter}
+              onMessageRecruiter={handleMessageRecruiter}
+            />
+          )}
+
+          {showRecruiterProfile && selectedRecruiterId && (
+            <RecruiterProfileDetails
+              recruiterId={selectedRecruiterId}
+              onClose={() => setShowRecruiterProfile(false)}
+              onMessageRecruiter={handleMessageRecruiter}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };
