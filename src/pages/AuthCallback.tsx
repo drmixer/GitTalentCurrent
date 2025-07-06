@@ -25,7 +25,6 @@ export const AuthCallback: React.FC = () => {
   const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 5;
-  const maxRetries = 5;
 
   // Function to redirect to GitHub App installation page
   const redirectToGitHubAppInstall = useCallback(() => {
