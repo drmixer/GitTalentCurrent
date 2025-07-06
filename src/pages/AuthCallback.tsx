@@ -21,12 +21,13 @@ export const AuthCallback: React.FC = () => {
   const { user, userProfile, developerProfile, loading: authLoading, authError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('loading');
-  const [message, setMessage] = useState('Verifying authentication...');
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('waiting');
+  const [message, setMessage] = useState('Processing authentication...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
+  const maxRetries = 5;
   const [authCompleted, setAuthCompleted] = useState(false);
   const [authAttempted, setAuthAttempted] = useState(false);
 
@@ -67,10 +68,12 @@ export const AuthCallback: React.FC = () => {
       try {
         setUiState('loading');
         console.log('AuthCallback: Starting auth callback processing');
-        console.log('AuthCallback: Auth loading state:', authLoading);
-        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
-        console.log('AuthCallback: User profile:', userProfile ? `Exists (${userProfile.id})` : 'Not loaded');
-        console.log('AuthCallback: Developer profile:', developerProfile ? `Exists (${developerProfile.user_id})` : 'Not loaded');
+        console.log('AuthCallback: Auth loading state:', authLoading, 'Retry count:', retryCount);
+        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user', 'Profile creation attempted:', profileCreationAttempted);
+        console.log('AuthCallback: User profile:', userProfile ? `Exists (${userProfile.id}, Role: ${userProfile.role})` : 'Not loaded');
+        console.log('AuthCallback: Developer profile:', developerProfile ? 
+          `Exists (GitHub handle: ${developerProfile.github_handle}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
+          'Not loaded');
 
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
@@ -146,7 +149,7 @@ export const AuthCallback: React.FC = () => {
               }
 
               console.log('Successfully saved installation ID:', installationId);
-              console.log('AuthCallback: About to refresh profile to get updated installation ID');
+              console.log('AuthCallback: About to refresh profile to get updated GitHub installation ID');
 
               if (!refreshProfile) {
                 console.error('refreshProfile function is not available');
@@ -154,7 +157,7 @@ export const AuthCallback: React.FC = () => {
                 setMessage('Failed to refresh profile. Please try again or contact support.');
                 setProcessingInstallation(false);
                 return;
-              }
+              } 
               await refreshProfile();
               console.log('AuthCallback: Profile refreshed successfully');
 
@@ -166,7 +169,7 @@ export const AuthCallback: React.FC = () => {
               cleanUrl.searchParams.delete('state');
               window.history.replaceState({}, '', cleanUrl.toString());
 
-              setUiState('success');
+              setUiState('success'); 
               setMessage('GitHub App successfully connected! Redirecting to dashboard...');
 
               setProcessingInstallation(false);
@@ -189,6 +192,7 @@ export const AuthCallback: React.FC = () => {
             setUiState('loading');
             setMessage('Waiting for authentication to complete before processing GitHub installation...');
             setAuthAttempted(true);
+            return; 
           } else if (processingInstallation) {
             console.log('AuthCallback: Already processing installation, waiting for completion');
             setUiState('loading');
@@ -197,7 +201,7 @@ export const AuthCallback: React.FC = () => {
           }
         }
 
-        // Redirect to GitHub App installation if flagged after auth
+        // Redirect to GitHub App installation if flagged after auth 
         if (user && stateData.install_after_auth && !installationId) {
           console.log('🚀 AuthCallback: User authenticated, install_after_auth flag detected:', stateData.install_after_auth);
           setUiState('redirect');
@@ -244,21 +248,47 @@ export const AuthCallback: React.FC = () => {
         }
 
         // Normal post-auth processing & navigation
-        if (user) {
+        if (user && !authLoading) {
           console.log('AuthCallback: User authenticated:', user.id);
           console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
           console.log('AuthCallback: Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
 
-          if (!userProfile && refreshProfile) {
+          // If we have a user but no profile, try to create it
+          if (!userProfile && !profileCreationAttempted) {
             console.log('AuthCallback: No user profile loaded, refreshing profile...');
+            setProfileCreationAttempted(true);
+            
+            // Try to create the profile via RPC
+            try {
+              const { data: rpcResult, error: rpcError } = await supabase.rpc(
+                'create_user_profile',
+                {
+                  user_id: user.id,
+                  user_email: user.email || 'unknown@example.com',
+                  user_name: user.user_metadata?.name || user.user_metadata?.full_name || 'GitHub User',
+                  user_role: 'developer',
+                  company_name: ''
+                }
+              );
+              
+              if (rpcError) {
+                console.error('AuthCallback: Error creating user profile via RPC:', rpcError);
+              } else {
+                console.log('AuthCallback: Profile creation RPC result:', rpcResult);
+              }
+            } catch (error) {
+              console.error('AuthCallback: Error in profile creation attempt:', error);
+            }
+            
+            // Refresh profile to load the newly created profile
             await refreshProfile();
           }
 
           if (userProfile) {
             console.log('AuthCallback: User profile loaded:', userProfile.id, 'Role:', userProfile.role);
             setUiState('success');
-            setMessage('Authentication successful!');
-
+            setMessage('Authentication successful! Redirecting to dashboard...');
+            
             if (userProfile.role === 'developer' && !developerProfile?.github_installation_id) {
               console.log('AuthCallback: Developer needs to connect GitHub App, redirecting to installation page');
               setUiState('redirect');
@@ -268,7 +298,7 @@ export const AuthCallback: React.FC = () => {
               }, 1500);
               return;
             }
-
+            
             timeoutId = window.setTimeout(() => {
               console.log('AuthCallback: Redirecting to dashboard based on role:', userProfile.role);
               if (userProfile.role === 'developer') {
@@ -287,9 +317,9 @@ export const AuthCallback: React.FC = () => {
             }, 1500);
             return;
           } else {
-            console.log('AuthCallback: User authenticated but no profile loaded yet, redirecting to dashboard');
+            console.log('AuthCallback: User authenticated but no profile loaded yet, will retry or redirect to dashboard');
             setUiState('success');
-            setMessage('Authentication successful!');
+            setMessage('Authentication successful! Redirecting to dashboard...');
             timeoutId = window.setTimeout(() => {
               navigate('/dashboard', { replace: true });
             }, 1500);
@@ -299,11 +329,10 @@ export const AuthCallback: React.FC = () => {
 
         // Wait for auth to complete or retry
         if (authLoading) {
-          setUiState('loading');
-          setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
+          setUiState('loading'); 
+          setMessage('Verifying authentication...');
           if (retryCount >= maxRetries) {
-            setUiState('error');
-            setMessage('Authentication is taking too long. Please try again or refresh the page.');
+            setMessage('Authentication is taking longer than expected. You may need to refresh the page.');
           } else {
             timeoutId = window.setTimeout(() => {
               setRetryCount(prev => prev + 1);
@@ -313,7 +342,7 @@ export const AuthCallback: React.FC = () => {
           return;
         }
 
-        // No user and auth is not loading => auth failure
+        // No user and auth is not loading => auth failure 
         if (!user && !authLoading) {
           setUiState('error');
           setMessage('Authentication failed. Please try again or refresh the page.');
@@ -321,7 +350,7 @@ export const AuthCallback: React.FC = () => {
         }
       } catch (error) {
         console.error('Error in AuthCallback useEffect:', error);
-        setUiState('error');
+        setUiState('error'); 
         setMessage(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
@@ -342,6 +371,7 @@ export const AuthCallback: React.FC = () => {
     location.search,
     processingInstallation,
     refreshProfile,
+    profileCreationAttempted,
     redirectToGitHubAppInstall,
     authAttempted,
     retryCount,
@@ -351,7 +381,7 @@ export const AuthCallback: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8" aria-live="polite" aria-atomic="true">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-6"> 
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
             <Github className="w-10 h-10 text-white" aria-hidden="true" />
           </div>
@@ -368,7 +398,7 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600">{message}</p>
-            <div className="mt-4">
+            <div className="mt-4"> 
               <p className="text-sm text-gray-500 mb-4">
                 {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`}
                 {retryCount > 0 && <span className="block mt-2 text-xs text-gray-500">This is taking longer than expected...</span>}
@@ -377,7 +407,7 @@ export const AuthCallback: React.FC = () => {
                 <button
                   onClick={() => navigate('/dashboard', { replace: true })}
                   className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
+                > 
                   <RefreshCw className="w-4 h-4 mr-2 inline" />
                   Go to Dashboard
                 </button>
@@ -389,7 +419,7 @@ export const AuthCallback: React.FC = () => {
         {uiState === 'redirect' && (
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-gray-600 mb-4">{message}</p>
+            <p className="text-gray-600 mb-4">{message}</p> 
             <p className="text-sm text-gray-500">Please wait while we redirect you...</p>
             <p className="text-xs text-gray-500 mt-2">
               You'll be redirected to GitHub to install the GitTalent App to access your GitHub data
@@ -400,7 +430,7 @@ export const AuthCallback: React.FC = () => {
         {uiState === 'success' && (
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-gray-600 mb-4">{message}</p>
+            <p className="text-gray-600 mb-4">{message}</p> 
             <p className="text-sm text-gray-500 mb-6">You'll be redirected to your dashboard in a moment...</p>
             <button
               onClick={() => navigate('/dashboard', { replace: true })}
@@ -414,7 +444,7 @@ export const AuthCallback: React.FC = () => {
         {uiState === 'error' && (
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-red-600 mb-6">{message}</p>
+            <p className="text-red-600 mb-6">{message}</p> 
             {authError && <p className="text-sm text-red-500 mb-4">{authError}</p>}
             <div className="flex flex-col space-y-3">
               <button
