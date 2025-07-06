@@ -421,7 +421,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
-    console.log('🔄 signInWithGitHub: Redirecting to GitHub App installation...');
+    console.log('🔄 signInWithGitHub: Starting GitHub OAuth flow...');
     
     try {
       // Clear any previous errors
@@ -431,31 +431,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const name = localStorage.getItem('gittalent_signup_name');
       const role = localStorage.getItem('gittalent_signup_role');
       
-      // Create a state object with all necessary data
+      // Create a state object with all necessary data for both auth and app installation
       const stateObj = {
         name,
         role,
-        installation_id: 'pending',
+        install_after_auth: true, // Flag to indicate we should install the app after auth
         ...(stateParams || {})
       };
       
-      // Encode the state parameter
-      const stateParam = encodeURIComponent(JSON.stringify(stateObj));
+      // Use Supabase OAuth with GitHub
+      const redirectTo = `${window.location.origin}/auth/callback`;
       
-      // Set up the GitHub App installation URL
-      const GITHUB_APP_SLUG = 'GitTalentApp'; // Must match your GitHub App slug exactly
-      const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
-      const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${returnUrl}`;
+      console.log('🔄 signInWithGitHub: Using Supabase OAuth with state:', stateObj);
       
-      console.log('🔄 signInWithGitHub: Redirecting to:', githubAppInstallUrl);
-
-      // Redirect to GitHub App installation page
-      window.location.href = githubAppInstallUrl;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo,
+          scopes: 'read:user user:email',
+          queryParams: {
+            state: JSON.stringify(stateObj)
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('❌ signInWithGitHub: Error with Supabase OAuth:', error);
+        throw error;
+      }
       
       return { error: null };
     } catch (error: any) {
-      console.error('❌ signInWithGitHub: Error redirecting to GitHub App:', error);
-      setAuthError(error.message || 'Failed to redirect to GitHub App installation');
+      console.error('❌ signInWithGitHub: Error with GitHub sign in:', error);
+      setAuthError(error.message || 'Failed to sign in with GitHub');
       return { error };
     }
   };
@@ -463,7 +471,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const connectGitHubApp = async () => {
     try {
       console.log('🔄 connectGitHubApp: Initiating GitHub App connection');
-      setAuthError(null);
+      setAuthError(null); 
       
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
@@ -472,7 +480,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Use the correct GitHub App slug
       const GITHUB_APP_SLUG = 'GitTalentApp';
       
-      // Create state parameter with user ID and redirect URL
+      // Create state parameter with user ID and redirect URL 
       const stateParam = encodeURIComponent(JSON.stringify({
         user_id: user.id,
         redirect_uri: `${window.location.origin}/github-setup`
@@ -487,7 +495,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 connectGitHubApp: Redirecting to GitHub App installation:', githubAppUrl);
       window.location.href = githubAppUrl;
       
-      return { error: null };
+      return { error: null, success: true };
     } catch (error: any) {
       console.error('❌ connectGitHubApp: Error:', error);
       setAuthError('Failed to connect GitHub App. Please try again.');

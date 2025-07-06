@@ -2,13 +2,9 @@
    };
  
    const handleConnectGitHub = () => {
+    // Set a flag to indicate we're connecting GitHub
      setConnectingGitHub(true);
      
-    // Use the connectGitHubApp function from AuthContext
-    connectGitHubApp()
-      .catch(error => {
-        console.error('Error connecting to GitHub:', error);
-        setConnectingGitHub(false);
-      });
+    // Navigate to GitHub setup page
      navigate('/github-setup');
    };

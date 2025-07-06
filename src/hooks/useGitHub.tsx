@@ -129,7 +129,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       // If we don't have an installation ID and this isn't the initial data load, we should prompt for installation
       if (!installationId && hasExistingData) {
         console.log('No GitHub installation ID but we have data - user needs to install the GitHub App');
-        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real contributions.'));
+        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
         setLoading(false);
         setFetchInProgress(false);
         return;

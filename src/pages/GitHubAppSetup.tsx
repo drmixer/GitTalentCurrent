@@ -34,7 +34,6 @@ export const GitHubAppSetup = () => {
     // Create a new state object with installation_id and existing state
     const stateObj = {
       ...existingState,
-      installation_id: 'pending',
       redirect_uri: `${window.location.origin}/github-setup`,
       user_id: user?.id
     };
@@ -126,7 +125,7 @@ export const GitHubAppSetup = () => {
       // If auth is still loading, wait.
       if (authLoading) {
         console.log('GitHubAppSetup: Auth context loading, waiting... (Attempt', retryCount + 1, 'of', maxRetries, ')');
-        
+
         if (retryCount > maxRetries) {
           setUiState('error');
           setMessage('Authentication is taking too long. Please try again.');
@@ -136,7 +135,7 @@ export const GitHubAppSetup = () => {
           
           // Set a timeout to increment retry count and refresh profile
           const timer = setTimeout(() => {
-            setRetryCount(prev => prev + 1);
+            setRetryCount(prev => prev + 1); 
             if (refreshProfile) {
               refreshProfile();
             }
@@ -144,7 +143,7 @@ export const GitHubAppSetup = () => {
           return () => clearTimeout(timer);
         }
         return;
-      }
+      } 
   
       // If no user after auth loading is complete, redirect to login
       if (!user) {
@@ -156,7 +155,7 @@ export const GitHubAppSetup = () => {
       // Scenario 1: App Install/Reconfigure for an existing user
       if (user && installationId) {
         setUiState('loading'); 
-        setMessage(`Connecting GitHub App...`);
+        setMessage(`Connecting GitHub App... (ID: ${installationId})`);
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
   
         try {
@@ -167,7 +166,7 @@ export const GitHubAppSetup = () => {
           } else {
             handleSuccess('GitHub App connection updated successfully!');
           }
-          
+
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('state'); 
@@ -179,7 +178,7 @@ export const GitHubAppSetup = () => {
         }
         return;
       }
-  
+
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
@@ -187,7 +186,7 @@ export const GitHubAppSetup = () => {
           `Loaded (GitHub handle: ${developerProfile.github_handle || 'none'}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
           'Not loaded');
         
-        // Check if developer profile has installation ID
+        // Check if developer profile has installation ID 
         const hasInstallationId = developerProfile?.github_installation_id && 
                                  developerProfile.github_installation_id !== '';
                                  
@@ -195,7 +194,7 @@ export const GitHubAppSetup = () => {
           console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
           handleSuccess('GitHub App is already connected!', 1500);
         } else {
-          // Check if we need to wait for profile to load
+          // Check if we need to wait for profile to load 
           if (!developerProfile && retryCount < maxRetries) { 
             console.log('GitHubAppSetup: Waiting for developer profile to load...');
             setUiState('loading');
@@ -209,7 +208,7 @@ export const GitHubAppSetup = () => {
               setRetryCount(prev => prev + 1);
             }, 2000);
           } else {
-            console.log('GitHubAppSetup: No installation ID found or max retries reached. Showing GitHub App connection info...');
+            console.log('GitHubAppSetup: No installation ID found. Showing GitHub App connection info...');
             setUiState('info');
             setMessage('Connect your GitHub account to display your contributions and repositories.');
           }
@@ -217,7 +216,7 @@ export const GitHubAppSetup = () => {
         return;
       }
       
-      setUiState('loading'); 
+      setUiState('loading');
       setMessage('Please wait...');
     };
 
@@ -292,7 +291,7 @@ export const GitHubAppSetup = () => {
                 <p className="text-sm text-gray-600">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                   This is a one-time setup process that securely connects your GitHub account.
-                  {retryCount > 0 && (
+                  {retryCount > 0 && ( 
                     <span className="block mt-2 text-xs text-gray-500">
                       Retry attempt {retryCount} of {maxRetries}
                     </span>

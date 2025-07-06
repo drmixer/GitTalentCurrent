@@ -10,16 +10,9 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
   const navigate = useNavigate();
 
   const handleGoToGitHubActivity = () => {
-    // Use the connectGitHubApp function from AuthContext
-    const { connectGitHubApp } = useAuth();
-    
-    connectGitHubApp()
-      .then(() => {
-        onClose(); // Close the prompt after initiating the connection
-      })
-      .catch(error => {
-        console.error('Error connecting to GitHub:', error);
-      });
+    // Navigate to GitHub setup page instead of direct GitHub App URL
+    navigate('/github-setup');
+    onClose(); // Close the prompt after navigating
   };
 
   return (
