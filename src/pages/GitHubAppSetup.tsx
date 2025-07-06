@@ -93,12 +93,22 @@ export const GitHubAppSetup = () => {
   useEffect(() => {
     const handleSetup = async () => {
       const searchParams = new URLSearchParams(location.search);
-      const installationId = searchParams.get('installation_id');
+      const installationId = searchParams.get('installation_id'); 
       const setupAction = searchParams.get('setup_action');
       const code = searchParams.get('code');
       const errorParam = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
       const state = searchParams.get('state');
+      
+      console.log('GitHubAppSetup: URL parameters:', { 
+        installationId, 
+        setupAction, 
+        code,
+        errorParam, 
+        errorDescription,
+        state
+      });
+      console.log('GitHubAppSetup: Full URL:', window.location.href);
   
       // Reset retry count when params change
       if (installationId || errorParam) {
@@ -153,11 +163,16 @@ export const GitHubAppSetup = () => {
       // Scenario 1: App Install/Reconfigure for an existing user
       if (user && installationId) {
         setUiState('loading'); 
-        setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
+        setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
         try {
+          console.log('GitHubAppSetup: Calling update_github_installation function with:', {
+            userId: user.id,
+            installationId
+          });
           await saveInstallationId(installationId, user.id);
+          console.log('GitHubAppSetup: Installation ID saved successfully');
           
           if (setupAction === 'install') {
             handleSuccess('GitHub App successfully installed and connected!');
@@ -181,9 +196,11 @@ export const GitHubAppSetup = () => {
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('Developer profile:', developerProfile 
-          ? `Loaded (GitHub handle: ${developerProfile.github_handle || 'none'}, Installation ID: ${developerProfile.github_installation_id || 'none'})`
-          : 'Not loaded');
+        console.log('Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
+        if (developerProfile) {
+          console.log('GitHub handle:', developerProfile.github_handle || 'none');
+          console.log('Installation ID:', developerProfile.github_installation_id || 'none');
+        }
         
         // Check if developer profile has installation ID 
         const hasInstallationId = developerProfile?.github_installation_id && 
@@ -194,10 +211,11 @@ export const GitHubAppSetup = () => {
           handleSuccess('GitHub App is already connected!', 1500);
         } else {
           // Check if we need to wait for profile to load 
-          if (!developerProfile && retryCount < maxRetries) { 
+          if (!developerProfile && retryCount < 3) { // Using a fixed value of 3 for maxRetries
             console.log('GitHubAppSetup: Waiting for developer profile to load...');
+            console.log(`GitHubAppSetup: Retry ${retryCount + 1}/3`);
             setUiState('loading');
-            setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
+            setMessage(`Loading your profile... (Attempt ${retryCount + 1}/3)`); 
             
             // Increment retry count and try to refresh profile
             setTimeout(() => {
