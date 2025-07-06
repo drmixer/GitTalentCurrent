@@ -106,6 +106,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             company_name: authUser.user_metadata?.company_name || 'Company'
           }
         );
+
         // Create profile directly in the database
         const { data: newProfile, error: createError } = await supabase
           .from('users')
@@ -116,6 +117,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role: authUser.user_metadata?.role || 'developer',
             is_approved: true // Auto-approve all users for now
           })
+          .select();
+
         if (rpcError) {
           console.error('❌ fetchUserProfile: Error creating user profile via RPC:', rpcError);
           setAuthError('Failed to create your profile: ' + rpcError.message);
@@ -126,7 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('✅ fetchUserProfile: Profile creation RPC result:', rpcResult);
         
         // Fetch the newly created profile
-        const { data: newProfile, error: fetchError } = await supabase
+        const { data: newlyCreatedProfile, error: fetchError } = await supabase
           .from('users')
           .select('*')
           .eq('id', authUser.id)
@@ -139,27 +142,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return null;
         }
         
-        console.log('✅ fetchUserProfile: Newly created profile fetched:', newProfile);
-        setUserProfile(newProfile);
+        console.log('✅ fetchUserProfile: Newly created profile fetched:', newlyCreatedProfile);
+        setUserProfile(newlyCreatedProfile);
         
         // If it's a developer, ensure developer profile exists
-        if (newProfile.role === 'developer') {
-          await ensureDeveloperProfile(authUser, newProfile);
+        if (newlyCreatedProfile.role === 'developer') {
+          await ensureDeveloperProfile(authUser, newlyCreatedProfile);
         }
         
         setLoading(false);
-        return newProfile;
-        
-        console.log('✅ fetchUserProfile: User profile created:', newProfile);
-        setUserProfile(newProfile);
-        
-        // If it's a developer, create developer profile
-        if (newProfile.role === 'developer') {
-          await createDeveloperProfileFromAuth(authUser, newProfile);
-        }
-        
-        setLoading(false);
-        return newProfile;
+        return newlyCreatedProfile;
       } else if (error) {
         console.error('❌ fetchUserProfile: Error fetching user profile:', error);
         setAuthError('Failed to load your profile. Please try again.');
@@ -173,10 +165,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (profile && profile.role === 'developer') {
         await fetchDeveloperProfile(authUser.id);
          
-         // If developer profile wasn't found, create it
-         if (!developerProfile) {
-           await ensureDeveloperProfile(authUser, profile);
-         }
+        // If developer profile wasn't found, create it
+        if (!developerProfile) {
+          await ensureDeveloperProfile(authUser, profile);
+        }
       }
 
       setLoading(false);
@@ -831,10 +823,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setLoading(true);
     try {
-      await fetchUserProfile(user);
-    } catch (error) {
-      console.error('❌ refreshProfile: Error refreshing profile:', error);
-    }
       await fetchUserProfile(user);
     } catch (error) {
       console.error('❌ refreshProfile: Error refreshing profile:', error);
