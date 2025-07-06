@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
       result = { updated: true, data };
     } else {
       console.log('Developer profile not found, checking if user exists');
-      // Check if user exists
+      // Check if user exists in the users table
       const { data: userData, error: userError } = await supabaseClient
         .from('users')
         .select('id, role')
