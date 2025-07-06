@@ -11,7 +11,7 @@ export const GitHubAppSetup = () => {
   const [retryCount, setRetryCount] = useState<number>(0);
   const maxRetries = 3;
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('info');
   const [message, setMessage] = useState('Connecting GitHub...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
 
@@ -211,7 +211,7 @@ export const GitHubAppSetup = () => {
           // Check if we need to wait for profile to load 
           if (!developerProfile && retryCount < maxRetries) {
             console.log('GitHubAppSetup: Waiting for developer profile to load...');
-            console.log(`GitHubAppSetup: Retry ${retryCount + 1}/${maxRetries}`);
+            console.log(`GitHubAppSetup: Retry attempt ${retryCount + 1}/${maxRetries}`);
             setUiState('loading'); 
             setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
             
@@ -226,7 +226,7 @@ export const GitHubAppSetup = () => {
           } else {
             console.log('GitHubAppSetup: No installation ID found or max retries reached. Showing GitHub App connection info...');
             setUiState('info');
-            setMessage('Connect your GitHub account to display your contributions and repositories.');
+            setMessage('Connect the GitHub App to display your contributions and repositories.');
           }
         }
         return;
@@ -247,7 +247,7 @@ export const GitHubAppSetup = () => {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
-            <Github className="w-10 h-10 text-white" aria-hidden="true" />
+            <Github className="w-10 h-10 text-white" />
           </div>
         </div>
 
@@ -261,7 +261,7 @@ export const GitHubAppSetup = () => {
 
         {uiState === 'loading' && (
           <div className="text-center">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500 mt-4">
               This allows us to sync your repository data and showcase your contributions.
@@ -271,7 +271,7 @@ export const GitHubAppSetup = () => {
 
         {uiState === 'redirect' && (
           <div className="text-center">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
+            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600 mb-6">{message}</p>
             <p className="text-sm text-gray-500">
               Please wait while we redirect you...
@@ -281,7 +281,7 @@ export const GitHubAppSetup = () => {
 
         {uiState === 'success' && (
           <div className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <p className="text-gray-600 mb-6">{message}</p>
             <p className="text-sm text-gray-500 mb-6">
               Redirecting you to your dashboard in a moment...
@@ -298,9 +298,9 @@ export const GitHubAppSetup = () => {
         {(uiState === 'error' || uiState === 'info') && (
           <div className="text-center">
             {uiState === 'error' ? (
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-6" aria-hidden="true" />
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-6" />
             ) : (
-              <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
+              <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" />
             )}
             <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             
@@ -318,7 +318,7 @@ export const GitHubAppSetup = () => {
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4 flex items-center justify-center"
                 >
                   <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                  Connect GitHub App
+                  Connect GitHub App Now
                 </button>
                 <button
                   onClick={() => navigate('/developer')}
@@ -328,7 +328,7 @@ export const GitHubAppSetup = () => {
                 </button>
               </div>
             )}
-
+            
             <div className="space-y-3">
               {uiState === 'error' && (
                 <button
@@ -342,7 +342,7 @@ export const GitHubAppSetup = () => {
                       if (developerProfile?.github_installation_id) {
                         handleSuccess('GitHub App is connected!');
                       } else {
-                        setUiState('info');
+                        setUiState('info'); 
                         setMessage('Connect your GitHub account to display your contributions and repositories.');
                       }
                     }, 2000);
