@@ -72,6 +72,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
+      console.log('🔄 fetchUserProfile: User metadata:', authUser.user_metadata);
       setAuthError(null);
 
       const { data: profile, error } = await supabase
@@ -82,18 +83,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create it
-        console.log('🔄 fetchUserProfile: Profile not found, creating one');
-        const profileCreated = await createUserProfileFromAuth(authUser);
+        console.log('🔄 fetchUserProfile: Profile not found in users table, creating one');
+        
+        // Create profile directly in the database
+        const { data: newProfile, error: createError } = await supabase
+          .from('users')
+          .insert({
+            id: authUser.id,
+            email: authUser.email || 'unknown@example.com',
+            name: authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'GitHub User',
+            role: authUser.user_metadata?.role || 'developer',
+            is_approved: true // Auto-approve all users for now
+          })
+          .select()
+          .single();
 
-        if (profileCreated) {
-          console.log('🔄 fetchUserProfile: Profile created, fetching again');
-          return await fetchUserProfile(authUser);
-        } else {
-          console.error('❌ fetchUserProfile: Failed to create profile');
-          setAuthError('Failed to create your profile. Please try again.');
+        if (createError) {
+          console.error('❌ fetchUserProfile: Error creating user profile:', createError);
+          setAuthError('Failed to create your profile: ' + createError.message);
           setLoading(false);
           return null;
         }
+        
+        console.log('✅ fetchUserProfile: User profile created:', newProfile);
+        setUserProfile(newProfile);
+        
+        // If it's a developer, create developer profile
+        if (newProfile.role === 'developer') {
+          await createDeveloperProfileFromAuth(authUser, newProfile);
+        }
+        
+        setLoading(false);
+        return newProfile;
       } else if (error) {
         console.error('❌ fetchUserProfile: Error fetching user profile:', error);
         setAuthError('Failed to load your profile. Please try again.');
@@ -104,7 +125,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('✅ fetchUserProfile: User profile fetched:', profile);
       setUserProfile(profile);
 
-      if (profile.role === 'developer') {
+      if (profile && profile.role === 'developer') {
         await fetchDeveloperProfile(authUser.id);
       }
 
@@ -115,6 +136,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAuthError('An unexpected error occurred. Please try again.');
       setLoading(false);
       return null;
+    }
+  };
+
+  const createDeveloperProfileFromAuth = async (authUser: SupabaseUser, userProfile: User) => {
+    try {
+      console.log('🔄 createDeveloperProfileFromAuth: Creating developer profile for:', authUser.id);
+      
+      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
+      const avatarUrl = authUser.user_metadata?.avatar_url || null;
+      
+      // Check if developer profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('developers')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+        
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ createDeveloperProfileFromAuth: Error checking for existing profile:', checkError);
+        return false;
+      }
+      
+      if (existingProfile) {
+        console.log('✅ createDeveloperProfileFromAuth: Developer profile already exists');
+        setDeveloperProfile(existingProfile);
+        return true;
+      }
+      
+      // Create new developer profile
+      const { data: devProfile, error: devError } = await supabase
+        .from('developers')
+        .insert({
+          user_id: authUser.id,
+          github_handle: githubUsername || '',
+          bio: authUser.user_metadata?.bio || '',
+          location: authUser.user_metadata?.location || '',
+          profile_pic_url: avatarUrl
+        })
+        .select();
+
+      if (devError) {
+        console.error('❌ createDeveloperProfileFromAuth: Error creating developer profile:', devError);
+        return false;
+      }
+      
+      console.log('✅ createDeveloperProfileFromAuth: Developer profile created:', devProfile);
+      setDeveloperProfile(devProfile[0]);
+      return true;
+    } catch (error) {
+      console.error('❌ createDeveloperProfileFromAuth: Unexpected error:', error);
+      return false;
     }
   };
 
@@ -129,7 +201,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('❌ fetchDeveloperProfile: Error fetching developer profile:', error);
+        console.error('❌ fetchDeveloperProfile: Error fetching developer profile:', error.message);
         setDeveloperProfile(null);
         return;
       }
@@ -137,7 +209,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('✅ fetchDeveloperProfile: Developer profile fetched:', devProfile);
       setDeveloperProfile(devProfile || null);
     } catch (error) {
-      console.error('❌ fetchDeveloperProfile: Unexpected error:', error);
+      console.error('❌ fetchDeveloperProfile: Unexpected error:', error instanceof Error ? error.message : error);
       setDeveloperProfile(null);
     }
   };
@@ -145,6 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     setAuthError(null);
+    console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
 
     try {
       const { data: existingProfile, error: profileError } = await supabase
@@ -160,6 +233,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
         const avatarUrl = authUser.user_metadata?.avatar_url || null;
+        const userBio = authUser.user_metadata?.bio || '';
+        const userLocation = authUser.user_metadata?.location || '';
 
         const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
         const userName = localStorage.getItem('gittalent_signup_name') || fullName;
@@ -181,7 +256,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (createError) {
           console.error('❌ handleGitHubSignIn: Error creating user profile:', createError);
           setAuthError('Failed to create user profile. Please try again.');
-          setLoading(false);
+          setLoading(false); 
           return;
         }
 
@@ -191,7 +266,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { error: devCreateError } = await supabase
             .from('developers')
             .insert({
-              user_id: authUser.id,
+              user_id: authUser.id, 
+              github_handle: githubUsername,
+              bio: userBio,
+              location: userLocation,
               github_handle: githubUsername,
               bio: authUser.user_metadata?.bio || '',
               location: authUser.user_metadata?.location || 'Remote',
@@ -202,6 +280,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.error('❌ handleGitHubSignIn: Error creating developer profile:', devCreateError);
           } else {
             await fetchDeveloperProfile(authUser.id);
+            console.log('✅ handleGitHubSignIn: Developer profile created and fetched');
           }
         }
       } else if (profileError) {
@@ -643,10 +722,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshProfile = async () => {
     if (!user) return;
 
-    console.log('🔄 refreshProfile: Refreshing profiles for user:', user.id); 
+    console.log('🔄 refreshProfile: Refreshing profiles for user:', user.id);
 
     setLoading(true);
-    await fetchUserProfile(user);
+    try {
+      await fetchUserProfile(user);
+    } catch (error) {
+      console.error('❌ refreshProfile: Error refreshing profile:', error);
+    }
     setLoading(false);
   };
 

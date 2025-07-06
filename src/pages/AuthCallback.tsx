@@ -6,6 +6,7 @@ import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-reac
 
 // GitHub App slug - must match exactly what's configured in GitHub
 const GITHUB_APP_SLUG = 'GitTalentApp';
+// Maximum number of retries for auth loading
 
 // Interface for state data from URL parameters
 interface StateData {
@@ -23,10 +24,11 @@ export const AuthCallback: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
-  const [message, setMessage] = useState('Connecting GitHub...');
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('loading');
+  const [message, setMessage] = useState('Verifying authentication...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
   const [authCompleted, setAuthCompleted] = useState(false);
+  const [authAttempted, setAuthAttempted] = useState(false);
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
@@ -46,7 +48,7 @@ export const AuthCallback: React.FC = () => {
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}`;
 
     console.log('🚀 AuthCallback: Redirecting to GitHub App installation with state:', stateObj);
-    console.log('🚀 AuthCallback: Full GitHub App installation URL:', githubAppInstallUrl);
+    console.log('🚀 AuthCallback: GitHub App installation URL:', githubAppInstallUrl);
 
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
@@ -130,8 +132,10 @@ export const AuthCallback: React.FC = () => {
             console.log('AuthCallback: Processing GitHub App installation with ID:', installationId);
 
             try {
-              const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
-                body: JSON.stringify({
+              // Update the installation ID directly in the database
+              const { error: updateError } = await supabase.from('developers').update({
+                  github_installation_id: installationId
+                }).eq('user_id', user.id);
                   userId: user.id,
                   installationId,
                 }),
@@ -141,7 +145,7 @@ export const AuthCallback: React.FC = () => {
               if (updateError) {
                 console.error('Error saving installation ID:', updateError);
                 setUiState('error');
-                setMessage(`Failed to save GitHub installation: ${updateError.message}`);
+                setMessage(`Failed to save GitHub installation: ${updateError.message || 'Database error'}`);
                 setProcessingInstallation(false);
                 return;
               }
@@ -152,7 +156,7 @@ export const AuthCallback: React.FC = () => {
               if (!refreshProfile) {
                 console.error('refreshProfile function is not available');
                 setUiState('error');
-                setMessage('Failed to refresh profile. Please try again.');
+                setMessage('Failed to refresh profile. Please try again or contact support.');
                 setProcessingInstallation(false);
                 return;
               }
@@ -189,7 +193,7 @@ export const AuthCallback: React.FC = () => {
             console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
             setUiState('loading');
             setMessage('Waiting for authentication to complete before processing GitHub installation...');
-            return;
+            setAuthAttempted(true);
           } else if (processingInstallation) {
             console.log('AuthCallback: Already processing installation, waiting for completion');
             setUiState('loading');
@@ -219,7 +223,7 @@ export const AuthCallback: React.FC = () => {
           }
 
           setUiState('loading');
-          setMessage('Verifying authentication...');
+          setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
           timeoutId = window.setTimeout(() => {
             setRetryCount(prev => prev + 1);
           }, 2000);
@@ -303,10 +307,12 @@ export const AuthCallback: React.FC = () => {
           setUiState('loading');
           setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
           if (retryCount >= maxRetries) {
-            setMessage('Authentication is taking longer than expected. You may need to refresh the page.');
+            setUiState('error');
+            setMessage('Authentication is taking too long. Please try again or refresh the page.');
           } else {
             timeoutId = window.setTimeout(() => {
               setRetryCount(prev => prev + 1);
+              if (refreshProfile) refreshProfile();
             }, 2000);
           }
           return;
@@ -342,6 +348,7 @@ export const AuthCallback: React.FC = () => {
     processingInstallation,
     refreshProfile,
     redirectToGitHubAppInstall,
+    authAttempted,
     retryCount,
     authCompleted,
   ]);
@@ -355,7 +362,7 @@ export const AuthCallback: React.FC = () => {
           </div>
         </div>
 
-        <h1 className="text-2xl font-black text-center text-gray-900 mb-6" role="heading" aria-level={1}>
+        <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
           {uiState === 'loading' && 'Processing Authentication'}
           {uiState === 'success' && 'Authentication Successful!'}
           {uiState === 'redirect' && 'Redirecting...'}
@@ -367,7 +374,7 @@ export const AuthCallback: React.FC = () => {
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600">{message}</p>
             <div className="mt-4">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 mb-4">
                 {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`}
                 {retryCount > 0 && <span className="block mt-2 text-xs text-gray-500">This is taking longer than expected...</span>}
               </p>
@@ -376,6 +383,7 @@ export const AuthCallback: React.FC = () => {
                   onClick={() => navigate('/dashboard', { replace: true })}
                   className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
+                  <RefreshCw className="w-4 h-4 mr-2 inline" />
                   Go to Dashboard
                 </button>
               )}
@@ -388,7 +396,7 @@ export const AuthCallback: React.FC = () => {
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">Please wait while we redirect you...</p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               You'll be redirected to GitHub to install the GitTalent App to access your GitHub data
             </p>
           </div>
@@ -398,7 +406,7 @@ export const AuthCallback: React.FC = () => {
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500 mb-6">Redirecting you to your dashboard in a moment...</p>
+            <p className="text-sm text-gray-500 mb-6">You'll be redirected to your dashboard in a moment...</p>
             <button
               onClick={() => navigate('/dashboard', { replace: true })}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
@@ -413,7 +421,7 @@ export const AuthCallback: React.FC = () => {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-red-600 mb-6">{message}</p>
             {authError && <p className="text-sm text-red-500 mb-4">{authError}</p>}
-            <div className="flex flex-col space-y-3 mb-4">
+            <div className="flex flex-col space-y-3">
               <button
                 onClick={() => navigate('/login')}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold w-full flex items-center justify-center"
@@ -421,7 +429,7 @@ export const AuthCallback: React.FC = () => {
                 Return to Login
               </button>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => { window.location.reload(); }}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium w-full flex items-center justify-center"
               >
                 <RefreshCw className="w-4 h-4 mr-2 inline" />

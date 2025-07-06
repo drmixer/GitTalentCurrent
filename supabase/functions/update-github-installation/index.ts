@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
   try {
     // Get the request body
     const requestBody = await req.text();
-    console.log("Request body:", requestBody);
+    console.log("Request body received:", requestBody);
     
     let userId, installationId;
     
@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
       const parsedBody = JSON.parse(requestBody);
       userId = parsedBody.userId;
       installationId = parsedBody.installationId;
-      console.log("Parsed request:", { userId, installationId });
+      console.log("Parsed request parameters:", { userId, installationId });
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
       return new Response(
@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
     
     // Validate userId parameter
     if (!userId) {
-      return new Response(JSON.stringify({ error: "userId is required" }), {
+      return new Response(JSON.stringify({ error: "userId parameter is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
 
     // Validate installationId parameter
     if (!installationId) {
-      return new Response(JSON.stringify({ error: "installationId is required" }), {
+      return new Response(JSON.stringify({ error: "installationId parameter is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     
     // Validate the installation ID
     if (installationId === 'pending') {
-      return new Response(JSON.stringify({ error: "Invalid installation ID: 'pending' is not a valid ID" }), {
+      return new Response(JSON.stringify({ error: "Invalid installation ID: 'pending' is not valid" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
     // First, check if the developer profile exists
     const { data: developerData, error: developerError } = await supabaseClient 
       .from('developers')
-      .select('user_id, github_handle, github_installation_id')
+      .select('*')
       .eq('user_id', userId)
       .maybeSingle();
     
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
     
     let result;
     
-    if (developerData) {
+    if (developerData) { 
       console.log('Developer profile found, updating installation ID');
       console.log('Current installation ID:', developerData.github_installation_id);
       console.log('New installation ID:', installationId);
@@ -107,7 +107,10 @@ Deno.serve(async (req: Request) => {
       // Update the existing developer profile
       const { data, error } = await supabaseClient
         .from('developers')
-        .update({ github_installation_id: installationId })
+        .update({ 
+          github_installation_id: installationId,
+          updated_at: new Date().toISOString()
+        })
         .eq('user_id', userId)
         .select();
       
@@ -132,7 +135,7 @@ Deno.serve(async (req: Request) => {
       // Check if user exists in the users table
       const { data: userData, error: userError } = await supabaseClient
         .from('users')
-        .select('id, role, name, email')
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
       
@@ -167,15 +170,17 @@ Deno.serve(async (req: Request) => {
       console.log('User found, creating new developer profile with installation ID');
       console.log('User data:', userData);
       
-      // Create a new developer profile
+      // Create a new developer profile with the installation ID
       const { data, error } = await supabaseClient
         .from('developers')
         .insert({
           user_id: userId,
           github_handle: '',
           bio: '',
-          availability: true,
-          github_installation_id: installationId
+          availability: true, 
+          github_installation_id: installationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select(); 
 
@@ -199,7 +204,11 @@ Deno.serve(async (req: Request) => {
     
     // Return the result
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({ 
+        success: true,
+        message: 'GitHub installation ID updated successfully',
+        data: result
+      }),
       {
         status: 200,
         headers: {
@@ -211,8 +220,11 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in update-github-installation function:', error); 
     
-    return new Response( 
-      JSON.stringify({ error: error.message || "An unexpected error occurred during installation update" }),
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        error: error.message || "An unexpected error occurred during installation update"
+      }),
       {
         status: 500,
         headers: {
