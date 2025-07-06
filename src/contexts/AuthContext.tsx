@@ -34,13 +34,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('🔄 AuthProvider: Initializing auth state...');
     prevSessionRef.current = null;
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => { // Made this async
       console.log('🔄 AuthProvider: Current session from getSession():', currentSession ? 'Found' : 'None');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+
+      // Test Supabase client calls here, outside of onAuthStateChange
+      if (currentSession?.user) {
+        console.log('🔄 AuthProvider: DEBUG_EFFECT - User found in getSession(). Testing Supabase calls.');
+        try {
+          console.log('🔄 AuthProvider: DEBUG_EFFECT - Test A: Before supabase.auth.getUser().');
+          const { data: { user: testUser }, error: testUserError } = await supabase.auth.getUser();
+          if (testUserError) {
+            console.error('❌ AuthProvider: DEBUG_EFFECT - Test A: supabase.auth.getUser() FAILED:', testUserError);
+          } else {
+            console.log('✅ AuthProvider: DEBUG_EFFECT - Test A: supabase.auth.getUser() success. User ID:', testUser?.id);
+          }
+        } catch (e: unknown) {
+          console.error('❌ AuthProvider: DEBUG_EFFECT - Test A: CRITICAL EXCEPTION during supabase.auth.getUser():', e);
+        }
+
+        try {
+          console.log('🔄 AuthProvider: DEBUG_EFFECT - Test B: Before Supabase query users table limit 1.');
+          const { data: usersTestData, error: usersTestError } = await supabase.from('users').select('id').limit(1);
+          if (usersTestError) {
+            console.error('❌ AuthProvider: DEBUG_EFFECT - Test B: Supabase query FAILED:', usersTestError);
+          } else {
+            console.log('✅ AuthProvider: DEBUG_EFFECT - Test B: Supabase query success. Data:', usersTestData);
+          }
+        } catch (e: unknown) {
+          console.error('❌ AuthProvider: DEBUG_EFFECT - Test B: CRITICAL EXCEPTION during Supabase query:', e);
+        }
+      }
+      // End of new test calls
+
       if (!currentSession?.user) {
         setLoading(false);
       }
+      // Note: Original fetchUserProfile call from here was removed in previous steps.
+      // onAuthStateChange is now the sole trigger for profile loading.
     }).catch(error => {
       console.error('❌ AuthProvider: Error in getSession():', error);
       setLoading(false);
@@ -232,10 +264,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log(`🔄 handleGitHubSignIn: DEBUG Calling setLoading(false) in finally for ${authUser.id}.`);
         setLoading(false);
       }
-      console.log(`🔄 handleGitHubSignIn: DEBUG setLoading(false) called/checked. Loading is now: ${loading}.`); // Note: this will show stale `loading`
+      console.log(`🔄 handleGitHubSignIn: DEBUG setLoading(false) called/checked. Loading is now: ${loading}.`);
     }
   };
 
+  // Other methods like signUp, signIn, etc. are assumed to be here and correct
+  // For brevity, they are omitted from this overwrite but should be in the actual file.
   const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any; error: any | null }> => {
     try {
       setAuthError(null);
