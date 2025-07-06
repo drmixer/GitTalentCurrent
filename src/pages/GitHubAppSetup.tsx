@@ -10,7 +10,6 @@ export const GitHubAppSetup = () => {
   const location = useLocation();
   const [retryCount, setRetryCount] = useState<number>(0);
   const maxRetries = 3;
-  const maxRetries = 3;
 
   const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
@@ -95,7 +94,6 @@ export const GitHubAppSetup = () => {
       const installationId = searchParams.get('installation_id'); 
       const setupAction = searchParams.get('setup_action');
       const code = searchParams.get('code');
-      const errorParam = searchParams.get('error');
       const errorParam = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
       const state = searchParams.get('state');
@@ -189,8 +187,6 @@ export const GitHubAppSetup = () => {
           cleanUrl.searchParams.delete('setup_action');
           cleanUrl.searchParams.delete('state'); 
           cleanUrl.searchParams.delete('code');
-          cleanUrl.searchParams.delete('code');
-          cleanUrl.searchParams.delete('setup_action');
           window.history.replaceState({}, '', cleanUrl.toString());
         } catch (err) {
           handleError(err instanceof Error ? err.message : 'Failed to save GitHub installation.');
@@ -202,7 +198,7 @@ export const GitHubAppSetup = () => {
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('GitHubAppSetup: Developer profile:', developerProfile 
+        console.log('GitHubAppSetup: Developer profile:', developerProfile); 
         if (developerProfile) {
           console.log('GitHub handle:', developerProfile.github_handle || 'none');
           console.log('Installation ID:', developerProfile.github_installation_id || 'none');
