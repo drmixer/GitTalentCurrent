@@ -38,19 +38,18 @@ export const AuthCallback: React.FC = () => {
     };
 
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
-    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
-    const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${returnUrl}`;
-    
-    console.log('🚀 AuthCallback: Redirecting to GitHub App installation with state:', stateObj);
-    console.log('🚀 AuthCallback: Full GitHub App installation URL:', githubAppInstallUrl);
-    setStatus('redirect');
-    setMessage('Redirecting to GitHub App installation page...');
+const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}`;
 
-    // Short delay to ensure UI updates before redirect
-    setTimeout(() => {
-      console.log('🚀 AuthCallback: Executing redirect to GitHub App installation');
-      window.location.href = githubAppInstallUrl;
-    }, 500);
+console.log('🚀 AuthCallback: Redirecting to GitHub App installation with state:', stateObj);
+console.log('🚀 AuthCallback: Full GitHub App installation URL:', githubAppInstallUrl);
+setStatus('redirect');
+setMessage('Redirecting to GitHub App installation page...');
+
+// Short delay to ensure UI updates before redirect
+setTimeout(() => {
+  console.log('🚀 AuthCallback: Executing redirect to GitHub App installation');
+  window.location.href = githubAppInstallUrl;
+}, 500);
   }, [user]);
 
   useEffect(() => {
