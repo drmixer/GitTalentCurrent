@@ -136,11 +136,6 @@ export const AuthCallback: React.FC = () => {
               const { error: updateError } = await supabase.from('developers').update({
                   github_installation_id: installationId
                 }).eq('user_id', user.id);
-                  userId: user.id,
-                  installationId,
-                }),
-              });
-              console.log('AuthCallback: Edge function response:', data);
 
               if (updateError) {
                 console.error('Error saving installation ID:', updateError);
@@ -150,7 +145,7 @@ export const AuthCallback: React.FC = () => {
                 return;
               }
 
-              console.log('Successfully saved installation ID:', installationId, data);
+              console.log('Successfully saved installation ID:', installationId);
               console.log('AuthCallback: About to refresh profile to get updated installation ID');
 
               if (!refreshProfile) {
