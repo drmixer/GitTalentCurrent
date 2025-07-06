@@ -312,7 +312,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log(`🔄 createDeveloperProfileFromAuth: Evaluating for user: ${authUser.id}. This function may be redundant.`);
     // For now, let it delegate to ensureDeveloperProfile for safety, though it should ideally be consolidated.
     return await ensureDeveloperProfile(authUser);
-    /*
+    /* The following block is the original implementation, commented out as it's likely redundant.
     try {
       console.log('🔄 createDeveloperProfileFromAuth: Creating developer profile for:', authUser.id);
       
