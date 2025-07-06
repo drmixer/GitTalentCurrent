@@ -17,6 +17,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const prevSessionRef = useRef<Session | null>(null);
+  const isProcessingAuthStateChangeRef = useRef(false);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null | undefined>(null);
   const [loading, setLoading] = useState(true);
@@ -44,42 +45,79 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('🔄 AuthProvider: Auth state changed:', event, newSession ? 'Session exists' : 'No session');
-      
+
+      if (isProcessingAuthStateChangeRef.current) {
+        console.log('🔄 AuthProvider: Auth state change event ignored, already processing.');
+        return;
+      }
+
       // Compare the new session with the previous one
       const prevSessionStr = JSON.stringify(prevSessionRef.current);
       const newSessionStr = JSON.stringify(newSession);
-      
-      if (prevSessionStr === newSessionStr) {
+
+      if (prevSessionStr === newSessionStr && event !== 'INITIAL_SESSION') { // Allow initial session to always process
         console.log('🔄 AuthProvider: Session unchanged, skipping update');
+        // If session is truly unchanged, ensure loading is false if no user.
+        if (!newSession?.user && !user) setLoading(false);
         return;
       }
       
-      // Update the ref with the new session before setting state
-      prevSessionRef.current = newSession;
+      isProcessingAuthStateChangeRef.current = true;
+      console.log('🔄 AuthProvider: Processing auth state change.');
 
-      setSession(newSession);
-      const newUser = newSession?.user ?? null;
-      setUser(newUser);
-      setAuthError(null);
+      try {
+        // Update the ref with the new session before setting state
+        prevSessionRef.current = newSession;
 
-      if (newUser) {
-        if (event === 'SIGNED_IN') {
-          if (newUser.app_metadata?.provider === 'github') {
-            console.log('🔄 AuthProvider: GitHub sign-in detected, handling GitHub auth');
-            await handleGitHubSignIn(newUser);
+        setSession(newSession);
+        const newUser = newSession?.user ?? null;
+        setUser(newUser);
+        setAuthError(null); // Clear previous errors on new auth event
+
+        if (newUser) {
+          // Always set loading to true when a user is present and we're about to fetch/process profiles
+          setLoading(true);
+          if (event === 'SIGNED_IN') {
+            if (newUser.app_metadata?.provider === 'github') {
+              console.log('🔄 AuthProvider: GitHub sign-in detected, handling GitHub auth');
+              await handleGitHubSignIn(newUser);
+            } else {
+              console.log('🔄 AuthProvider: Non-GitHub sign-in detected, fetching profile');
+              await fetchUserProfile(newUser);
+            }
+          } else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+            // For these events, it's usually good to re-fetch the profile to ensure data is fresh
+            console.log(`🔄 AuthProvider: Event ${event} detected, fetching profile`);
+            await fetchUserProfile(newUser);
+          } else if (event === 'SIGNED_OUT') {
+             // This case should ideally be handled by the 'else' block below (newUser is null)
+            console.log('🔄 AuthProvider: SIGNED_OUT event, clearing profiles');
+            setUserProfile(null);
+            setDeveloperProfile(null);
+            setLoading(false);
           } else {
-            console.log('🔄 AuthProvider: Non-GitHub sign-in detected, fetching profile');
+            // For other events where user is present, fetch profile if not already loaded or to be safe
+            console.log(`🔄 AuthProvider: Auth state change (${event}), fetching profile`);
             await fetchUserProfile(newUser);
           }
-        } else {
-          console.log('🔄 AuthProvider: Auth state change (not SIGNED_IN), fetching profile');
-          await fetchUserProfile(newUser);
+        } else { // No user
+          console.log('🔄 AuthProvider: No user after auth state change, clearing profiles');
+          setUserProfile(null);
+          setDeveloperProfile(null);
+          setLoading(false); // Definitely no loading if no user
         }
-      } else {
-        console.log('🔄 AuthProvider: No user after auth state change, clearing profiles');
-        setUserProfile(null);
-        setDeveloperProfile(null);
-        setLoading(false);
+      } catch (error) {
+        console.error('❌ AuthProvider: Error in onAuthStateChange handler:', error);
+        setAuthError(error instanceof Error ? error.message : 'An unexpected error occurred in auth state handler.');
+        setLoading(false); // Ensure loading is false on error
+      } finally {
+        isProcessingAuthStateChangeRef.current = false;
+        console.log('🔄 AuthProvider: Finished processing auth state change.');
+        // Final check: if no user and profiles are null, ensure loading is false.
+        // This handles cases where an async operation might have set loading true, then user becomes null.
+        if (!user && !userProfile && !developerProfile) {
+            setLoading(false);
+        }
       }
     });
 
@@ -90,11 +128,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
+    console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
+    setAuthError(null);
+    setLoading(true);
     try {
-      console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
       console.log('🔄 fetchUserProfile: User metadata:', authUser.user_metadata);
-      setAuthError(null);
-      setLoading(true);
 
       const { data: profile, error } = await supabase
         .from('users')
@@ -191,8 +229,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error('❌ fetchUserProfile: Unexpected error:', error);
       setAuthError('An unexpected error occurred. Please try again.');
-      setLoading(false);
       return null;
+    } finally {
+      setLoading(false);
+      console.log('🔄 fetchUserProfile: Finished fetching profile, loading set to false.');
     }
   }; 
   
@@ -337,6 +377,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     setAuthError(null);
+    // setLoading(true) is typically set by the caller like onAuthStateChange
     console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
 
     try {
@@ -353,9 +394,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
         const avatarUrl = authUser.user_metadata?.avatar_url || null;
-
-        // Get role from localStorage or default to developer
-        // This is set in the SignupForm before GitHub OAuth
         const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
         const userName = localStorage.getItem('gittalent_signup_name') || fullName;
 
@@ -395,26 +433,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           if (devCreateError) {
             console.error('❌ handleGitHubSignIn: Error creating developer profile:', devCreateError);
+            // Potentially set an error message but don't necessarily stop loading,
+            // as base user profile might be okay.
           } else {
-            await fetchDeveloperProfile(authUser.id);
+            await fetchDeveloperProfile(authUser.id); // This sets developerProfile state
             console.log('✅ handleGitHubSignIn: Developer profile created and fetched');
           }
         }
       } else if (profileError) {
         console.error('❌ handleGitHubSignIn: Error fetching user profile:', profileError);
         setAuthError('Failed to load your profile. Please try again.');
-        setLoading(false);
-      } else {
+        setLoading(false); // Critical error, stop loading
+        return;
+      } else { // Profile exists
         setUserProfile(existingProfile);
-
         if (existingProfile.role === 'developer') {
-          await fetchDeveloperProfile(authUser.id);
+          await fetchDeveloperProfile(authUser.id); // This sets developerProfile state
         }
       }
+      // If we've reached this point without returning, it means operations were successful or non-critical.
+      // The main loading state should be concluded.
+      setLoading(false);
+      console.log('✅ handleGitHubSignIn: Successfully processed GitHub sign-in.');
+
     } catch (error) {
       console.error('❌ handleGitHubSignIn: Error handling GitHub sign in:', error);
       setAuthError('Error during GitHub sign in. Please try again.');
-      setLoading(false);
+      setLoading(false); // Ensure loading is false on any unexpected error
     }
   };
 
