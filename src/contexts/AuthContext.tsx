@@ -421,6 +421,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`🔄 handleGitHubSignIn: DEBUG - Original logic commented out for this test for user ${authUser.id}.`);
 
       // Original logic commented out below for debugging:
+      // Ensure this block comment is properly terminated
       /*
       let userProfileData: User | null = null;
       let profileError: any = null;
