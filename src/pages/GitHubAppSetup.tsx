@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, developerProfile, refreshProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, developerProfile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -16,16 +16,30 @@ export const GitHubAppSetup = () => {
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
-    const GITHUB_APP_SLUG = 'GitTalentApp'; // Your GitHub App slug
+    const GITHUB_APP_SLUG = 'GitTalentApp'; // Make sure this matches your GitHub App slug exactly
     const searchParams = new URLSearchParams(location.search);
-    const stateParam = searchParams.get('state') || '';
+    const stateParam = searchParams.get('state');
     
-    // Create a state object with installation_id and any existing state
-    const state = encodeURIComponent(JSON.stringify({
+    // Parse existing state if available
+    let existingState = {};
+    if (stateParam) {
+      try {
+        existingState = JSON.parse(decodeURIComponent(stateParam));
+        console.log('GitHubAppSetup: Parsed existing state:', existingState);
+      } catch (e) {
+        console.error('GitHubAppSetup: Error parsing state param:', e);
+      }
+    }
+    
+    // Create a new state object with installation_id and existing state
+    const stateObj = {
+      ...existingState,
       installation_id: 'pending',
       redirect_uri: `${window.location.origin}/github-setup`,
-      original_state: stateParam
-    }));
+      user_id: user?.id
+    };
+    
+    const state = encodeURIComponent(JSON.stringify(stateObj));
     
     const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${state}&redirect_uri=${returnUrl}`;
@@ -38,7 +52,7 @@ export const GitHubAppSetup = () => {
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
-  }, [location.search]);
+  }, [location.search, user]);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
     console.log('GitHubAppSetup: Success - ', successMessage);
@@ -58,7 +72,7 @@ export const GitHubAppSetup = () => {
   const saveInstallationId = useCallback(async (id: string, currentUserId: string) => { 
     try {
       const { error: updateError } = await supabase 
-        .functions.invoke('update-github-installation', {
+        .functions.invoke('update-github-installation', { 
           body: { 
             userId: currentUserId,
             installationId: id
@@ -67,7 +81,7 @@ export const GitHubAppSetup = () => {
 
       if (updateError) {
         throw new Error(`Failed to save installation ID: ${updateError.message}`);
-      }
+      } 
       
       // After saving, refresh profile to get the latest state including the new installation ID
       if (refreshProfile) {
@@ -85,10 +99,9 @@ export const GitHubAppSetup = () => {
       const searchParams = new URLSearchParams(location.search);
       const installationId = searchParams.get('installation_id');
       const setupAction = searchParams.get('setup_action');
-      const code = searchParams.get('code');
-      const errorParam = searchParams.get('error') || '';
-      const errorDescription = searchParams.get('error_description') || '';
-      const state = searchParams.get('state') || '';
+      const errorParam = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
+      const state = searchParams.get('state');
   
       // Reset retry count when params change
       if (installationId || errorParam) {
@@ -96,7 +109,7 @@ export const GitHubAppSetup = () => {
       }
   
       console.log('GitHubAppSetup: URL params:', { 
-        installationId: installationId || 'none', 
+        installationId, 
         setupAction, 
         code,
         errorParam, 
@@ -104,7 +117,7 @@ export const GitHubAppSetup = () => {
         state
       });
   
-      // Handle errors first
+      // Handle errors first 
       if (errorParam) {
         handleError(`GitHub Error: ${errorDescription || errorParam}`);
         return;
@@ -112,7 +125,7 @@ export const GitHubAppSetup = () => {
   
       // If auth is still loading, wait.
       if (authLoading) {
-        console.log('GitHubAppSetup: Auth context loading, waiting...');
+        console.log('GitHubAppSetup: Auth context loading, waiting... (Attempt', retryCount + 1, 'of', maxRetries, ')');
         
         if (retryCount > maxRetries) {
           setUiState('error');
@@ -120,7 +133,7 @@ export const GitHubAppSetup = () => {
         } else {
           setUiState('loading');
           setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-  
+          
           // Set a timeout to increment retry count and refresh profile
           const timer = setTimeout(() => {
             setRetryCount(prev => prev + 1);
@@ -133,7 +146,7 @@ export const GitHubAppSetup = () => {
         return;
       }
   
-      // If no user after auth loading is complete, redirect to login page
+      // If no user after auth loading is complete, redirect to login
       if (!user) {
         console.log('GitHubAppSetup: No user, redirecting to login.');
         navigate('/login', { replace: true });
@@ -141,7 +154,7 @@ export const GitHubAppSetup = () => {
       }
   
       // Scenario 1: App Install/Reconfigure for an existing user
-      if (user && installationId && installationId !== 'pending') {
+      if (user && installationId) {
         setUiState('loading'); 
         setMessage(`Connecting GitHub App...`);
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
@@ -149,7 +162,7 @@ export const GitHubAppSetup = () => {
         try {
           await saveInstallationId(installationId, user.id);
           
-          if (setupAction === 'install' || setupAction === 'update') {
+          if (setupAction === 'install') {
             handleSuccess('GitHub App successfully installed and connected!');
           } else {
             handleSuccess('GitHub App connection updated successfully!');
@@ -157,7 +170,8 @@ export const GitHubAppSetup = () => {
           
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
-          cleanUrl.searchParams.delete('state');
+          cleanUrl.searchParams.delete('state'); 
+          cleanUrl.searchParams.delete('code');
           cleanUrl.searchParams.delete('setup_action');
           window.history.replaceState({}, '', cleanUrl.toString());
         } catch (err) {
@@ -169,7 +183,9 @@ export const GitHubAppSetup = () => {
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('Developer profile:', developerProfile ? `Loaded (Installation ID: ${developerProfile.github_installation_id || 'none'})` : 'Not loaded');
+        console.log('Developer profile:', developerProfile ? 
+          `Loaded (GitHub handle: ${developerProfile.github_handle || 'none'}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
+          'Not loaded');
         
         // Check if developer profile has installation ID
         const hasInstallationId = developerProfile?.github_installation_id && 
@@ -177,7 +193,7 @@ export const GitHubAppSetup = () => {
                                  
         if (hasInstallationId) {
           console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
-          handleSuccess('GitHub App is already connected!', 1000);
+          handleSuccess('GitHub App is already connected!', 1500);
         } else {
           // Check if we need to wait for profile to load
           if (!developerProfile && retryCount < maxRetries) { 
@@ -193,7 +209,7 @@ export const GitHubAppSetup = () => {
               setRetryCount(prev => prev + 1);
             }, 2000);
           } else {
-            console.log('GitHubAppSetup: No installation ID found. Showing GitHub App connection info...');
+            console.log('GitHubAppSetup: No installation ID found or max retries reached. Showing GitHub App connection info...');
             setUiState('info');
             setMessage('Connect your GitHub account to display your contributions and repositories.');
           }
@@ -201,7 +217,7 @@ export const GitHubAppSetup = () => {
         return;
       }
       
-      setUiState('info'); 
+      setUiState('loading'); 
       setMessage('Please wait...');
     };
 
@@ -209,7 +225,7 @@ export const GitHubAppSetup = () => {
   }, [user, developerProfile, authLoading, location.search, navigate, refreshProfile, 
       handleSuccess, handleError, saveInstallationId, redirectToGitHubAppInstall, retryCount]);
 
-  return ( 
+  return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="flex justify-center mb-6">
@@ -232,7 +248,7 @@ export const GitHubAppSetup = () => {
             <p className="text-gray-600">{message}</p>
             <p className="text-sm text-gray-500 mt-4">
               This allows us to sync your repository data and showcase your contributions.
-            </p>
+            </p> 
           </div>
         )}
 
@@ -240,7 +256,7 @@ export const GitHubAppSetup = () => {
           <div className="text-center">
             <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500">
               Please wait while we redirect you...
             </p>
           </div>
@@ -250,7 +266,7 @@ export const GitHubAppSetup = () => {
           <div className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" aria-hidden="true" />
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 mb-6">
               Redirecting you to your dashboard in a moment...
             </p> 
             <button
@@ -258,7 +274,7 @@ export const GitHubAppSetup = () => {
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
             >
               {uiState === 'error' ? 'Return to Dashboard' : 'Go to Dashboard'}
-            </button>
+            </button> 
           </div>
         )}
 
@@ -267,7 +283,7 @@ export const GitHubAppSetup = () => {
             {uiState === 'error' ? (
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
             ) : (
-              <Github className="h-12 w-12 text-blue-500 mx-auto mb-4" aria-hidden="true" />
+              <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" aria-hidden="true" />
             )}
             <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
             

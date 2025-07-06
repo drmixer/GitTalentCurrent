@@ -175,6 +175,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     
+    // Clear any previous errors
+    setAuthError(null);
+    
     try {
       // First, check if the user profile exists
       const { data: existingProfile, error: profileError } = await supabase
@@ -190,7 +193,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Extract data from GitHub metadata
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
-        const avatarUrl = authUser.user_metadata?.avatar_url || '';
+        const avatarUrl = authUser.user_metadata?.avatar_url || null;
         
         // Try to get role from localStorage (set during signup)
         const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
@@ -204,9 +207,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .insert({
             id: authUser.id,
             email: authUser.email || 'unknown@example.com',
-            name: userName,
-            role: userRole,
-            is_approved: userRole === 'developer' // Auto-approve developers
+            name: userName || 'GitHub User',
+            role: userRole === 'recruiter' ? 'recruiter' : 'developer', // Default to developer if not recruiter
+            is_approved: userRole !== 'recruiter' // Auto-approve developers and admins
           })
           .select()
           .single();
@@ -224,6 +227,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If it's a developer, create developer profile
         if (userRole === 'developer' && githubUsername) {
           console.log('🔄 handleGitHubSignIn: Creating developer profile with GitHub handle:', githubUsername);
+          console.log('🔄 handleGitHubSignIn: Avatar URL:', avatarUrl);
           
           const { error: devCreateError } = await supabase
             .from('developers')
@@ -231,7 +235,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               user_id: authUser.id,
               github_handle: githubUsername,
               bio: authUser.user_metadata?.bio || '',
-              location: authUser.user_metadata?.location || '',
+              location: authUser.user_metadata?.location || 'Remote',
               profile_pic_url: avatarUrl
             });
           
@@ -438,16 +442,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async () => {
     try {
       setAuthError(null);
-      console.log('🔄 signInWithGitHub: Attempting GitHub sign in');
+      console.log('🔄 signInWithGitHub: Attempting GitHub sign in with state params:', stateParams);
       
       // Store any signup data from localStorage in the state parameter
       const name = localStorage.getItem('gittalent_signup_name');
       const role = localStorage.getItem('gittalent_signup_role');
       
-      const stateParam = JSON.stringify({
+      // Combine localStorage data with any passed state params
+      const stateParam = JSON.stringify({ 
         name,
-        role
+        role,
+        ...stateParams
       });
+      
+      console.log('🔄 signInWithGitHub: Using state param:', stateParam);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
@@ -476,12 +484,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const connectGitHubApp = async () => {
     try {
       console.log('🔄 connectGitHubApp: Initiating GitHub App connection');
+      setAuthError(null);
       
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
       }
 
-      const githubAppUrl = `https://github.com/apps/devhire-talent-scout/installations/new?state=${encodeURIComponent(JSON.stringify({ user_id: user.id }))}`;
+      // Use the correct GitHub App slug
+      const GITHUB_APP_SLUG = 'GitTalentApp';
+      
+      // Create state parameter with user ID and redirect URL
+      const stateParam = encodeURIComponent(JSON.stringify({
+        user_id: user.id,
+        redirect_uri: `${window.location.origin}/github-setup`
+      }));
+      
+      // Create the redirect URL
+      const redirectUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
+      
+      // Build the GitHub App installation URL
+      const githubAppUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${redirectUrl}`;
       
       console.log('🔄 connectGitHubApp: Redirecting to GitHub App installation:', githubAppUrl);
       window.location.href = githubAppUrl;
@@ -761,11 +783,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshProfile = async () => {
     try {
       if (!user) {
-        throw new Error('User must be authenticated to refresh profile');
+        console.log('🔄 refreshProfile: No user, skipping profile refresh');
+        return { error: new Error('User must be authenticated to refresh profile') };
       }
 
       console.log('🔄 refreshProfile: Refreshing profile for user:', user.id);
-      await fetchUserProfile(user);
+      const profile = await fetchUserProfile(user);
+      
+      if (profile && profile.role === 'developer') {
+        await fetchDeveloperProfile(user.id);
+      }
+      
       return { error: null };
     } catch (error: any) {
       console.error('❌ refreshProfile: Unexpected error:', error);
