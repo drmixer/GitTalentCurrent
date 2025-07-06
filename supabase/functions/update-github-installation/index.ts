@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
   try {
     // Get the request body
     const requestBody = await req.text();
-    console.log("Request body received:", requestBody);
+    console.log("Request body:", requestBody);
     
     let userId, installationId;
     
@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
     
     // Validate userId parameter
     if (!userId) {
-      return new Response(JSON.stringify({ error: "userId parameter is required" }), {
+      return new Response(JSON.stringify({ error: "userId is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
 
     // Validate installationId parameter
     if (!installationId) {
-      return new Response(JSON.stringify({ error: "installationId parameter is required" }), {
+      return new Response(JSON.stringify({ error: "installationId is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     
     // Validate the installation ID
     if (installationId === 'pending') {
-      return new Response(JSON.stringify({ error: "Invalid installation ID: 'pending' is not valid" }), {
+      return new Response(JSON.stringify({ error: "Invalid installation ID: 'pending' is not a valid ID" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
@@ -209,6 +209,10 @@ Deno.serve(async (req: Request) => {
         message: 'GitHub installation ID updated successfully',
         data: result
       }),
+        success: true,
+        message: 'GitHub installation ID updated successfully',
+        data: result
+      }),
       {
         status: 200,
         headers: {
@@ -222,6 +226,9 @@ Deno.serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ 
+        success: false,
+        error: error.message || "An unexpected error occurred during installation update"
+      }),
         success: false,
         error: error.message || "An unexpected error occurred during installation update"
       }),

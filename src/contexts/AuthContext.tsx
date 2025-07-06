@@ -217,7 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     setAuthError(null);
-    console.log('🔄 handleGitHubSignIn: User metadata:', authUser.user_metadata);
+    console.log('🔄 handleGitHubSignIn: User metadata:', JSON.stringify(authUser.user_metadata));
 
     try {
       const { data: existingProfile, error: profileError } = await supabase
@@ -244,11 +244,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { data: createdProfile, error: createError } = await supabase
           .from('users')
           .insert({
-            id: authUser.id,
-            email: authUser.email || 'unknown@example.com',
-            name: userName || 'GitHub User',
-            role: userRole === 'recruiter' ? 'recruiter' : 'developer',
-            is_approved: userRole !== 'recruiter'
+            id: authUser.id, 
+            email: authUser.email || 'unknown@example.com', 
+            name: userName || 'GitHub User', 
+            role: userRole === 'recruiter' ? 'recruiter' : 'developer', 
+            is_approved: userRole !== 'recruiter' 
           })
           .select()
           .single();
@@ -265,15 +265,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (userRole === 'developer' && githubUsername) {
           const { error: devCreateError } = await supabase
             .from('developers')
-            .insert({
-              user_id: authUser.id, 
-              github_handle: githubUsername,
-              bio: userBio,
-              location: userLocation,
-              github_handle: githubUsername,
-              bio: authUser.user_metadata?.bio || '',
-              location: authUser.user_metadata?.location || 'Remote',
-              profile_pic_url: avatarUrl
+            .insert({ 
+              user_id: authUser.id,  
+              github_handle: githubUsername, 
+              bio: authUser.user_metadata?.bio || '', 
+              location: authUser.user_metadata?.location || 'Remote', 
+              profile_pic_url: avatarUrl 
             });
 
           if (devCreateError) {
@@ -470,7 +467,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const connectGitHubApp = async (): Promise<{ error: any | null; success?: boolean }> => {
     try {
       setAuthError(null);
-      setLoading(true);
 
       if (!user) {
         throw new Error('User must be authenticated to connect GitHub App');
@@ -493,7 +489,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       window.location.href = githubAppUrl;
 
       return { error: null, success: true };
-      
+
     } catch (error: any) {
       setAuthError('Failed to connect GitHub App. Please try again.');
       return { error };

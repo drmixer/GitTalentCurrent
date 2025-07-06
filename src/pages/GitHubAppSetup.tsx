@@ -137,21 +137,24 @@ export const GitHubAppSetup = () => {
           console.log('GitHubAppSetup: Calling update-github-installation function with:', {
             userId: user.id,
             installationId
-          }); 
+          });
           
           // Call the Edge Function to update the installation ID
-          const { error: updateError } = await supabase
-            .from('developers')
-            .update({ github_installation_id: installationId })
-            .eq('user_id', user.id);
+          const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
+            body: JSON.stringify({
+              userId: user.id,
+              installationId,
+            }),
+          });
           
           if (updateError) {
-            console.error('GitHubAppSetup: Error updating installation ID:', updateError);
+            console.error('GitHubAppSetup: Error from update-github-installation:', updateError);
             setProcessingInstallation(false);
-            handleError(`Failed to save GitHub installation: ${updateError.message || 'Database error'}`);
+            handleError(`Failed to save GitHub installation: ${updateError.message}`);
             return;
           }
           
+          console.log('GitHubAppSetup: Edge function response:', data);
           console.log('GitHubAppSetup: Installation ID saved successfully');
           
           // Refresh the profile to get the updated installation ID
@@ -316,7 +319,7 @@ export const GitHubAppSetup = () => {
                 <button
                   onClick={redirectToGitHubAppInstall}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4 flex items-center justify-center"
-                >
+                > 
                   <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
                   Connect GitHub App Now
                 </button>
