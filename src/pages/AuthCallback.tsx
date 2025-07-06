@@ -22,7 +22,6 @@ export const AuthCallback: React.FC = () => {
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'redirect' | 'waiting' | 'info'>('waiting');
   const [message, setMessage] = useState('Processing authentication...');
-  const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // Function to redirect to GitHub App installation page
@@ -248,11 +247,13 @@ export const AuthCallback: React.FC = () => {
         // If we don't have a user yet, keep waiting
         if (authLoading) {
           setStatus('loading');
+          console.log(`AuthCallback: Still waiting for auth to complete. Retry ${retryCount}/${maxRetries}`);
           console.log('AuthCallback: Auth still loading, waiting... (Retry count:', retryCount, ')');
           setMessage('Verifying authentication...');
           
           // If we've been waiting too long, show a retry button
           if (retryCount >= maxRetries) {
+            console.log('AuthCallback: Maximum retries reached. Suggesting manual action.');
             setMessage('Authentication is taking longer than expected. You may need to refresh the page.');
           }
           return;
@@ -269,6 +270,8 @@ export const AuthCallback: React.FC = () => {
         // Increment retry count if we're still waiting
         if (status === 'loading' || status === 'waiting') {
           setTimeout(() => {
+            const nextRetryCount = retryCount + 1;
+            console.log(`AuthCallback: Setting retry timeout. Next retry will be ${nextRetryCount}/${maxRetries}`);
             console.log('AuthCallback: Incrementing retry count:', retryCount + 1);
             setRetryCount(prev => prev + 1);
           }, 2000);
@@ -361,44 +364,20 @@ export const AuthCallback: React.FC = () => {
             <div className="flex flex-col space-y-3 mb-4">
               <button
                 onClick={() => navigate('/login')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold w-full"
               >
                 Return to Login
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium w-full"
               >
                 <RefreshCw className="w-4 h-4 mr-2 inline" />
                 Refresh Page
               </button>
-            </div>
-            <div>
-              <button
-                onClick={() => navigate('/login')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-              >
-                Return to Login
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-              >
-                <RefreshCw className="w-4 h-4 mr-2 inline" />
-                Refresh Page 
-              </button>
-            </div>
-            <div>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-              >
-                <RefreshCw className="w-4 h-4 mr-2 inline" />
-                Refresh Page 
-              </button>
               <button
                 onClick={redirectToGitHubAppInstall}
-                className="mt-4 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium"
+                className="px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium w-full"
               >
                 Connect GitHub App
               </button>
