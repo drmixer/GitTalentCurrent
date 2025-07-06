@@ -22,20 +22,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [signingOut, setSigningOut] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Track current user ID for which profile is being fetched to avoid redundant calls
-  const [profileLoadingUserId, setProfileLoadingUserId] = useState<string | null>(null);
-
   useEffect(() => {
     console.log('🔄 AuthProvider: Initializing auth state...');
-    setLoading(true);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔄 AuthProvider: Initial session:', session ? 'Found' : 'None');
       setSession(session);
       setUser(session?.user ?? null);
       setAuthError(null);
 
       if (session?.user) {
-        fetchUserProfile(session.user).finally(() => setLoading(false));
+        fetchUserProfile(session.user);
       } else {
         setLoading(false);
       }
@@ -50,14 +47,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAuthError(null);
 
       if (newUser) {
-        // Avoid fetching profile multiple times for the same user
-        if (profileLoadingUserId === newUser.id) {
-          console.log('🔄 AuthProvider: Profile already loading for this user, skipping fetch');
-          return;
-        }
-        setLoading(true);
-        setProfileLoadingUserId(newUser.id);
-
         if (event === 'SIGNED_IN') {
           if (newUser.app_metadata?.provider === 'github') {
             await handleGitHubSignIn(newUser);
@@ -67,13 +56,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } else {
           await fetchUserProfile(newUser);
         }
-        setLoading(false);
-        setProfileLoadingUserId(null);
       } else {
         setUserProfile(null);
         setDeveloperProfile(null);
         setLoading(false);
-        setProfileLoadingUserId(null);
       }
     });
 
@@ -81,13 +67,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🔄 AuthProvider: Cleaning up auth subscription');
       subscription.unsubscribe();
     };
-  }, [profileLoadingUserId]);
+  }, []);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('🔄 fetchUserProfile: Fetching profile for user:', authUser.id);
       setAuthError(null);
-      setLoading(true);
 
       const { data: profile, error } = await supabase
         .from('users')
@@ -96,35 +81,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (error && error.code === 'PGRST116') {
+        // Profile doesn't exist, create it
         console.log('🔄 fetchUserProfile: Profile not found, creating one');
-        const created = await createUserProfileFromAuth(authUser);
-        if (created) {
+        const profileCreated = await createUserProfileFromAuth(authUser);
+
+        if (profileCreated) {
           console.log('🔄 fetchUserProfile: Profile created, fetching again');
-          return fetchUserProfile(authUser);
+          return await fetchUserProfile(authUser);
         } else {
-          setLoading(false);
+          console.error('❌ fetchUserProfile: Failed to create profile');
           setAuthError('Failed to create your profile. Please try again.');
+          setLoading(false);
           return null;
         }
       } else if (error) {
-        setLoading(false);
+        console.error('❌ fetchUserProfile: Error fetching user profile:', error);
         setAuthError('Failed to load your profile. Please try again.');
+        setLoading(false);
         return null;
       }
 
+      console.log('✅ fetchUserProfile: User profile fetched:', profile);
       setUserProfile(profile);
 
       if (profile.role === 'developer') {
         await fetchDeveloperProfile(authUser.id);
-      } else {
-        setDeveloperProfile(null);
       }
 
       setLoading(false);
       return profile;
-    } catch (e) {
-      setLoading(false);
+    } catch (error) {
+      console.error('❌ fetchUserProfile: Unexpected error:', error);
       setAuthError('An unexpected error occurred. Please try again.');
+      setLoading(false);
       return null;
     }
   };
@@ -145,8 +134,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      setDeveloperProfile(devProfile || null);
       console.log('✅ fetchDeveloperProfile: Developer profile fetched:', devProfile);
+      setDeveloperProfile(devProfile || null);
     } catch (error) {
       console.error('❌ fetchDeveloperProfile: Unexpected error:', error);
       setDeveloperProfile(null);
@@ -156,7 +145,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleGitHubSignIn = async (authUser: SupabaseUser) => {
     console.log('🔄 handleGitHubSignIn: Processing GitHub sign-in for user:', authUser.id);
     setAuthError(null);
-    setLoading(true);
 
     try {
       const { data: existingProfile, error: profileError } = await supabase
@@ -166,15 +154,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (profileError && profileError.code === 'PGRST116') {
+        // Profile doesn't exist, create it
         console.log('🔄 handleGitHubSignIn: User profile not found, creating one');
 
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
         const avatarUrl = authUser.user_metadata?.avatar_url || null;
-        const installationId = authUser.user_metadata?.installation_id || null;
 
         const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
         const userName = localStorage.getItem('gittalent_signup_name') || fullName;
+
+        console.log('🔄 handleGitHubSignIn: Creating profile with name:', userName, 'role:', userRole);
 
         const { data: createdProfile, error: createError } = await supabase
           .from('users')
@@ -189,6 +179,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .single();
 
         if (createError) {
+          console.error('❌ handleGitHubSignIn: Error creating user profile:', createError);
           setAuthError('Failed to create user profile. Please try again.');
           setLoading(false);
           return;
@@ -214,7 +205,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } else if (profileError) {
+        console.error('❌ handleGitHubSignIn: Error fetching user profile:', profileError);
         setAuthError('Failed to load your profile. Please try again.');
+        setLoading(false);
       } else {
         setUserProfile(existingProfile);
 
@@ -223,8 +216,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
     } catch (error) {
+      console.error('❌ handleGitHubSignIn: Error handling GitHub sign in:', error);
       setAuthError('Error during GitHub sign in. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -292,34 +285,369 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // --- Your existing functions (signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
-  // createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole, createAssignment,
-  // createHire, updateUserApprovalStatus, updateProfileStrength, refreshProfile) remain unchanged
-  // except add `setLoading(true)` at start and `setLoading(false)` at end of async functions
-  // where appropriate (especially refreshProfile).
-
-  // For brevity, here is just refreshProfile updated with loading control:
-  const refreshProfile = async (): Promise<{ error: any | null }> => {
+  const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any; error: any | null }> => {
     try {
-      if (!user) {
-        return { error: new Error('User must be authenticated to refresh profile') };
+      setAuthError(null);
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            role: userData.role
+          }
+        }
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return { error };
       }
-      setLoading(true);
-      const profile = await fetchUserProfile(user);
-      if (profile && profile.role === 'developer') {
-        await fetchDeveloperProfile(user.id);
+
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email,
+            name: userData.name,
+            role: userData.role,
+            is_approved: userData.role === 'developer'
+          });
+
+        if (profileError) {
+          setAuthError(profileError.message);
+          return { error: profileError };
+        }
       }
-      setLoading(false);
+
+      return { data, error: null };
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setAuthError(errorMessage);
+      return { error: { message: errorMessage } };
+    }
+  };
+
+  const signIn = async (email: string, password: string): Promise<{ user: SupabaseUser | null; error: any | null }> => {
+    try {
+      setAuthError(null);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return { user: null, error };
+      }
+
+      return { user: data.user, error: null };
+    } catch (error: any) {
+      setAuthError('An unexpected error occurred during sign in. Please try again.');
+      return { user: null, error };
+    }
+  };
+
+  const signInWithGitHub = async (stateParams?: Record<string, any>) => {
+    setAuthError(null);
+
+    const name = localStorage.getItem('gittalent_signup_name');
+    const role = localStorage.getItem('gittalent_signup_role');
+
+    const stateObj = {
+      name,
+      role: role || 'developer',
+      install_after_auth: true,
+      ...(stateParams || {})
+    };
+
+    const redirectTo = `${window.location.origin}/auth/callback`;
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo,
+          scopes: 'read:user repo user:email',
+          state: JSON.stringify(stateObj)
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
       return { error: null };
     } catch (error: any) {
-      setLoading(false);
+      setAuthError(error.message || 'Failed to sign in with GitHub');
       return { error };
     }
   };
 
-  // All other functions you provided can stay as is, just add loading toggles where you want UX feedback.
+  const connectGitHubApp = async (): Promise<{ error: any | null; success?: boolean }> => {
+    try {
+      setAuthError(null);
 
-  const value = {
+      if (!user) {
+        throw new Error('User must be authenticated to connect GitHub App');
+      }
+
+      const GITHUB_APP_SLUG = 'GitTalentApp';
+
+      const stateParam = encodeURIComponent(
+        JSON.stringify({
+          user_id: user.id,
+          from_app: true,
+          redirect_uri: `${window.location.origin}/github-setup`
+        })
+      );
+
+      const redirectUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
+
+      const githubAppUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${redirectUrl}`;
+
+      window.location.href = githubAppUrl;
+
+      return { error: null, success: true };
+    } catch (error: any) {
+      setAuthError('Failed to connect GitHub App. Please try again.');
+      return { error };
+    }
+  };
+
+  const signOut = async (): Promise<{ error: any | null }> => {
+    try {
+      setSigningOut(true);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setAuthError(error.message);
+        return { error };
+      }
+
+      setUser(null);
+      setUserProfile(null);
+      setDeveloperProfile(null);
+      setAuthError(null);
+      return { error: null };
+    } catch (error: any) {
+      setAuthError('An unexpected error occurred during sign out. Please try again.');
+      return { error };
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to create developer profile');
+      }
+
+      const { data, error } = await supabase
+        .from('developers')
+        .insert([
+          {
+            user_id: user.id,
+            ...profileData
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setDeveloperProfile(data);
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const updateDeveloperProfile = async (updates: Partial<Developer>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user || !developerProfile) {
+        throw new Error('User and developer profile must exist to update');
+      }
+
+      const { data, error } = await supabase
+        .from('developers')
+        .update(updates)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setDeveloperProfile(data);
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const createJobRole = async (jobData: Partial<JobRole>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to create job roles');
+      }
+
+      const { data, error } = await supabase
+        .from('job_roles')
+        .insert([jobData])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const updateJobRole = async (jobRoleId: number, updates: Partial<JobRole>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to update job roles');
+      }
+
+      const { data, error } = await supabase
+        .from('job_roles')
+        .update(updates)
+        .eq('id', jobRoleId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const createAssignment = async (assignmentData: Partial<Assignment>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to create assignments');
+      }
+
+      const { data, error } = await supabase
+        .from('assignments')
+        .insert([assignmentData])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const createHire = async (hireData: Partial<Hire>): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to create hires');
+      }
+
+      const { data, error } = await supabase
+        .from('hires')
+        .insert([hireData])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to update approval status');
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .update({ is_approved: isApproved })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (userId === user.id) {
+        setUserProfile(data);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const updateProfileStrength = async (userId: string, strength: number): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to update profile strength');
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .update({ profile_strength: strength })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (userId === user.id) {
+        setUserProfile(data);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (!user) return;
+
+    console.log('🔄 refreshProfile: Refreshing profiles for user:', user.id);
+
+    setLoading(true);
+    await fetchUserProfile(user);
+    setLoading(false);
+  };
+
+  const value: AuthContextType = {
     user,
     session,
     userProfile,
@@ -341,12 +669,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateUserApprovalStatus,
     updateProfileStrength,
     refreshProfile,
-    needsOnboarding: !developerProfile && userProfile?.role === 'developer'
+    needsOnboarding: !developerProfile && userProfile?.role === 'developer',
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
