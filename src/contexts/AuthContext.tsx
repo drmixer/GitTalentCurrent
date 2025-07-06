@@ -418,123 +418,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error(`❌ handleGitHubSignIn: DEBUG STEP 2 - CRITICAL EXCEPTION during supabase.auth.getUser() for user ${authUser.id}:`, e);
       }
 
-      console.log(`🔄 handleGitHubSignIn: DEBUG - Original logic commented out for this test for user ${authUser.id}.`);
-
-      // Original logic commented out below for debugging:
-      // Ensure this block comment is properly terminated
-      /*
-      let userProfileData: User | null = null;
-      let profileError: any = null;
-
-      console.log(`🔄 handleGitHubSignIn: LOG POINT 1 - About to query 'users' table for user ${authUser.id}.`);
-      try {
-        console.log(`🔄 handleGitHubSignIn: LOG POINT 2 - Entering inner try for 'users' query for user ${authUser.id}.`);
-
-        const currentAuthSession = await supabase.auth.getSession();
-        console.log(`🔄 handleGitHubSignIn: Current Supabase session before query for user ${authUser.id}:`, currentAuthSession?.data?.session);
-
-        const { data, error: queryError } = await promiseWithTimeout( // Apply timeout
-          supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single(),
-          8000, // 8 seconds timeout
-          new Error(`Timeout: Supabase user query took too long for user ${authUser.id}`)
-        );
-        console.log(`🔄 handleGitHubSignIn: LOG POINT 3 - 'await' for 'users' query (with timeout) completed for user ${authUser.id}.`);
-        userProfileData = data;
-        profileError = queryError;
-        console.log(`🔄 handleGitHubSignIn: LOG POINT 4 - 'users' table query assignment done for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
-      } catch (e: unknown) {
-        console.error(`❌ handleGitHubSignIn: LOG POINT 5 - INNER CATCH TRIGGERED for 'users' query for ${authUser.id}:`, e);
-        if (e instanceof Error) {
-            profileError = e;
-        } else {
-            profileError = { message: String(e), code: 'UNKNOWN_EXCEPTION' };
-        }
-        userProfileData = null;
-      }
-      console.log(`🔄 handleGitHubSignIn: LOG POINT 6 - After inner try/catch for 'users' query for ${authUser.id}. userProfileData:`, userProfileData, `profileError:`, profileError);
-
-      // Now, proceed using userProfileData and profileError from the try/catch block above.
-
-      if (profileError && (profileError.code === 'PGRST116' || profileError.message?.includes(' रिजल्ट में कोई पंक्ति नहीं'))) { // Handling Supabase v2 "no rows" & v1
-        console.log(`🔄 handleGitHubSignIn: User profile not found for ${authUser.id} (Error code: ${profileError.code}), creating one.`);
-
-        const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
-        const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
-        const avatarUrl = authUser.user_metadata?.avatar_url || null;
-        const userRole = localStorage.getItem('gittalent_signup_role') || 'developer';
-        const userName = localStorage.getItem('gittalent_signup_name') || fullName;
-
-        console.log('🔄 handleGitHubSignIn: Creating profile with name:', userName, 'role:', userRole);
-
-        const { data: createdProfile, error: createError } = await supabase
-          .from('users')
-          .insert({
-            id: authUser.id, 
-            email: authUser.email || 'unknown@example.com', 
-            name: userName || 'GitHub User', 
-            role: userRole === 'recruiter' ? 'recruiter' : 'developer', 
-            is_approved: userRole !== 'recruiter' 
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('❌ handleGitHubSignIn: Error creating user profile:', createError);
-          setAuthError('Failed to create user profile. Please try again.');
-          setLoading(false); 
-          return;
-        }
-
-        setUserProfile(createdProfile);
-
-        if (userRole === 'developer' && githubUsername) {
-          const { error: devCreateError } = await supabase
-            .from('developers')
-            .insert({ 
-              user_id: authUser.id,  
-              github_handle: githubUsername, 
-              bio: authUser.user_metadata?.bio || '', 
-              location: authUser.user_metadata?.location || 'Remote', 
-              profile_pic_url: avatarUrl 
-            });
-
-          if (devCreateError) {
-            console.error('❌ handleGitHubSignIn: Error creating developer profile:', devCreateError);
-            // Potentially set an error message but don't necessarily stop loading,
-            // as base user profile might be okay.
-          } else {
-            await fetchDeveloperProfile(authUser.id); // This sets developerProfile state
-            console.log('✅ handleGitHubSignIn: Developer profile created and fetched');
-          }
-        }
-      } else if (profileError) {
-        console.error('❌ handleGitHubSignIn: Error fetching user profile:', profileError);
-        setAuthError('Failed to load your profile. Please try again.');
-        setLoading(false); // Critical error, stop loading
-        return;
-      } else { // Profile exists
-        setUserProfile(existingProfile);
-        if (existingProfile.role === 'developer') {
-          await fetchDeveloperProfile(authUser.id); // This sets developerProfile state
-        }
-      }
-      // If we've reached this point without returning, it means operations were successful or non-critical.
-      // The main loading state should be concluded.
-      setLoading(false);
-      console.log('✅ handleGitHubSignIn: Successfully processed GitHub sign-in.');
-
-    } catch (error) {
-      console.error('❌ handleGitHubSignIn: Error handling GitHub sign in:', error);
-      setAuthError('Error during GitHub sign in. Please try again.');
-      setLoading(false); // Ensure loading is false on any unexpected error
-    }
-  };
-
-  const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
+      console.log(`🔄 handleGitHubSignIn: DEBUG - Original logic is intentionally bypassed for this test for user ${authUser.id}.`);
+      // The multi-line comment block containing the original logic has been removed.
+      // The simplified test steps (setTimeout and supabase.auth.getUser()) are the only active code
+      // in this try block for this debugging phase.
+    } catch (error: unknown) { // Catch unknown type for broader error catching
+      console.error(`❌ handleGitHubSignIn: DEBUG CAUGHT UNEXPECTED ERROR for user ${authUser.id}:`, error);
     try {
       const localStorageRole = localStorage.getItem('gittalent_signup_role');
       const userRole = localStorageRole ||
