@@ -271,6 +271,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUserProfileFromAuth = async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       console.log('🔄 createUserProfileFromAuth: Creating user profile from auth user:', authUser.id);
+      console.log('🔄 createUserProfileFromAuth: Auth user metadata:', authUser.user_metadata);
       
       // Extract role with fallbacks
       // Try to get role from localStorage first (set during signup)
@@ -285,6 +286,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const userName = localStorageName ||
                        authUser.user_metadata?.full_name || 
                        authUser.user_metadata?.name || 
+                       authUser.user_metadata?.preferred_username ||
                        authUser.user_metadata?.user_name ||
                        'User';
                       
@@ -292,6 +294,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
       const githubHandle = authUser.user_metadata?.user_name || '';
       const githubInstallationId = authUser.user_metadata?.installation_id || null;
+      const userBio = authUser.user_metadata?.bio || '';
+      const userLocation = authUser.user_metadata?.location || '';
 
       console.log('🔄 createUserProfileFromAuth: Creating profile with role:', userRole, 'name:', userName);
 
@@ -320,8 +324,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .insert({
             user_id: authUser.id,
             github_handle: githubHandle,
-            bio: authUser.user_metadata?.bio || '',
-            location: authUser.user_metadata?.location || '',
+            bio: userBio,
+            location: userLocation,
+            top_languages: [],
+            linked_projects: [],
             profile_pic_url: avatarUrl,
             github_installation_id: githubInstallationId
           });
@@ -330,7 +336,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.error('❌ createUserProfileFromAuth: Error creating developer profile:', devError);
           return false;
         }
-        
+
         console.log('✅ createUserProfileFromAuth: Developer profile created successfully');
         await fetchDeveloperProfile(authUser.id);
       }
@@ -343,7 +349,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signUp = async (email: string, password: string, userData: Partial<User>) => {
+  const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any, error: any | null }> => {
     try {
       setAuthError(null);
       console.log('🔄 AuthProvider: Signing up user:', email, userData.role);
@@ -395,7 +401,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<{ user: SupabaseUser | null, error: any | null }> => {
     try {
       setAuthError(null);
       console.log('🔄 signIn: Attempting to sign in user');
@@ -423,27 +429,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     console.log('🔄 signInWithGitHub: Starting GitHub OAuth flow...');
     
+    // Clear any previous errors
+    setAuthError(null);
+    
+    // Get signup data from localStorage
+    const name = localStorage.getItem('gittalent_signup_name');
+    const role = localStorage.getItem('gittalent_signup_role');
+    
+    // Create a state object with all necessary data for both auth and app installation
+    const stateObj = {
+      name,
+      role,
+      install_after_auth: true, // Flag to indicate we should install the app after auth
+      ...(stateParams || {})
+    };
+    
+    // Use Supabase OAuth with GitHub
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    
+    console.log('🔄 signInWithGitHub: Using Supabase OAuth with state:', stateObj);
+    
     try {
-      // Clear any previous errors
-      setAuthError(null);
-      
-      // Get signup data from localStorage
-      const name = localStorage.getItem('gittalent_signup_name');
-      const role = localStorage.getItem('gittalent_signup_role');
-      
-      // Create a state object with all necessary data for both auth and app installation
-      const stateObj = {
-        name,
-        role,
-        install_after_auth: true, // Flag to indicate we should install the app after auth
-        ...(stateParams || {})
-      };
-      
-      // Use Supabase OAuth with GitHub
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      
-      console.log('🔄 signInWithGitHub: Using Supabase OAuth with state:', stateObj);
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
@@ -468,7 +474,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const connectGitHubApp = async () => {
+  const connectGitHubApp = async (): Promise<{ error: any | null, success?: boolean }> => {
     try {
       console.log('🔄 connectGitHubApp: Initiating GitHub App connection');
       setAuthError(null); 
@@ -503,7 +509,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<{ error: any | null }> => {
     try {
       setSigningOut(true);
       console.log('🔄 signOut: Attempting to sign out user');
@@ -531,7 +537,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const createDeveloperProfile = async (profileData: Partial<Developer>) => {
+  const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create developer profile');
@@ -562,7 +568,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateDeveloperProfile = async (updates: Partial<Developer>) => {
+  const updateDeveloperProfile = async (updates: Partial<Developer>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user || !developerProfile) {
         throw new Error('User and developer profile must exist to update');
@@ -591,7 +597,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const createJobRole = async (jobData: Partial<JobRole>) => {
+  const createJobRole = async (jobData: Partial<JobRole>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create job role');
@@ -621,7 +627,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateJobRole = async (jobId: string, updates: Partial<JobRole>) => {
+  const updateJobRole = async (jobId: string, updates: Partial<JobRole>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to update job role');
@@ -650,7 +656,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const createAssignment = async (assignmentData: Partial<Assignment>) => {
+  const createAssignment = async (assignmentData: Partial<Assignment>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create assignment');
@@ -680,7 +686,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const createHire = async (hireData: Partial<Hire>) => {
+  const createHire = async (hireData: Partial<Hire>): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create hire');
@@ -710,7 +716,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateUserApprovalStatus = async (userId: string, isApproved: boolean) => {
+  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to update approval status');
@@ -738,7 +744,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateProfileStrength = async (strength: number) => {
+  const updateProfileStrength = async (strength: number): Promise<{ data: any | null, error: any | null }> => {
     try {
       if (!user || !developerProfile) {
         throw new Error('User and developer profile must exist to update profile strength');
@@ -767,7 +773,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<{ error: any | null }> => {
     try {
       if (!user) {
         console.log('🔄 refreshProfile: No user, skipping profile refresh');

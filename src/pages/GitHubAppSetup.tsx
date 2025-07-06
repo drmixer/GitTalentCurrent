@@ -11,16 +11,15 @@ export const GitHubAppSetup = () => {
   const [retryCount, setRetryCount] = useState<number>(0);
   const maxRetries = 3;
 
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading'); 
+  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'info' | 'redirect'>('loading');
   const [message, setMessage] = useState('Connecting GitHub...');
 
   // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
-    const GITHUB_APP_SLUG = 'GitTalentApp'; // Make sure this matches your GitHub App slug exactly
+    const GITHUB_APP_SLUG = 'GitTalentApp';
     const searchParams = new URLSearchParams(location.search);
     const stateParam = searchParams.get('state');
     
-    // Parse existing state if available
     let existingState = {};
     if (stateParam) {
       try {
@@ -31,7 +30,6 @@ export const GitHubAppSetup = () => {
       }
     }
     
-    // Create a new state object with installation_id and existing state
     const stateObj = {
       ...existingState,
       redirect_uri: `${window.location.origin}/github-setup`,
@@ -47,7 +45,6 @@ export const GitHubAppSetup = () => {
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
     
-    // Short delay to ensure UI updates before redirect
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
@@ -98,6 +95,7 @@ export const GitHubAppSetup = () => {
       const searchParams = new URLSearchParams(location.search);
       const installationId = searchParams.get('installation_id');
       const setupAction = searchParams.get('setup_action');
+      const code = searchParams.get('code');
       const errorParam = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
       const state = searchParams.get('state');
@@ -155,7 +153,7 @@ export const GitHubAppSetup = () => {
       // Scenario 1: App Install/Reconfigure for an existing user
       if (user && installationId) {
         setUiState('loading'); 
-        setMessage(`Connecting GitHub App... (ID: ${installationId})`);
+        setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
         console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
   
         try {
@@ -171,6 +169,7 @@ export const GitHubAppSetup = () => {
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('state'); 
           cleanUrl.searchParams.delete('code');
+          cleanUrl.searchParams.delete('code');
           cleanUrl.searchParams.delete('setup_action');
           window.history.replaceState({}, '', cleanUrl.toString());
         } catch (err) {
@@ -182,9 +181,9 @@ export const GitHubAppSetup = () => {
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
         console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('Developer profile:', developerProfile ? 
-          `Loaded (GitHub handle: ${developerProfile.github_handle || 'none'}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
-          'Not loaded');
+        console.log('Developer profile:', developerProfile 
+          ? `Loaded (GitHub handle: ${developerProfile.github_handle || 'none'}, Installation ID: ${developerProfile.github_installation_id || 'none'})`
+          : 'Not loaded');
         
         // Check if developer profile has installation ID 
         const hasInstallationId = developerProfile?.github_installation_id && 
@@ -291,7 +290,7 @@ export const GitHubAppSetup = () => {
                 <p className="text-sm text-gray-600">
                   Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
                   This is a one-time setup process that securely connects your GitHub account.
-                  {retryCount > 0 && ( 
+                  {retryCount > 0 && (
                     <span className="block mt-2 text-xs text-gray-500">
                       Retry attempt {retryCount} of {maxRetries}
                     </span>

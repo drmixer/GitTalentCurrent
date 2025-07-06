@@ -139,7 +139,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
 
       console.log('Calling GitHub proxy at:', apiUrl, 'with handle:', handle);
-
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -151,7 +151,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
           // The proxy will use the installation ID to authenticate with GitHub
           // if available, or fall back to public access
           handle,
-          installationId // Pass the installation ID to the proxy
+          installationId
         })
       });
 
@@ -177,7 +177,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         user: data.user?.login || 'No user data',
         reposCount: data.repos?.length || 0,
         languagesCount: Object.keys(data.languages || {}).length,
-        totalStars: data.totalStars || 0,
+        totalStars: data.totalStars || 0, 
       });
 
       // Calculate contribution statistics
@@ -198,7 +198,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       if (handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         await syncLanguagesToProfile();
         await syncProjectsToProfile();
-      }
+      } 
 
     } catch (err: any) {
       console.error('Error in refreshGitHubDataInternal:', err.message || err);
@@ -206,7 +206,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
       setFetchInProgress(false);
-    }
+    } 
   }, [developerProfile, user, gitHubData.user, lastFetchedHandle]);
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
@@ -224,7 +224,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await refreshGitHubDataInternal(handleToUse);
-  }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]);
+  }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]); 
 
   // Trigger refresh when handle OR installation ID changes, with a delay
   useEffect(() => {
@@ -232,7 +232,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       const timer = setTimeout(() => {
         refreshGitHubData();
       }, 500);
-
+      
       return () => clearTimeout(timer); // Cleanup timer if component unmounts or deps change
     } else if (!authLoading && !developerProfile?.github_handle) {
       console.log('useGitHub - No GitHub handle found in developer profile.');
@@ -245,7 +245,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       });
       
       setLoading(false);
-      setError(new Error('No GitHub handle provided in your profile. Please add it.'));
+      setError(new Error('No GitHub handle provided in your profile. Please add it.')); 
     } 
   }, [developerProfile?.github_handle, developerProfile?.github_installation_id, authLoading, refreshGitHubData]);
 
@@ -253,7 +253,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     console.log('getTopLanguages - Languages data:', Object.keys(gitHubData.languages).length);
     return Object.entries(gitHubData.languages)
       .sort(([, a], [, b]) => (b as number) - (a as number))
-      .slice(0, limit)
+      .slice(0, limit) 
       .map(([language]) => language);
   }, [gitHubData.languages]);
 
@@ -262,7 +262,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     return gitHubData.repos
       .filter(repo => !repo.name.includes('.github.io') && !repo.fork)
       .sort((a, b) => b.stargazers_count - a.stargazers_count)
-      .slice(0, limit);
+      .slice(0, limit); 
   }, [gitHubData.repos]);
 
   const syncLanguagesToProfile = useCallback(async () => {
@@ -271,7 +271,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const topLanguages = getTopLanguages(15);
+    const topLanguages = getTopLanguages(15); 
     console.log('syncLanguagesToProfile - Top languages:', topLanguages);
     if (topLanguages.length > 0) {
       const existingLanguages = developerProfile.top_languages || [];
@@ -281,7 +281,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         top_languages: mergedLanguages
       });
 
-      console.log('syncLanguagesToProfile - Updated profile with languages:', mergedLanguages.length);
+      console.log('syncLanguagesToProfile - Updated profile with languages:', mergedLanguages.length); 
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopLanguages, updateDeveloperProfile]);
 
@@ -290,7 +290,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       console.log('syncProjectsToProfile - Skipping, profile missing, loading, or handle mismatch');
       return;
     }
-
+    
     const topRepos = getTopRepos(8).map(repo => repo.html_url);
     console.log('syncProjectsToProfile - Top repos:', topRepos.length);
     if (topRepos.length > 0) {
@@ -300,7 +300,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       await updateDeveloperProfile?.({
         linked_projects: uniqueProjects
       });
-
+      
       console.log('syncProjectsToProfile - Updated profile with projects:', uniqueProjects.length);
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
