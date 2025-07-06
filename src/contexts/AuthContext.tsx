@@ -393,15 +393,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // let finalAttemptedDeveloperProfile: Developer | null = null; // Not needed with direct state logging in finally
 
     try {
-      console.log(`🔄 handleGitHubSignIn: Entered TRY block for user ${authUser.id}.`);
+      console.log(`🔄 handleGitHubSignIn: DEBUG Entered TRY block for user ${authUser.id}.`);
 
       if (!supabase) {
-        console.error(`❌ handleGitHubSignIn: Supabase client is null or undefined at the start of try block for user ${authUser.id}. Cannot proceed.`);
+        console.error(`❌ handleGitHubSignIn: DEBUG Supabase client is null or undefined for user ${authUser.id}.`);
         setAuthError("Authentication service error. Please try again.");
-        if (loading) setLoading(false); // Critical failure, stop loading
+        if (loading) setLoading(false);
         return;
       }
 
+      console.log(`🔄 handleGitHubSignIn: DEBUG STEP 1 - Testing basic await with setTimeout for user ${authUser.id}.`);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log(`✅ handleGitHubSignIn: DEBUG STEP 1 - setTimeout completed for user ${authUser.id}.`);
+
+      console.log(`🔄 handleGitHubSignIn: DEBUG STEP 2 - Testing supabase.auth.getUser() for user ${authUser.id}.`);
+      try {
+        const { data: { user: authUserFromGet }, error: getUserError } = await supabase.auth.getUser();
+        if (getUserError) {
+          console.error(`❌ handleGitHubSignIn: DEBUG STEP 2 - Error from supabase.auth.getUser() for user ${authUser.id}:`, getUserError);
+        } else {
+          console.log(`✅ handleGitHubSignIn: DEBUG STEP 2 - supabase.auth.getUser() success for user ${authUser.id}. User from getUser:`, authUserFromGet?.id);
+        }
+      } catch (e: unknown) {
+        console.error(`❌ handleGitHubSignIn: DEBUG STEP 2 - CRITICAL EXCEPTION during supabase.auth.getUser() for user ${authUser.id}:`, e);
+      }
+
+      console.log(`🔄 handleGitHubSignIn: DEBUG - Original logic commented out for this test for user ${authUser.id}.`);
+
+      // Original logic commented out below for debugging:
+      /*
       let userProfileData: User | null = null;
       let profileError: any = null;
 
