@@ -370,31 +370,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       console.log(`🔄 handleGitHubSignIn: Entered TRY block for user ${authUser.id}.`);
-      let userProfileData: User | null = null; // Use this to hold the fetched/created user profile
+
+      if (!supabase) {
+        console.error(`❌ handleGitHubSignIn: Supabase client is null or undefined at the start of try block for user ${authUser.id}. Cannot proceed.`);
+        setAuthError("Authentication service error. Please try again.");
+        if (loading) setLoading(false); // Critical failure, stop loading
+        return;
+      }
+
+      let userProfileData: User | null = null;
       let profileError: any = null;
 
       console.log(`🔄 handleGitHubSignIn: About to query 'users' table for user ${authUser.id}.`);
       try {
-        const { data, error } = await supabase
+        const { data, error: queryError } = await supabase // Renamed error to queryError to avoid conflict
           .from('users')
           .select('*')
           .eq('id', authUser.id)
           .single();
-        userProfileData = data; // Assign to userProfileData
-        profileError = error;
+        userProfileData = data;
+        profileError = queryError; // Assign queryError to profileError
         console.log(`🔄 handleGitHubSignIn: 'users' table query completed for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
-      } catch (e) {
-        console.error(`❌ handleGitHubSignIn: CRITICAL ERROR during 'users' table query for ${authUser.id}:`, e);
-        profileError = e; // Ensure profileError is set so logic below can handle it
-        // If this critical query fails, we likely can't proceed, so set userProfileData to null explicitly.
+      } catch (e: unknown) { // Catch unknown for broader exception type
+        console.error(`❌ handleGitHubSignIn: CRITICAL EXCEPTION during 'users' table query for ${authUser.id}:`, e);
+        // Construct a more standard error object if it's not already one
+        if (e instanceof Error) {
+            profileError = e;
+        } else {
+            profileError = { message: String(e), code: 'UNKNOWN_EXCEPTION' };
+        }
         userProfileData = null;
       }
 
-      // Removed the redundant, unwrapped call to fetch users table that was here.
       // Now, proceed using userProfileData and profileError from the try/catch block above.
 
-      if (profileError && profileError.code === 'PGRST116') { // User profile doesn't exist based on error code
-        console.log(`🔄 handleGitHubSignIn: User profile not found for ${authUser.id} (PGRST116), creating one.`);
+      if (profileError && (profileError.code === 'PGRST116' || profileError.message?.includes(' रिजल्ट में कोई पंक्ति नहीं'))) { // Handling Supabase v2 "no rows" & v1
+        console.log(`🔄 handleGitHubSignIn: User profile not found for ${authUser.id} (Error code: ${profileError.code}), creating one.`);
 
         const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
         const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || githubUsername || 'GitHub User';
