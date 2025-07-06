@@ -4,8 +4,11 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
 
+
 // GitHub App slug - must match exactly what's configured in GitHub
 const GITHUB_APP_SLUG = 'GitTalentApp';
+// Maximum number of retries for auth loading
+const maxRetries = 5;
 
 // Interface for state data from URL parameters
 interface StateData {
@@ -24,16 +27,18 @@ export const AuthCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing authentication...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 5;
 
   // Function to redirect to GitHub App installation page
   const redirectToGitHubAppInstall = useCallback(() => {
-    // Create a state object with just the user ID
-    const stateObj = { user_id: user?.id };
+    // Create a state object with all necessary information
+    const stateObj = {
+      user_id: user?.id,
+      redirect_uri: `${window.location.origin}/github-setup`,
+      from_auth: true
+    };
 
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
-    const redirectUri = `${window.location.origin}/github-setup`;
-    const returnUrl = encodeURIComponent(redirectUri);
+    const returnUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${returnUrl}`;
     
     console.log('🚀 AuthCallback: Redirecting to GitHub App installation with state:', stateObj);
@@ -98,6 +103,10 @@ export const AuthCallback: React.FC = () => {
         
         // GitHub App installation flow
         if (installationId) {
+          console.log('AuthCallback: Installation ID found in URL:', installationId);
+          console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
+          console.log('AuthCallback: Processing installation state:', processingInstallation ? 'Already processing' : 'Not processing');
+          
           // Only process installation if we have a user and haven't processed it yet
           if (user?.id && !processingInstallation) {
             setProcessingInstallation(true);
@@ -110,10 +119,10 @@ export const AuthCallback: React.FC = () => {
             try {
               // Save the installation ID directly here
               const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
-                body: {
+                body: JSON.stringify({
                   userId: user.id,
                   installationId: installationId
-                }
+                })
               });
               console.log('AuthCallback: Edge function response:', data);
 
@@ -130,6 +139,7 @@ export const AuthCallback: React.FC = () => {
               // Reset processing flag after successful installation
               setProcessingInstallation(false);
               console.log('AuthCallback: Reset processingInstallation to false after successful save');
+              console.log('AuthCallback: Refreshing profile to get updated installation ID');
 
               // Refresh the profile to get the updated installation ID 
               if (!refreshProfile) {
@@ -167,10 +177,15 @@ export const AuthCallback: React.FC = () => {
           } else if (!user) {
             // If we don't have a user yet but have installation_id, wait for auth to complete
             console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
-            console.log('AuthCallback: Auth loading state:', authLoading);
-            console.log('AuthCallback: Will retry later, current retry count:', retryCount);
+            console.log(`AuthCallback: Auth loading state: ${authLoading ? 'Loading' : 'Not loading'}`);
+            console.log(`AuthCallback: Will retry later, current retry count: ${retryCount}/${maxRetries}`);
             setStatus('loading'); 
             setMessage('Waiting for authentication to complete before processing GitHub installation...'); 
+            return;
+          } else if (processingInstallation) {
+            console.log('AuthCallback: Already processing installation, waiting for completion');
+            setStatus('loading');
+            setMessage('Processing GitHub App installation...');
             return;
           }
         }
@@ -257,8 +272,8 @@ export const AuthCallback: React.FC = () => {
         // If we don't have a user yet, keep waiting
         if (authLoading) {
           setStatus('loading');
-          console.log(`AuthCallback: Still waiting for auth to complete. Retry ${retryCount + 1}/${maxRetries}`);
-          console.log('AuthCallback: Auth still loading, waiting... (Retry count:', retryCount, ')');
+          console.log(`AuthCallback: Still waiting for auth to complete. Retry ${retryCount}/${maxRetries}`);
+          console.log(`AuthCallback: Auth still loading, waiting... (Retry count: ${retryCount})`);
           setMessage('Verifying authentication...');
           
           // If we've been waiting too long, show a retry button
@@ -279,11 +294,13 @@ export const AuthCallback: React.FC = () => {
         
         // Increment retry count if we're still waiting
         if (status === 'loading' || status === 'waiting') {
-          setTimeout(() => {
-            console.log(`AuthCallback: Setting retry timeout. Next retry will be ${retryCount + 1}/${maxRetries}`);
-            console.log('AuthCallback: Incrementing retry count:', retryCount + 1);
-            setRetryCount(prev => prev + 1);
-          }, 2000);
+          if (retryCount < maxRetries) {
+            setTimeout(() => {
+              console.log(`AuthCallback: Setting retry timeout. Next retry will be ${retryCount + 1}/${maxRetries}`);
+              console.log('AuthCallback: Incrementing retry count:', retryCount + 1);
+              setRetryCount(prev => prev + 1);
+            }, 2000);
+          }
         }
       } catch (error) {
         console.error('Error in AuthCallback useEffect:', error); 
@@ -322,7 +339,7 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600">{message}</p>
             <div className="mt-4">
               <p className="text-sm text-gray-500">
-                {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount + 1})`}
+                {authLoading ? 'Verifying your authentication...' : `Loading your profile... (Attempt ${retryCount}/${maxRetries})`}
               </p>
               <button
                 onClick={() => navigate('/dashboard', { replace: true })}
@@ -340,7 +357,7 @@ export const AuthCallback: React.FC = () => {
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">
               Please wait while we redirect you...
-            </p>
+            </p> 
             <p className="text-xs text-gray-400 mt-2">
               You'll be redirected to GitHub to install the GitTalent App
             </p>
@@ -373,21 +390,22 @@ export const AuthCallback: React.FC = () => {
             <div className="flex flex-col space-y-3 mb-4">
               <button
                 onClick={() => navigate('/login')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold w-full"
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold w-full flex items-center justify-center"
               >
                 Return to Login
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium w-full"
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium w-full flex items-center justify-center"
               >
                 <RefreshCw className="w-4 h-4 mr-2 inline" />
                 Refresh Page
               </button>
               <button
                 onClick={redirectToGitHubAppInstall}
-                className="px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium w-full"
+                className="px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors font-medium w-full flex items-center justify-center"
               >
+                <Github className="w-4 h-4 mr-2" />
                 Connect GitHub App
               </button>
             </div>

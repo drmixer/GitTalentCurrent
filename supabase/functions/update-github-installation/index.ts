@@ -18,7 +18,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Get the request body
-    const { userId, installationId } = await req.json();
+    const requestData = await req.json();
+    const { userId, installationId } = requestData;
+    
+    console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
     
     // Validate userId parameter
     if (!userId) {
@@ -35,8 +38,6 @@ Deno.serve(async (req: Request) => {
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
     }
-    
-    console.log(`Updating GitHub installation ID for user: ${userId}, installation ID: ${installationId}`);
     
     // Validate the installation ID
     if (installationId === 'pending') {
