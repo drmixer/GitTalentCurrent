@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import { createContext, useState, useEffect, ReactNode, useContext, useRef } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User, Developer, JobRole, Assignment, Hire, AuthContextType } from '../types';
@@ -16,6 +16,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const prevSessionRef = useRef<Session | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null | undefined>(null);
   const [loading, setLoading] = useState(true);
@@ -25,38 +26,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     console.log('🔄 AuthProvider: Initializing auth state...');
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔄 AuthProvider: Initial session:', session ? 'Found' : 'None');
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('🔄 AuthProvider: Initial session:', initialSession ? 'Found' : 'None');
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
       setAuthError(null);
+      
+      // Store the initial session in the ref
+      prevSessionRef.current = initialSession;
 
-      if (session?.user) {
-        fetchUserProfile(session.user);
+      if (initialSession?.user) {
+        fetchUserProfile(initialSession.user);
       } else {
         setLoading(false);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 AuthProvider: Auth state changed:', event, session ? 'Session exists' : 'No session');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('🔄 AuthProvider: Auth state changed:', event, newSession ? 'Session exists' : 'No session');
+      
+      // Compare the new session with the previous one
+      const prevSessionStr = JSON.stringify(prevSessionRef.current);
+      const newSessionStr = JSON.stringify(newSession);
+      
+      if (prevSessionStr === newSessionStr) {
+        console.log('🔄 AuthProvider: Session unchanged, skipping update');
+        return;
+      }
+      
+      // Update the ref with the new session before setting state
+      prevSessionRef.current = newSession;
 
-      setSession(session);
-      const newUser = session?.user ?? null;
+      setSession(newSession);
+      const newUser = newSession?.user ?? null;
       setUser(newUser);
       setAuthError(null);
 
       if (newUser) {
         if (event === 'SIGNED_IN') {
           if (newUser.app_metadata?.provider === 'github') {
+            console.log('🔄 AuthProvider: GitHub sign-in detected, handling GitHub auth');
             await handleGitHubSignIn(newUser);
           } else {
+            console.log('🔄 AuthProvider: Non-GitHub sign-in detected, fetching profile');
             await fetchUserProfile(newUser);
           }
         } else {
+          console.log('🔄 AuthProvider: Auth state change (not SIGNED_IN), fetching profile');
           await fetchUserProfile(newUser);
         }
       } else {
+        console.log('🔄 AuthProvider: No user after auth state change, clearing profiles');
         setUserProfile(null);
         setDeveloperProfile(null);
         setLoading(false);
