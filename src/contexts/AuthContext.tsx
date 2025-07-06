@@ -13,6 +13,30 @@ export const useAuth = () => {
   return context;
 };
 
+// Helper function for adding timeout to promises
+function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  timeoutError = new Error('Promise timed out')
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      console.warn(`Promise timed out after ${ms}ms`);
+      reject(timeoutError);
+    }, ms);
+
+    promise
+      .then(value => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -384,12 +408,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`🔄 handleGitHubSignIn: LOG POINT 1 - About to query 'users' table for user ${authUser.id}.`);
       try {
         console.log(`🔄 handleGitHubSignIn: LOG POINT 2 - Entering inner try for 'users' query for user ${authUser.id}.`);
-        const { data, error: queryError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-        console.log(`🔄 handleGitHubSignIn: LOG POINT 3 - 'await' for 'users' query completed for user ${authUser.id}.`);
+
+        const currentAuthSession = await supabase.auth.getSession();
+        console.log(`🔄 handleGitHubSignIn: Current Supabase session before query for user ${authUser.id}:`, currentAuthSession?.data?.session);
+
+        const { data, error: queryError } = await promiseWithTimeout( // Apply timeout
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single(),
+          8000, // 8 seconds timeout
+          new Error(`Timeout: Supabase user query took too long for user ${authUser.id}`)
+        );
+        console.log(`🔄 handleGitHubSignIn: LOG POINT 3 - 'await' for 'users' query (with timeout) completed for user ${authUser.id}.`);
         userProfileData = data;
         profileError = queryError;
         console.log(`🔄 handleGitHubSignIn: LOG POINT 4 - 'users' table query assignment done for ${authUser.id}. Profile found: ${!!userProfileData}, Error:`, profileError);
