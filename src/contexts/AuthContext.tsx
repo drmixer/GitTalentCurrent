@@ -442,14 +442,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGitHub = async () => {
     try {
       setAuthError(null);
-      console.log('🔄 signInWithGitHub: Attempting GitHub sign in with state params:', stateParams);
+      console.log('🔄 signInWithGitHub: Attempting GitHub sign in');
       
       // Store any signup data from localStorage in the state parameter
       const name = localStorage.getItem('gittalent_signup_name');
       const role = localStorage.getItem('gittalent_signup_role');
       
-      // Combine localStorage data with any passed state params
-      const stateParam = JSON.stringify({ 
+      // Create a state object with localStorage data and any passed params
+      const stateParam = JSON.stringify({
         name,
         role,
         ...stateParams
