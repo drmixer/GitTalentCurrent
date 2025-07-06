@@ -311,56 +311,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createDeveloperProfileFromAuth = async (authUser: SupabaseUser, userProfile: User) => {
     console.log(`🔄 createDeveloperProfileFromAuth: Evaluating for user: ${authUser.id}. This function may be redundant.`);
     // For now, let it delegate to ensureDeveloperProfile for safety, though it should ideally be consolidated.
+    // Original implementation commented out below was causing build errors and has been removed.
     return await ensureDeveloperProfile(authUser);
-    /* The following block is the original implementation, commented out as it's likely redundant.
-    try {
-      console.log('🔄 createDeveloperProfileFromAuth: Creating developer profile for:', authUser.id);
-      
-      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username;
-      const avatarUrl = authUser.user_metadata?.avatar_url || null;
-      
-      // Check if developer profile already exists
-      const { data: existingProfile, error: checkError } = await supabase
-        .from('developers')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .maybeSingle();
-        
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ createDeveloperProfileFromAuth: Error checking for existing profile:', checkError);
-        return false;
-      }
-      
-      if (existingProfile) {
-        console.log('✅ createDeveloperProfileFromAuth: Developer profile already exists');
-        setDeveloperProfile(existingProfile);
-        return true;
-      }
-      
-      // Create new developer profile
-      const { data: devProfile, error: devError } = await supabase
-        .from('developers')
-        .insert({
-          user_id: authUser.id,
-          github_handle: githubUsername || '',
-          bio: authUser.user_metadata?.bio || '',
-          location: authUser.user_metadata?.location || '',
-          profile_pic_url: avatarUrl
-        })
-        .select();
-
-      if (devError) {
-        console.error('❌ createDeveloperProfileFromAuth: Error creating developer profile:', devError);
-        return false;
-      }
-      
-      console.log('✅ createDeveloperProfileFromAuth: Developer profile created:', devProfile);
-      setDeveloperProfile(devProfile[0]);
-      return true;
-    } catch (error) {
-      console.error('❌ createDeveloperProfileFromAuth: Unexpected error:', error);
-      return false;
-    }
   };
 
   const fetchDeveloperProfile = async (userId: string) => {
