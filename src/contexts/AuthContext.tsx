@@ -440,43 +440,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithGitHub = async () => {
+    console.log('🔄 signInWithGitHub: Redirecting to GitHub App installation...');
+    
     try {
+      // Clear any previous errors
       setAuthError(null);
-      console.log('🔄 signInWithGitHub: Attempting GitHub sign in');
       
-      // Store any signup data from localStorage in the state parameter
+      // Get signup data from localStorage
       const name = localStorage.getItem('gittalent_signup_name');
       const role = localStorage.getItem('gittalent_signup_role');
       
-      // Create a state object with localStorage data and any passed params
-      const stateParam = JSON.stringify({
+      // Create a state object with all necessary data
+      const stateObj = {
         name,
         role,
-        ...stateParams
-      });
+        installation_id: 'pending',
+        ...(stateParams || {})
+      };
       
-      console.log('🔄 signInWithGitHub: Using state param:', stateParam);
+      // Encode the state parameter
+      const stateParam = encodeURIComponent(JSON.stringify(stateObj));
+      
+      // Set up the GitHub App installation URL
+      const GITHUB_APP_SLUG = 'GitTalentApp'; // Must match your GitHub App slug exactly
+      const returnUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
+      const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}&redirect_uri=${returnUrl}`;
+      
+      console.log('🔄 signInWithGitHub: Redirecting to:', githubAppInstallUrl);
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'read:user user:email',
-          state: stateParam
-        }
-      });
-
-      if (error) {
-        console.error('❌ signInWithGitHub: Error during GitHub sign in:', error);
-        setAuthError(error.message);
-        return { error };
-      }
-
-      console.log('✅ signInWithGitHub: GitHub sign in initiated');
+      // Redirect to GitHub App installation page
+      window.location.href = githubAppInstallUrl;
+      
       return { error: null };
     } catch (error: any) {
-      console.error('❌ signInWithGitHub: Unexpected error:', error);
-      setAuthError('An unexpected error occurred during GitHub sign in. Please try again.');
+      console.error('❌ signInWithGitHub: Error redirecting to GitHub App:', error);
+      setAuthError(error.message || 'Failed to redirect to GitHub App installation');
       return { error };
     }
   };
