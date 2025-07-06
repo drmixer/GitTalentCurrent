@@ -266,7 +266,7 @@ async function fetchContributionData(username: string, authToken: string) {
   `;
 
   const response = await fetch('https://api.github.com/graphql', {
-    method: 'POST',
+    method: 'POST', 
     headers: {
       'Authorization': authToken,
       'Content-Type': 'application/json',
@@ -276,7 +276,8 @@ async function fetchContributionData(username: string, authToken: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`GraphQL request failed: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`GraphQL request failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -353,7 +354,7 @@ function generateContributionsFromRepos(repos: any[]): { date: string; count: nu
       }
     }
   });
-  
+   
   // Apply the counts to our contributions array
   contributions.forEach((day, index) => {
     if (dateMap[day.date]) {
