@@ -102,14 +102,8 @@ export const SignupForm = () => {
       localStorage.setItem('gittalent_signup_name', formData.name);
       localStorage.setItem('gittalent_signup_role', formData.role);
       
-      // Create a state object with installation_id to be used later
-      const stateObj = {
-        name: formData.name,
-        role: formData.role,
-        installation_id: 'pending' // This will be replaced by the actual installation ID
-      };
-      
-      await signInWithGitHub(stateObj);
+      // Call signInWithGitHub which will handle the redirect to GitHub App installation
+      await signInWithGitHub();
       // Navigation will be handled by the redirect
     } catch (error: any) {
       console.error('GitHub signup error:', error);

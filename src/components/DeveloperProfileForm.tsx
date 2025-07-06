@@ -2,10 +2,13 @@
    };
  
    const handleConnectGitHub = () => {
-+    // Set a flag to indicate we're connecting GitHub
      setConnectingGitHub(true);
      
--    // Navigate to GitHub setup page without any localStorage flags
-+    // Navigate to GitHub setup page
+    // Use the connectGitHubApp function from AuthContext
+    connectGitHubApp()
+      .catch(error => {
+        console.error('Error connecting to GitHub:', error);
+        setConnectingGitHub(false);
+      });
      navigate('/github-setup');
    };

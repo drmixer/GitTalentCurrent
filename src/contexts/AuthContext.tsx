@@ -290,21 +290,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                       
       const companyName = authUser.user_metadata?.company_name || 'Company';
       const avatarUrl = authUser.user_metadata?.avatar_url || '';
+      const githubHandle = authUser.user_metadata?.user_name || '';
+      const githubInstallationId = authUser.user_metadata?.installation_id || null;
 
       console.log('🔄 createUserProfileFromAuth: Creating profile with role:', userRole, 'name:', userName);
 
-      // Create user profile
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: authUser.id,
-          email: authUser.email || 'unknown@example.com',
-          name: userName,
-          role: userRole,
-          is_approved: userRole === 'developer' || userRole === 'admin'
-        })
-        .select()
-        .single();
+      // Create user profile using RPC function
+      const { error: userError } = await supabase.rpc('create_user_profile', {
+        user_id: authUser.id,
+        user_email: authUser.email || 'unknown@example.com',
+        user_name: userName,
+        user_role: userRole,
+        company_name: companyName
+      });
 
       if (userError) {
         console.error('❌ createUserProfileFromAuth: Error creating user profile:', userError);
@@ -313,12 +311,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       console.log('✅ createUserProfileFromAuth: User profile created successfully');
-      setUserProfile(userData);
 
       // Create role-specific profile if needed
-      if (userRole === 'developer') {
-        const githubHandle = authUser.user_metadata?.user_name || '';
-        
+      if (userRole === 'developer' || authUser.app_metadata?.provider === 'github') {
         // Create developer profile
         const { error: devError } = await supabase
           .from('developers')
@@ -327,7 +322,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             github_handle: githubHandle,
             bio: authUser.user_metadata?.bio || '',
             location: authUser.user_metadata?.location || '',
-            profile_pic_url: avatarUrl
+            profile_pic_url: avatarUrl,
+            github_installation_id: githubInstallationId
           });
 
         if (devError) {
@@ -337,21 +333,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         console.log('✅ createUserProfileFromAuth: Developer profile created successfully');
         await fetchDeveloperProfile(authUser.id);
-      } else if (userRole === 'recruiter') {
-        // Create recruiter profile
-        const { error: recError } = await supabase
-          .from('recruiters')
-          .insert({
-            user_id: authUser.id,
-            company_name: companyName
-          });
-
-        if (recError) {
-          console.error('❌ createUserProfileFromAuth: Error creating recruiter profile:', recError);
-          return false;
-        }
-        
-        console.log('✅ createUserProfileFromAuth: Recruiter profile created successfully');
       }
 
       return true;
@@ -439,7 +420,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signInWithGitHub = async () => {
+  const signInWithGitHub = async (stateParams?: Record<string, any>) => {
     console.log('🔄 signInWithGitHub: Redirecting to GitHub App installation...');
     
     try {
