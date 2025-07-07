@@ -158,10 +158,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [ensureDeveloperProfile, fetchDeveloperProfile]);
 
-  const handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
+  handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
     console.log(`🔄 handleGitHubSignIn: Restored - Processing GitHub sign-in for user: ${authUser.id}`);
+    // Log the detailed user_metadata at the very beginning of the handler
+    console.log(`ℹ️ handleGitHubSignIn: authUser.user_metadata for ${authUser.id}:`, JSON.stringify(authUser.user_metadata, null, 2));
     setAuthError(null);
-    console.log(`🔄 handleGitHubSignIn: Restored - User metadata for ${authUser.id}:`, authUser.user_metadata);
+    // console.log(`🔄 handleGitHubSignIn: Restored - User metadata for ${authUser.id}:`, authUser.user_metadata); // Redundant if using stringify above
 
     try {
       console.log(`🔄 handleGitHubSignIn: Restored - Entered TRY block for user ${authUser.id}.`);
