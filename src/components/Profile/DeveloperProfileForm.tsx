@@ -185,6 +185,19 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
+  const handleUseGitHubAvatar = () => {
+    if (user?.user_metadata?.avatar_url) {
+      setFormData(prev => ({
+        ...prev,
+        profile_pic_url: user.user_metadata.avatar_url
+      }));
+      // Optionally, add a toast message here: "GitHub avatar applied. Save changes to make it permanent."
+    } else {
+      // Optionally, add a toast message: "GitHub avatar URL not found."
+      console.warn("Attempted to use GitHub avatar, but URL not found in user metadata.");
+    }
+  };
+
   const handleConnectGitHub = () => {
     // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
@@ -387,6 +400,15 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                     )}
                     {uploadingProfilePic ? 'Uploading...' : 'Upload Photo'}
                   </label>
+                  <button
+                    type="button"
+                    onClick={handleUseGitHubAvatar}
+                    className="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    title="Use your GitHub profile picture"
+                  >
+                    <Github className="w-4 h-4 mr-2 text-gray-500" />
+                    Use GitHub Avatar
+                  </button>
                 </div>
               </div>
               {errors.profile_pic && (
