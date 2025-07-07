@@ -489,22 +489,6 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* GitHub Activity */}
-      {developer?.github_handle && (
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">GitHub Activity</h3>
-            <button
-              onClick={() => setActiveTab('github-activity')}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-            >
-              View Full Activity
-            </button>
-          </div>
-          <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
-        </div>
-      )}
-
       {/* Featured Portfolio Item */}
       {featuredPortfolioItem && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -625,8 +609,12 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {activeTab === 'github-activity' && developer?.github_handle && (
-        <div className="max-w-4xl mx-auto">
-          <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
+        <div className="max-w-3xl mx-auto"> {/* Adjusted max-width */}
+          <RealGitHubChart
+            githubHandle={developer.github_handle}
+            className="w-full"
+            compactMode={true} // Pass compactMode prop
+          />
         </div>
       )}
 
