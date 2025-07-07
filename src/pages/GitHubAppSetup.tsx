@@ -26,25 +26,20 @@ export const GitHubAppSetup = () => {
       timestamp: Date.now() // Add timestamp to prevent caching issues
     };
     
-    console.log('GitHubAppSetup: Creating state object for GitHub App installation:', stateObj);
     const state = encodeURIComponent(JSON.stringify(stateObj));
     
     const redirectUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${state}&redirect_uri=${redirectUrl}`;
     
-    console.log('GitHubAppSetup: Redirecting to GitHub App installation:', githubAppInstallUrl);
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
     
-    console.log('GitHubAppSetup: Setting timeout for redirect to GitHub App installation');
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
   }, [user]);
 
   const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
-    console.log('GitHubAppSetup: Success - ', successMessage);
-    console.log(`GitHubAppSetup: Will redirect to dashboard in ${redirectDelay}ms`);
     setUiState('success');
     setMessage(successMessage);
     setTimeout(() => {
@@ -53,8 +48,7 @@ export const GitHubAppSetup = () => {
   }, [navigate]);
 
   const handleError = useCallback((errorMessage: string) => {
-    console.error('GitHubAppSetup: Error - ', errorMessage);
-    console.log('GitHubAppSetup: Setting error state with message:', errorMessage);
+    console.error('GitHubAppSetup: Error - ', errorMessage); // Keep console.error for actual errors
     setUiState('error');
     setMessage(errorMessage);
   }, []);
@@ -64,26 +58,11 @@ export const GitHubAppSetup = () => {
       const searchParams = new URLSearchParams(location.search);
       const installationId = searchParams.get('installation_id'); 
       const setupAction = searchParams.get('setup_action');
-      const code = searchParams.get('code');
+      // const code = searchParams.get('code'); // code is not used
       const errorParam = searchParams.get('error'); 
       const errorDescription = searchParams.get('error_description'); 
-      const state = searchParams.get('state');
+      // const state = searchParams.get('state'); // state is not directly used after parsing
       
-      console.log('GitHubAppSetup: URL parameters:', { 
-        installationId, 
-        setupAction, 
-        code,
-        errorParam, 
-        errorDescription,
-        state
-      });
-      console.log('GitHubAppSetup: Full URL:', window.location.href);
-      console.log('GitHubAppSetup: Auth loading:', authLoading);
-      console.log('GitHubAppSetup: User:', user ? `Exists (${user.id})` : 'Not loaded');
-      console.log('GitHubAppSetup: Developer profile:', developerProfile ? 
-        `Exists (GitHub handle: ${developerProfile.github_handle}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
-        'Not loaded');
-  
       // Reset retry count when params change
       if (installationId || errorParam) {
         setRetryCount(0);
@@ -97,8 +76,6 @@ export const GitHubAppSetup = () => {
   
       // If auth is still loading, wait.
       if (authLoading) {
-        console.log(`GitHubAppSetup: Auth context loading, waiting... (Attempt ${retryCount + 1} of ${maxRetries})`);
-
         if (retryCount >= maxRetries) {
           setUiState('error');
           setMessage('Authentication is taking too long. Please try again.');
@@ -106,14 +83,8 @@ export const GitHubAppSetup = () => {
           setUiState('loading');
           setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
           
-          // Set a timeout to increment retry count.
-          // DO NOT call refreshProfile here; AuthContext handles its own loading cycle.
-          // GitHubAppSetup should wait for authLoading to become false.
           const timer = setTimeout(() => {
             setRetryCount(prev => prev + 1); 
-            // if (refreshProfile) { // Removed refreshProfile call
-            //   refreshProfile();
-            // }
           }, 2000);
           return () => clearTimeout(timer);
         }
@@ -122,17 +93,12 @@ export const GitHubAppSetup = () => {
   
       // If no user after auth loading is complete, redirect to login
       if (!user) {
-        console.log('GitHubAppSetup: No user found after auth loading completed, redirecting to login');
         navigate('/login', { replace: true });
         return;
       }
   
       // Scenario 1: App Install/Reconfigure for an existing user
-      // This block should now primarily react to developerProfile changes after refreshProfile is called once.
       if (user && installationId && developerProfile?.github_installation_id === installationId) {
-        // If installationId is in URL AND it matches what's in the developerProfile, consider it done.
-        console.log(`GitHubAppSetup: Installation ID ${installationId} matches profile. Setup complete.`);
-        // Clear URL parameters
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('installation_id');
         cleanUrl.searchParams.delete('setup_action');
@@ -147,19 +113,12 @@ export const GitHubAppSetup = () => {
         return;
 
       } else if (user && installationId && !processingInstallation) {
-        setProcessingInstallation(true); // Indicate processing has started
+        setProcessingInstallation(true);
         setUiState('loading');
-        console.log('GitHubAppSetup: Found installation_id in URL, initiating processing with Edge Function');
-        console.log(`GitHubAppSetup: User ${user.id} present with installation_id ${installationId}. Action: ${setupAction}`);
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
         try {
-          console.log('GitHubAppSetup: Calling update-github-installation function with:', {
-            userId: user.id,
-            installationId
-          });
-          
-          const { data, error: updateError } = await supabase.functions.invoke('update-github-installation', {
+          const { error: updateError } = await supabase.functions.invoke('update-github-installation', {
             body: JSON.stringify({ userId: user.id, installationId }),
           });
           
@@ -170,22 +129,10 @@ export const GitHubAppSetup = () => {
             return;
           }
           
-          console.log('GitHubAppSetup: Edge function response:', data);
-          console.log('GitHubAppSetup: Installation ID update requested via Edge Function.');
-          
-          // Refresh the profile ONCE to get the updated installation ID
           if (refreshProfile) {
-            console.log('GitHubAppSetup: Calling refreshProfile to get updated installation ID.');
             await refreshProfile();
-            // After this, useEffect will re-run. The condition above
-            // (developerProfile?.github_installation_id === installationId) should eventually be met.
-            console.log('GitHubAppSetup: refreshProfile call completed. Waiting for developerProfile update.');
           }
-          // Do not setProcessingInstallation(false) here immediately, let the effect re-evaluate with new profile
-          // Or, we can rely on the developerProfile change to trigger the success state.
-          // For now, let's allow the effect to re-run and hit the success condition.
           
-          // Clear URL parameters (moved to success block)
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
@@ -195,7 +142,6 @@ export const GitHubAppSetup = () => {
           setProcessingInstallation(false);
           
           if (setupAction === 'install') {
-            console.log('GitHubAppSetup: GitHub App successfully installed');
             handleSuccess('GitHub App successfully installed and connected!');
           } else {
             handleSuccess('GitHub App connection updated successfully!');
@@ -207,7 +153,6 @@ export const GitHubAppSetup = () => {
         }
         return;
       } else if (user && installationId && processingInstallation) {
-        console.log('GitHubAppSetup: Already processing installation, waiting for completion');
         setUiState('loading');
         setMessage('Processing GitHub App installation...');
         return;
@@ -215,40 +160,20 @@ export const GitHubAppSetup = () => {
 
       // Scenario 2: User is logged in but no installation_id in URL
       if (user && !installationId) {
-        console.log(`GitHubAppSetup: User ${user.id} present, but no installation_id in URL.`);
-        console.log('GitHubAppSetup: Developer profile:', developerProfile);
-        if (developerProfile) {
-          console.log('GitHub handle:', developerProfile.github_handle || 'none');
-          console.log('Installation ID:', developerProfile.github_installation_id || 'none');
-        }
-        
-        // Check if developer profile has installation ID 
         const hasInstallationId = developerProfile?.github_installation_id && 
                                  developerProfile.github_installation_id !== '';
                                  
-        console.log('GitHubAppSetup: Has installation ID:', hasInstallationId);
         if (hasInstallationId) {
-          console.log('GitHubAppSetup: Developer profile already has an installation ID. GitHub App is connected.');
           handleSuccess('GitHub App is already connected!', 1500);
         } else {
-          // Check if we need to wait for profile to load 
           if (!developerProfile && retryCount < maxRetries) {
-            console.log('GitHubAppSetup: Waiting for developer profile to load...');
-            console.log(`GitHubAppSetup: Retry attempt ${retryCount + 1}/${maxRetries}`);
             setUiState('loading'); 
             setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
             
-            // Increment retry count. DO NOT call refreshProfile here.
-            // Wait for AuthContext to settle its loading state.
             setTimeout(() => {
-              // if (refreshProfile) { // Removed refreshProfile call
-              //  refreshProfile();
-              // }
-              console.log(`GitHubAppSetup: Incrementing retry count to ${retryCount + 1} while waiting for developer profile.`);
               setRetryCount(prev => prev + 1);
             }, 2000);
           } else {
-            console.log('GitHubAppSetup: Developer profile not loaded after retries or no installation ID. Showing GitHub App connection info...');
             setUiState('info');
             setMessage('Connect the GitHub App to display your contributions and repositories.');
           }
@@ -257,7 +182,6 @@ export const GitHubAppSetup = () => {
       }
       
       setUiState('loading');
-      console.log('GitHubAppSetup: Default case - waiting for state to resolve');
       setMessage('Please wait...');
     };
 

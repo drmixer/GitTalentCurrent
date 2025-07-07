@@ -354,13 +354,11 @@ export const DeveloperDashboard: React.FC = () => {
   };
 
   const handleViewJobDetails = (job: JobRole) => {
-    console.log('Viewing job details:', job);
     setSelectedJobForDetails(job);
     setShowJobDetailsModal(true);
   };
 
   const handleViewRecruiter = (recruiterId: string) => {
-    console.log('Viewing recruiter profile:', recruiterId);
     setSelectedRecruiterId(recruiterId);
     setShowRecruiterProfile(true);
   };
@@ -398,7 +396,6 @@ export const DeveloperDashboard: React.FC = () => {
   };
 
   const handleExpressInterest = async (jobId: string) => {
-    console.log('Handling express interest for job:', jobId);
     const job = recommendedJobs.find(j => j.id === jobId);
     if (!job) {
       console.error('Job not found:', jobId);
@@ -628,7 +625,9 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {activeTab === 'github-activity' && developer?.github_handle && (
-        <RealGitHubChart githubHandle={developer.github_handle} className="w-full" showFullView />
+        <div className="max-w-4xl mx-auto">
+          <RealGitHubChart githubHandle={developer.github_handle} className="w-full" />
+        </div>
       )}
 
       {activeTab === 'messages' && (
