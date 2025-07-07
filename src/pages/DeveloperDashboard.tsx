@@ -609,11 +609,11 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {activeTab === 'github-activity' && developer?.github_handle && (
-        <div className="max-w-lg mx-auto"> {/* Adjusted max-width to lg */}
+        <div className="max-w-xs mx-auto"> {/* Adjusted max-width to xs for snippet */}
           <RealGitHubChart
             githubHandle={developer.github_handle}
             className="w-full"
-            compactMode={true} // Pass compactMode prop
+            displayMode='dashboardSnippet' // Use new displayMode prop
           />
         </div>
       )}
