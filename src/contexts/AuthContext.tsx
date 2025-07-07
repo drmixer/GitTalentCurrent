@@ -13,40 +13,15 @@ export const useAuth = () => {
   return context;
 };
 
-// Helper function for adding timeout to promises (currently not used by simplified handleGitHubSignIn)
-/*
-function promiseWithTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  timeoutError = new Error('Promise timed out')
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      console.warn(`Promise timed out after ${ms}ms for promise:`, promise);
-      reject(timeoutError);
-    }, ms);
-
-    promise
-      .then(value => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch(err => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
-*/
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const prevSessionRef = useRef<Session | null>(null);
-  const isProcessingAuthStateChangeRef = useRef(false);
+  const latestSessionRef = useRef<string | null>(null); // Used to compare incoming sessions
+  const isProcessingAuthEventRef = useRef(false); // Guards the new useEffect processor
+
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null | undefined>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Global loading for auth context
   const [signingOut, setSigningOut] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -55,25 +30,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser): Promise<boolean> => {
     console.log(`🔄 ensureDeveloperProfile for user ${authUser.id}`);
-    // Log the metadata at the beginning of ensureDeveloperProfile IF it's going to create one
+    console.log(`ℹ️ ensureDeveloperProfile: authUser.user_metadata for ${authUser.id}:`, JSON.stringify(authUser.user_metadata, null, 2));
     try {
       const { data: existingProfile, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
       if (checkError && checkError.code !== 'PGRST116') { console.error(`❌ ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); return false; }
-      if (existingProfile) {
-        console.log(`✅ ensureDeveloperProfile: Developer profile already exists for user ${authUser.id}. Calling setDeveloperProfile.`);
-        setDeveloperProfile(existingProfile);
-        console.log(`🔄 ensureDeveloperProfile: setDeveloperProfile call completed for ${authUser.id}.`);
-        return true;
-      }
-      console.log(`🔄 ensureDeveloperProfile: No existing developer profile for ${authUser.id}. Creating new one.`);
-      // Log metadata here, only when creating new
-      console.log(`ℹ️ ensureDeveloperProfile: authUser.user_metadata for ${authUser.id} (before new dev profile creation):`, JSON.stringify(authUser.user_metadata, null, 2));
-      const githubUsername = authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
+
+      const githubUsername = authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
-      const githubInstallationId = authUser.user_metadata?.installation_id || null;
-      console.log(`🔄 ensureDeveloperProfile: Creating new developer profile for ${authUser.id} with GitHub handle: ${githubUsername}`);
+      // installationId is NOT sourced from user_metadata here; it's updated by GitHubAppSetup flow
+
+      if (existingProfile) {
+        console.log(`✅ ensureDeveloperProfile: Developer profile already exists for user ${authUser.id}.`);
+        let needsUpdate = false;
+        const updates: Partial<Developer> = {};
+        if (githubUsername && existingProfile.github_handle !== githubUsername) {
+          updates.github_handle = githubUsername;
+          needsUpdate = true;
+        }
+        // Potentially update other fields like avatar_url, bio, location if they can change
+        if (avatarUrl && existingProfile.profile_pic_url !== avatarUrl) {
+          updates.profile_pic_url = avatarUrl;
+          needsUpdate = true;
+        }
+         if (userBio && existingProfile.bio !== userBio) {
+          updates.bio = userBio;
+          needsUpdate = true;
+        }
+        if (userLocation && existingProfile.location !== userLocation) {
+          updates.location = userLocation;
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          console.log(`🔄 ensureDeveloperProfile: Updating existing developer profile for ${authUser.id} with new metadata:`, updates);
+          const { data: updatedProfile, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
+          if (updateError) {
+            console.error(`❌ ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
+            // Don't return false, just means update failed, but profile exists
+          } else if (updatedProfile) {
+            console.log(`✅ ensureDeveloperProfile: Developer profile updated for ${authUser.id}. Calling setDeveloperProfile.`);
+            setDeveloperProfile(updatedProfile);
+            console.log(`🔄 ensureDeveloperProfile: setDeveloperProfile call completed for ${authUser.id}.`);
+            return true;
+          }
+        } else {
+           console.log(`🔄 ensureDeveloperProfile: Existing developer profile for ${authUser.id} is up-to-date. Calling setDeveloperProfile.`);
+        }
+        setDeveloperProfile(existingProfile); // Set it even if no update, to ensure state is fresh
+        console.log(`🔄 ensureDeveloperProfile: setDeveloperProfile call completed for ${authUser.id} (existing).`);
+        return true;
+      }
+
+      console.log(`🔄 ensureDeveloperProfile: No existing developer profile for ${authUser.id}. Creating new one.`);
+      const githubInstallationId = null; // This will be set by GitHubAppSetup flow
+      console.log(`🔄 ensureDeveloperProfile: Creating new developer profile for ${authUser.id} with GitHub handle: '${githubUsername}'`);
       const { data: newDevProfileData, error: createError } = await supabase.from('developers').insert({
         user_id: authUser.id, github_handle: githubUsername, bio: userBio, location: userLocation,
         profile_pic_url: avatarUrl, github_installation_id: githubInstallationId, availability: true
@@ -111,7 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error && error.code === 'PGRST116') {
         console.log(`🔄 fetchUserProfile: Profile not found for ${authUser.id}, creating one.`);
         const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
-        const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.preferred_username || authUser.user_metadata?.user_name || 'GitHub User';
+        const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'GitHub User';
         const companyName = authUser.user_metadata?.company_name || 'Company';
         console.log(`🔄 fetchUserProfile: Creating profile via RPC for ${authUser.id} with role: ${userRole}, name: ${userName}`);
         const { error: rpcError } = await supabase.rpc(
@@ -141,11 +153,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`🔄 fetchUserProfile: setUserProfile call completed for ${authUser.id}.`);
       if (profile.role === 'developer') {
         console.log(`🔄 fetchUserProfile: User ${authUser.id} is developer. Fetching/ensuring dev profile.`);
-        const devProfile = await fetchDeveloperProfile(authUser.id);
-        if (!devProfile) {
-          console.log(`🔄 fetchUserProfile: Dev profile not found for ${authUser.id}, ensuring creation.`);
-          await ensureDeveloperProfile(authUser);
-        }
+        await ensureDeveloperProfile(authUser); // Ensure dev profile exists and handle is up-to-date
       }
       return profile;
     } catch (error) {
@@ -153,166 +161,146 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAuthError('An unexpected error occurred while fetching your profile.'); return null;
     } finally {
       console.log(`🔄 fetchUserProfile: In finally block for ${authUser.id}.`);
-      // setLoading(false) should be called by the useEffect that initiated this.
-      // But if called directly, it should manage its own loading state if it set it.
-      // For now, the new useEffect wrapper handles the setLoading(false) after this promise resolves.
+      console.log(`🔄 fetchUserProfile: Calling setLoading(false) for ${authUser.id}.`);
+      setLoading(false); // This function now manages its own loading state when called.
+      console.log(`🔄 fetchUserProfile: setLoading(false) completed for ${authUser.id}.`);
     }
-  }, [ensureDeveloperProfile, fetchDeveloperProfile]); // Removed loading, setAuthError, setUserProfile as they are stable setters
+  }, [ensureDeveloperProfile]);
 
   const handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
     console.log(`🔄 handleGitHubSignIn: Processing GitHub sign-in for user: ${authUser.id}`);
-    // Log the detailed user_metadata at the very beginning of the handler
     console.log(`ℹ️ handleGitHubSignIn: authUser.user_metadata for ${authUser.id}:`, JSON.stringify(authUser.user_metadata, null, 2));
     setAuthError(null);
-
     try {
-      console.log(`🔄 handleGitHubSignIn: DEBUG Entered TRY block for user ${authUser.id}.`);
-
+      console.log(`🔄 handleGitHubSignIn: Entered TRY block for user ${authUser.id}.`);
       if (!supabase) {
-        console.error(`❌ handleGitHubSignIn: DEBUG Supabase client is null for user ${authUser.id}.`);
-        setAuthError("Auth service error.");
-        // setLoading(false) is handled in finally
-        return;
+        console.error(`❌ handleGitHubSignIn: Supabase client is null for user ${authUser.id}.`);
+        setAuthError("Auth service error."); return;
       }
-
-      console.log(`🔄 handleGitHubSignIn: DEBUG Test 1 - Before simple await setTimeout for user ${authUser.id}.`);
-      await new Promise(resolve => setTimeout(resolve, 50));
-      console.log(`✅ handleGitHubSignIn: DEBUG Test 1 - After simple await setTimeout for user ${authUser.id}.`);
-
-      console.log(`🔄 handleGitHubSignIn: DEBUG - Introducing short delay (20ms) before Supabase calls for user ${authUser.id}.`);
-      await new Promise(resolve => setTimeout(resolve, 20));
-      console.log(`✅ handleGitHubSignIn: DEBUG - Short delay completed for user ${authUser.id}.`);
-
-      console.log(`🔄 handleGitHubSignIn: DEBUG Test 2 - Before supabase.auth.getUser() for user ${authUser.id}.`);
-      try {
-        const { data: { user: authUserTest }, error: getUserError } = await supabase.auth.getUser();
-        if (getUserError) {
-          console.error(`❌ handleGitHubSignIn: DEBUG Test 2 - supabase.auth.getUser() FAILED for user ${authUser.id}:`, getUserError);
-        } else {
-          console.log(`✅ handleGitHubSignIn: DEBUG Test 2 - supabase.auth.getUser() success for ${authUser.id}. User ID:`, authUserTest?.id);
-        }
-      } catch (e: unknown) {
-        console.error(`❌ handleGitHubSignIn: DEBUG Test 2 - CRITICAL EXCEPTION during supabase.auth.getUser() for ${authUser.id}:`, e);
-      }
-
-      console.log(`🔄 handleGitHubSignIn: DEBUG Test 3 - Before Supabase query 'users' limit 1 for user ${authUser.id}.`);
-      try {
-        const { data: usersTestData, error: usersTestError } = await supabase.from('users').select('id').limit(1);
-        if (usersTestError) {
-          console.error(`❌ handleGitHubSignIn: DEBUG Test 3 - Supabase query FAILED for user ${authUser.id}:`, usersTestError);
-        } else {
-          console.log(`✅ handleGitHubSignIn: DEBUG Test 3 - Supabase query success for ${authUser.id}. Data:`, usersTestData);
-        }
-      } catch (e: unknown) {
-        console.error(`❌ handleGitHubSignIn: DEBUG Test 3 - CRITICAL EXCEPTION during Supabase query for ${authUser.id}:`, e);
-      }
-      console.log(`🔄 handleGitHubSignIn: DEBUG - All tests complete. Original logic is bypassed for user ${authUser.id}.`);
+      // Directly call fetchUserProfile which contains all logic for user and developer profile creation/update.
+      await fetchUserProfile(authUser);
+      console.log(`✅ handleGitHubSignIn: fetchUserProfile completed for ${authUser.id}.`);
     } catch (error: unknown) {
-      console.error(`❌ handleGitHubSignIn: DEBUG CAUGHT TOP-LEVEL UNEXPECTED ERROR for user ${authUser.id}:`, error);
+      console.error(`❌ handleGitHubSignIn: CAUGHT TOP-LEVEL UNEXPECTED ERROR for user ${authUser.id}:`, error);
       if (error instanceof Error) {
-        console.error(`❌ handleGitHubSignIn: DEBUG Error name: ${error.name}, message: ${error.message}, stack: ${error.stack}`);
+        console.error(`❌ handleGitHubSignIn: Error name: ${error.name}, message: ${error.message}, stack: ${error.stack}`);
       }
       setAuthError('An unexpected error occurred during sign in.');
     } finally {
-      console.log(`🔄 handleGitHubSignIn: DEBUG In finally block for user ${authUser.id}. Current loading (before set): ${loading}`);
+      console.log(`🔄 handleGitHubSignIn: In finally block for user ${authUser.id}. Current loading (before set): ${loading}`);
       if (loading) {
-        console.log(`🔄 handleGitHubSignIn: DEBUG Calling setLoading(false) in finally for ${authUser.id}.`);
+        console.log(`🔄 handleGitHubSignIn: Calling setLoading(false) in finally for ${authUser.id}.`);
         setLoading(false);
       }
-      console.log(`🔄 handleGitHubSignIn: DEBUG setLoading(false) call issued. AuthContext loading state will be false in next render if true now.`);
+      console.log(`🔄 handleGitHubSignIn: setLoading(false) call completed/checked. Loading is now (stale read): ${loading}.`);
     }
-  }, [loading]); // `loading` is a dependency for the finally block logic. `setAuthError`, `setLoading` are stable.
+  }, [loading, fetchUserProfile]); // Added fetchUserProfile
 
   useEffect(() => {
-    console.log('🔄 AuthProvider: Main useEffect for onAuthStateChange setup.');
-    prevSessionRef.current = null;
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log('🔄 AuthProvider: Current session from getSession():', currentSession ? 'Found' : 'None');
+    console.log('🔄 AuthProvider: Main useEffect for onAuthStateChange setup (runs once).');
+    latestSessionRef.current = JSON.stringify(session); // Initialize with current session state if any
+
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => { // Make async
+      console.log('🔄 AuthProvider: Initial getSession() result:', currentSession ? `Session for ${currentSession.user.id}` : 'No session');
+      const currentSessionStr = JSON.stringify(currentSession);
+
+      // Set initial states
       setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (!currentSession?.user) {
+      const initialUser = currentSession?.user ?? null;
+      setUser(initialUser);
+      latestSessionRef.current = currentSessionStr;
+
+      if (initialUser && !authUserToProcess) {
+        console.log(`🔄 AuthProvider: User ${initialUser.id} from getSession(), queueing for INITIAL_SESSION style processing.`);
+        setLoading(true);
+        setAuthUserToProcess(initialUser);
+        setAuthProcessingEventType('INITIAL_SESSION');
+      } else if (!initialUser) {
         setLoading(false);
       }
     }).catch(error => {
-      console.error('❌ AuthProvider: Error in getSession():', error);
+      console.error('❌ AuthProvider: Error in initial getSession():', error);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log(`🔄 AuthProvider: onAuthStateChange event: ${event}`, newSession ? `Session for user ${newSession.user?.id}` : 'No session');
-      if (isProcessingAuthStateChangeRef.current && !(event === 'INITIAL_SESSION' && !authUserToProcess)) {
-        console.log('🔄 AuthProvider: onAuthStateChange event ignored, already processing another or initial processed.');
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`🔄 AuthProvider: onAuthStateChange event: ${event}`, session ? `Session for user ${session.user?.id}` : 'No session');
+
+      const newSessionStr = JSON.stringify(session);
+      if (latestSessionRef.current === newSessionStr && event !== 'INITIAL_SESSION') {
+        console.log('🔄 AuthProvider: onAuthStateChange - Session appears unchanged by content, event:', event, '. Skipping redundant processing trigger.');
         return;
       }
-      const prevSessionStr = JSON.stringify(prevSessionRef.current);
-      const newSessionStr = JSON.stringify(newSession);
-      if (prevSessionStr === newSessionStr && event !== 'INITIAL_SESSION' && prevSessionRef.current !== null) {
-        console.log('🔄 AuthProvider: Session unchanged and not initial, skipping update.');
-        if (!newSession?.user && !user && loading) { setLoading(false); }
-        return;
-      }
-      isProcessingAuthStateChangeRef.current = true;
-      console.log('🔄 AuthProvider: Processing new auth state change.');
-      prevSessionRef.current = newSession;
-      const NUser = newSession?.user ?? null;
-      setSession(newSession);
+      console.log('🔄 AuthProvider: onAuthStateChange - Session changed or initial. Proceeding.');
+      latestSessionRef.current = newSessionStr; // Update ref for next event comparison
+
+      // isProcessingAuthEventRef guards the new useEffect, not this callback directly.
+      // This callback should be lean: update basic state and trigger the processing useEffect.
+      const NUser = session?.user ?? null;
+      setSession(session);
       setUser(NUser);
       setAuthError(null);
+
       if (NUser) {
-        console.log(`🔄 AuthProvider: User ${NUser.id} from event ${event}. Setting loading & queueing.`);
+        console.log(`🔄 AuthProvider: User ${NUser.id} from onAuthStateChange event ${event}. Setting loading & queueing.`);
         setLoading(true);
         setAuthUserToProcess(NUser);
         setAuthProcessingEventType(event);
       } else {
-        console.log('🔄 AuthProvider: No user from event. Clearing profiles, setting loading false.');
-        setUserProfile(null); setDeveloperProfile(null); setLoading(false);
+        console.log('🔄 AuthProvider: No user from onAuthStateChange event. Clearing profiles, loading false.');
+        setUserProfile(null);
+        setDeveloperProfile(null);
+        setLoading(false);
         setAuthUserToProcess(null);
         setAuthProcessingEventType(null);
-        isProcessingAuthStateChangeRef.current = false;
       }
     });
     return () => {
-      console.log('🔄 AuthProvider: Cleaning up auth subscription.');
+      console.log('🔄 AuthProvider: Cleaning up onAuthStateChange subscription.');
       subscription.unsubscribe();
     };
-  }, [loading, user, authUserToProcess]); // Added loading, user, authUserToProcess as they are used in conditions for skipping.
+  }, []); // Empty dependency array: setup listener once.
 
   useEffect(() => {
     if (authUserToProcess) {
+      if (isProcessingAuthEventRef.current) {
+        console.log(`🔄 AuthProvider: useEffect for authUserToProcess - already processing event for user ${authUserToProcess.id}. Ignoring.`);
+        return;
+      }
+      isProcessingAuthEventRef.current = true;
       console.log(`🔄 AuthProvider: useEffect processing user ${authUserToProcess.id} for event type ${authProcessingEventType}`);
-      const processAuthUser = async () => {
-        let processed = false;
+
+      const processIt = async () => {
         try {
           if (authProcessingEventType === 'SIGNED_IN') {
             if (authUserToProcess.app_metadata?.provider === 'github') {
-              console.log('🔄 AuthProvider (useEffect): GitHub sign-in, calling handleGitHubSignIn.');
-              await handleGitHubSignIn(authUserToProcess); processed = true;
+              await handleGitHubSignIn(authUserToProcess);
             } else {
-              console.log('🔄 AuthProvider (useEffect): Non-GitHub sign-in, calling fetchUserProfile.');
-              await fetchUserProfile(authUserToProcess); processed = true;
+              await fetchUserProfile(authUserToProcess);
             }
-          } else if (authProcessingEventType === 'INITIAL_SESSION' || authProcessingEventType === 'USER_UPDATED' || authProcessingEventType === 'TOKEN_REFRESHED' || authProcessingEventType === 'MANUAL_REFRESH') {
-            console.log(`🔄 AuthProvider (useEffect): Event ${authProcessingEventType}, calling fetchUserProfile.`);
-            await fetchUserProfile(authUserToProcess); processed = true;
+          } else if (['INITIAL_SESSION', 'USER_UPDATED', 'TOKEN_REFRESHED', 'MANUAL_REFRESH'].includes(authProcessingEventType!)) {
+            await fetchUserProfile(authUserToProcess);
           } else {
-            console.log(`🔄 AuthProvider (useEffect): Unhandled event ${authProcessingEventType} with user, attempting fetchUserProfile.`);
-            await fetchUserProfile(authUserToProcess); processed = true; // Fallback for safety
+            console.warn(`🔄 AuthProvider (useEffect): Unhandled event type ${authProcessingEventType} with user, attempting fetchUserProfile as fallback.`);
+            await fetchUserProfile(authUserToProcess);
           }
         } catch (e) {
           console.error('❌ AuthProvider (useEffect): Error during decoupled auth processing:', e);
           setAuthError(e instanceof Error ? e.message : 'Unexpected error in decoupled processing.');
-          if(loading) setLoading(false);
+          setLoading(false); // Ensure loading is false on direct error in this effect
         } finally {
-          console.log(`🔄 AuthProvider (useEffect): Finished processing for ${authUserToProcess.id}. Clearing authUserToProcess. Processed flag: ${processed}`);
+          console.log(`🔄 AuthProvider (useEffect): Finished processing for ${authUserToProcess.id}. Clearing authUserToProcess.`);
           setAuthUserToProcess(null);
           setAuthProcessingEventType(null);
-          isProcessingAuthStateChangeRef.current = false;
-          console.log('🔄 AuthProvider (useEffect): Reset isProcessingAuthStateChangeRef.');
+          isProcessingAuthEventRef.current = false;
+          console.log('🔄 AuthProvider (useEffect): Reset isProcessingAuthEventRef.');
+          // setLoading(false) is expected to be handled by fetchUserProfile/handleGitHubSignIn's finally
         }
       };
-      processAuthUser();
+      processIt();
     }
-  }, [authUserToProcess, authProcessingEventType, handleGitHubSignIn, fetchUserProfile, loading, setAuthError, setLoading]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUserToProcess, authProcessingEventType, handleGitHubSignIn, fetchUserProfile]); // Dependencies are stable callbacks
 
   const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any; error: any | null }> => {
     try {
@@ -321,11 +309,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email, password, options: { data: { name: userData.name, role: userData.role } }
       });
       if (error) { setAuthError(error.message); setLoading(false); return { error }; }
-      if (data.user) {
-        // onAuthStateChange will pick this up
-      } else {
-        setLoading(false);
-      }
+      // onAuthStateChange will pick this up. setLoading(true) remains until processing completes.
       return { data, error: null };
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -381,10 +365,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setSigningOut(true); setLoading(true);
       const { error } = await supabase.auth.signOut();
-      if (error) { setAuthError(error.message); return { error }; }
+      if (error) { setAuthError(error.message); setLoading(false); return { error }; }
       return { error: null };
     } catch (error: any) {
-      setAuthError('An unexpected error occurred during sign out.');
+      setAuthError('An unexpected error occurred during sign out.'); setLoading(false);
       return { error };
     } finally {
       setSigningOut(false);
