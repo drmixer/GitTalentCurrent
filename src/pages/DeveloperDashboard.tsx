@@ -609,7 +609,7 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {activeTab === 'github-activity' && developer?.github_handle && (
-        <div className="max-w-3xl mx-auto"> {/* Adjusted max-width */}
+        <div className="max-w-lg mx-auto"> {/* Adjusted max-width to lg */}
           <RealGitHubChart
             githubHandle={developer.github_handle}
             className="w-full"
