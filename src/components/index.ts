@@ -17,6 +17,7 @@ export { JobRoleForm } from './JobRoles/JobRoleForm';
 export { JobRoleDetails } from './JobRoles/JobRoleDetails';
 export { JobSearchList } from './JobRoles/JobSearchList';
 export { JobImportModal } from './JobRoles/JobImportModal';
+export { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 
 // Developer components
 export { DeveloperCard } from './DeveloperCard';
