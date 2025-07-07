@@ -29,7 +29,8 @@ import {
   Clock, 
   Send,
   ExternalLink,
-  Building
+  Building,
+  Eye // Added Eye icon
 } from 'lucide-react';
 import { GitHubConnectPrompt } from '../components/GitHubConnectPrompt';
 
@@ -489,6 +490,21 @@ export const DeveloperDashboard: React.FC = () => {
               <p className="text-sm font-medium text-gray-600">Job Interests</p>
               <p className="text-2xl font-bold text-gray-900">
                 {recommendedJobs.length > 0 ? recommendedJobs.length : '--'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Views Stat Card */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Eye className="w-6 h-6 text-yellow-600" /> {/* Using Eye lucide icon */}
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Profile Views</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {developer?.profile_view_count || 0}
               </p>
             </div>
           </div>

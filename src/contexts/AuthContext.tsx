@@ -45,7 +45,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           updates.github_handle = githubUsername;
           needsUpdate = true;
         }
-        if (avatarUrl && existingProfile.profile_pic_url !== avatarUrl) {
+        // Only set profile_pic_url from GitHub if it's currently empty
+        // Custom uploads will be handled by DeveloperProfileForm
+        // "Use GitHub Avatar" button will provide explicit override
+        if (avatarUrl && !existingProfile.profile_pic_url) {
           updates.profile_pic_url = avatarUrl;
           needsUpdate = true;
         }
@@ -67,6 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return true;
           }
         }
+        // If no updates were performed, or if update failed but we still have the existing profile
         setDeveloperProfile(existingProfile);
         return true;
       }
