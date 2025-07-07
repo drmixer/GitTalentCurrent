@@ -49,15 +49,11 @@ export const AuthCallback: React.FC = () => {
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}`;
 
-    console.log('🚀 AuthCallback: Redirecting to GitHub App installation with state:', stateObj);
-    console.log('🚀 AuthCallback: GitHub App installation URL:', githubAppInstallUrl);
-
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation...');
 
     // Delay to allow UI update before redirecting
     setTimeout(() => {
-      console.log('🚀 AuthCallback: Executing redirect to GitHub App installation');
       window.location.href = githubAppInstallUrl;
     }, 500);
   }, [user]);
@@ -68,13 +64,6 @@ export const AuthCallback: React.FC = () => {
     const handleAuthCallback = async () => {
       try {
         setUiState('loading');
-        console.log('AuthCallback: Starting auth callback processing');
-        console.log('AuthCallback: Auth loading state:', authLoading, 'Retry count:', retryCount);
-        console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
-        console.log('AuthCallback: User profile:', userProfile ? `Exists (${userProfile.id}, Role: ${userProfile.role})` : 'Not loaded');
-        console.log('AuthCallback: Developer profile:', developerProfile ? 
-          `Exists (GitHub handle: ${developerProfile.github_handle}, Installation ID: ${developerProfile.github_installation_id || 'none'})` : 
-          'Not loaded');
 
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
@@ -84,16 +73,6 @@ export const AuthCallback: React.FC = () => {
         const state = params.get('state');
         const installationId = params.get('installation_id');
         
-        console.log('AuthCallback: URL parameters:', { 
-          installationId,
-          setupAction, 
-          code,
-          errorParam, 
-          errorDescription,
-          state
-        });
-        console.log('AuthCallback: Full URL:', window.location.href);
-
         // Handle errors from OAuth
         if (errorParam) {
           setUiState('error');
@@ -106,7 +85,6 @@ export const AuthCallback: React.FC = () => {
         if (state) {
           try {
             stateData = JSON.parse(decodeURIComponent(state));
-            console.log('AuthCallback: Parsed state data:', stateData);
 
             // Normalize install_after_auth to boolean
             if (typeof stateData.install_after_auth === 'string') {
@@ -116,24 +94,17 @@ export const AuthCallback: React.FC = () => {
             // Store relevant data in localStorage if available
             if (stateData.name) localStorage.setItem('gittalent_signup_name', stateData.name);
             if (stateData.role) localStorage.setItem('gittalent_signup_role', stateData.role);
-            console.log('AuthCallback: Stored data in localStorage, install_after_auth:', stateData.install_after_auth);
           } catch (parseError) {
             console.error('AuthCallback: Error parsing state parameter:', parseError);
-            console.log('AuthCallback: Raw state parameter:', state);
           }
         }
 
         // Process GitHub App installation flow
         if (installationId) {
-          console.log('AuthCallback: Installation ID found in URL:', installationId);
-          console.log('AuthCallback: User state:', user ? `User exists (${user.id})` : 'No user');
-          console.log('AuthCallback: Processing installation state:', processingInstallation ? 'Already processing' : 'Not processing');
-
           if (user?.id && !processingInstallation) {
             setProcessingInstallation(true);
             setUiState('loading');
             setMessage(`GitHub App installation detected (ID: ${installationId}), updating profile...`);
-            console.log('AuthCallback: Processing GitHub App installation with ID:', installationId);
 
             try {
               // Update the installation ID directly in the database
@@ -149,9 +120,6 @@ export const AuthCallback: React.FC = () => {
                 return;
               }
 
-              console.log('Successfully saved installation ID:', installationId);
-              console.log('AuthCallback: About to refresh profile to get updated GitHub installation ID');
-
               if (!refreshProfile) {
                 console.error('refreshProfile function is not available');
                 setUiState('error');
@@ -160,7 +128,6 @@ export const AuthCallback: React.FC = () => {
                 return;
               } 
               await refreshProfile();
-              console.log('AuthCallback: Profile refreshed successfully');
 
               // Clean URL parameters (including code and state)
               const cleanUrl = new URL(window.location.href);
@@ -174,7 +141,6 @@ export const AuthCallback: React.FC = () => {
               setMessage('GitHub App successfully connected! Redirecting to dashboard...');
 
               setProcessingInstallation(false);
-              console.log('AuthCallback: Reset processingInstallation to false after successful save');
 
               timeoutId = window.setTimeout(() => {
                 navigate('/developer?tab=github-activity', { replace: true });
@@ -189,13 +155,10 @@ export const AuthCallback: React.FC = () => {
               return;
             }
           } else if (!user) {
-            console.log('AuthCallback: Have installation_id but no user yet, waiting for auth to complete');
             setUiState('loading');
             setMessage('Waiting for authentication to complete before processing GitHub installation...');
             return; 
-            return; 
           } else if (processingInstallation) {
-            console.log('AuthCallback: Already processing installation, waiting for completion');
             setUiState('loading');
             setMessage('Processing GitHub App installation...');
             return;
@@ -204,7 +167,6 @@ export const AuthCallback: React.FC = () => {
 
         // Redirect to GitHub App installation if flagged after auth 
         if (user && stateData.install_after_auth && !installationId) {
-          console.log('🚀 AuthCallback: User authenticated, install_after_auth flag detected:', stateData.install_after_auth);
           setUiState('redirect');
           setMessage('Authentication successful! Redirecting to GitHub App installation page...');
           timeoutId = window.setTimeout(() => {
@@ -215,7 +177,6 @@ export const AuthCallback: React.FC = () => {
 
         // If auth is still loading, wait.
         if (authLoading) {
-          console.log(`AuthCallback: Auth context loading, waiting... (Attempt ${retryCount + 1} of ${maxRetries})`);
           if (retryCount >= maxRetries) {
             setUiState('error');
             setMessage('Authentication is taking too long. Please try again.');
@@ -232,7 +193,6 @@ export const AuthCallback: React.FC = () => {
 
         // If no user after auth loading is complete, redirect to login
         if (!user) {
-          console.log('AuthCallback: No user found after auth loading completed, redirecting to login');
           if (authCompleted) {
             navigate('/login', { replace: true });
           } else {
@@ -250,21 +210,11 @@ export const AuthCallback: React.FC = () => {
 
         // Normal post-auth processing & navigation
         if (user && !authLoading) {
-          console.log('AuthCallback: User authenticated:', user.id);
-          console.log('AuthCallback: User profile:', userProfile ? 'Loaded' : 'Not loaded');
-          console.log('AuthCallback: Developer profile:', developerProfile ? 'Loaded' : 'Not loaded');
-
-          // When authLoading is false and user exists, AuthContext should have already attempted
-          // to load or create the userProfile. We now trust its result.
-          // Profile creation responsibility is solely with AuthContext.
-
           if (userProfile) {
-            console.log('AuthCallback: User profile loaded by AuthContext:', userProfile.id, 'Role:', userProfile.role);
             setUiState('success');
             setMessage('Authentication successful! Redirecting to dashboard...');
             
             if (userProfile.role === 'developer' && !developerProfile?.github_installation_id && !installationId) {
-              console.log('AuthCallback: Developer needs to connect GitHub App, redirecting to installation page');
               setUiState('redirect');
               setMessage('Redirecting to GitHub App installation...');
               timeoutId = window.setTimeout(() => {
@@ -274,7 +224,6 @@ export const AuthCallback: React.FC = () => {
             }
             
             timeoutId = window.setTimeout(() => {
-              console.log('AuthCallback: Redirecting to dashboard based on role:', userProfile.role);
               if (userProfile.role === 'developer') {
                 navigate('/developer', { replace: true });
               } else if (userProfile.role === 'recruiter') {
@@ -291,7 +240,6 @@ export const AuthCallback: React.FC = () => {
             }, 1500);
             return;
           } else {
-            console.log('AuthCallback: User authenticated but no profile loaded yet, will retry or redirect to dashboard');
             setUiState('success');
             setMessage('Authentication successful! Redirecting to dashboard...');
             timeoutId = window.setTimeout(() => {
