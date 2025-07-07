@@ -84,7 +84,10 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
     : developer.user.name;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 ${className}`}>
+    <div
+      className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer ${className}`}
+      onClick={onViewFullProfile}
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-start space-x-4">
@@ -114,6 +117,11 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <h3 className="text-xl font-black text-gray-900">{displayName}</h3>
+              {developer.title && (
+                <p className="text-md text-purple-700 font-semibold">{developer.title}</p>
+              )}
+            </div>
+            <div className="flex items-center space-x-3 mb-1"> {/* Reduced mb here to compensate for title */}
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                 developer.availability 
                   ? 'bg-emerald-100 text-emerald-800' 
@@ -151,25 +159,34 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {developer.top_languages.slice(0, 5).map((lang, index) => (
-                <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
-                  {lang}
-                </span>
-              ))}
-              {developer.top_languages.length > 5 && (
-                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg">
-                  +{developer.top_languages.length - 5} more
-                </span>
-              )}
-            </div>
+            {/* Core Skills Display */}
+            {developer.skills && developer.skills.length > 0 && (
+              <div className="mt-3 mb-3">
+                <div className="flex items-center mb-1">
+                  <Code className="w-4 h-4 mr-2 text-purple-600" />
+                  <h5 className="text-xs text-gray-500 uppercase font-semibold">Core Skills</h5>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {developer.skills.slice(0, 5).map((skill, index) => (
+                    <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-lg">
+                      {skill}
+                    </span>
+                  ))}
+                  {developer.skills.length > 5 && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg">
+                      +{developer.skills.length - 5} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* GitHub Activity Snapshot */}
       <div className="p-6 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2"> {/* Reduced mb here */}
           <h4 className="text-sm font-bold text-gray-900">GitHub Activity</h4>
           {developer.github_handle ? (
             <a 
@@ -190,28 +207,19 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
         </div>
         
         {developer.github_handle ? (
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {/* Simplified contribution graph - just for visual representation */}
-            {Array.from({ length: 49 }, (_, i) => {
-              const intensity = Math.random();
-              let bgColor = 'bg-gray-100';
-              if (intensity > 0.8) bgColor = 'bg-emerald-600';
-              else if (intensity > 0.6) bgColor = 'bg-emerald-500';
-              else if (intensity > 0.4) bgColor = 'bg-emerald-400';
-              else if (intensity > 0.2) bgColor = 'bg-emerald-300';
-              else if (intensity > 0.1) bgColor = 'bg-emerald-200';
-              
-              return (
-                <div
-                  key={i}
-                  className={`w-3 h-3 rounded-sm ${bgColor}`}
-                />
-              );
-            })}
+          <div className="space-y-2 text-sm text-gray-700 mt-2">
+            <div>
+              <span className="font-medium">Public Repositories:</span>{' '}
+              {developer.public_repos_count !== undefined ? developer.public_repos_count : <span className="text-gray-500">N/A</span>}
+            </div>
+            <div>
+              <span className="font-medium">Contributions (Last Year):</span>{' '}
+              {developer.annual_contributions !== undefined ? developer.annual_contributions : <span className="text-gray-500">N/A</span>}
+            </div>
           </div>
         ) : (
-          <div className="text-center py-2">
-            <p className="text-xs text-gray-500">GitHub not connected</p>
+          <div className="text-center py-2 mt-2">
+            <p className="text-xs text-gray-500">GitHub not connected or stats unavailable.</p>
           </div>
         )}
       </div>
