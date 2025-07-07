@@ -97,6 +97,12 @@ export interface Developer {
   created_at: string;
   updated_at: string;
   user?: User;
+
+  // New fields for the snapshot card
+  title?: string;                   // Developer's job title
+  skills?: string[];                // Core skills
+  public_repos_count?: number;      // GitHub public repositories count
+  annual_contributions?: number;    // GitHub contributions in the last year
 }
 
 export interface PortfolioItem {
