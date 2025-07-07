@@ -11,8 +11,10 @@ import {
   JobRoleDetails,
   ProfileStrengthIndicator,
   RealGitHubChart,
-  RecruiterProfileDetails
+  RecruiterProfileDetails,
+  GitHubUserActivityDetails
 } from '../components';
+import { useGitHub } from '../hooks/useGitHub'; // Import useGitHub hook
 import { 
   User, 
   Briefcase, 
@@ -103,6 +105,10 @@ export const DeveloperDashboard: React.FC = () => {
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
   const [showGitHubConnectPrompt, setShowGitHubConnectPrompt] = useState(false);
+
+  // GitHub data for the right column
+  const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = useGitHub();
+
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -609,12 +615,43 @@ export const DeveloperDashboard: React.FC = () => {
       )}
 
       {activeTab === 'github-activity' && developer?.github_handle && (
-        <div className="max-w-xs mx-auto"> {/* Adjusted max-width to xs for snippet */}
-          <RealGitHubChart
-            githubHandle={developer.github_handle}
-            className="w-full"
-            displayMode='dashboardSnippet' // Use new displayMode prop
-          />
+        <div className="flex flex-wrap md:flex-nowrap gap-6">
+          {/* Left Column: GitHub Chart Snippet */}
+          <div className="w-full md:w-2/5 flex-shrink-0">
+            <div className="max-w-sm mx-auto md:mx-0"> {/* Keep max-w-sm for the chart itself, remove mx-auto for md+ */}
+              <RealGitHubChart
+                githubHandle={developer.github_handle}
+                className="w-full"
+                displayMode='dashboardSnippet'
+              />
+            </div>
+          </div>
+          {/* Right Column: GitHub Details */}
+          <div className="w-full md:w-3/5 flex-grow">
+            {gitHubDataLoading && (
+              <div className="flex justify-center items-center h-full bg-white p-6 rounded-lg shadow-sm border">
+                <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V4a10 10 0 00-10 10h2zm8 10a10 10 0 0010-10h-2a8 8 0 01-8 8v2z"></path>
+                </svg>
+                <span className="ml-3 text-gray-500">Loading GitHub Details...</span>
+              </div>
+            )}
+            {!gitHubDataLoading && gitHubDataError && (
+              <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
+                <h3 className="text-lg font-semibold text-red-600">Error Loading GitHub Details</h3>
+                <p className="text-gray-500 mt-2">{gitHubDataError.message}</p>
+              </div>
+            )}
+            {!gitHubDataLoading && !gitHubDataError && gitHubData && (
+              <GitHubUserActivityDetails gitHubData={gitHubData} />
+            )}
+             {!gitHubDataLoading && !gitHubDataError && !gitHubData && (
+              <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
+                <p className="text-gray-500">No GitHub data available to display details.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
