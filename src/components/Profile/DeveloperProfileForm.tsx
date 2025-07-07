@@ -95,6 +95,19 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Set initial profile picture from GitHub if not already set and available
+    if (!formData.profile_pic_url && user?.user_metadata?.avatar_url) {
+      setFormData(prev => ({
+        ...prev,
+        profile_pic_url: user.user_metadata.avatar_url
+      }));
+    }
+    // This effect should run when initialData or user context changes,
+    // primarily to populate the form on mount or data refresh.
+    // The dependency array should reflect what `formData` depends on for its initial state.
+  }, [initialData, user]); // Rerun if initialData or user changes
+
+  useEffect(() => {
     if (newLanguage) {
       const filtered = PROGRAMMING_LANGUAGES.filter(lang =>
         lang.toLowerCase().includes(newLanguage.toLowerCase()) &&
@@ -336,6 +349,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
+          {/* User Name and GitHub Handle Display */}
+          {initialData?.user?.name && initialData?.github_handle && (
+            <div className="mb-6 pb-4 border-b border-gray-200">
+              <h1 className="text-3xl font-bold text-gray-900">{initialData.user.name}</h1>
+              <p className="text-lg text-gray-500">@{initialData.github_handle}</p>
+            </div>
+          )}
+
           {/* Profile Strength Indicator */}
           <div className="bg-gray-50 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">

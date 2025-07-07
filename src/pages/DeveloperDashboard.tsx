@@ -30,7 +30,9 @@ import {
   Send,
   ExternalLink,
   Building,
-  Eye // Added Eye icon
+  Eye, // Added Eye icon
+  SearchCheck // Added for Search Appearances
+  // ListChecks, LayoutGrid removed as their stat cards are reverted
 } from 'lucide-react';
 import { GitHubConnectPrompt } from '../components/GitHubConnectPrompt';
 
@@ -467,6 +469,21 @@ export const DeveloperDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Search Appearances Stat Card */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-cyan-100 rounded-lg"> {/* Different color for variety */}
+              <SearchCheck className="w-6 h-6 text-cyan-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Search Appearances</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {developer?.search_appearance_count || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
@@ -509,6 +526,7 @@ export const DeveloperDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        {/* Portfolio Projects and Skills Documented cards removed as per refined plan */}
       </div>
 
       {/* Featured Portfolio Item */}
