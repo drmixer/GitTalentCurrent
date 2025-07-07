@@ -228,43 +228,52 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   // Trigger refresh when developerProfile (handle or installation ID) changes, or authLoading status changes.
   useEffect(() => {
-    console.log('useGitHub useEffect: Evaluating. AuthLoading:', authLoading, 'DevProfile Handle:', developerProfile?.github_handle, 'DevProfile InstallID:', developerProfile?.github_installation_id);
-    if (!authLoading && developerProfile?.github_handle && developerProfile?.github_installation_id) {
-      // Ensure installationId is not a placeholder string before using it
-      if (developerProfile.github_installation_id && developerProfile.github_installation_id !== 'none' && developerProfile.github_installation_id !== 'not available') {
-        console.log(`useGitHub useEffect: Conditions met. Handle: ${developerProfile.github_handle}, InstallID: ${developerProfile.github_installation_id}. Scheduling refreshGitHubData.`);
+    const currentDevProfile = developerProfile; // Capture current value for consistent use in this effect
+    const currentAuthLoading = authLoading;
+
+    console.log(
+      'useGitHub DEBUG useEffect Triggered. AuthLoading:', currentAuthLoading,
+      'DevProfile Handle:', currentDevProfile?.github_handle,
+      'DevProfile InstallID:', currentDevProfile?.github_installation_id,
+      'DevProfile Object:', currentDevProfile // Log the whole object
+    );
+
+    if (!currentAuthLoading && currentDevProfile?.github_handle) {
+      const instId = currentDevProfile.github_installation_id;
+      if (instId && instId !== 'none' && instId !== 'not available' && String(instId).length > 0) {
+        console.log(`useGitHub DEBUG useEffect: Conditions MET. Handle: ${currentDevProfile.github_handle}, InstallID: ${instId}. Scheduling refreshGitHubData.`);
         const timer = setTimeout(() => {
-          console.log('useGitHub useEffect: Timer fired. Calling refreshGitHubData.');
-          refreshGitHubData(developerProfile.github_handle); // Pass handle explicitly
-        }, 500); // Debounce/delay slightly
+          console.log('useGitHub DEBUG useEffect: Timer fired. Calling refreshGitHubData.');
+          refreshGitHubData(currentDevProfile.github_handle);
+        }, 500);
         return () => {
-          console.log('useGitHub useEffect: Cleanup timer.');
+          console.log('useGitHub DEBUG useEffect: Cleanup timer for refresh call.');
           clearTimeout(timer);
         };
       } else {
-        console.log('useGitHub useEffect: Handle present, but installation ID is invalid or placeholder. Not fetching.');
-        setError(new Error('GitHub App connection incomplete. Installation ID missing or invalid.'));
+        console.warn(`useGitHub DEBUG useEffect: Handle present (${currentDevProfile.github_handle}), but Installation ID is invalid/missing: '${instId}'. Not fetching GitHub data.`);
+        setError(new Error(`GitHub App connection incomplete. Installation ID is '${instId}'. Please ensure the GitHub App is correctly installed and connected.`));
         setLoading(false);
+        // Clear data if we previously had some but now installation ID is invalid
+        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
       }
-    } else if (!authLoading && developerProfile && !developerProfile.github_handle) {
-      console.log('useGitHub useEffect: No GitHub handle found in developer profile.');
+    } else if (!currentAuthLoading && currentDevProfile && !currentDevProfile.github_handle) {
+      console.warn('useGitHub DEBUG useEffect: No GitHub handle found in developer profile.');
       setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
       setLoading(false);
       setError(new Error('No GitHub handle found in your profile. Please add it via settings.'));
-    } else if (!authLoading && developerProfile && developerProfile.github_handle && !developerProfile.github_installation_id) {
-      console.log('useGitHub useEffect: Handle present, but no installation ID. Waiting for it or prompt to connect.');
-      // This state could mean the app installation is pending or failed to record.
-      // GitHubAppSetup should handle redirecting to install if needed.
-      // For now, useGitHub will show an error/prompt.
-      setError(new Error('GitHub App not fully connected. Installation ID missing. Please try reconnecting the GitHub App via settings if this persists.'));
-      setLoading(false);
-    } else if (!authLoading && !developerProfile) {
-      console.log('useGitHub useEffect: Developer profile not loaded and not authLoading. Clearing data.');
+    } else if (!currentAuthLoading && !currentDevProfile) {
+      console.warn('useGitHub DEBUG useEffect: Developer profile not loaded and not authLoading. Clearing data.');
        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
        setLoading(false);
-       setError(new Error('Developer profile not available.'));
+       setError(new Error('Developer profile not available to fetch GitHub data.'));
+    } else if (currentAuthLoading) {
+      console.log('useGitHub DEBUG useEffect: Auth is loading. Waiting...');
+      // setLoading(true); // Optionally set loading true here if desired, but refreshGitHubData handles it
+    } else {
+      console.log('useGitHub DEBUG useEffect: Conditions not met for fetching data. AuthLoading:', currentAuthLoading, 'DevProfile Handle:', currentDevProfile?.github_handle);
     }
-  }, [developerProfile, authLoading, refreshGitHubData]); // Depend on the whole developerProfile object
+  }, [developerProfile, authLoading, refreshGitHubData]);
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     console.log('getTopLanguages - Languages data:', Object.keys(gitHubData.languages).length);
