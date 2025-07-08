@@ -26,12 +26,12 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   onViewFullProfile,
   className = ''
 }) => {
-  console.log('Rendering DeveloperSnapshotCard for:', developer.user_id, developer.user.name);
+  console.log('Rendering DeveloperSnapshotCard for user ID:', developer?.user?.id, 'Name:', developer?.user?.name);
   console.log('Developer data in snapshot card:', { 
-    githubHandle: developer.github_handle || 'none',
-    bio: developer.bio?.substring(0, 20) + '...' || 'none',
-    languages: developer.top_languages?.length || 0,
-    availability: developer.availability
+    githubHandle: developer?.github_handle || 'none',
+    bio: developer?.bio?.substring(0, 20) + '...' || 'none',
+    skillsCount: developer?.skills?.length || 0, // Changed to skills to match what card uses
+    availability: developer?.availability
   });
 
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<PortfolioItem | null>(null);
@@ -88,6 +88,7 @@ export const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
       className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer ${className}`}
       onClick={onViewFullProfile}
     >
+      <div style={{ color: 'red', padding: '10px', border: '1px solid red', textAlign: 'center' }}>Test Snapshot Render</div> {/* Test Div Added */}
       {/* Header */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-start space-x-4">
