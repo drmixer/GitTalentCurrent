@@ -641,7 +641,12 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'overview' && renderOverview()}
 
       {activeTab === 'profile' && developer && (
-        <DeveloperProfileForm developer={developer} onUpdate={fetchDeveloperData} />
+        <DeveloperProfileForm
+          initialData={developer}
+          onSuccess={fetchDeveloperData}
+          isOnboarding={false}
+          // onCancel could be added here if needed, e.g. to switch tab or reset an edit mode
+        />
       )}
 
       {activeTab === 'portfolio' && (
