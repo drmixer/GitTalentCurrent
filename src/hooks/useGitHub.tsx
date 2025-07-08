@@ -88,59 +88,45 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<Error | null>(null);
   const [fetchInProgress, setFetchInProgress] = useState(false);
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
-  const [lastFetchedInstallationId, setLastFetchedInstallationId] = useState<string | null | undefined>(null); // Re-add for more precise checks
 
-  const refreshGitHubDataInternal = useCallback(async (handle: string, installationIdParam?: string) => { // installationIdParam is the one to use
+  const refreshGitHubDataInternal = useCallback(async (handle: string) => {
     if (!handle) {
+      // console.log('refreshGitHubDataInternal - No GitHub handle provided'); // Kept for clarity if needed
       setLoading(false);
       setError(new Error('No GitHub handle provided'));
       setFetchInProgress(false);
       return;
     }
 
-    // If already fetching for the exact same handle and installationId context, skip.
-    if (fetchInProgress && lastFetchedHandle === handle && lastFetchedInstallationId === installationIdParam) {
-      // console.log(`[useGitHub] Fetch already in progress for ${handle} with ID ${installationIdParam}.`);
+    if (fetchInProgress) {
+      // console.log('refreshGitHubDataInternal - Fetch already in progress for:', handle); // Kept for clarity
       return;
     }
 
-    // Postponing logic: if this call is for the authenticated user (handle matches developerProfile.github_handle)
-    // AND the installationIdParam intended for this call is missing (falsy), then postpone.
-    // This typically happens on initial load after app install, waiting for AuthContext to update.
-    if (handle === developerProfile?.github_handle && !installationIdParam) {
-      console.log(`[useGitHub] Postponing fetch for own data (${handle}): installationIdParam is '${installationIdParam}'. Waiting for context. DeveloperProfile ID: ${developerProfile?.github_installation_id}`);
-      // Note: setLoading(true) might have been set by the caller or previous effect.
-      // We don't change fetchInProgress here, letting the useEffect re-trigger.
+    const hasExistingData = lastFetchedHandle === handle &&
+                          gitHubData.user &&
+                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase() && gitHubData.contributions.length > 0;
+
+    if (hasExistingData && developerProfile?.github_installation_id) {
+      // console.log('refreshGitHubDataInternal - Already have data for handle:', handle, 'with installation ID'); // Kept
+      setTimeout(() => setLoading(false), 200);
       return;
     }
-
-    const hasExistingData =
-      lastFetchedHandle === handle &&
-      lastFetchedInstallationId === installationIdParam && // Data is specific to this install ID context
-      gitHubData.user &&
-      gitHubData.user.login?.toLowerCase() === handle.toLowerCase() &&
-      gitHubData.contributions.length > 0;
-
-    if (hasExistingData) {
-      // console.log(`[useGitHub] Has existing data for ${handle} with ID ${installationIdParam}.`);
-      // Ensure loading is false if we skip the fetch for existing data.
-      setLoading(false);
-      setFetchInProgress(false); // also reset this if we are not fetching.
-      return;
-    }
-
-    // --- Start actual fetch process ---
-    setFetchInProgress(true);
-    setLoading(true);
-    setError(null); // Reset error at the start of every new fetch attempt
 
     try {
-      // The `installationIdParam` is now the single source of truth for the installation ID for this fetch.
-      // If `installationIdParam` is undefined/null/empty, the proxy will receive that.
-      // The proxy must then decide if it can fetch public data or if an ID is strictly required.
+      setFetchInProgress(true);
+      setLoading(true);
+      setError(null);
 
-      // Removed the `if (!installationIdParam && hasExistingData)` block that set an error here.
-      // Let the actual fetch result (or proxy error) dictate the error state.
+      const installationId = developerProfile?.github_installation_id;
+
+      if (!installationId && hasExistingData) {
+        // console.log('No GitHub installation ID but we have data - user needs to install the GitHub App'); // Kept
+        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
+        setLoading(false);
+        setFetchInProgress(false);
+        return;
+      }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
@@ -153,7 +139,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ 
           handle,
-          installationId: installationIdParam // Use the passed parameter
+          installationId
         })
       });
 
@@ -185,7 +171,6 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         averageContributions: contributionStats.averagePerDay
       });
       setLastFetchedHandle(handle);
-      setLastFetchedInstallationId(installationIdParam); // Store the installationId used for this fetch
 
       if (handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         await syncLanguagesToProfile();
@@ -193,36 +178,30 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       } 
 
     } catch (err: any) {
-      console.error('Error in refreshGitHubDataInternal:', err.message || err);
+      console.error('Error in refreshGitHubDataInternal:', err.message || err); // Keep console.error
       setError(err);
     } finally {
       setLoading(false);
       setFetchInProgress(false);
     } 
-  }, [developerProfile, user, gitHubData.user, lastFetchedHandle, lastFetchedInstallationId, fetchInProgress, syncLanguagesToProfile, syncProjectsToProfile]);
+  }, [developerProfile, user, gitHubData.user, lastFetchedHandle]);
 
-
-  const refreshGitHubData = useCallback(async (targetHandle?: string, targetInstallationId?: string) => {
-    const handleToUse = targetHandle || developerProfile?.github_handle;
+  const refreshGitHubData = useCallback(async (handle?: string) => {
+    const handleToUse = handle || developerProfile?.github_handle;
     if (!handleToUse) {
-      setLoading(false); // Also set loading false here
+      // console.log('refreshGitHubData - No GitHub handle provided or found in profile.'); // Kept
+      setLoading(false);
       setError(new Error('No GitHub handle provided'));
       return;
     }
 
-    let installationIdToUseForCall: string | undefined | null = targetInstallationId;
-
-    // If targetInstallationId is not provided (undefined),
-    // and we are fetching for the authenticated user (handleToUse matches their handle),
-    // then use the installationId from their developerProfile context.
-    if (targetInstallationId === undefined && handleToUse === developerProfile?.github_handle) {
-      installationIdToUseForCall = developerProfile?.github_installation_id;
+    if (fetchInProgress && lastFetchedHandle === handleToUse) {
+      // console.log('refreshGitHubData - Fetch already in progress for handle:', handleToUse, 'Skipping duplicate request.'); // Kept
+      return;
     }
-    // If targetInstallationId IS provided, it will be used.
-    // If targetHandle is for someone else AND targetInstallationId is undefined, installationIdToUseForCall remains undefined.
 
-    await refreshGitHubDataInternal(handleToUse, installationIdToUseForCall);
-  }, [developerProfile, refreshGitHubDataInternal]); // refreshGitHubDataInternal is stable if its deps are
+    await refreshGitHubDataInternal(handleToUse);
+  }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]);
 
   useEffect(() => {
     const currentDevProfile = developerProfile;
