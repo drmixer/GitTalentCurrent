@@ -222,7 +222,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await refreshGitHubDataInternal(handleToUse, installationIdToUseForCall);
-  }, [developerProfile?.github_handle, developerProfile?.github_installation_id, fetchInProgress, lastFetchedHandle, lastFetchedInstallationId, refreshGitHubDataInternal]);
+  }, [developerProfile, fetchInProgress, lastFetchedHandle, lastFetchedInstallationId, refreshGitHubDataInternal]);
 
   useEffect(() => {
     const currentDevProfile = developerProfile;
