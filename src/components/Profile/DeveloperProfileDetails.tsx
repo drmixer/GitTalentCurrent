@@ -558,6 +558,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       {activeTab === 'github' && (
         <RealGitHubChart
           githubHandle={developer.github_handle || ''}
+          targetDeveloperInstallationId={developer.github_installation_id} // Pass the developer's installation ID
           className="w-full max-w-4xl mx-auto"
         />
       )}

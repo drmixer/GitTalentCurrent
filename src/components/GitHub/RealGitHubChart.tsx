@@ -11,50 +11,73 @@ import {
 
 interface RealGitHubChartProps {
   githubHandle: string;
+  targetDeveloperInstallationId?: string; // New prop
   className?: string;
   displayMode?: 'full' | 'dashboardSnippet';
 }
 
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   githubHandle,
+  targetDeveloperInstallationId, // Destructure new prop
   className = '',
   displayMode = 'full'
 }) => {
-  const { gitHubData, loading, error } = useGitHub();
-  const { developerProfile } = useAuth();
+  const { gitHubData, loading, error, refreshGitHubData } = useGitHub();
 
-  const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly 
-  const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
+  React.useEffect(() => {
+    if (githubHandle) {
+      // Pass targetDeveloperInstallationId to refreshGitHubData
+      refreshGitHubData(githubHandle, targetDeveloperInstallationId);
+    } else {
+      // Clear data if githubHandle is removed or becomes null/undefined
+      // This might be handled within useGitHub or by ensuring refreshGitHubData handles null handle gracefully
+      refreshGitHubData(undefined, undefined); // Or some other way to clear/reset
+    }
+  }, [githubHandle, targetDeveloperInstallationId, refreshGitHubData]);
 
-  const isGitHubAppInstalled = !!developerProfile?.github_installation_id;
+  if (!githubHandle) {
+    return (
+      <div className="text-center p-8 bg-white rounded-xl shadow-md">
+        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">No GitHub Handle</h2>
+        <p className="text-gray-600">This developer has not provided a GitHub handle.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader className="animate-spin h-12 w-12 text-blue-500" />
-        <p className="ml-4 text-gray-600">Loading GitHub data...</p>
+        <p className="ml-4 text-gray-600">Loading GitHub data for @{githubHandle}...</p>
       </div>
     );
   }
 
-  if (!isGitHubAppInstalled) {
+  if (error) {
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
-        <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" /> 
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">GitHub App Not Connected</h2>
-        <p className="text-gray-600 mb-4">
-          To display your real contribution data and unlock full features, please connect the GitHub App.
+        <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-red-700 mb-2">Error Loading GitHub Data</h2>
+        <p className="text-gray-600 mb-4">Could not load GitHub activity for @{githubHandle}.</p>
+        <p className="text-sm text-red-600">{error.message}</p>
+      </div>
+    );
+  }
+
+  // Check if data for the specific handle was loaded, or if it's empty/default state
+  // A more robust check might be needed if useGitHub doesn't clear data on handle change or error
+  const hasDataForHandle = gitHubData.user && gitHubData.user.login?.toLowerCase() === githubHandle.toLowerCase();
+
+  if (!hasDataForHandle || !gitHubData.contributions || gitHubData.contributions.length === 0) {
+    return (
+      <div className="text-center p-8 bg-white rounded-xl shadow-md">
+        <Github className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">GitHub Activity Not Available</h2>
+        <p className="text-gray-600">
+          No GitHub contribution data found for @{githubHandle}. This developer may not have connected the GitTalent GitHub App,
+          or their contribution data is not yet synced.
         </p>
-        <a
-          href={githubAppInstallUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold shadow-lg"
-        >
-          <Github className="w-5 h-5 mr-2" />
-          Connect GitHub App
-        </a>
-        {error && <p className="text-red-500 mt-4">{error.message}</p>}
       </div>
     );
   }
