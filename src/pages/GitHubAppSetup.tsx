@@ -130,17 +130,23 @@ export const GitHubAppSetup = () => {
             return;
           }
 
-          // Assuming the function returns { success: true, data: { updated?: true, created?: true, data: developerRecordArray } }
-          // or { success: true, data: { data: developerRecord } } if .single() was used effectively in edge func
-          const responseData = functionResponse?.data; // This is the 'result' object from your edge function
-          const freshDeveloperData = responseData?.data?.[0] || responseData?.data; // Access nested data, handle array vs object
+          // ADD DETAILED LOGS HERE
+          console.log('[GitHubAppSetup] Full functionResponse from update-github-installation:', functionResponse);
+          if (functionResponse) {
+            console.log('[GitHubAppSetup] functionResponse.data (this should be the inner \'data\' object from your function):', functionResponse.data);
+            if (functionResponse.data) {
+              console.log('[GitHubAppSetup] functionResponse.data.data (this should be the developer record or array):', functionResponse.data.data);
+            }
+          }
+
+          const responseData = functionResponse?.data;
+          const freshDeveloperData = responseData?.data?.[0] || responseData?.data;
 
           if (freshDeveloperData && setResolvedDeveloperProfile) {
-            console.log('[GitHubAppSetup] Directly setting resolved developer profile in AuthContext:', freshDeveloperData);
+            console.log('[GitHubAppSetup] Attempting to directly set resolved developer profile in AuthContext with:', freshDeveloperData);
             setResolvedDeveloperProfile(freshDeveloperData);
           } else {
-            // Fallback to generic refresh if direct data not available from function response, or setter not there
-            console.warn('[GitHubAppSetup] Did not get fresh developer data from function response, or setter missing. Falling back to refreshProfile(). Response:', functionResponse);
+            console.warn('[GitHubAppSetup] Did not get fresh developer data from function response for direct set, or setter missing. Falling back to refreshProfile(). freshDeveloperData:', freshDeveloperData, 'Full Response:', functionResponse);
             if (refreshProfile) {
               await refreshProfile();
             }
