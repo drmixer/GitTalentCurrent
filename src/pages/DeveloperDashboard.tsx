@@ -109,8 +109,9 @@ export const DeveloperDashboard: React.FC = () => {
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
   const [showGitHubConnectPrompt, setShowGitHubConnectPrompt] = useState(false);
 
-  // GitHub data for the right column
+  // GitHub data for the right column & Auth context developer profile
   const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = useGitHub();
+  const { developerProfile: contextDeveloperProfile } = useAuth(); // Get context version of developerProfile
 
 
   const navigate = useNavigate();
@@ -217,6 +218,7 @@ export const DeveloperDashboard: React.FC = () => {
       if (!user) return;
       setLoading(true);
       try {
+        // fetchDeveloperData will set the 'developer' state
         await Promise.all([
           fetchDeveloperData(),
           fetchMessages(),
@@ -231,7 +233,27 @@ export const DeveloperDashboard: React.FC = () => {
     };
 
     fetchAllData();
-  }, [user]);
+  }, [user]); // Keep user dependency for initial data load
+
+  // New useEffect to manage showGitHubConnectPrompt based on local and context developer profiles
+  useEffect(() => {
+    if (developer && developer.github_handle) {
+      const hasInstallIdInContext = !!contextDeveloperProfile?.github_installation_id;
+      const hasInstallIdInLocalFetch = !!developer.github_installation_id;
+
+      // Show prompt only if handle exists AND installation ID is missing from BOTH context and local fetch
+      if (!hasInstallIdInContext && !hasInstallIdInLocalFetch) {
+        setShowGitHubConnectPrompt(true);
+      } else {
+        setShowGitHubConnectPrompt(false);
+      }
+    } else if (developer && !developer.github_handle) {
+      // No GitHub handle, so don't show the prompt to connect the app
+      setShowGitHubConnectPrompt(false);
+    }
+    // If developer is null (still loading initially), do nothing, wait for data
+  }, [developer, contextDeveloperProfile]);
+
 
   // Update URL when tab changes
   useEffect(() => {
@@ -258,10 +280,10 @@ export const DeveloperDashboard: React.FC = () => {
       if (error) throw error;
       setDeveloper(data);
       
-      // Check if GitHub App is not connected but GitHub handle exists
-      if (data && data.github_handle && !data.github_installation_id) {
-        setShowGitHubConnectPrompt(true);
-      } 
+      // Decision to show prompt is now handled by the new useEffect
+      // if (data && data.github_handle && !data.github_installation_id) {
+      //   setShowGitHubConnectPrompt(true);
+      // }
     } catch (error) {
       console.error('Error fetching developer data:', error);
     }
