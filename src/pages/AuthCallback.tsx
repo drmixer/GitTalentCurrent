@@ -165,10 +165,11 @@ export const AuthCallback: React.FC = () => {
           }
         }
 
-        // Redirect to GitHub App installation if flagged after auth 
-        if (user && stateData.install_after_auth && !installationId) {
+        // Redirect to GitHub App installation if flagged AND user doesn't already have an installation ID
+        const alreadyHasInstallationId = !!developerProfile?.github_installation_id;
+        if (user && stateData.install_after_auth && !installationId && !alreadyHasInstallationId) {
           setUiState('redirect');
-          setMessage('Authentication successful! Redirecting to GitHub App installation page...');
+          setMessage('Authentication successful! Finalizing GitHub App connection...'); // Updated message
           timeoutId = window.setTimeout(() => {
             redirectToGitHubAppInstall();
           }, 1500);
