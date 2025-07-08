@@ -539,10 +539,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
             </div>
           </div>
 
-          <ProfileStrengthIndicator
-            strength={developer.profile_strength || 0} 
-            suggestions={generateProfileSuggestions()}
-          />
+          {isOwnProfile && (
+            <ProfileStrengthIndicator
+              strength={developer.profile_strength || 0}
+              suggestions={generateProfileSuggestions()}
+            />
+          )}
         </div>
       )}
 
