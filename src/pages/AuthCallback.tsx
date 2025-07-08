@@ -165,18 +165,45 @@ export const AuthCallback: React.FC = () => {
           }
         }
 
-        // Redirect to GitHub App installation if flagged AND user doesn't already have an installation ID
-        const alreadyHasInstallationId = !!developerProfile?.github_installation_id;
-        if (user && stateData.install_after_auth && !installationId && !alreadyHasInstallationId) {
-          setUiState('redirect');
-          setMessage('Authentication successful! Finalizing GitHub App connection...'); // Updated message
-          timeoutId = window.setTimeout(() => {
-            redirectToGitHubAppInstall();
-          }, 1500);
-          return;
+        // Handle stateData.install_after_auth:
+        // This is tricky because of the strict rule: "no scenario in which it should ever take them to the app install or details after sign up"
+        // This means if they are a developer and supposedly signed up, install_after_auth should not lead to re-install.
+        if (user && stateData.install_after_auth && !installationId) {
+          // If this is reached, it's a login flow where install_after_auth was true in state.
+          // We must ensure they are not an already fully signed-up developer.
+          if (authLoading) { // Wait for auth context to be fully loaded
+            setUiState('loading'); setMessage(`Verifying account status... (Attempt ${retryCount + 1}/${maxRetries})`);
+            timeoutId = window.setTimeout(() => { setRetryCount(prev => prev + 1); }, 2000);
+            return;
+          }
+          if (userProfile && userProfile.role === 'developer') {
+            if (developerProfile === undefined) { // Still waiting for developerProfile to be determined
+              setUiState('loading'); setMessage(`Loading developer details... (Attempt ${retryCount + 1}/${maxRetries})`);
+              timeoutId = window.setTimeout(() => { setRetryCount(prev => prev + 1); }, 2000);
+              return;
+            }
+            // If developerProfile is loaded and has github_installation_id, they are fully onboarded.
+            // So, install_after_auth should be ignored for this login.
+            if (developerProfile && developerProfile.github_installation_id) {
+              // Do nothing here, let it fall through to normal navigation.
+            } else {
+              // User is a developer, install_after_auth was true, but profile (even after load) shows no install ID.
+              // This implies an incomplete onboarding. Redirect to install is appropriate here.
+              setUiState('redirect');
+              setMessage('Authentication successful! Completing GitHub App setup...');
+              timeoutId = window.setTimeout(() => { redirectToGitHubAppInstall(); }, 1000);
+              return;
+            }
+          } else if (userProfile && userProfile.role !== 'developer') {
+            // Not a developer, install_after_auth is irrelevant for GitHub app. Fall through.
+          } else if (!userProfile && retryCount < maxRetries) { // userProfile not loaded yet
+            setUiState('loading'); setMessage(`Loading profile information... (Attempt ${retryCount + 1}/${maxRetries})`);
+            timeoutId = window.setTimeout(() => { setRetryCount(prev => prev + 1); }, 2000);
+            return;
+          }
         }
 
-        // If auth is still loading, wait.
+        // If auth is still loading (could be re-checked after stateData.install_after_auth logic if it returned early)
         if (authLoading) {
           if (retryCount >= maxRetries) {
             setUiState('error');
@@ -215,14 +242,19 @@ export const AuthCallback: React.FC = () => {
             setUiState('success');
             setMessage('Authentication successful! Redirecting to dashboard...');
             
-            if (userProfile.role === 'developer' && !developerProfile?.github_installation_id && !installationId) {
-              setUiState('redirect');
-              setMessage('Redirecting to GitHub App installation...');
-              timeoutId = window.setTimeout(() => {
-                redirectToGitHubAppInstall();
-              }, 1500);
-              return;
-            }
+            // This block is removed based on the strict rule:
+            // If they are a signed-up developer, they MUST have an installation ID.
+            // If developerProfile.github_installation_id is missing here, it's a data anomaly,
+            // but they should still go to their dashboard. The dashboard has its own
+            // GitHubConnectPrompt if data.github_installation_id (from its own fetch) is missing.
+            // if (userProfile.role === 'developer' && !developerProfile?.github_installation_id && !installationId) {
+            //   setUiState('redirect');
+            //   setMessage('Redirecting to GitHub App installation...');
+            //   timeoutId = window.setTimeout(() => {
+            //     redirectToGitHubAppInstall();
+            //   }, 1500);
+            //   return;
+            // }
             
             timeoutId = window.setTimeout(() => {
               if (userProfile.role === 'developer') {
