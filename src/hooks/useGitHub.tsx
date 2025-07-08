@@ -228,26 +228,20 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const ghHandle = currentDevProfile.github_handle;
-    const ghInstId = currentDevProfile.github_installation_id;
+    const ghHandle = currentDevProfile.github_handle;
+    // const ghInstId = currentDevProfile.github_installation_id; // No longer used to gate call here
 
     if (ghHandle && String(ghHandle).trim() !== '') {
-      if (ghInstId && String(ghInstId).trim() !== '' && ghInstId !== 'none' && ghInstId !== 'not available') {
-        // console.log(`useGitHub DEBUG useEffect: Conditions MET. Handle: '${ghHandle}', InstallID: '${ghInstId}'. Scheduling refreshGitHubData.`); // Can be removed
-        const timer = setTimeout(() => {
-          // console.log('useGitHub DEBUG useEffect: Timer fired. Calling refreshGitHubData.'); // Can be removed
-          refreshGitHubData(ghHandle);
-        }, 500);
-        return () => {
-          // console.log('useGitHub DEBUG useEffect: Cleanup timer for refresh call.'); // Can be removed
-          clearTimeout(timer);
-        };
-      } else {
-        console.warn(`useGitHub: Handle '${ghHandle}' present, but Installation ID is invalid/missing: '${ghInstId}'. Not fetching GitHub data.`); // Keep warn
-        setError(new Error(`GitHub App connection is incomplete or ID not yet synced. Installation ID found: '${ghInstId}'. Please ensure the GitHub App is correctly installed and connected. Data may update shortly.`));
-        setLoading(false);
-        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
-      }
+      // Always attempt to refresh if handle exists.
+      // refreshGitHubData will internally use developerProfile.github_installation_id from context.
+      const timer = setTimeout(() => {
+        refreshGitHubData(ghHandle);
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
+      // If no handle, then it's appropriate to set an error or clear data.
       console.warn('useGitHub: No valid GitHub handle found in developer profile.'); // Keep warn
       setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
       setLoading(false);
