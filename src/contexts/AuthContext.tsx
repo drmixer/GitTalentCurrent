@@ -67,11 +67,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
           } else if (updatedProfile) {
             setDeveloperProfile(updatedProfile);
+            console.log('[AuthContext] Developer Profile Updated in ensureDeveloperProfile:', updatedProfile);
             return true;
           }
         }
         // If no updates were performed, or if update failed but we still have the existing profile
         setDeveloperProfile(existingProfile);
+        console.log('[AuthContext] Developer Profile Set (existing) in ensureDeveloperProfile:', existingProfile);
         return true;
       }
 
@@ -83,6 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
       if (!newDevProfileData) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
       setDeveloperProfile(newDevProfileData);
+      console.log('[AuthContext] Developer Profile Created in ensureDeveloperProfile:', newDevProfileData);
       return true;
     } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
   }, []);
@@ -91,10 +94,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { data: devProfile, error } = await supabase.from('developers').select('*').eq('user_id', userId).single();
       if (error) {
-        if (error.code === 'PGRST116') { setDeveloperProfile(null); return null; }
+        if (error.code === 'PGRST116') {
+          setDeveloperProfile(null);
+          console.log('[AuthContext] Developer Profile Set to null (no record) in fetchDeveloperProfile for user:', userId);
+          return null;
+        }
         else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); return null; }
       }
       setDeveloperProfile(devProfile);
+      console.log('[AuthContext] Developer Profile Set in fetchDeveloperProfile:', devProfile);
       return devProfile;
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); return null; }
   }, []);

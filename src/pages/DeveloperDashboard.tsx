@@ -111,7 +111,10 @@ export const DeveloperDashboard: React.FC = () => {
 
   // GitHub data for the right column & Auth context developer profile
   const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = useGitHub();
-  const { developerProfile: contextDeveloperProfile } = useAuth(); // Get context version of developerProfile
+  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth(); // Get context version of developerProfile (userProfile also needed for logs)
+
+  console.log('[Dashboard] Initial contextDeveloperProfile:', contextDeveloperProfile);
+  console.log('[Dashboard] Initial userProfile from useAuth:', userProfile);
 
 
   const navigate = useNavigate();
@@ -237,22 +240,31 @@ export const DeveloperDashboard: React.FC = () => {
 
   // New useEffect to manage showGitHubConnectPrompt based on local and context developer profiles
   useEffect(() => {
-    if (developer && developer.github_handle) {
-      const hasInstallIdInContext = !!contextDeveloperProfile?.github_installation_id;
-      const hasInstallIdInLocalFetch = !!developer.github_installation_id;
+    console.log('[Dashboard-Effect] developer:', developer);
+    console.log('[Dashboard-Effect] contextDeveloperProfile:', contextDeveloperProfile);
+    const handle = developer?.github_handle;
+    const ctxHasId = !!contextDeveloperProfile?.github_installation_id;
+    const localHasId = !!developer?.github_installation_id;
+    console.log('[Dashboard-Effect] Decision variables for prompt:', { handle, ctxHasId, localHasId });
 
+    if (developer && developer.github_handle) {
       // Show prompt only if handle exists AND installation ID is missing from BOTH context and local fetch
-      if (!hasInstallIdInContext && !hasInstallIdInLocalFetch) {
+      if (!ctxHasId && !localHasId) {
         setShowGitHubConnectPrompt(true);
+        console.log('[Dashboard-Effect] Setting showGitHubConnectPrompt to true');
       } else {
         setShowGitHubConnectPrompt(false);
+        console.log('[Dashboard-Effect] Setting showGitHubConnectPrompt to false');
       }
     } else if (developer && !developer.github_handle) {
       // No GitHub handle, so don't show the prompt to connect the app
       setShowGitHubConnectPrompt(false);
+      console.log('[Dashboard-Effect] No github_handle, setting showGitHubConnectPrompt to false');
+    } else {
+      // If developer is null (still loading initially), do nothing, wait for data
+      console.log('[Dashboard-Effect] Developer data is null, showGitHubConnectPrompt unchanged (current value):', showGitHubConnectPrompt);
     }
-    // If developer is null (still loading initially), do nothing, wait for data
-  }, [developer, contextDeveloperProfile]);
+  }, [developer, contextDeveloperProfile]); // Removed showGitHubConnectPrompt from deps to avoid loop if it was there
 
 
   // Update URL when tab changes
