@@ -209,20 +209,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Determine installationId for the call, prioritizing targetInstallationId
-    // Fallback to logged-in user's ID only if handleToUse is also the logged-in user's handle
-    let installationIdToUseForCall: string | null | undefined = targetInstallationId;
-    if (targetInstallationId === undefined && handleToUse === developerProfile?.github_handle) {
-      installationIdToUseForCall = developerProfile?.github_installation_id;
-    }
-
-
-    if (fetchInProgress && lastFetchedHandle === handleToUse && lastFetchedInstallationId === installationIdToUseForCall) {
-      return; // Skip if already fetching for the exact same context
-    }
-
-    await refreshGitHubDataInternal(handleToUse, installationIdToUseForCall);
-  }, [developerProfile, fetchInProgress, lastFetchedHandle, lastFetchedInstallationId, refreshGitHubDataInternal]);
+    // Pass targetInstallationId directly.
+    // refreshGitHubDataInternal will handle its own fetchInProgress check and derivation of installationIdToUse.
+    await refreshGitHubDataInternal(handleToUse, targetInstallationId);
+  }, [developerProfile, refreshGitHubDataInternal]); // Simplified deps
 
   useEffect(() => {
     const currentDevProfile = developerProfile;
