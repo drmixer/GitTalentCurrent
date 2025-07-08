@@ -98,51 +98,48 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (fetchInProgress) {
-      // console.log('refreshGitHubDataInternal - Fetch already in progress for:', handle); // Kept for clarity
+    // More specific check for fetchInProgress for the current handle
+    if (fetchInProgress && lastFetchedHandle === handle) {
+      // console.log('[useGitHub] Fetch already in progress for this specific handle:', handle);
+      return;
+    }
+
+    const installationId = developerProfile?.github_installation_id;
+
+    // If fetching for the currently authenticated user AND their installationId is not yet in context,
+    // return early and wait for AuthContext to update and trigger a re-run.
+    if (handle === developerProfile?.github_handle && !installationId) {
+      console.log(`[useGitHub] Postponing fetch for own data (${handle}): github_installation_id not yet in developerProfile context. Current context value:`, installationId);
+      // Do not set fetchInProgress or change loading state here; let the calling effect manage it or re-trigger.
       return;
     }
 
     const hasExistingData = lastFetchedHandle === handle &&
                           gitHubData.user &&
-                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase() && gitHubData.contributions.length > 0;
-    
-    // If fetching for the currently authenticated user AND their installationId is not yet in context,
-    // postpone the fetch. AuthContext update should trigger a re-run via the main useEffect.
-    // This check is primarily for the very initial load after app install & redirect.
-    const installationId = developerProfile?.github_installation_id; // Get it once for checks
-    if (handle === developerProfile?.github_handle && !installationId) {
-      console.log(`[useGitHub] Postponing fetch for own data (${handle}): github_installation_id not yet in developerProfile context. Current context value:`, installationId);
-      // setLoading(true); // Ensure loading state persists if it was already true
+                          gitHubData.user.login?.toLowerCase() === handle.toLowerCase() &&
+                          gitHubData.contributions.length > 0;
+
+    // If we have existing data for this handle and a valid installationId context, consider it fresh enough for a short while.
+    if (hasExistingData && installationId) {
+      // console.log('[useGitHub] Has existing data and installation ID for handle:', handle);
+      setTimeout(() => { if (lastFetchedHandle === handle) setLoading(false); }, 200); // check lastFetchedHandle again in timeout
       return;
     }
 
-    // This existing check might still be useful if installationId is required for any fetch of existing data.
-    // However, for the current user, the above check should handle the "stale context" case.
-    if (hasExistingData && installationId) { // Slightly modified: only return if hasExistingData AND installationId
-      setTimeout(() => setLoading(false), 200);
-      return;
-    }
+    // Only set loading/inProgress when an actual fetch is about to happen
+    setFetchInProgress(true);
+    setLoading(true);
+    setError(null);
 
     try {
-      setFetchInProgress(true);
-      setLoading(true);
-      setError(null); // Reset error at the start of every fetch attempt
+      // Note: installationId used here is from the top of this function scope, reflecting developerProfile at call time.
+      // This is correct because if it was missing for current user, we returned early.
+      // If it's for another user, this is the best we have (null if not their own profile usually).
 
-      // Re-evaluate installationId here in case developerProfile updated between the top check and now,
-      // though with useCallback deps this is less likely to be different unless dp itself changed.
-      // Using the one from above is fine.
-
-      if (!installationId && hasExistingData) { // This check might be redundant now or needs re-evaluation
-        // This was intended to show an error if we have some old data but lost connection.
-        // For a fresh user, hasExistingData will be false.
-        // For an existing user, if installationId is truly gone from DB, this might be valid.
-        // console.log('No GitHub installation ID but we have data - user needs to install the GitHub App');
-        setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
-        setLoading(false);
-        setFetchInProgress(false);
-        return;
-      }
+      // The check `if (!installationId && hasExistingData)` was here.
+      // If installationId is required by proxy and missing, the fetch will fail and error will be set.
+      // If it's not required, fetch might return public data.
+      // Removing the explicit error set here to rely on actual fetch outcome.
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
@@ -200,7 +197,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setFetchInProgress(false);
     } 
-  }, [developerProfile, user, gitHubData.user, lastFetchedHandle]);
+  }, [developerProfile, user, gitHubData.user, lastFetchedHandle, fetchInProgress, syncLanguagesToProfile, syncProjectsToProfile]); // Added fetchInProgress and sync functions
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
