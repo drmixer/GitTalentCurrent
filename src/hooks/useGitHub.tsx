@@ -232,28 +232,41 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
     if (ghHandle && String(ghHandle).trim() !== '') {
       if (ghInstId && String(ghInstId).trim() !== '' && ghInstId !== 'none' && ghInstId !== 'not available') {
-        // console.log(`useGitHub DEBUG useEffect: Conditions MET. Handle: '${ghHandle}', InstallID: '${ghInstId}'. Scheduling refreshGitHubData.`); // Can be removed
+        // Has handle and valid-looking installation ID. Proceed to fetch.
+        setError(null); // Explicitly clear any previous error
         const timer = setTimeout(() => {
-          // console.log('useGitHub DEBUG useEffect: Timer fired. Calling refreshGitHubData.'); // Can be removed
           refreshGitHubData(ghHandle);
-        }, 500);
-        return () => {
-          // console.log('useGitHub DEBUG useEffect: Cleanup timer for refresh call.'); // Can be removed
-          clearTimeout(timer);
-        };
+        }, 250); // Slightly reduced timeout
+        return () => clearTimeout(timer);
       } else {
-        console.warn(`useGitHub: Handle '${ghHandle}' present, but Installation ID is invalid/missing: '${ghInstId}'. Not fetching GitHub data.`); // Keep warn
-        setError(new Error(`GitHub App connection is incomplete or ID not yet synced. Installation ID found: '${ghInstId}'. Please ensure the GitHub App is correctly installed and connected. Data may update shortly.`));
-        setLoading(false);
-        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
+        // Has a handle, but no valid installation ID *yet* in this render's developerProfile.
+        // This could be a new user post-install where context hasn't updated,
+        // OR a user who genuinely needs to connect.
+        // Keep loading to give AuthContext a chance to provide the updated developerProfile.
+        console.warn(`[useGitHub] Handle '${ghHandle}' present, but Installation ID ('${ghInstId}') is currently missing or invalid in context. Waiting for potential context update or longer timeout.`);
+        setLoading(true); // Explicitly keep/set loading true
+        setError(null);   // Clear any previous errors, as we are in a "waiting for context/timeout" state
+
+        // Safety timeout to eventually attempt fetch if context never provides the ID quickly enough
+        // or if this is a genuinely disconnected user.
+        const waitingTimeout = setTimeout(() => {
+          // Check loading flag, in case a concurrent successful refresh already happened.
+          // Also check if developerProfile itself became null (e.g. user signed out during this wait)
+          if (loading && developerProfile && developerProfile.github_handle === ghHandle) {
+            console.warn(`[useGitHub] Waited, but Installation ID for ${ghHandle} still not in context or invalid ('${developerProfile.github_installation_id}'). Attempting fetch anyway.`);
+            refreshGitHubData(ghHandle); // Attempt fetch, refreshGitHubDataInternal will use current (possibly null) ghInstId from context
+          }
+        }, 1500); // Wait 1.5 seconds
+        return () => clearTimeout(waitingTimeout);
       }
     } else {
-      console.warn('useGitHub: No valid GitHub handle found in developer profile.'); // Keep warn
+      // No GitHub handle.
+      console.warn('useGitHub: No valid GitHub handle found in developer profile.');
       setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
       setLoading(false);
       setError(new Error('Your GitHub handle is missing from your profile. Please update it in your settings to see GitHub activity.'));
     }
-  }, [developerProfile, authLoading, refreshGitHubData]);
+  }, [developerProfile, authLoading, refreshGitHubData, loading]); // Added loading to dep array for safety timeout logic
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
