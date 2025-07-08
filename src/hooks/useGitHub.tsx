@@ -228,7 +228,6 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const ghHandle = currentDevProfile.github_handle;
-    const ghHandle = currentDevProfile.github_handle;
     // const ghInstId = currentDevProfile.github_installation_id; // No longer used to gate call here
 
     if (ghHandle && String(ghHandle).trim() !== '') {
