@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, userProfile, developerProfile, refreshProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, developerProfile, refreshProfile, loading: authLoading, setResolvedDeveloperProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -118,19 +118,32 @@ export const GitHubAppSetup = () => {
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
         try {
-          const { error: updateError } = await supabase.functions.invoke('update-github-installation', {
+          // Call the Supabase function
+          const { data: functionResponse, error: functionError } = await supabase.functions.invoke('update-github-installation', {
             body: JSON.stringify({ userId: user.id, installationId }),
           });
-          
-          if (updateError) {
-            console.error('GitHubAppSetup: Error from update-github-installation:', updateError);
+
+          if (functionError) {
+            console.error('GitHubAppSetup: Error invoking update-github-installation:', functionError);
             setProcessingInstallation(false);
-            handleError(`Failed to save GitHub installation: ${updateError.message}`);
+            handleError(`Failed to save GitHub installation: ${functionError.message}`);
             return;
           }
-          
-          if (refreshProfile) {
-            await refreshProfile();
+
+          // Assuming the function returns { success: true, data: { updated?: true, created?: true, data: developerRecordArray } }
+          // or { success: true, data: { data: developerRecord } } if .single() was used effectively in edge func
+          const responseData = functionResponse?.data; // This is the 'result' object from your edge function
+          const freshDeveloperData = responseData?.data?.[0] || responseData?.data; // Access nested data, handle array vs object
+
+          if (freshDeveloperData && setResolvedDeveloperProfile) {
+            console.log('[GitHubAppSetup] Directly setting resolved developer profile in AuthContext:', freshDeveloperData);
+            setResolvedDeveloperProfile(freshDeveloperData);
+          } else {
+            // Fallback to generic refresh if direct data not available from function response, or setter not there
+            console.warn('[GitHubAppSetup] Did not get fresh developer data from function response, or setter missing. Falling back to refreshProfile(). Response:', functionResponse);
+            if (refreshProfile) {
+              await refreshProfile();
+            }
           }
           
           const cleanUrl = new URL(window.location.href);
