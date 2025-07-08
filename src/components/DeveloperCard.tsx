@@ -133,7 +133,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
             >
               <Eye className="w-4 h-4 mr-2" />
-              View Profile
+              View Snapshot
             </button>
             <button
               onClick={onSendMessage}
