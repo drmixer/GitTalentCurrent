@@ -11,7 +11,8 @@ import {
   Users, 
   ArrowLeft,
   Loader,
-  AlertCircle
+  AlertCircle,
+  X as XIcon // For modal close button
 } from 'lucide-react';
 import { Developer, User } from '../types';
 
@@ -31,10 +32,14 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer & { user: User } | null>(null);
-  const [showFullProfile, setShowFullProfile] = useState(true);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer & { user: User } | null>(null); // For full profile page
+  const [showFullProfile, setShowFullProfile] = useState(false); // Default to false, only true when navigating to full profile
   const [showMessageThread, setShowMessageThread] = useState(false);
   const [filterAvailability, setFilterAvailability] = useState<boolean | null>(null);
+
+  // State for Snapshot Modal
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+  const [selectedDeveloperForSnapshot, setSelectedDeveloperForSnapshot] = useState<(Developer & { user: User }) | null>(null);
   
   // Enhanced search and filtering
   const [filterLanguages, setFilterLanguages] = useState<string[]>([]);
@@ -188,15 +193,25 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
     }
   };
 
-  const handleViewProfile = (developer: Developer & { user: User }) => {
-    setSelectedDeveloper(developer);
-    setShowFullProfile(true);
-    console.log('Selected developer for profile view:', developer);
+  // Renamed from handleViewProfile to reflect new action
+  const openSnapshotModal = (developer: Developer & { user: User }) => {
+    setSelectedDeveloperForSnapshot(developer);
+    setIsSnapshotModalOpen(true);
+    // We don't set selectedDeveloper or showFullProfile here anymore
   };
 
-  const handleViewFullProfile = () => {
+  const closeSnapshotModal = () => {
+    setIsSnapshotModalOpen(false);
+    setSelectedDeveloperForSnapshot(null);
+  };
+
+  // This is called from the Snapshot modal to navigate to the full profile view
+  const handleNavigateToFullProfile = (developer: Developer & { user: User }) => {
+    closeSnapshotModal();
+    setSelectedDeveloper(developer); // Set this for the full profile view
     setShowFullProfile(true);
-    console.log('Viewing full profile for developer:', selectedDeveloper?.user_id);
+    setShowMessageThread(false); // Ensure message thread is not active
+    console.log('Navigating to full profile for developer:', developer.user_id);
   };
 
   const handleSendMessage = (developer: Developer & { user: User }) => {
@@ -209,9 +224,10 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
   };
 
   const handleBackToList = () => {
-    setSelectedDeveloper(null);
+    setSelectedDeveloper(null); // Clear selection for full profile
     setShowFullProfile(false);
     setShowMessageThread(false);
+    // Modal state is handled by its own close button/logic
   };
 
   // Apply client-side filtering for any filters that couldn't be applied in the query
@@ -259,34 +275,8 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
     );
   }
 
-  if (selectedDeveloper) {
-    if (showFullProfile) {
-      return (
-        <div className="space-y-6">
-          <button
-            onClick={handleBackToList}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Developers
-          </button>
-          
-          <DeveloperProfileDetails
-            developer={selectedDeveloper}
-            onClose={handleBackToList}
-            onSendMessage={(developerId, developerName) => {
-              if (onSendMessage) {
-                onSendMessage(developerId, developerName);
-                handleBackToList();
-              } else {
-                setShowMessageThread(true);
-              }
-            }}
-          />
-        </div>
-      );
-    }
-    
+  // If showing full profile details page
+  if (showFullProfile && selectedDeveloper) {
     return (
       <div className="space-y-6">
         <button
@@ -297,24 +287,36 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
           Back to Developers
         </button>
         
-        <DeveloperSnapshotCard
+        <DeveloperProfileDetails
           developer={selectedDeveloper}
-          onViewFullProfile={handleViewFullProfile}
-          className="max-w-3xl mx-auto"
+          onClose={handleBackToList}
+          onSendMessage={(developerId, developerName) => {
+            if (onSendMessage) {
+              onSendMessage(developerId, developerName);
+              // handleBackToList(); // Keep profile open if messaging from main page context
+            } else {
+              // This case might not be hit if onSendMessage is always provided from RecruiterDashboard
+              setSelectedDeveloperForSnapshot(selectedDeveloper); // Keep context if needed
+              setShowMessageThread(true);
+              setShowFullProfile(false); // Hide full profile to show message thread
+            }
+          }}
         />
       </div>
     );
   }
 
+  // If not showing full profile, render the list and potentially the modal
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">
-          {fetchType === 'assigned' ? 'Assigned Developers' : 'Developer Search'}
-        </h2>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-gray-900">
+            {fetchType === 'assigned' ? 'Assigned Developers' : 'Developer Search'}
+          </h2>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search developers..."
@@ -484,8 +486,18 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
             <DeveloperCard
               key={developer.user_id}
               developer={developer}
-              onViewProfile={() => handleViewProfile(developer)}
-              onSendMessage={() => handleSendMessage(developer)}
+              onViewProfile={() => openSnapshotModal(developer)} // Changed to open snapshot modal
+              onSendMessage={() => {
+                // If onSendMessage prop is provided (from RecruiterDashboard), use it directly
+                if (onSendMessage) {
+                  onSendMessage(developer.user_id, developer.user.name);
+                } else {
+                  // Fallback to internal message thread logic if needed
+                  setSelectedDeveloper(developer); // Set for message thread context
+                  setShowMessageThread(true);
+                  setShowFullProfile(false); // Ensure full profile is not shown
+                }
+              }}
             />
           ))}
         </div>
@@ -531,5 +543,26 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
         </div>
       )}
     </div>
+
+    {/* Snapshot Modal */}
+    {isSnapshotModalOpen && selectedDeveloperForSnapshot && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative transform transition-all duration-300 ease-in-out scale-100">
+          <button
+            onClick={closeSnapshotModal}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
+            aria-label="Close snapshot"
+          >
+            <XIcon size={24} />
+          </button>
+          <DeveloperSnapshotCard
+            developer={selectedDeveloperForSnapshot}
+            onViewFullProfile={() => handleNavigateToFullProfile(selectedDeveloperForSnapshot)}
+            // TODO: Add isFavorite and onToggleFavorite props in Phase 2
+          />
+        </div>
+      </div>
+    )}
+  </>
   );
 };
