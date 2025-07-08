@@ -28,14 +28,14 @@ export const GitHubConnectPrompt: React.FC<GitHubConnectPromptProps> = ({ onClos
           Welcome to GitTalent!
         </h2>
         <p className="text-gray-700 text-center mb-6">
-          To unlock your personalized GitHub activity chart and showcase your contributions, you need to connect the GitHub App.
+          To unlock your personalized GitHub activity chart and showcase your contributions, you need to connect the GitTalent GitHub App.
         </p>
         <div className="flex justify-center">
           <button
             onClick={handleConnectGitHub}
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg"
           >
-            Connect GitHub App
+            Connect GitTalent GitHub App
           </button>
         </div>
       </div>
