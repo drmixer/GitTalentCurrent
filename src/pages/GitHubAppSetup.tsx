@@ -153,6 +153,9 @@ export const GitHubAppSetup = () => {
             }
           }
           
+          // Add a small delay to allow context to propagate
+          await new Promise(resolve => setTimeout(resolve, 100));
+
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
