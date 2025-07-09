@@ -14,7 +14,8 @@ import {
   RecruiterProfileDetails,
   GitHubUserActivityDetails
 } from '../components';
-import { useGitHub } from '../hooks/useGitHub'; // Import useGitHub hook
+import { useGitHub } from '../hooks/useGitHub';
+import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce'; // Import new hook
 import { 
   User, 
   Briefcase, 
@@ -109,16 +110,35 @@ export const DeveloperDashboard: React.FC = () => {
   const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null);
   const [showGitHubConnectPrompt, setShowGitHubConnectPrompt] = useState(false);
 
-  // GitHub data for the right column & Auth context developer profile
-  const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = useGitHub();
-  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth(); // Get context version of developerProfile (userProfile also needed for logs)
+  const navigate = useNavigate();
+  const location = useLocation(); // Already imported, ensure it's used
+
+  const freshSetupState = location.state as {
+    freshGitHubHandle?: string;
+    freshGitHubInstallationId?: string;
+    isFreshGitHubSetup?: boolean
+  } | null;
+
+  let githubDataHookResult;
+  if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubHandle) {
+    console.log('[Dashboard] Using useFreshGitHubDataOnce for initial load with state:', freshSetupState);
+    githubDataHookResult = useFreshGitHubDataOnce({
+      handle: freshSetupState.freshGitHubHandle,
+      installationId: freshSetupState.freshGitHubInstallationId,
+    });
+  } else {
+    // console.log('[Dashboard] Using useGitHub for normal load.'); // Keep this commented or remove if too noisy
+    githubDataHookResult = useGitHub();
+  }
+  const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = githubDataHookResult;
+
+  // Auth context data, still needed for other parts of dashboard and prompt logic
+  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth();
 
   console.log('[Dashboard] Initial contextDeveloperProfile:', contextDeveloperProfile);
   console.log('[Dashboard] Initial userProfile from useAuth:', userProfile);
+  console.log('[Dashboard] Location state for fresh setup:', freshSetupState);
 
-
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // Define renderJobSearch function before it's used in the return statement
   const renderJobSearch = () => {
@@ -275,6 +295,15 @@ export const DeveloperDashboard: React.FC = () => {
       navigate('/developer', { replace: true });
     }
   }, [activeTab, navigate]);
+
+  // Effect to clear navigation state after fresh setup data is loaded/used
+  useEffect(() => {
+    if (freshSetupState?.isFreshGitHubSetup && gitHubData && !gitHubDataLoading) {
+      // Data loaded via fresh setup, clear the state by re-navigating to the same URL without state
+      console.log('[Dashboard] Fresh GitHub data loaded, clearing navigation state.');
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [freshSetupState, gitHubData, gitHubDataLoading, navigate, location.pathname, location.search]);
 
   const fetchDeveloperData = async () => {
     if (!user) return;
