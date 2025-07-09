@@ -119,15 +119,7 @@ export const DeveloperDashboard: React.FC = () => {
     isFreshGitHubSetup?: boolean
   } | null;
 
-  const location = useLocation();
-
-  const freshSetupState = location.state as {
-    freshGitHubHandle?: string;
-    freshGitHubInstallationId?: string;
-    isFreshGitHubSetup?: boolean
-  } | null;
-
-  console.log('[Dashboard] Determining GitHub data source. freshSetupState:', freshSetupState); // Moved log here
+  // console.log('[Dashboard] Determining GitHub data source. freshSetupState:', freshSetupState); // Log moved to after freshSetupState is definitively defined
 
   // Call both hooks unconditionally
   const freshGitHubHook = useFreshGitHubDataOnce({
