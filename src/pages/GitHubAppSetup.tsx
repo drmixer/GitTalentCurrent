@@ -160,8 +160,9 @@ export const GitHubAppSetup = () => {
             }
           }
           
-          // Add a small delay to allow context to propagate
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // No artificial delay needed here, context propagation is handled by React's rendering cycle.
+          // The useGitHub hook has also been made more resilient to this.
+          // await new Promise(resolve => setTimeout(resolve, 100)); // Removed delay
 
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');

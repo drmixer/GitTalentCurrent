@@ -229,21 +229,33 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // At this point, auth is done, developerProfile and github_handle exist.
-    const ghHandle = developerProfile.github_handle;
-    const ghInstId = developerProfile.github_installation_id;
+    const currentDevProfile = developerProfile; // Capture current profile for this effect run
+    const ghHandle = currentDevProfile.github_handle;
+    const ghInstId = currentDevProfile.github_installation_id;
 
-    // Check based on the developerProfile received in this render, which was triggered by lastProfileUpdateTime changing
+    // If ghInstId is missing BUT lastProfileUpdateTime is very recent (e.g., within last 3 seconds),
+    // it's possible it's about to arrive. So, remain in a loading state without setting a hard error.
+    const now = Date.now();
+    const profileUpdateIsRecent = lastProfileUpdateTime && (now - lastProfileUpdateTime < 3000); // 3 seconds threshold
+
     if (ghInstId && String(ghInstId).trim() !== '' && ghInstId !== 'none' && ghInstId !== 'not available') {
       console.log(`[useGitHub useEffect] Valid ghInstId ('${ghInstId}') found for ${ghHandle} (profileTime: ${lastProfileUpdateTime}). Calling refreshGitHubData.`);
       setError(null); // Clear any previous error state
       refreshGitHubData(ghHandle); // This will use the ghInstId from the current developerProfile
     } else {
-      console.warn(`[useGitHub useEffect] Missing or invalid ghInstId ('${ghInstId}') for ${ghHandle} (profileTime: ${lastProfileUpdateTime}). Setting error.`);
-      setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] }); // Clear data
-      setError(new Error(`GitHub App connection is incomplete or Installation ID ('${ghInstId}') is invalid. Please try reconnecting the GitTalent GitHub App from your profile settings if this persists.`));
-      setLoading(false); // Stop loading, show error.
+      // ghInstId is missing or invalid
+      if (profileUpdateIsRecent && !error) { // Added !error to prevent flicker if error was already set
+        console.warn(`[useGitHub useEffect] Missing ghInstId ('${ghInstId}') for ${ghHandle} (profileTime: ${lastProfileUpdateTime}), but profile update was recent. Waiting briefly.`);
+        setLoading(true); // Stay in loading state, don't set hard error yet
+        // The effect will re-run when lastProfileUpdateTime changes again or if developerProfile instance changes.
+      } else {
+        console.warn(`[useGitHub useEffect] Missing or invalid ghInstId ('${ghInstId}') for ${ghHandle} (profileTime: ${lastProfileUpdateTime}). Setting error.`);
+        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] }); // Clear data
+        setError(new Error(`GitHub App connection is incomplete or Installation ID ('${ghInstId}') is invalid. Please try reconnecting the GitTalent GitHub App from your profile settings if this persists.`));
+        setLoading(false); // Stop loading, show error.
+      }
     }
-  }, [developerProfile, authLoading, refreshGitHubData, lastProfileUpdateTime]); // Added lastProfileUpdateTime
+  }, [developerProfile, authLoading, refreshGitHubData, lastProfileUpdateTime, error]); // Added lastProfileUpdateTime and error
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
