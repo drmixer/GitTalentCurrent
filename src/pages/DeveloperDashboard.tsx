@@ -119,18 +119,36 @@ export const DeveloperDashboard: React.FC = () => {
     isFreshGitHubSetup?: boolean
   } | null;
 
-  let githubDataHookResult;
+  const location = useLocation();
+
+  const freshSetupState = location.state as {
+    freshGitHubHandle?: string;
+    freshGitHubInstallationId?: string;
+    isFreshGitHubSetup?: boolean
+  } | null;
+
+  console.log('[Dashboard] Determining GitHub data source. freshSetupState:', freshSetupState); // Moved log here
+
+  // Call both hooks unconditionally
+  const freshGitHubHook = useFreshGitHubDataOnce({
+    handle: freshSetupState?.freshGitHubHandle, // Pass potentially undefined handle
+    installationId: freshSetupState?.freshGitHubInstallationId,
+  });
+  const standardGitHubHook = useGitHub();
+
+  let gitHubData, gitHubDataLoading, gitHubDataError;
+
   if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubHandle) {
-    console.log('[Dashboard] Using useFreshGitHubDataOnce for initial load with state:', freshSetupState);
-    githubDataHookResult = useFreshGitHubDataOnce({
-      handle: freshSetupState.freshGitHubHandle,
-      installationId: freshSetupState.freshGitHubInstallationId,
-    });
+    console.log('[Dashboard] Path taken: Using useFreshGitHubDataOnce for display.');
+    gitHubData = freshGitHubHook.gitHubData;
+    gitHubDataLoading = freshGitHubHook.loading;
+    gitHubDataError = freshGitHubHook.error;
   } else {
-    // console.log('[Dashboard] Using useGitHub for normal load.'); // Keep this commented or remove if too noisy
-    githubDataHookResult = useGitHub();
+    console.log('[Dashboard] Path taken: Using useGitHub for display.');
+    gitHubData = standardGitHubHook.gitHubData;
+    gitHubDataLoading = standardGitHubHook.loading;
+    gitHubDataError = standardGitHubHook.error;
   }
-  const { gitHubData, loading: gitHubDataLoading, error: gitHubDataError } = githubDataHookResult;
 
   // Auth context data, still needed for other parts of dashboard and prompt logic
   const { userProfile, developerProfile: contextDeveloperProfile } = useAuth();
