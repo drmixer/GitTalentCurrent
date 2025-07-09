@@ -67,29 +67,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (updateError) {
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
           } else if (updatedProfile) {
+            console.log(`[AuthContext] ensureDeveloperProfile (updated existing): Setting profile. ghInstId: ${updatedProfile.github_installation_id}`);
             setDeveloperProfile(updatedProfile);
-            setLastProfileUpdateTime(Date.now()); // Update time
-            console.log('[AuthContext] Developer Profile Updated in ensureDeveloperProfile:', updatedProfile);
+            setLastProfileUpdateTime(Date.now());
             return true;
           }
         }
-        // If no updates were performed, or if update failed but we still have the existing profile
+        console.log(`[AuthContext] ensureDeveloperProfile (using existing): Setting profile. ghInstId: ${existingProfile.github_installation_id}`);
         setDeveloperProfile(existingProfile);
-        setLastProfileUpdateTime(Date.now()); // Update time
-        console.log('[AuthContext] Developer Profile Set (existing) in ensureDeveloperProfile:', existingProfile);
+        setLastProfileUpdateTime(Date.now());
         return true;
       }
 
-      const githubInstallationId = null;
+      const githubInstallationId = null; // Default for new profile, should be updated by GitHubAppSetup flow
       const { data: newDevProfileData, error: createError } = await supabase.from('developers').insert({
         user_id: authUser.id, github_handle: githubUsername, bio: userBio, location: userLocation,
         profile_pic_url: avatarUrl, github_installation_id: githubInstallationId, availability: true
       }).select().single();
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
       if (!newDevProfileData) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
+      console.log(`[AuthContext] ensureDeveloperProfile (created new): Setting profile. ghInstId: ${newDevProfileData.github_installation_id}`);
       setDeveloperProfile(newDevProfileData);
-      setLastProfileUpdateTime(Date.now()); // Update time
-      console.log('[AuthContext] Developer Profile Created in ensureDeveloperProfile:', newDevProfileData);
+      setLastProfileUpdateTime(Date.now());
       return true;
     } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
   }, []);
@@ -99,16 +98,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data: devProfile, error } = await supabase.from('developers').select('*').eq('user_id', userId).single();
       if (error) {
         if (error.code === 'PGRST116') {
+          console.log('[AuthContext] fetchDeveloperProfile: No record found, setting profile to null.');
           setDeveloperProfile(null);
-          setLastProfileUpdateTime(Date.now()); // Update time even if null
-          console.log('[AuthContext] Developer Profile Set to null (no record) in fetchDeveloperProfile for user:', userId);
+          setLastProfileUpdateTime(Date.now());
           return null;
         }
         else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
       }
+      console.log(`[AuthContext] fetchDeveloperProfile: Setting profile. ghInstId: ${devProfile?.github_installation_id}`);
       setDeveloperProfile(devProfile);
-      setLastProfileUpdateTime(Date.now()); // Update time
-      console.log('[AuthContext] Developer Profile Set in fetchDeveloperProfile:', devProfile);
+      setLastProfileUpdateTime(Date.now());
       return devProfile;
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
   }, []);
@@ -443,88 +442,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
     }
-  }, []);
-
-  // --- Modified ensureDeveloperProfile to add logging ---
-  const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser): Promise<boolean> => {
-    try {
-      const { data: existingProfile, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
-      if (checkError && checkError.code !== 'PGRST116') { console.error(`ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); return false; }
-
-      const githubUsername = authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
-      const avatarUrl = authUser.user_metadata?.avatar_url || null;
-      const userBio = authUser.user_metadata?.bio || '';
-      const userLocation = authUser.user_metadata?.location || '';
-
-      if (existingProfile) {
-        let needsUpdate = false;
-        const updates: Partial<Developer> = {};
-        if (githubUsername && existingProfile.github_handle !== githubUsername) {
-          updates.github_handle = githubUsername;
-          needsUpdate = true;
-        }
-        if (avatarUrl && !existingProfile.profile_pic_url) {
-          updates.profile_pic_url = avatarUrl;
-          needsUpdate = true;
-        }
-         if (userBio && existingProfile.bio !== userBio) {
-          updates.bio = userBio;
-          needsUpdate = true;
-        }
-        if (userLocation && existingProfile.location !== userLocation) {
-          updates.location = userLocation;
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          const { data: updatedProfile, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
-          if (updateError) {
-            console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
-          } else if (updatedProfile) {
-            console.log(`[AuthContext] ensureDeveloperProfile (updated existing): Setting profile. ghInstId: ${updatedProfile.github_installation_id}`);
-            setDeveloperProfile(updatedProfile);
-            setLastProfileUpdateTime(Date.now());
-            return true;
-          }
-        }
-        console.log(`[AuthContext] ensureDeveloperProfile (using existing): Setting profile. ghInstId: ${existingProfile.github_installation_id}`);
-        setDeveloperProfile(existingProfile);
-        setLastProfileUpdateTime(Date.now());
-        return true;
-      }
-
-      const githubInstallationId = null; // Default for new profile, should be updated by GitHubAppSetup flow
-      const { data: newDevProfileData, error: createError } = await supabase.from('developers').insert({
-        user_id: authUser.id, github_handle: githubUsername, bio: userBio, location: userLocation,
-        profile_pic_url: avatarUrl, github_installation_id: githubInstallationId, availability: true
-      }).select().single();
-      if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
-      if (!newDevProfileData) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
-      console.log(`[AuthContext] ensureDeveloperProfile (created new): Setting profile. ghInstId: ${newDevProfileData.github_installation_id}`);
-      setDeveloperProfile(newDevProfileData);
-      setLastProfileUpdateTime(Date.now());
-      return true;
-    } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
-  }, []);
-
-  // --- Modified fetchDeveloperProfile to add logging ---
-  const fetchDeveloperProfile = useCallback(async (userId: string): Promise<Developer | null> => {
-    try {
-      const { data: devProfile, error } = await supabase.from('developers').select('*').eq('user_id', userId).single();
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('[AuthContext] fetchDeveloperProfile: No record found, setting profile to null.');
-          setDeveloperProfile(null);
-          setLastProfileUpdateTime(Date.now());
-          return null;
-        }
-        else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
-      }
-      console.log(`[AuthContext] fetchDeveloperProfile: Setting profile. ghInstId: ${devProfile?.github_installation_id}`);
-      setDeveloperProfile(devProfile);
-      setLastProfileUpdateTime(Date.now());
-      return devProfile;
-    } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
   }, []);
 
 
