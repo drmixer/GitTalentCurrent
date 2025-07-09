@@ -6,6 +6,7 @@ import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from '
 
 export const GitHubAppSetup = () => {
   const { user, userProfile, developerProfile, refreshProfile, loading: authLoading, setResolvedDeveloperProfile } = useAuth();
+  console.log('[GitHubAppSetup] typeof setResolvedDeveloperProfile from useAuth():', typeof setResolvedDeveloperProfile, setResolvedDeveloperProfile); // Added log
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState<number>(0);
