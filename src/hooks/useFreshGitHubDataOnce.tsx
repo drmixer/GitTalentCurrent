@@ -79,22 +79,22 @@ const initialState: GitHubData = {
 
 export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHubDataOnceProps): UseFreshGitHubDataOnceReturn => {
   const [gitHubData, setGitHubData] = useState<GitHubData>(initialState);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Initial loading state true only if handle is present, otherwise false.
+  const [loading, setLoading] = useState<boolean>(!!handle);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchData = useCallback(async () => {
+    // This internal check is still good, though useEffect also gates by handle.
     if (!handle) {
-      console.log('[useFreshGitHubDataOnce] No handle provided.');
-      setError(new Error('GitHub handle is required.'));
+      console.log('[useFreshGitHubDataOnce] fetchData: No handle, exiting.');
+      setGitHubData(initialState); // Ensure data is reset if handle becomes null
+      setError(null);
       setLoading(false);
       return;
     }
 
-    // Note: For this hook, we assume if installationId is needed, it's provided.
-    // The proxy will decide if it can fetch without it or if it's an error.
-    console.log(`[useFreshGitHubDataOnce] Fetching for handle: ${handle}, installationId: ${installationId}`);
-    setLoading(true);
-    setError(null);
+    console.log(`[useFreshGitHubDataOnce] fetchData: Fetching for handle: ${handle}, installationId: ${installationId}`);
+    // setLoading(true) and setError(null) will be set by the calling useEffect
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -151,11 +151,20 @@ export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHu
     } finally {
       setLoading(false);
     }
-  }, [handle, installationId]); // Effect dependencies
+  }, [handle, installationId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]); // fetchData is memoized by useCallback
+    if (handle) { // Only run if handle is valid and present
+      setLoading(true);
+      setError(null);
+      fetchData();
+    } else {
+      // If handle becomes null/undefined (e.g. nav state cleared), reset to initial non-loading state
+      setGitHubData(initialState);
+      setLoading(false);
+      setError(null);
+    }
+  }, [handle, fetchData]); // fetchData's dependency on installationId will also trigger this if ID changes with same handle
 
   return { gitHubData, loading, error };
 };
