@@ -21,6 +21,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null | undefined>(null);
+  const [lastProfileUpdateTime, setLastProfileUpdateTime] = useState<number | null>(null); // New state
   const [loading, setLoading] = useState(true); // Global loading for auth context
   const [signingOut, setSigningOut] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -67,12 +68,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
           } else if (updatedProfile) {
             setDeveloperProfile(updatedProfile);
+            setLastProfileUpdateTime(Date.now()); // Update time
             console.log('[AuthContext] Developer Profile Updated in ensureDeveloperProfile:', updatedProfile);
             return true;
           }
         }
         // If no updates were performed, or if update failed but we still have the existing profile
         setDeveloperProfile(existingProfile);
+        setLastProfileUpdateTime(Date.now()); // Update time
         console.log('[AuthContext] Developer Profile Set (existing) in ensureDeveloperProfile:', existingProfile);
         return true;
       }
@@ -85,6 +88,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
       if (!newDevProfileData) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
       setDeveloperProfile(newDevProfileData);
+      setLastProfileUpdateTime(Date.now()); // Update time
       console.log('[AuthContext] Developer Profile Created in ensureDeveloperProfile:', newDevProfileData);
       return true;
     } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
@@ -96,15 +100,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) {
         if (error.code === 'PGRST116') {
           setDeveloperProfile(null);
+          setLastProfileUpdateTime(Date.now()); // Update time even if null
           console.log('[AuthContext] Developer Profile Set to null (no record) in fetchDeveloperProfile for user:', userId);
           return null;
         }
-        else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); return null; }
+        else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
       }
       setDeveloperProfile(devProfile);
+      setLastProfileUpdateTime(Date.now()); // Update time
       console.log('[AuthContext] Developer Profile Set in fetchDeveloperProfile:', devProfile);
       return devProfile;
-    } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); return null; }
+    } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
   }, []);
 
   const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
@@ -433,6 +439,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Ensure we're actually setting a Developer object, not null/undefined if types allow
     if (developerData && typeof developerData === 'object' && developerData.user_id) {
       setDeveloperProfile(developerData);
+      setLastProfileUpdateTime(Date.now()); // Update time
     } else {
       console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
     }
@@ -441,11 +448,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const value: AuthContextType = {
     user, session, userProfile, developerProfile, loading, authError, signingOut,
+    lastProfileUpdateTime, // Added here
     signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
     createAssignment, createHire, updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
-    setResolvedDeveloperProfile, // Added here
+    setResolvedDeveloperProfile,
     needsOnboarding: !developerProfile && userProfile?.role === 'developer',
   };
 

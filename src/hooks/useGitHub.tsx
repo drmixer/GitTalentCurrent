@@ -207,53 +207,43 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     const currentDevProfile = developerProfile;
     const currentAuthLoading = authLoading;
 
-    // console.log( // Main debug log for useEffect, can be removed or kept commented
-    //   'useGitHub DEBUG useEffect: Evaluating. AuthLoading:', currentAuthLoading,
-    //   'DevProfile Handle:', currentDevProfile?.github_handle,
-    //   'DevProfile InstallID:', currentDevProfile?.github_installation_id,
-    //   'DevProfile Exists:', !!currentDevProfile
+    // Main debug log for useEffect, can be removed or kept commented
+    //   'useGitHub DEBUG useEffect: Evaluating. AuthLoading:', authLoading,
+    //   'DevProfile Handle:', developerProfile?.github_handle,
+    //   'DevProfile InstallID:', developerProfile?.github_installation_id,
+    //   'DevProfile Exists:', !!developerProfile,
+    //   'LastProfileUpdateTime:', lastProfileUpdateTime
     // );
 
-    if (currentAuthLoading) {
-      // console.log('useGitHub DEBUG useEffect: Auth is loading. Waiting...'); // Can be removed
+    if (authLoading) {
+      setLoading(true); // Keep loading true while auth is resolving
       return;
     }
 
-    if (!currentDevProfile) {
-      console.warn('useGitHub: Developer profile is NOT loaded (and auth is not loading). Cannot fetch GitHub data.'); // Keep warn
+    if (!developerProfile || !developerProfile.github_handle) {
+      console.warn('[useGitHub useEffect] Developer profile or GitHub handle not available.');
       setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
-      setLoading(false);
-      setError(new Error('Developer profile not available. Cannot fetch GitHub data.'));
+      setError(new Error('Developer profile or GitHub handle not available for GitHub activity.'));
+      setLoading(false); // Stop loading if no profile/handle to act on
       return;
     }
 
-    const ghHandle = currentDevProfile.github_handle;
-    const ghInstId = currentDevProfile.github_installation_id;
+    // At this point, auth is done, developerProfile and github_handle exist.
+    const ghHandle = developerProfile.github_handle;
+    const ghInstId = developerProfile.github_installation_id;
 
-    if (ghHandle && String(ghHandle).trim() !== '') {
-      if (ghInstId && String(ghInstId).trim() !== '' && ghInstId !== 'none' && ghInstId !== 'not available') {
-        // console.log(`useGitHub DEBUG useEffect: Conditions MET. Handle: '${ghHandle}', InstallID: '${ghInstId}'. Scheduling refreshGitHubData.`); // Can be removed
-        const timer = setTimeout(() => {
-          // console.log('useGitHub DEBUG useEffect: Timer fired. Calling refreshGitHubData.'); // Can be removed
-          refreshGitHubData(ghHandle);
-        }, 500);
-        return () => {
-          // console.log('useGitHub DEBUG useEffect: Cleanup timer for refresh call.'); // Can be removed
-          clearTimeout(timer);
-        };
-      } else {
-        console.warn(`useGitHub: Handle '${ghHandle}' present, but Installation ID is invalid/missing: '${ghInstId}'. Not fetching GitHub data.`); // Keep warn
-        setError(new Error(`GitHub App connection is incomplete or ID not yet synced. Installation ID found: '${ghInstId}'. Please ensure the GitHub App is correctly installed and connected. Data may update shortly.`));
-        setLoading(false);
-        setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
-      }
+    // Check based on the developerProfile received in this render, which was triggered by lastProfileUpdateTime changing
+    if (ghInstId && String(ghInstId).trim() !== '' && ghInstId !== 'none' && ghInstId !== 'not available') {
+      console.log(`[useGitHub useEffect] Valid ghInstId ('${ghInstId}') found for ${ghHandle} (profileTime: ${lastProfileUpdateTime}). Calling refreshGitHubData.`);
+      setError(null); // Clear any previous error state
+      refreshGitHubData(ghHandle); // This will use the ghInstId from the current developerProfile
     } else {
-      console.warn('useGitHub: No valid GitHub handle found in developer profile.'); // Keep warn
-      setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] });
-      setLoading(false);
-      setError(new Error('Your GitHub handle is missing from your profile. Please update it in your settings to see GitHub activity.'));
+      console.warn(`[useGitHub useEffect] Missing or invalid ghInstId ('${ghInstId}') for ${ghHandle} (profileTime: ${lastProfileUpdateTime}). Setting error.`);
+      setGitHubData({ user: null, repos: [], languages: {}, totalStars: 0, contributions: [] }); // Clear data
+      setError(new Error(`GitHub App connection is incomplete or Installation ID ('${ghInstId}') is invalid. Please try reconnecting the GitTalent GitHub App from your profile settings if this persists.`));
+      setLoading(false); // Stop loading, show error.
     }
-  }, [developerProfile, authLoading, refreshGitHubData]);
+  }, [developerProfile, authLoading, refreshGitHubData, lastProfileUpdateTime]); // Added lastProfileUpdateTime
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
