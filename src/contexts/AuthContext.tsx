@@ -29,90 +29,96 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [authUserToProcess, setAuthUserToProcess] = useState<SupabaseUser | null>(null);
   const [authProcessingEventType, setAuthProcessingEventType] = useState<string | null>(null);
 
-  // Helper to preserve a recently set ghInstId if DB returns null for it
-  const mergeProfileWithExistingGhId = useCallback((profileFromDbOrNew: Developer): Developer => {
-    const currentGhInstIdInState = developerProfile?.github_installation_id;
-    // Only preserve if the ID in state was set recently (e.g. by GitHubAppSetup)
-    // and the new data from DB has a null/undefined ID.
-    const lastUpdateWasRecent = lastProfileUpdateTime && (Date.now() - lastProfileUpdateTime < 5000); // 5 seconds window
-
-    if (
-      (profileFromDbOrNew.github_installation_id === null || profileFromDbOrNew.github_installation_id === undefined) &&
-      currentGhInstIdInState &&
-      lastUpdateWasRecent
-    ) {
-      console.log(`[AuthContext] mergeProfileWithExistingGhId: Preserving ghInstId (${currentGhInstIdInState}) from recent state over null/undefined from DB/new record for user ${profileFromDbOrNew.user_id}`);
-      return { ...profileFromDbOrNew, github_installation_id: currentGhInstIdInState };
-    }
-    return profileFromDbOrNew;
-  }, [developerProfile, lastProfileUpdateTime]); // Dependencies: current developerProfile and its update time
-
   const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser): Promise<boolean> => {
     try {
-      const { data: existingProfile, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
+      const { data: existingProfileFromDb, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
       if (checkError && checkError.code !== 'PGRST116') { console.error(`ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); return false; }
 
       const githubUsername = authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
+      const currentGhInstIdInState = developerProfile?.github_installation_id; // Get ID from current React state
 
-      if (existingProfile) {
+      if (existingProfileFromDb) {
+        let profileToSet = { ...existingProfileFromDb }; // Clone to make mutable
+
+        // Preserve ghInstId from state if DB is null and state has a valid one
+        if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
+          console.log(`[AuthContext] ensureDeveloperProfile (existing): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
+          profileToSet.github_installation_id = currentGhInstIdInState;
+        }
+
         let needsUpdate = false;
         const updates: Partial<Developer> = {};
-        if (githubUsername && existingProfile.github_handle !== githubUsername) {
+        if (githubUsername && profileToSet.github_handle !== githubUsername) {
           updates.github_handle = githubUsername;
           needsUpdate = true;
         }
-        // Only set profile_pic_url from GitHub if it's currently empty
-        // Custom uploads will be handled by DeveloperProfileForm
-        // "Use GitHub Avatar" button will provide explicit override
-        if (avatarUrl && !existingProfile.profile_pic_url) {
+        if (avatarUrl && !profileToSet.profile_pic_url) {
           updates.profile_pic_url = avatarUrl;
           needsUpdate = true;
         }
-         if (userBio && existingProfile.bio !== userBio) {
+         if (userBio && profileToSet.bio !== userBio) {
           updates.bio = userBio;
           needsUpdate = true;
         }
-        if (userLocation && existingProfile.location !== userLocation) {
+        if (userLocation && profileToSet.location !== userLocation) {
           updates.location = userLocation;
           needsUpdate = true;
         }
 
         if (needsUpdate) {
-          const { data: updatedProfile, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
+          const { data: updatedProfileFromDb, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
           if (updateError) {
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
-          } else if (updatedProfile) {
-            const finalUpdatedProfile = mergeProfileWithExistingGhId(updatedProfile);
-            console.log(`[AuthContext] ensureDeveloperProfile (updated existing): Setting profile. ghInstId: ${finalUpdatedProfile.github_installation_id}`);
-            setDeveloperProfile(finalUpdatedProfile);
-            setLastProfileUpdateTime(Date.now());
-            return true;
+            // Even if update fails, proceed with profileToSet which has the original existing data + potential ghInstId preservation
+          } else if (updatedProfileFromDb) {
+            profileToSet = { ...updatedProfileFromDb }; // Use the updated data from DB
+            // Preserve ghInstId again if the update somehow nulled it and state still has it
+            if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
+              console.log(`[AuthContext] ensureDeveloperProfile (after DB update): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
+              profileToSet.github_installation_id = currentGhInstIdInState;
+            }
           }
         }
-        const finalExistingProfile = mergeProfileWithExistingGhId(existingProfile);
-        console.log(`[AuthContext] ensureDeveloperProfile (using existing): Setting profile. ghInstId: ${finalExistingProfile.github_installation_id}`);
-        setDeveloperProfile(finalExistingProfile);
+        console.log(`[AuthContext] ensureDeveloperProfile (using existing/updated): Setting profile. ghInstId: ${profileToSet.github_installation_id}`);
+        setDeveloperProfile(profileToSet);
         setLastProfileUpdateTime(Date.now());
         return true;
       }
 
-      const githubInstallationId = null; // Default for new profile, should be updated by GitHubAppSetup flow
-      const { data: newDevProfileDataFromDb, error: createError } = await supabase.from('developers').insert({
-        user_id: authUser.id, github_handle: githubUsername, bio: userBio, location: userLocation,
-        profile_pic_url: avatarUrl, github_installation_id: githubInstallationId, availability: true
-      }).select().single();
+      // Creating a new profile
+      let newDevProfileData: Partial<Developer> = {
+        user_id: authUser.id,
+        github_handle: githubUsername,
+        bio: userBio,
+        location: userLocation,
+        profile_pic_url: avatarUrl,
+        github_installation_id: currentGhInstIdInState || null, // Prefer ID from state if available, else null
+        availability: true
+      };
+      if(currentGhInstIdInState && newDevProfileData.github_installation_id === currentGhInstIdInState){
+        console.log(`[AuthContext] ensureDeveloperProfile (creating new): Preserving ghInstId (${currentGhInstIdInState}) from state for new profile.`);
+      }
+
+      const { data: insertedProfile, error: createError } = await supabase.from('developers').insert(newDevProfileData).select().single();
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
-      if (!newDevProfileDataFromDb) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
-      const finalNewProfile = mergeProfileWithExistingGhId(newDevProfileDataFromDb);
-      console.log(`[AuthContext] ensureDeveloperProfile (created new): Setting profile. ghInstId: ${finalNewProfile.github_installation_id}`);
-      setDeveloperProfile(finalNewProfile);
+      if (!insertedProfile) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
+
+      // The insertedProfile should ideally have the ghInstId if we passed it.
+      // If it's different (e.g. DB default took over), and state had one, re-affirm.
+      if (insertedProfile.github_installation_id !== currentGhInstIdInState && currentGhInstIdInState) {
+          console.log(`[AuthContext] ensureDeveloperProfile (created new, re-affirming): Preserving ghInstId (${currentGhInstIdInState}) over DB insert result ${insertedProfile.github_installation_id}.`);
+          insertedProfile.github_installation_id = currentGhInstIdInState;
+      }
+
+      console.log(`[AuthContext] ensureDeveloperProfile (created new): Setting profile. ghInstId: ${insertedProfile.github_installation_id}`);
+      setDeveloperProfile(insertedProfile);
       setLastProfileUpdateTime(Date.now());
       return true;
     } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
-  }, [mergeProfileWithExistingGhId]); // Added mergeProfileWithExistingGhId to dependencies
+  }, [developerProfile, lastProfileUpdateTime]); // Depends on current developerProfile for ghInstId preservation
 
   const fetchDeveloperProfile = useCallback(async (userId: string): Promise<Developer | null> => {
     try {
@@ -120,24 +126,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) {
         if (error.code === 'PGRST116') {
           console.log('[AuthContext] fetchDeveloperProfile: No record found, setting profile to null.');
-          setDeveloperProfile(null);
+          setDeveloperProfile(null); // Intentionally null, no ID to preserve
           setLastProfileUpdateTime(Date.now());
           return null;
         }
         else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
       }
-      if (!devProfileFromDb) { // Should be caught by PGRST116, but as a safeguard
-        setDeveloperProfile(null);
+      if (!devProfileFromDb) {
+        setDeveloperProfile(null); // Intentionally null
         setLastProfileUpdateTime(Date.now());
         return null;
       }
-      const finalDevProfile = mergeProfileWithExistingGhId(devProfileFromDb);
-      console.log(`[AuthContext] fetchDeveloperProfile: Setting profile. ghInstId: ${finalDevProfile?.github_installation_id}`);
-      setDeveloperProfile(finalDevProfile);
+
+      let profileToSet = { ...devProfileFromDb };
+      const currentGhInstIdInState = developerProfile?.github_installation_id;
+
+      if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
+        console.log(`[AuthContext] fetchDeveloperProfile: Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null for user ${userId}.`);
+        profileToSet.github_installation_id = currentGhInstIdInState;
+      }
+
+      console.log(`[AuthContext] fetchDeveloperProfile: Setting profile. ghInstId: ${profileToSet.github_installation_id}`);
+      setDeveloperProfile(profileToSet);
       setLastProfileUpdateTime(Date.now());
-      return finalDevProfile; // Return the potentially merged profile
+      return profileToSet;
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
-  }, [mergeProfileWithExistingGhId]); // Added mergeProfileWithExistingGhId to dependencies
+  }, [developerProfile, lastProfileUpdateTime]); // Depends on current developerProfile for ghInstId preservation
 
   const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
     setAuthError(null);
