@@ -75,7 +75,7 @@ export const useGitHub = () => {
 };
 
 export const GitHubProvider = ({ children }: { children: ReactNode }) => {
-  const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth();
+  const { user, developerProfile, updateDeveloperProfile, loading: authLoading, lastProfileUpdateTime } = useAuth(); // Added lastProfileUpdateTime
 
   const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
