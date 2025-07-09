@@ -90,8 +90,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
   const refreshGitHubDataInternal = useCallback(async (handle: string) => {
+    const contextInstallationId = developerProfile?.github_installation_id;
+    console.log('[RDI] Entry. Handle:', handle, 'Context InstallationID from developerProfile:', contextInstallationId);
+
     if (!handle) {
-      // console.log('refreshGitHubDataInternal - No GitHub handle provided'); // Kept for clarity if needed
+      console.log('[RDI] No handle provided, exiting.');
       setLoading(false);
       setError(new Error('No GitHub handle provided'));
       setFetchInProgress(false);
@@ -113,24 +116,26 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    console.log('[RDI] Proceeding to fetch. Current installationId from context for fetch:', contextInstallationId);
     try {
       setFetchInProgress(true);
       setLoading(true);
       setError(null);
 
-      const installationId = developerProfile?.github_installation_id;
+      // const installationId = developerProfile?.github_installation_id; // Already captured as contextInstallationId
 
-      if (!installationId && hasExistingData) {
-        // console.log('No GitHub installation ID but we have data - user needs to install the GitHub App'); // Kept
+      if (!contextInstallationId && hasExistingData) {
+        console.log('[RDI] No installationId from context, but hasExistingData. Setting error and returning.');
         setError(new Error('GitHub App not connected. Please connect the GitHub App to see your real-time contributions.'));
-        setLoading(false);
-        setFetchInProgress(false);
-        return;
+        // setLoading(false); // will be handled by finally
+        // setFetchInProgress(false); // will be handled by finally
+        throw new Error('GitHub App not connected but has existing data.'); // Throw to ensure finally runs
       }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
       
+      console.log('[RDI] Making fetch call to proxy with handle:', handle, 'and installationId:', contextInstallationId);
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -139,12 +144,14 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ 
           handle,
-          installationId
+          installationId: contextInstallationId
         })
       });
 
+      console.log('[RDI] Fetch response received. ok:', response.ok, 'status:', response.status);
       if (!response.ok) {
         const errorText = await response.text();
+        console.log('[RDI] Fetch not ok. Error text attempt:', errorText);
         let errorMessage = `GitHub API error: ${response.status}`;
         try {
           const errorData = JSON.parse(errorText);
@@ -158,6 +165,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const data = await response.json();
+      console.log('[RDI] Data processed and setGitHubData called.');
       const contributionStats = calculateContributionStats(data.contributions || []);
 
       setGitHubData({
@@ -178,13 +186,14 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       } 
 
     } catch (err: any) {
-      console.error('Error in refreshGitHubDataInternal:', err.message || err); // Keep console.error
+      console.error('[RDI] Caught error:', err);
       setError(err);
     } finally {
+      console.log('[RDI] Entering finally block. setLoading(false), setFetchInProgress(false).');
       setLoading(false);
       setFetchInProgress(false);
     } 
-  }, [developerProfile, user, gitHubData.user, lastFetchedHandle]);
+  }, [developerProfile, user, gitHubData.user, lastFetchedHandle, syncLanguagesToProfile, syncProjectsToProfile]); // Added sync* funcs
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
