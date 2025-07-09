@@ -40,11 +40,18 @@ export const GitHubAppSetup = () => {
     }, 1000);
   }, [user]);
 
-  const handleSuccess = useCallback((successMessage: string, redirectDelay: number = 2000) => {
+  const handleSuccess = useCallback((
+    successMessage: string,
+    redirectDelay: number = 2000,
+    navState?: { freshGitHubHandle?: string; freshGitHubInstallationId?: string; isFreshGitHubSetup?: boolean }
+  ) => {
     setUiState('success');
     setMessage(successMessage);
     setTimeout(() => {
-      navigate('/developer?tab=github-activity', { replace: true });
+      navigate('/developer?tab=github-activity', {
+        replace: true,
+        state: navState
+      });
     }, redirectDelay);
   }, [navigate]);
 
@@ -164,10 +171,16 @@ export const GitHubAppSetup = () => {
           
           setProcessingInstallation(false);
           
+          const navState = {
+            freshGitHubHandle: freshDeveloperData?.github_handle,
+            freshGitHubInstallationId: freshDeveloperData?.github_installation_id,
+            isFreshGitHubSetup: true
+          };
+
           if (setupAction === 'install') {
-            handleSuccess('GitHub App successfully installed and connected!');
+            handleSuccess('GitHub App successfully installed and connected!', 2000, navState);
           } else {
-            handleSuccess('GitHub App connection updated successfully!');
+            handleSuccess('GitHub App connection updated successfully!', 2000, navState);
           }
         } catch (err) {
           console.error('GitHubAppSetup: Error saving installation ID:', err);
