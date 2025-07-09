@@ -229,9 +229,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // At this point, auth is done, developerProfile and github_handle exist.
-    const currentDevProfile = developerProfile; // Capture current profile for this effect run
-    const ghHandle = currentDevProfile.github_handle;
-    const ghInstId = currentDevProfile.github_installation_id;
+    // const currentDevProfile = developerProfile; // REVERTED: This was a mistaken re-declaration.
+                                                // The existing currentDevProfile from the top of useEffect should be used.
+    const ghHandle = currentDevProfile.github_handle; // Uses existing currentDevProfile
+    const ghInstId = currentDevProfile.github_installation_id; // Uses existing currentDevProfile
 
     // If ghInstId is missing BUT lastProfileUpdateTime is very recent (e.g., within last 3 seconds),
     // it's possible it's about to arrive. So, remain in a loading state without setting a hard error.
