@@ -426,7 +426,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     setAuthUserToProcess(user);
     setAuthProcessingEventType('MANUAL_REFRESH');
-  }, [user]);
+  }, [user, fetchUserProfile]); // Added fetchUserProfile as it's part of the logic path now
+
+  const setResolvedDeveloperProfile = useCallback((developerData: Developer) => {
+    console.log('[AuthContext] setResolvedDeveloperProfile called with:', developerData);
+    // Ensure we're actually setting a Developer object, not null/undefined if types allow
+    if (developerData && typeof developerData === 'object' && developerData.user_id) {
+      setDeveloperProfile(developerData);
+    } else {
+      console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
+    }
+  }, []); // Empty dependency array: this function's identity is stable
+
 
   const value: AuthContextType = {
     user, session, userProfile, developerProfile, loading, authError, signingOut,
@@ -434,6 +445,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
     createAssignment, createHire, updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
+    setResolvedDeveloperProfile, // Added here
     needsOnboarding: !developerProfile && userProfile?.role === 'developer',
   };
 

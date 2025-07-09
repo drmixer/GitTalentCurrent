@@ -67,6 +67,7 @@ export interface AuthContextType {
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ data?: any, error: any | null }>;
   signOut: () => Promise<{ error: any | null }>;
   refreshProfile?: () => Promise<void>;
+  setResolvedDeveloperProfile?: (developerData: Developer) => void; // Added this line
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   createJobRole?: (jobData: Partial<JobRole>) => Promise<boolean>; 
