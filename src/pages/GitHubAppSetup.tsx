@@ -140,17 +140,14 @@ export const GitHubAppSetup = () => {
 
           // ADD DETAILED LOGS HERE
           console.log('[GitHubAppSetup] Full functionResponse from update-github-installation:', functionResponse);
-          if (functionResponse) {
-            console.log('[GitHubAppSetup] functionResponse.data (this should be the inner \'data\' object from your function):', functionResponse.data);
-            if (functionResponse.data) {
-              console.log('[GitHubAppSetup] functionResponse.data.data (this should be the developer record or array):', functionResponse.data.data);
-            }
-          }
 
-          const responseData = functionResponse?.data;
-          const freshDeveloperData = responseData?.data?.[0] || responseData?.data;
+          // 'functionResponse.data' IS the 'resultData' from the Edge Function, which is the developer object.
+          const freshDeveloperData = functionResponse?.data;
 
-          if (freshDeveloperData && setResolvedDeveloperProfile) {
+          console.log('[GitHubAppSetup] Extracted freshDeveloperData (should be the developer object):', freshDeveloperData);
+
+          // Ensure freshDeveloperData is a valid object with user_id before using it
+          if (freshDeveloperData && typeof freshDeveloperData === 'object' && freshDeveloperData.user_id && setResolvedDeveloperProfile) {
             console.log('[GitHubAppSetup] Attempting to directly set resolved developer profile in AuthContext with:', freshDeveloperData);
             setResolvedDeveloperProfile(freshDeveloperData);
           } else {
