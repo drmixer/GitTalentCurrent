@@ -371,24 +371,24 @@ export const DeveloperDashboard: React.FC = () => {
 
   // Effect to clear navigation state after fresh setup data is loaded/used successfully
   useEffect(() => {
+    let navClearTimerId: NodeJS.Timeout | null = null;
     // Only clear if it was a fresh setup, and the fresh load attempt is now successful
     if (freshSetupState?.isFreshGitHubSetup && freshLoadStatus === 'success') {
-      console.log('[Dashboard] Fresh GitHub data loaded successfully. Scheduling navigation state clear.');
+      console.log('[Dashboard] Fresh GitHub data loaded successfully. Scheduling navigation state clear with longer delay.');
 
-      // Delay the navigation slightly
-      const timerId = setTimeout(() => {
+      navClearTimerId = setTimeout(() => {
         console.log('[Dashboard] Clearing navigation state now.');
+        // Only navigate. Do not reset other local states here,
+        // as navigation should cause a re-evaluation of freshSetupState on the next render,
+        // which will then reset isAttemptingFreshLoad etc. in the other useEffect.
         navigate(location.pathname + location.search, { replace: true, state: null });
-        // These state resets might be redundant if navigate causes a full remount,
-        // but are kept for explicit state management if it doesn't always remount.
-        setIsAttemptingFreshLoad(false);
-        setDerivedHandle(null);
-        setFreshLoadStatus('idle');
-      }, 100); // 100ms delay
+      }, 1000); // Increased delay to 1 second for testing
 
-      return () => clearTimeout(timerId); // Cleanup timer if component unmounts before timeout
+      return () => { // Cleanup timer
+        if (navClearTimerId) clearTimeout(navClearTimerId);
+      };
     }
-  }, [freshSetupState, freshLoadStatus, navigate, location.pathname, location.search]);
+  }, [freshSetupState?.isFreshGitHubSetup, freshLoadStatus, navigate, location.pathname, location.search]); // More specific dependencies
 
   const fetchDeveloperData = async () => {
     if (!user) return;
