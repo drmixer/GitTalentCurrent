@@ -373,12 +373,20 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     // Only clear if it was a fresh setup, and the fresh load attempt is now successful
     if (freshSetupState?.isFreshGitHubSetup && freshLoadStatus === 'success') {
-      console.log('[Dashboard] Fresh GitHub data loaded successfully via useFreshGitHubDataOnce, clearing navigation state.');
-      navigate(location.pathname + location.search, { replace: true, state: null });
-      // Also reset fresh load attempt markers
-      setIsAttemptingFreshLoad(false);
-      setDerivedHandle(null);
-      setFreshLoadStatus('idle');
+      console.log('[Dashboard] Fresh GitHub data loaded successfully. Scheduling navigation state clear.');
+
+      // Delay the navigation slightly
+      const timerId = setTimeout(() => {
+        console.log('[Dashboard] Clearing navigation state now.');
+        navigate(location.pathname + location.search, { replace: true, state: null });
+        // These state resets might be redundant if navigate causes a full remount,
+        // but are kept for explicit state management if it doesn't always remount.
+        setIsAttemptingFreshLoad(false);
+        setDerivedHandle(null);
+        setFreshLoadStatus('idle');
+      }, 100); // 100ms delay
+
+      return () => clearTimeout(timerId); // Cleanup timer if component unmounts before timeout
     }
   }, [freshSetupState, freshLoadStatus, navigate, location.pathname, location.search]);
 
