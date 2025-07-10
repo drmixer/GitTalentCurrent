@@ -369,26 +369,29 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [activeTab, navigate, location.state]);
 
-  // Effect to clear navigation state after fresh setup data is loaded/used successfully
+  // Effect to clear navigation state ONCE after a fresh setup redirect.
+  // This should run regardless of data loading success/failure for useFreshGitHubDataOnce.
   useEffect(() => {
-    let navClearTimerId: NodeJS.Timeout | null = null;
-    // Only clear if it was a fresh setup, and the fresh load attempt is now successful
-    if (freshSetupState?.isFreshGitHubSetup && freshLoadStatus === 'success') {
-      console.log('[Dashboard] Fresh GitHub data loaded successfully. Scheduling navigation state clear with longer delay.');
-
-      navClearTimerId = setTimeout(() => {
-        console.log('[Dashboard] Clearing navigation state now.');
-        // Only navigate. Do not reset other local states here,
-        // as navigation should cause a re-evaluation of freshSetupState on the next render,
-        // which will then reset isAttemptingFreshLoad etc. in the other useEffect.
+    let cleanupTimerId: NodeJS.Timeout | null = null;
+    if (freshSetupState?.isFreshGitHubSetup) {
+      console.log('[Dashboard] Detected fresh GitHub setup from navState. Scheduling state cleanup.');
+      // Schedule the navigation state clear to happen after the current render cycle and initial effects.
+      // This helps ensure that other effects (like data fetching) have a chance to kick off.
+      cleanupTimerId = setTimeout(() => {
+        console.log('[Dashboard] Clearing navState (freshSetupState).');
         navigate(location.pathname + location.search, { replace: true, state: null });
-      }, 1000); // Increased delay to 1 second for testing
-
-      return () => { // Cleanup timer
-        if (navClearTimerId) clearTimeout(navClearTimerId);
-      };
+        // After navigation, freshSetupState will be null in subsequent renders,
+        // effectively making this a one-time operation per fresh setup.
+        // Local states like isAttemptingFreshLoad, derivedHandle will be reset by their own
+        // useEffect when freshSetupState becomes null.
+      }, 100); // A small delay is usually sufficient here.
     }
-  }, [freshSetupState?.isFreshGitHubSetup, freshLoadStatus, navigate, location.pathname, location.search]); // More specific dependencies
+    return () => {
+      if (cleanupTimerId) clearTimeout(cleanupTimerId);
+    };
+  // Rerun this effect if freshSetupState.isFreshGitHubSetup changes, or if navigation tools change.
+  // This ensures it runs once when isFreshGitHubSetup becomes true.
+  }, [freshSetupState?.isFreshGitHubSetup, navigate, location.pathname, location.search]);
 
   const fetchDeveloperData = async () => {
     if (!user) return;
