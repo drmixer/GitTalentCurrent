@@ -127,23 +127,40 @@ export const DeveloperDashboard: React.FC = () => {
     installationId: freshSetupState?.freshGitHubInstallationId,
   });
   const standardGitHubHook = useGitHub();
+  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth(); // Moved useAuth call higher
 
-  let gitHubData, gitHubDataLoading, gitHubDataError;
+  let gitHubData, gitHubDataLoading, gitHubDataError, usingFreshHook = false;
 
-  if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubHandle) {
-    console.log('[Dashboard] Path taken: Using useFreshGitHubDataOnce for display.');
+  // Determine the handle to use for useFreshGitHubDataOnce more robustly:
+  let handleForFreshHook: string | undefined | null = null;
+  if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubInstallationId) {
+    if (freshSetupState.freshGitHubHandle) {
+      handleForFreshHook = freshSetupState.freshGitHubHandle;
+    } else if (contextDeveloperProfile?.github_handle) {
+      // Fallback to context if navState handle is missing but it's a fresh setup with an ID
+      console.log('[Dashboard] Fresh setup: navState.freshGitHubHandle is missing, using contextDeveloperProfile.github_handle as fallback for useFreshGitHubDataOnce.');
+      handleForFreshHook = contextDeveloperProfile.github_handle;
+    } else {
+      console.warn('[Dashboard] Fresh setup: Both navState.freshGitHubHandle and context handle are missing. Cannot use useFreshGitHubDataOnce effectively without a handle.');
+    }
+  }
+
+  // Decide which hook's data to use
+  if (freshSetupState?.isFreshGitHubSetup && handleForFreshHook && freshSetupState.freshGitHubInstallationId) {
+    console.log('[Dashboard] Path taken: Using useFreshGitHubDataOnce for display with handle:', handleForFreshHook);
+    // Note: freshGitHubHook is already called unconditionally at the top of the component.
+    // We just assign its results here.
     gitHubData = freshGitHubHook.gitHubData;
     gitHubDataLoading = freshGitHubHook.loading;
     gitHubDataError = freshGitHubHook.error;
+    usingFreshHook = true;
   } else {
-    console.log('[Dashboard] Path taken: Using useGitHub for display.');
+    console.log('[Dashboard] Path taken: Using useGitHub for display. Reasons - isFreshGitHubSetup:', freshSetupState?.isFreshGitHubSetup, 'handleForFreshHook:', handleForFreshHook, 'freshGitHubInstallationId:', freshSetupState?.freshGitHubInstallationId);
     gitHubData = standardGitHubHook.gitHubData;
     gitHubDataLoading = standardGitHubHook.loading;
     gitHubDataError = standardGitHubHook.error;
+    usingFreshHook = false;
   }
-
-  // Auth context data, still needed for other parts of dashboard and prompt logic
-  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth();
 
   console.log('[Dashboard] Initial contextDeveloperProfile:', contextDeveloperProfile);
   console.log('[Dashboard] Initial userProfile from useAuth:', userProfile);
