@@ -80,15 +80,15 @@ const initialState: GitHubData = {
 export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHubDataOnceProps): UseFreshGitHubDataOnceReturn => {
   const [gitHubData, setGitHubData] = useState<GitHubData>(initialState);
   // Initial loading state true only if handle is present, otherwise false.
-  const [loading, setLoading] = useState<boolean>(!!(handle && installationId)); // Initial loading based on both
+  const [loading, setLoading] = useState<boolean>(false); // Initialize loading to false
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     let isMounted = true;
 
     const fetchDataInternal = async () => {
-      // Double check handle and installationId as they are from closure of useEffect
-      if (!handle || !installationId) {
+      if (!handle || !installationId) { // Guard against missing props
         if (isMounted) {
           setGitHubData(initialState);
           setLoading(false);
@@ -97,12 +97,10 @@ export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHu
         return;
       }
 
-      // Set loading and clear error at the beginning of an actual fetch attempt
       if (isMounted) {
         setLoading(true);
         setError(null);
       }
-
       console.log(`[useFreshGitHubDataOnce] fetchDataInternal: Fetching for handle: ${handle}, installationId: ${installationId}`);
 
       try {
@@ -113,36 +111,33 @@ export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHu
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` // Using anon key for proxy
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({
-          handle,
-          installationId // Pass it directly, can be null/undefined
-        })
+          body: JSON.stringify({ handle, installationId }),
+          signal: controller.signal // Pass abort signal
       });
 
-      console.log(`[useFreshGitHubDataOnce] Response for ${handle}: ok=${response.ok}, status=${response.status}`);
+        if (!isMounted) return; // Check after await
 
+      console.log(`[useFreshGitHubDataOnce] Response for ${handle}: ok=${response.ok}, status=${response.status}`);
       if (!response.ok) {
         const errorText = await response.text();
+          if (!isMounted) return; // Check after await
         console.error(`[useFreshGitHubDataOnce] Fetch error for ${handle}:`, errorText);
         let errorMessage = `GitHub API error: ${response.status}`;
         try {
           const errorData = JSON.parse(errorText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          errorMessage = errorText;
-        }
+            if (errorData.error) errorMessage = errorData.error;
+          } catch (e) { errorMessage = errorText; }
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      console.log(`[useFreshGitHubDataOnce] fetchDataInternal: Data received for ${handle}:`, data);
-      const contributionStats = calculateContributionStats(data.contributions || []);
+        const data = await response.json();
+        if (!isMounted) return; // Check after await
 
-      if (isMounted) {
+        console.log(`[useFreshGitHubDataOnce] fetchDataInternal: Data received for ${handle}:`, data);
+        const contributionStats = calculateContributionStats(data.contributions || []);
+
         setGitHubData({
           user: data.user || null,
           repos: data.repos || [],
@@ -153,36 +148,39 @@ export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHu
           longestStreak: contributionStats.longestStreak,
           averageContributions: contributionStats.averagePerDay
         });
-        setError(null); // Clear error on success
-      }
-    } catch (err: any) {
-      console.error(`[useFreshGitHubDataOnce] fetchDataInternal: Caught error for ${handle}:`, err);
-      if (isMounted) {
-        setError(err);
-        setGitHubData(initialState); // Reset data on error
-      }
-    } finally {
-      if (isMounted) {
-        setLoading(false);
-      }
-    }
-  }; // End of fetchDataInternal
+        setError(null);
 
-    if (handle && installationId) { // Only run if both handle and installationId are valid and present
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          console.log('[useFreshGitHubDataOnce] Fetch aborted.');
+          // No state update needed if fetch was aborted due to unmount
+        } else if (isMounted) { // Only update state if still mounted and not an abort error
+          console.error(`[useFreshGitHubDataOnce] fetchDataInternal: Caught error for ${handle}:`, err);
+          setError(err);
+          setGitHubData(initialState);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    if (handle && installationId) {
       fetchDataInternal();
     } else {
-      // If handle or installationId becomes null/undefined (e.g. nav state cleared, or not ready yet), reset to initial non-loading state
-      if (isMounted) { // Check isMounted before setting state here too
-        setGitHubData(initialState);
-        setLoading(false);
-        setError(null);
-      }
+      // If props are not ready, ensure hook is in a clean non-loading state.
+      setGitHubData(initialState);
+      setLoading(false);
+      setError(null);
     }
 
     return () => {
       isMounted = false;
+      controller.abort(); // Abort fetch on unmount
+      console.log(`[useFreshGitHubDataOnce] Unmounting or deps changed for handle: ${handle}, installationId: ${installationId}. Aborting fetch.`);
     };
-  }, [handle, installationId]); // Effect dependencies
+  }, [handle, installationId]);
 
   return { gitHubData, loading, error };
 };
