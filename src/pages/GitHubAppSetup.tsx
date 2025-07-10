@@ -126,41 +126,57 @@ export const GitHubAppSetup = () => {
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
         try {
-          // Call the Supabase function
+          // Call the Supabase function ONCE
           const { data: functionResponse, error: functionError } = await supabase.functions.invoke('update-github-installation', {
-            body: JSON.stringify({ userId: user.id, installationId }),
+            body: JSON.stringify({ userId: user.id, installationId }), // Ensure body is stringified if your function expects JSON string
           });
 
           if (functionError) {
-            console.error('GitHubAppSetup: Error invoking update-github-installation:', functionError);
+            console.error('[GitHubAppSetup] Error invoking update-github-installation:', functionError);
             setProcessingInstallation(false);
             handleError(`Failed to save GitHub installation: ${functionError.message}`);
-            return;
+            return; // Exit early on function error
           }
 
-          // ADD DETAILED LOGS HERE
-          console.log('[GitHubAppSetup] Full functionResponse from update-github-installation:', functionResponse);
-
-          // 'functionResponse.data' IS the 'resultData' from the Edge Function, which is the developer object.
-          const freshDeveloperData = functionResponse?.data;
-
-          console.log('[GitHubAppSetup] Extracted freshDeveloperData (should be the developer object):', freshDeveloperData);
-
-          // Ensure freshDeveloperData is a valid object with user_id before using it
-          if (freshDeveloperData && typeof freshDeveloperData === 'object' && freshDeveloperData.user_id && setResolvedDeveloperProfile) {
-            console.log('[GitHubAppSetup] Attempting to directly set resolved developer profile in AuthContext with:', freshDeveloperData);
-            setResolvedDeveloperProfile(freshDeveloperData);
-          } else {
-            console.warn('[GitHubAppSetup] Did not get fresh developer data from function response for direct set, or setter missing. Falling back to refreshProfile(). freshDeveloperData:', freshDeveloperData, 'Full Response:', functionResponse);
-            if (refreshProfile) {
-              await refreshProfile();
+          console.log('[GitHubAppSetup] Raw functionResponse from update-github-installation:', JSON.stringify(functionResponse));
+            
+          // Logic to correctly parse freshDeveloperData from functionResponse
+          // This assumes the Edge Function might return data directly, or nested under a 'data' property,
+          // and it might be an object or an array with a single object.
+          let freshDeveloperData = null;
+          if (functionResponse) {
+            if (Array.isArray(functionResponse)) {
+                freshDeveloperData = functionResponse[0];
+                 console.log('[GitHubAppSetup] functionResponse was an array, took first element.');
+            } else if (typeof functionResponse.data !== 'undefined') {
+                if(Array.isArray(functionResponse.data)) {
+                    freshDeveloperData = functionResponse.data[0];
+                    console.log('[GitHubAppSetup] functionResponse.data was an array, took first element.');
+                } else {
+                    freshDeveloperData = functionResponse.data;
+                    console.log('[GitHubAppSetup] Used functionResponse.data directly.');
+                }
+            } else if (typeof functionResponse === 'object' && functionResponse !== null) {
+                // If functionResponse is an object but not an array and no .data, assume it's the data.
+                freshDeveloperData = functionResponse;
+                console.log('[GitHubAppSetup] Used functionResponse directly as it is an object.');
             }
           }
           
-          // No artificial delay needed here, context propagation is handled by React's rendering cycle.
-          // The useGitHub hook has also been made more resilient to this.
-          // await new Promise(resolve => setTimeout(resolve, 100)); // Removed delay
+          console.log('[GitHubAppSetup] Parsed freshDeveloperData:', JSON.stringify(freshDeveloperData));
 
+          // Update AuthContext with the new developer profile
+          if (freshDeveloperData && typeof freshDeveloperData === 'object' && freshDeveloperData.user_id && setResolvedDeveloperProfile) {
+            console.log('[GitHubAppSetup] Developer data from function seems valid, attempting to set in AuthContext.');
+            setResolvedDeveloperProfile(freshDeveloperData); 
+          } else {
+            console.warn('[GitHubAppSetup] Did not get valid fresh developer data from function response for direct set, or setResolvedDeveloperProfile is missing. Attempting refreshProfile(). Parsed freshDeveloperData:', freshDeveloperData);
+            if (refreshProfile) {
+              await refreshProfile(); 
+            }
+          }
+          
+          // Clean URL
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
@@ -169,31 +185,45 @@ export const GitHubAppSetup = () => {
           
           setProcessingInstallation(false);
           
-          const navState = {
-            freshGitHubHandle: freshDeveloperData?.github_handle,
-            freshGitHubInstallationId: freshDeveloperData?.github_installation_id,
-            isFreshGitHubSetup: true
-          };
-
-          if (setupAction === 'install') {
-            handleSuccess('GitHub App successfully installed and connected!', 2000, navState);
+          // Navigation logic based on successfully obtained data
+          if (freshDeveloperData && freshDeveloperData.github_handle && freshDeveloperData.github_installation_id) {
+            console.log(`[GitHubAppSetup] Valid data found for navState: handle=${freshDeveloperData.github_handle}, instId=${freshDeveloperData.github_installation_id}. Navigating WITH state.`);
+            const navState = {
+              freshGitHubHandle: freshDeveloperData.github_handle,
+              freshGitHubInstallationId: freshDeveloperData.github_installation_id,
+              isFreshGitHubSetup: true,
+              timestamp: Date.now(),
+            };
+            // Using handleSuccess which navigates to /developer?tab=github-activity
+            if (setupAction === 'install') {
+              handleSuccess('GitHub App successfully installed and connected!', 2000, navState);
+            } else {
+              handleSuccess('GitHub App connection updated successfully!', 2000, navState);
+            }
           } else {
-            handleSuccess('GitHub App connection updated successfully!', 2000, navState);
+            console.warn('[GitHubAppSetup] freshDeveloperData is missing github_handle or github_installation_id for navState. Navigating WITHOUT state (or with partial success message).', freshDeveloperData);
+            if (setupAction === 'install') {
+              handleSuccess('GitHub App installed (profile data may take a moment to update).'); 
+            } else {
+              handleSuccess('GitHub App connection updated (profile data may take a moment to update).');
+            }
           }
-        } catch (err) {
-          console.error('GitHubAppSetup: Error saving installation ID:', err);
+        } catch (err: any) { 
+          console.error('[GitHubAppSetup] Error processing GitHub installation (outer catch):', err.message ? err.message : err);
           setProcessingInstallation(false);
-          handleError(err instanceof Error ? err.message : 'Failed to save GitHub installation.');
+          handleError(err.message || 'Failed to process GitHub installation.');
         }
-        return;
+        return; 
+
       } else if (user && installationId && processingInstallation) {
         setUiState('loading');
         setMessage('Processing GitHub App installation...');
-        return;
+        return; // Still processing, wait for it to complete
       }
 
-      // Scenario 2: User is logged in but no installation_id in URL
+      // Scenario 2: User is logged in but no installation_id in URL (e.g. user revisits /github-setup)
       if (user && !installationId) {
+        console.log('[GitHubAppSetup] No installation_id in URL. Checking current developer profile state.');
         const hasInstallationId = developerProfile?.github_installation_id && 
                                  developerProfile.github_installation_id !== '';
                                  
