@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log(`[AuthContext] ensureDeveloperProfile (existing): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
           profileToSet.github_installation_id = currentGhInstIdInState;
         }
-
+        
         let needsUpdate = false;
         const updates: Partial<Developer> = {};
         if (githubUsername && profileToSet.github_handle !== githubUsername) {
@@ -90,22 +90,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Creating a new profile
       let newDevProfileData: Partial<Developer> = {
-        user_id: authUser.id,
-        github_handle: githubUsername,
-        bio: userBio,
+        user_id: authUser.id, 
+        github_handle: githubUsername, 
+        bio: userBio, 
         location: userLocation,
-        profile_pic_url: avatarUrl,
-        github_installation_id: currentGhInstIdInState || null, // Prefer ID from state if available, else null
+        profile_pic_url: avatarUrl, 
+        // github_installation_id: currentGhInstIdInState || null, // Let this be set by GitHubAppSetup or DB default initially
         availability: true
       };
-      if(currentGhInstIdInState && newDevProfileData.github_installation_id === currentGhInstIdInState){
-        console.log(`[AuthContext] ensureDeveloperProfile (creating new): Preserving ghInstId (${currentGhInstIdInState}) from state for new profile.`);
+      // Only include github_installation_id in the insert if it's already available in the context's state.
+      // For a brand new user, this would typically be null/undefined, so it won't be included,
+      // allowing the GitHub app installation callback to set it cleanly.
+      if (currentGhInstIdInState) {
+         newDevProfileData.github_installation_id = currentGhInstIdInState;
+         console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
+      } else {
+         console.log(`[AuthContext] ensureDeveloperProfile (creating new): Not including ghInstId in new profile data as it's not in current context state. It should be set by GitHub App installation flow.`);
       }
 
       const { data: insertedProfile, error: createError } = await supabase.from('developers').insert(newDevProfileData).select().single();
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
       if (!insertedProfile) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
-
+      
       // The insertedProfile should ideally have the ghInstId if we passed it.
       // If it's different (e.g. DB default took over), and state had one, re-affirm.
       if (insertedProfile.github_installation_id !== currentGhInstIdInState && currentGhInstIdInState) {
@@ -145,7 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log(`[AuthContext] fetchDeveloperProfile: Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null for user ${userId}.`);
         profileToSet.github_installation_id = currentGhInstIdInState;
       }
-
+      
       console.log(`[AuthContext] fetchDeveloperProfile: Setting profile. ghInstId: ${profileToSet.github_installation_id}`);
       setDeveloperProfile(profileToSet);
       setLastProfileUpdateTime(Date.now());
@@ -153,42 +159,98 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
   }, [developerProfile, lastProfileUpdateTime]); // Depends on current developerProfile for ghInstId preservation
 
-  const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
-    setAuthError(null);
-    try {
-      const { data: profile, error } = await supabase.from('users').select('*').eq('id', authUser.id).single();
-      if (error && error.code === 'PGRST116') {
-        const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
-        const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'GitHub User';
-        const companyName = authUser.user_metadata?.company_name || 'Company';
-        const { error: rpcError } = await supabase.rpc(
-          'create_user_profile',
-          { user_id: authUser.id, user_email: authUser.email || 'unknown@example.com', user_name: userName, user_role: userRole, company_name: companyName }
-        );
-        if (rpcError) { console.error(`fetchUserProfile: Error creating profile via RPC for ${authUser.id}:`, rpcError); setAuthError('Failed to create your profile: ' + rpcError.message); return null; }
-        const { data: newProfile, error: fetchError } = await supabase.from('users').select('*').eq('id', authUser.id).single();
-        if (fetchError) { console.error(`fetchUserProfile: Error fetching newly created profile for ${authUser.id}:`, fetchError); setAuthError('Failed to load your profile after creation.'); return null; }
-        setUserProfile(newProfile);
-        if (newProfile.role === 'developer') {
-          await ensureDeveloperProfile(authUser);
-        }
-        return newProfile;
-      } else if (error) {
-        console.error(`fetchUserProfile: Error fetching profile for ${authUser.id}:`, error);
-        setAuthError('Failed to load your profile.'); return null;
+const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
+  setAuthError(null);
+  console.log(`[AuthContext] fetchUserProfile START for user_id: ${authUser.id}, email: ${authUser.email}`);
+  try {
+    const { data: profile, error, status } = await supabase // Added status here
+      .from('users')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    console.log(`[AuthContext] fetchUserProfile: Initial fetch from 'users' table - Status: ${status}, Error Code: ${error?.code}, Error Message: ${error?.message}, Profile Data:`, profile);
+
+    // PGRST116 is the error code when .single() finds no rows, which can result in status 406.
+    if (error && error.code === 'PGRST116') { // This also covers the 406 scenario for .single()
+      console.log(`[AuthContext] fetchUserProfile: Profile not found for ${authUser.id} (PGRST116 / implies 406 with .single()). Attempting to create via RPC.`);
+      
+      const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
+      const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'GitHub User';
+      const companyName = authUser.user_metadata?.company_name || 'Company';
+      
+      console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' params: user_id=${authUser.id}, email=${authUser.email || 'unknown@example.com'}, name=${userName}, role=${userRole}, company=${companyName}`);
+
+      const { error: rpcError } = await supabase.rpc(
+        'create_user_profile',
+        { user_id: authUser.id, user_email: authUser.email || 'unknown@example.com', user_name: userName, user_role: userRole, company_name: companyName }
+      );
+
+      if (rpcError) { 
+        console.error(`[AuthContext] fetchUserProfile: Error creating profile via RPC for ${authUser.id}:`, rpcError); 
+        setAuthError('Failed to create your profile: ' + rpcError.message); 
+        return null; 
       }
-      setUserProfile(profile);
-      if (profile.role === 'developer') {
-        await ensureDeveloperProfile(authUser);
+      
+      console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' successful for ${authUser.id}. Attempting to fetch newly created profile.`);
+      const { data: newProfile, error: fetchErrorAfterRpc, status: fetchStatusAfterRpc } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      
+      console.log(`[AuthContext] fetchUserProfile: Fetch after RPC - Status: ${fetchStatusAfterRpc}, Error Code: ${fetchErrorAfterRpc?.code}, Error Message: ${fetchErrorAfterRpc?.message}, New Profile Data:`, newProfile);
+
+      if (fetchErrorAfterRpc) { 
+        console.error(`[AuthContext] fetchUserProfile: Error fetching newly created profile for ${authUser.id}:`, fetchErrorAfterRpc); 
+        setAuthError('Failed to load your profile after creation.'); 
+        return null; 
       }
-      return profile;
-    } catch (error) {
-      console.error(`fetchUserProfile: Unexpected error for ${authUser.id}:`, error);
-      setAuthError('An unexpected error occurred while fetching your profile.'); return null;
-    } finally {
-      setLoading(false);
+      
+      if (!newProfile) {
+        console.error(`[AuthContext] fetchUserProfile: Profile still not found for ${authUser.id} after RPC creation and re-fetch. This is unexpected.`);
+        setAuthError('Profile creation seemed to succeed but could not be retrieved.');
+        return null;
+      }
+      
+      console.log(`[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`);
+      setUserProfile(newProfile); // Set the main user profile
+      if (newProfile.role === 'developer') {
+        console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
+        await ensureDeveloperProfile(authUser); 
+      }
+      return newProfile;
+
+    } else if (error) { // Other errors during initial fetch (not PGRST116)
+      console.error(`[AuthContext] fetchUserProfile: Non-PGRST116 error fetching profile for ${authUser.id}: Code: ${error.code}, Message: ${error.message}`);
+      setAuthError('Failed to load your profile.'); return null;
     }
-  }, [ensureDeveloperProfile]);
+
+    // Profile existed, fetched successfully on the first try
+    if (!profile) {
+        console.error(`[AuthContext] fetchUserProfile: Initial fetch successful (no error, no PGRST116) but profile data is null/undefined for ${authUser.id}. This is unexpected.`);
+        setAuthError('Profile data was unexpectedly empty after fetch.');
+        return null;
+    }
+      
+    console.log(`[AuthContext] fetchUserProfile: Profile existed and fetched successfully for ${authUser.id}.`);
+    setUserProfile(profile);
+    if (profile.role === 'developer') {
+      console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
+      await ensureDeveloperProfile(authUser); 
+    }
+    return profile;
+
+  } catch (errorCatch) { // Renamed to avoid conflict with 'error' from supabase calls
+    console.error(`[AuthContext] fetchUserProfile: Unexpected top-level catch error for ${authUser.id}:`, errorCatch);
+    setAuthError('An unexpected error occurred while fetching your profile.'); return null;
+  } finally {
+    setLoading(false); 
+    // The log message below might show stale 'loading' state due to closure.
+    // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`); 
+    console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading state will be false.`);
+  }
+}, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]); // Added dependencies based on usage
 
   const handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
     setAuthError(null);
@@ -483,7 +545,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
     }
-  }, []);
+  }, [setDeveloperProfile, setLastProfileUpdateTime]); // Added dependencies
 
 
   const value: AuthContextType = {
@@ -498,4 +560,3 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
