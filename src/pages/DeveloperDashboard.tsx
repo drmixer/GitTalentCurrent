@@ -371,6 +371,8 @@ export const DeveloperDashboard: React.FC = () => {
 
   // Effect to clear navigation state ONCE after a fresh setup redirect.
   // This should run regardless of data loading success/failure for useFreshGitHubDataOnce.
+  // --- TEMPORARILY COMMENTED OUT FOR DIAGNOSING REACT #301 ERROR ---
+  /*
   useEffect(() => {
     let cleanupTimerId: NodeJS.Timeout | null = null;
     if (freshSetupState?.isFreshGitHubSetup) {
@@ -392,6 +394,7 @@ export const DeveloperDashboard: React.FC = () => {
   // Rerun this effect if freshSetupState.isFreshGitHubSetup changes, or if navigation tools change.
   // This ensures it runs once when isFreshGitHubSetup becomes true.
   }, [freshSetupState?.isFreshGitHubSetup, navigate, location.pathname, location.search]);
+  */
 
   const fetchDeveloperData = async () => {
     if (!user) return;
