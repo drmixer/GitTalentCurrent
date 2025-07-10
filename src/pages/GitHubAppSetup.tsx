@@ -5,8 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Loader, CheckCircle, AlertCircle, Github, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const GitHubAppSetup = () => {
-  const { user, userProfile, developerProfile, refreshProfile, loading: authLoading, setResolvedDeveloperProfile } = useAuth();
-  console.log('[GitHubAppSetup] typeof setResolvedDeveloperProfile from useAuth():', typeof setResolvedDeveloperProfile, setResolvedDeveloperProfile); // Added log
+  const { user, developerProfile, refreshProfile, loading: authLoading, setResolvedDeveloperProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -16,25 +15,19 @@ export const GitHubAppSetup = () => {
   const [message, setMessage] = useState('Connecting GitHub...');
   const [processingInstallation, setProcessingInstallation] = useState(false);
 
-  // Function to redirect to GitHub App installation
   const redirectToGitHubAppInstall = useCallback(() => {
     const GITHUB_APP_SLUG = 'GitTalentApp';
-    
-    // Create a state object with user ID and redirect info
     const stateObj = {
       redirect_uri: `${window.location.origin}/github-setup`,
       user_id: user?.id,
-      timestamp: Date.now() // Add timestamp to prevent caching issues
+      timestamp: Date.now()
     };
-    
     const state = encodeURIComponent(JSON.stringify(stateObj));
-    
     const redirectUrl = encodeURIComponent(`${window.location.origin}/github-setup`);
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${state}&redirect_uri=${redirectUrl}`;
     
     setUiState('redirect');
     setMessage('Redirecting to GitHub App installation page...');
-    
     setTimeout(() => {
       window.location.href = githubAppInstallUrl;
     }, 1000);
@@ -43,7 +36,7 @@ export const GitHubAppSetup = () => {
   const handleSuccess = useCallback((
     successMessage: string,
     redirectDelay: number = 2000,
-    navState?: { freshGitHubHandle?: string; freshGitHubInstallationId?: string; isFreshGitHubSetup?: boolean }
+    navState?: { freshGitHubHandle?: string; freshGitHubInstallationId?: string | number; isFreshGitHubSetup?: boolean }
   ) => {
     setUiState('success');
     setMessage(successMessage);
@@ -56,127 +49,110 @@ export const GitHubAppSetup = () => {
   }, [navigate]);
 
   const handleError = useCallback((errorMessage: string) => {
-    console.error('GitHubAppSetup: Error - ', errorMessage); // Keep console.error for actual errors
+    console.error('[GitHubAppSetup] Error - ', errorMessage);
     setUiState('error');
     setMessage(errorMessage);
   }, []);
 
   useEffect(() => {
+    console.log('[GitHubAppSetup] useEffect triggered. Current user:', user?.id, 'Params:', location.search);
     const handleSetup = async () => {
       const searchParams = new URLSearchParams(location.search);
       const installationId = searchParams.get('installation_id'); 
       const setupAction = searchParams.get('setup_action');
-      // const code = searchParams.get('code'); // code is not used
       const errorParam = searchParams.get('error'); 
       const errorDescription = searchParams.get('error_description'); 
-      // const state = searchParams.get('state'); // state is not directly used after parsing
       
-      // Reset retry count when params change
       if (installationId || errorParam) {
         setRetryCount(0);
       }
   
-      // Handle errors first 
       if (errorParam) {
         handleError(`GitHub Error: ${errorDescription || errorParam}`);
         return;
       }
   
-      // If auth is still loading, wait.
-      if (authLoading) {
+      if (authLoading && !user) { // Only wait if user is not yet loaded
         if (retryCount >= maxRetries) {
-          setUiState('error');
-          setMessage('Authentication is taking too long. Please try again.');
+          handleError('Authentication is taking too long. Please try logging in again.');
         } else {
           setUiState('loading');
-          setMessage(`Verifying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-          
-          const timer = setTimeout(() => {
-            setRetryCount(prev => prev + 1); 
-          }, 2000);
+          setMessage(`Verifying your session... (Attempt ${retryCount + 1}/${maxRetries})`);
+          const timer = setTimeout(() => setRetryCount(prev => prev + 1), 2000);
           return () => clearTimeout(timer);
         }
         return;
       } 
   
-      // If no user after auth loading is complete, redirect to login
       if (!user) {
+        console.log('[GitHubAppSetup] No user session found. Redirecting to login.');
         navigate('/login', { replace: true });
         return;
       }
   
-      // Scenario 1: App Install/Reconfigure for an existing user
-      if (user && installationId && developerProfile?.github_installation_id === installationId) {
+      if (user && installationId && developerProfile?.github_installation_id && String(developerProfile.github_installation_id) === String(installationId)) {
+        console.log('[GitHubAppSetup] Installation ID already matches profile. Likely a refresh or re-config.');
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('installation_id');
         cleanUrl.searchParams.delete('setup_action');
         cleanUrl.searchParams.delete('state');
         window.history.replaceState({}, '', cleanUrl.toString());
-
-        if (setupAction === 'install') {
-          handleSuccess('GitHub App successfully installed and connected!');
-        } else {
-          handleSuccess('GitHub App connection updated successfully!');
-        }
+        handleSuccess(setupAction === 'install' ? 'GitHub App successfully installed!' : 'GitHub App connection updated!', 1000, {
+          freshGitHubHandle: developerProfile.github_handle,
+          freshGitHubInstallationId: developerProfile.github_installation_id,
+          isFreshGitHubSetup: true
+        });
         return;
-
-      } else if (user && installationId && !processingInstallation) {
+      } 
+      
+      if (user && installationId && !processingInstallation) {
         setProcessingInstallation(true);
         setUiState('loading');
         setMessage(`Connecting GitHub App... (Installation ID: ${installationId})`);
   
         try {
-          // Call the Supabase function ONCE
           const { data: functionResponse, error: functionError } = await supabase.functions.invoke('update-github-installation', {
-            body: JSON.stringify({ userId: user.id, installationId }), // Ensure body is stringified if your function expects JSON string
+            body: { userId: user.id, installationId: String(installationId) }, // Ensure installationId is string
           });
 
           if (functionError) {
             console.error('[GitHubAppSetup] Error invoking update-github-installation:', functionError);
             setProcessingInstallation(false);
             handleError(`Failed to save GitHub installation: ${functionError.message}`);
-            return; // Exit early on function error
+            return;
           }
 
           console.log('[GitHubAppSetup] Raw functionResponse from update-github-installation:', JSON.stringify(functionResponse));
-            
-          // Logic to correctly parse freshDeveloperData from functionResponse
-          // This assumes the Edge Function might return data directly, or nested under a 'data' property,
-          // and it might be an object or an array with a single object.
+          
           let freshDeveloperData = null;
           if (functionResponse) {
             if (Array.isArray(functionResponse)) {
                 freshDeveloperData = functionResponse[0];
                  console.log('[GitHubAppSetup] functionResponse was an array, took first element.');
-            } else if (typeof functionResponse.data !== 'undefined') {
+            } else if (functionResponse.data && typeof functionResponse.data === 'object') { // Check if .data exists and is an object
                 if(Array.isArray(functionResponse.data)) {
                     freshDeveloperData = functionResponse.data[0];
                     console.log('[GitHubAppSetup] functionResponse.data was an array, took first element.');
                 } else {
                     freshDeveloperData = functionResponse.data;
-                    console.log('[GitHubAppSetup] Used functionResponse.data directly.');
+                    console.log('[GitHubAppSetup] Used functionResponse.data directly as it is an object.');
                 }
             } else if (typeof functionResponse === 'object' && functionResponse !== null) {
-                // If functionResponse is an object but not an array and no .data, assume it's the data.
                 freshDeveloperData = functionResponse;
-                console.log('[GitHubAppSetup] Used functionResponse directly as it is an object.');
+                console.log('[GitHubAppSetup] Used functionResponse directly as it is an object (and not array/no .data).');
             }
           }
           
           console.log('[GitHubAppSetup] Parsed freshDeveloperData:', JSON.stringify(freshDeveloperData));
 
-          // Update AuthContext with the new developer profile
           if (freshDeveloperData && typeof freshDeveloperData === 'object' && freshDeveloperData.user_id && setResolvedDeveloperProfile) {
-            console.log('[GitHubAppSetup] Developer data from function seems valid, attempting to set in AuthContext.');
-            setResolvedDeveloperProfile(freshDeveloperData); 
+            console.log('[GitHubAppSetup] Developer data from function seems valid, calling setResolvedDeveloperProfile.');
+            setResolvedDeveloperProfile(freshDeveloperData as Developer);
           } else {
-            console.warn('[GitHubAppSetup] Did not get valid fresh developer data from function response for direct set, or setResolvedDeveloperProfile is missing. Attempting refreshProfile(). Parsed freshDeveloperData:', freshDeveloperData);
-            if (refreshProfile) {
-              await refreshProfile(); 
-            }
+            console.warn('[GitHubAppSetup] Did not get valid fresh developer data from function to set in context. Attempting refreshProfile(). Parsed data:', freshDeveloperData);
+            if (refreshProfile) await refreshProfile();
           }
           
-          // Clean URL
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('installation_id');
           cleanUrl.searchParams.delete('setup_action');
@@ -185,28 +161,20 @@ export const GitHubAppSetup = () => {
           
           setProcessingInstallation(false);
           
-          // Navigation logic based on successfully obtained data
           if (freshDeveloperData && freshDeveloperData.github_handle && freshDeveloperData.github_installation_id) {
-            console.log(`[GitHubAppSetup] Valid data found for navState: handle=${freshDeveloperData.github_handle}, instId=${freshDeveloperData.github_installation_id}. Navigating WITH state.`);
-            const navState = {
-              freshGitHubHandle: freshDeveloperData.github_handle,
-              freshGitHubInstallationId: freshDeveloperData.github_installation_id,
-              isFreshGitHubSetup: true,
-              timestamp: Date.now(),
-            };
-            // Using handleSuccess which navigates to /developer?tab=github-activity
-            if (setupAction === 'install') {
-              handleSuccess('GitHub App successfully installed and connected!', 2000, navState);
-            } else {
-              handleSuccess('GitHub App connection updated successfully!', 2000, navState);
-            }
+            console.log(`[GitHubAppSetup] Navigating WITH state: handle=${freshDeveloperData.github_handle}, instId=${freshDeveloperData.github_installation_id}.`);
+            handleSuccess(
+              setupAction === 'install' ? 'GitHub App successfully installed and connected!' : 'GitHub App connection updated successfully!', 
+              1000, 
+              {
+                freshGitHubHandle: freshDeveloperData.github_handle,
+                freshGitHubInstallationId: freshDeveloperData.github_installation_id,
+                isFreshGitHubSetup: true
+              }
+            );
           } else {
-            console.warn('[GitHubAppSetup] freshDeveloperData is missing github_handle or github_installation_id for navState. Navigating WITHOUT state (or with partial success message).', freshDeveloperData);
-            if (setupAction === 'install') {
-              handleSuccess('GitHub App installed (profile data may take a moment to update).'); 
-            } else {
-              handleSuccess('GitHub App connection updated (profile data may take a moment to update).');
-            }
+            console.warn('[GitHubAppSetup] Missing critical data from Edge Function for navState. Navigating WITHOUT state or with partial success.', freshDeveloperData);
+            handleSuccess(setupAction === 'install' ? 'GitHub App installed (profile data may take a moment to update).' : 'GitHub App connection updated (profile data may take a moment to update).', 2000);
           }
         } catch (err: any) { 
           console.error('[GitHubAppSetup] Error processing GitHub installation (outer catch):', err.message ? err.message : err);
@@ -218,174 +186,111 @@ export const GitHubAppSetup = () => {
       } else if (user && installationId && processingInstallation) {
         setUiState('loading');
         setMessage('Processing GitHub App installation...');
-        return; // Still processing, wait for it to complete
+        return;
       }
 
-      // Scenario 2: User is logged in but no installation_id in URL (e.g. user revisits /github-setup)
       if (user && !installationId) {
         console.log('[GitHubAppSetup] No installation_id in URL. Checking current developer profile state.');
-        const hasInstallationId = developerProfile?.github_installation_id && 
-                                 developerProfile.github_installation_id !== '';
+        const hasInstallationId = developerProfile?.github_installation_id && String(developerProfile.github_installation_id).length > 0;
                                  
         if (hasInstallationId) {
-          handleSuccess('GitHub App is already connected!', 1500);
+          handleSuccess('GitHub App is already connected! Redirecting to dashboard...', 1000, {
+             freshGitHubHandle: developerProfile.github_handle,
+             freshGitHubInstallationId: developerProfile.github_installation_id,
+             isFreshGitHubSetup: false // Not a fresh setup, but data is present
+          });
         } else {
-          if (!developerProfile && retryCount < maxRetries) {
+          if (developerProfile === undefined && retryCount < maxRetries && !authLoading) { // developerProfile might not be loaded yet from AuthContext
             setUiState('loading'); 
-            setMessage(`Loading your profile... (Attempt ${retryCount + 1}/${maxRetries})`); 
-            
-            setTimeout(() => {
+            setMessage(`Loading your profile to check GitHub status... (Attempt ${retryCount + 1}/${maxRetries})`); 
+            const timer = setTimeout(() => {
+              if(refreshProfile) refreshProfile();
               setRetryCount(prev => prev + 1);
-            }, 2000);
-          } else {
+            }, 1500);
+            return () => clearTimeout(timer);
+          } else if (developerProfile === null || (developerProfile && !developerProfile.github_installation_id)) {
             setUiState('info');
             setMessage('Connect the GitHub App to display your contributions and repositories.');
+          } else if (developerProfile === undefined && (authLoading || retryCount >= maxRetries)) {
+             handleError('Could not load your profile to check GitHub status. Please try again or return to dashboard.');
+          } else {
+            setUiState('info'); // Default info state if other conditions not met
+            setMessage('Checking GitHub connection status...');
           }
         }
         return;
       }
       
-      setUiState('loading');
-      setMessage('Please wait...');
+      // Default state if none of the above conditions are met (e.g. unexpected URL state)
+      if (!installationId) {
+        console.log('[GitHubAppSetup] No installation ID in URL and not an existing connection. Showing info.');
+        setUiState('info');
+        setMessage('Ready to connect your GitHub account.');
+      }
     };
 
     handleSetup();
   }, [user, developerProfile, authLoading, location.search, navigate, refreshProfile, 
-      handleSuccess, handleError, redirectToGitHubAppInstall, retryCount, processingInstallation]);
+      handleSuccess, handleError, processingInstallation, retryCount, setResolvedDeveloperProfile, redirectToGitHubAppInstall]);
 
-  // Render the appropriate UI based on the current state
+  // UI Rendering
+  let iconToShow = <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />;
+  if (uiState === 'success') iconToShow = <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />;
+  if (uiState === 'error') iconToShow = <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />;
+  if (uiState === 'redirect') iconToShow = <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" />;
+  if (uiState === 'info') iconToShow = <Github className="h-12 w-12 text-gray-400 mx-auto mb-4" />;
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
-            <Github className="w-10 h-10 text-white" />
-          </div>
+          {iconToShow}
         </div>
-
-        <h1 className="text-2xl font-black text-center text-gray-900 mb-6">
+        <h1 className="text-2xl font-black text-gray-900 mb-4">
           {uiState === 'loading' && 'Connecting GitHub...'}
           {uiState === 'success' && 'GitHub Connected!'}
           {uiState === 'error' && 'Connection Error'}
-          {uiState === 'redirect' && 'Redirecting...'}
-          {uiState === 'info' && 'GitHub Connection Action Needed'}
+          {uiState === 'redirect' && 'Redirecting to GitHub...'}
+          {uiState === 'info' && 'Connect to GitHub'}
         </h1>
-
-        {uiState === 'loading' && (
-          <div className="text-center">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500 mt-4">
-              This allows us to sync your repository data and showcase your contributions.
-            </p> 
-          </div>
+        <p className="text-gray-600 mb-6">{message}</p>
+        
+        {uiState === 'info' && (
+          <button
+            onClick={redirectToGitHubAppInstall}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
+            disabled={authLoading || !user}
+          >
+            <Github className="w-5 h-5 mr-2" />
+            Connect GitHub App
+          </button>
         )}
 
-        {uiState === 'redirect' && (
-          <div className="text-center">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600 mb-6">{message}</p>
-            <p className="text-sm text-gray-500">
-              Please wait while we redirect you...
-            </p>
-          </div>
-        )}
-
-        {uiState === 'success' && (
-          <div className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <p className="text-gray-600 mb-6">{message}</p>
-            <p className="text-sm text-gray-500 mb-6">
-              Redirecting you to your dashboard in a moment...
-            </p> 
+        {(uiState === 'error') && (
+          <div className="space-y-3 mt-6">
             <button
-              onClick={() => navigate('/developer?tab=github-activity')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+              onClick={() => {
+                setRetryCount(0); // Reset retries
+                if(refreshProfile) refreshProfile();
+                // The useEffect will re-trigger handleSetup
+                setUiState('loading');
+                setMessage('Retrying connection...');
+              }}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </button>
+            <button
+              onClick={() => navigate('/developer')}
+              className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
             >
               Go to Dashboard
-            </button> 
+            </button>
           </div>
         )}
-
-        {(uiState === 'error' || uiState === 'info') && (
-          <div className="text-center">
-            {uiState === 'error' ? (
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-6" />
-            ) : (
-              <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-            )}
-            <p className={`${uiState === 'error' ? 'text-red-600' : 'text-gray-700'} mb-6`}>{message}</p>
-            
-            {uiState === 'info' && (
-              <div className="space-y-4 mb-4">
-                <p className="text-sm text-gray-600 mb-6">
-                  Connecting the GitHub App allows us to display your contributions, repositories, and coding activity.
-                  This is a one-time setup process that securely connects your GitHub account.
-                  <span className="block mt-2 text-xs text-gray-500">
-                    {retryCount > 0 ? `Retry attempt ${retryCount} of ${maxRetries}` : 'No GitHub App connection detected'}
-                  </span>
-                </p>
-                <button
-                  onClick={redirectToGitHubAppInstall}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold mb-4 flex items-center justify-center"
-                > 
-                  <Github className="w-4 h-4 mr-2 inline" aria-hidden="true" />
-                  Connect GitHub App Now
-                </button>
-                <button
-                  onClick={() => navigate('/developer')}
-                  className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                >
-                  {uiState === 'error' ? 'Return to Dashboard' : 'Skip for Now'}
-                </button>
-              </div>
-            )}
-            
-            <div className="space-y-3">
-              {uiState === 'error' && (
-                <button
-                  onClick={() => {
-                    refreshProfile?.();
-                    setUiState('loading');
-                    setMessage('Refreshing your profile...');
-                    setRetryCount(0);
-                    console.log('GitHubAppSetup: Refreshing profile after error');
-                    setTimeout(() => {
-                      if (developerProfile?.github_installation_id) {
-                        handleSuccess('GitHub App is connected!');
-                      } else {
-                        setUiState('info'); 
-                        setMessage('Connect your GitHub account to display your contributions and repositories.');
-                      }
-                    }, 2000);
-                  }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center w-full"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Try Again
-                </button>
-              )}
-              
-              {uiState === 'error' && (
-                <button
-                  onClick={() => navigate('/developer')}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium w-full"
-                >
-                  Return to Dashboard
-                </button>
-              )}
-            </div>
-            
-            {uiState === 'error' && (
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-4 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium block mx-auto"
-              >
-                <RefreshCw className="w-4 h-4 mr-2 inline-block" aria-hidden="true" />
-                Refresh Page
-              </button>
-            )}
-          </div>
+         {(authLoading && retryCount >= maxRetries && uiState !== 'error') && (
+            <p className="text-sm text-orange-600 mt-4">Authentication is taking a while. If this persists, please try returning to the dashboard and connecting from your profile settings.</p>
         )}
       </div>
     </div>
