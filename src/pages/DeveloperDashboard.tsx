@@ -130,45 +130,56 @@ export const DeveloperDashboard: React.FC = () => {
   const { userProfile, developerProfile: contextDeveloperProfile } = useAuth();
 
   const [derivedHandle, setDerivedHandle] = useState<string | null>(null);
+  const [derivedInstallId, setDerivedInstallId] = useState<string | null>(null); // New state
   const [isAttemptingFreshLoad, setIsAttemptingFreshLoad] = useState<boolean>(false);
   const [freshLoadStatus, setFreshLoadStatus] = useState<'idle' | 'waiting_for_handle' | 'loading_data' | 'error' | 'success'>('idle');
 
-  // Effect to manage deriving the handle for fresh setup
+  // Effect to manage deriving the handle and installationId for fresh setup
   useEffect(() => {
-    // Only attempt this if we have a fresh setup marker and installation ID from nav state
     if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubInstallationId) {
-      setIsAttemptingFreshLoad(true); // Mark that we are in the fresh load path
+      setIsAttemptingFreshLoad(true);
 
-      if (freshSetupState.freshGitHubHandle) {
-        console.log('[Dashboard] Fresh setup: Using handle from navState:', freshSetupState.freshGitHubHandle);
-        setDerivedHandle(freshSetupState.freshGitHubHandle);
-        setFreshLoadStatus('loading_data'); // Ready to load data with this handle
-      } else if (contextDeveloperProfile?.github_handle) {
-        console.log('[Dashboard] Fresh setup: navState handle missing, using handle from context:', contextDeveloperProfile.github_handle);
-        setDerivedHandle(contextDeveloperProfile.github_handle);
-        setFreshLoadStatus('loading_data'); // Ready to load data with this handle
-      } else {
-        console.log('[Dashboard] Fresh setup: Waiting for github_handle from navState or context...');
-        setFreshLoadStatus('waiting_for_handle'); // Still waiting for a handle
-        // derivedHandle remains null
+      // Only set derived props if they haven't been set yet for this flow instance,
+      // OR if the source from navState/context has now become available.
+      if (derivedHandle === null || derivedInstallId === null) {
+        const handleFromNav = freshSetupState.freshGitHubHandle;
+        const handleFromContext = contextDeveloperProfile?.github_handle;
+        const handleToUse = handleFromNav || handleFromContext;
+
+        if (handleToUse) {
+          console.log(`[Dashboard] Fresh setup: Initializing derivedHandle ('${handleToUse}') and derivedInstallId ('${freshSetupState.freshGitHubInstallationId}').`);
+          setDerivedHandle(handleToUse);
+          setDerivedInstallId(freshSetupState.freshGitHubInstallationId); // Latch the installId
+          setFreshLoadStatus('loading_data');
+        } else {
+          console.log('[Dashboard] Fresh setup: Waiting for github_handle to initialize derived props...');
+          setFreshLoadStatus('waiting_for_handle');
+        }
       }
     } else {
-      // Not a fresh setup, or critical info (isFreshGitHubSetup, freshGitHubInstallationId) missing from navState
-      setIsAttemptingFreshLoad(false);
-      setDerivedHandle(null); // Ensure derivedHandle is reset if not a fresh setup
-      setFreshLoadStatus('idle');
+      // Not a fresh setup, or navState has been cleared/is invalid
+      if (isAttemptingFreshLoad || derivedHandle || derivedInstallId) { // Only reset if they were active/set
+          console.log('[Dashboard] Exiting fresh setup flow or navState invalid. Resetting derived props.');
+          setIsAttemptingFreshLoad(false);
+          setDerivedHandle(null);
+          setDerivedInstallId(null); // Reset installId too
+          setFreshLoadStatus('idle');
+      }
     }
-  }, [freshSetupState, contextDeveloperProfile?.github_handle]); // Re-run if navState or context handle changes
+  }, [
+      freshSetupState?.isFreshGitHubSetup,
+      freshSetupState?.freshGitHubInstallationId,
+      freshSetupState?.freshGitHubHandle,
+      contextDeveloperProfile?.github_handle,
+      derivedHandle, // Part of condition to set once
+      derivedInstallId, // Part of condition to set once
+      isAttemptingFreshLoad // To allow resetting when exiting fresh flow
+  ]);
 
-
-  // Prepare props for useFreshGitHubDataOnce.
-  // It will only be "active" (i.e., fetch data) if both handle and installationId are valid strings.
-  const freshHookDataInput = {
-    handle: (isAttemptingFreshLoad && derivedHandle) ? derivedHandle : undefined,
-    installationId: (isAttemptingFreshLoad && derivedHandle) ? freshSetupState?.freshGitHubInstallationId : undefined,
-  };
-
-  const freshGitHubDataResults = useFreshGitHubDataOnce(freshHookDataInput);
+  const freshGitHubDataResults = useFreshGitHubDataOnce({
+    handle: derivedHandle ?? undefined, // Use latched state
+    installationId: derivedInstallId ?? undefined, // Use latched state
+  });
   const standardGitHubHook = useGitHub(); // Standard hook, always called
 
   let gitHubData, gitHubDataLoading, gitHubDataError;
