@@ -127,40 +127,84 @@ export const DeveloperDashboard: React.FC = () => {
     installationId: freshSetupState?.freshGitHubInstallationId,
   });
   const standardGitHubHook = useGitHub();
-  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth(); // Moved useAuth call higher
+  const { userProfile, developerProfile: contextDeveloperProfile } = useAuth();
 
-  let gitHubData, gitHubDataLoading, gitHubDataError, usingFreshHook = false;
+  const [derivedHandle, setDerivedHandle] = useState<string | null>(null);
+  const [isAttemptingFreshLoad, setIsAttemptingFreshLoad] = useState<boolean>(false);
+  const [freshLoadStatus, setFreshLoadStatus] = useState<'idle' | 'waiting_for_handle' | 'loading_data' | 'error' | 'success'>('idle');
 
-  // Determine the handle to use for useFreshGitHubDataOnce more robustly:
-  let handleForFreshHook: string | undefined | null = null;
-  if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubInstallationId) {
-    if (freshSetupState.freshGitHubHandle) {
-      handleForFreshHook = freshSetupState.freshGitHubHandle;
-    } else if (contextDeveloperProfile?.github_handle) {
-      // Fallback to context if navState handle is missing but it's a fresh setup with an ID
-      console.log('[Dashboard] Fresh setup: navState.freshGitHubHandle is missing, using contextDeveloperProfile.github_handle as fallback for useFreshGitHubDataOnce.');
-      handleForFreshHook = contextDeveloperProfile.github_handle;
+
+  // Effect to manage deriving the handle for fresh setup
+  useEffect(() => {
+    if (freshSetupState?.isFreshGitHubSetup && freshSetupState.freshGitHubInstallationId) {
+      setIsAttemptingFreshLoad(true);
+      setFreshLoadStatus('waiting_for_handle');
+      if (freshSetupState.freshGitHubHandle) {
+        console.log('[Dashboard] Fresh setup: Using handle from navState:', freshSetupState.freshGitHubHandle);
+        setDerivedHandle(freshSetupState.freshGitHubHandle);
+        setFreshLoadStatus('loading_data');
+      } else if (contextDeveloperProfile?.github_handle) {
+        console.log('[Dashboard] Fresh setup: navState handle missing, using handle from context:', contextDeveloperProfile.github_handle);
+        setDerivedHandle(contextDeveloperProfile.github_handle);
+        setFreshLoadStatus('loading_data');
+      } else {
+        console.log('[Dashboard] Fresh setup: Waiting for github_handle from context...');
+        // derivedHandle remains null, status is 'waiting_for_handle'
+      }
     } else {
-      console.warn('[Dashboard] Fresh setup: Both navState.freshGitHubHandle and context handle are missing. Cannot use useFreshGitHubDataOnce effectively without a handle.');
+      setIsAttemptingFreshLoad(false); // Not a fresh setup, or critical info missing
+      setFreshLoadStatus('idle');
     }
-  }
+  }, [freshSetupState, contextDeveloperProfile?.github_handle]); // Re-run if navState or context handle changes
 
-  // Decide which hook's data to use
-  if (freshSetupState?.isFreshGitHubSetup && handleForFreshHook && freshSetupState.freshGitHubInstallationId) {
-    console.log('[Dashboard] Path taken: Using useFreshGitHubDataOnce for display with handle:', handleForFreshHook);
-    // Note: freshGitHubHook is already called unconditionally at the top of the component.
-    // We just assign its results here.
-    gitHubData = freshGitHubHook.gitHubData;
-    gitHubDataLoading = freshGitHubHook.loading;
-    gitHubDataError = freshGitHubHook.error;
-    usingFreshHook = true;
+  // Prepare props for useFreshGitHubDataOnce, only if derivedHandle is available
+  const freshHookProps = {
+    handle: derivedHandle,
+    installationId: freshSetupState?.freshGitHubInstallationId,
+  };
+
+  // Call useFreshGitHubDataOnce conditionally based on derivedHandle being ready
+  // This hook instance will only actively fetch if both handle and installationId are provided.
+  // The useFreshGitHubDataOnce hook itself has an internal check: `if (handle) { fetchData() }`
+  const freshGitHubDataResults = useFreshGitHubDataOnce(
+    (isAttemptingFreshLoad && derivedHandle && freshSetupState?.freshGitHubInstallationId)
+      ? freshHookProps
+      : { handle: undefined, installationId: undefined } // Pass undefined if not ready, so hook doesn't fetch
+  );
+
+  const standardGitHubHook = useGitHub();
+  let gitHubData, gitHubDataLoading, gitHubDataError;
+
+  if (isAttemptingFreshLoad) {
+    if (derivedHandle && freshSetupState?.freshGitHubInstallationId) {
+      // We have a handle and installation ID, so useFreshGitHubDataOnce is active or has completed
+      console.log(`[Dashboard] Fresh load attempt: Using useFreshGitHubDataOnce with handle '${derivedHandle}'.`);
+      gitHubData = freshGitHubDataResults.gitHubData;
+      gitHubDataLoading = freshGitHubDataResults.loading;
+      gitHubDataError = freshGitHubDataResults.error;
+      if (!gitHubDataLoading && gitHubDataError) setFreshLoadStatus('error');
+      else if (!gitHubDataLoading && gitHubData?.user) setFreshLoadStatus('success');
+      else if (gitHubDataLoading) setFreshLoadStatus('loading_data');
+
+    } else {
+      // Still waiting for handle for the fresh load
+      console.log('[Dashboard] Fresh load attempt: Waiting for derived handle.');
+      gitHubDataLoading = true; // Show loading state for the GitHub activity section
+      gitHubData = initialStateForGitHubData; // Or some sensible empty state
+      gitHubDataError = null;
+      setFreshLoadStatus('waiting_for_handle');
+    }
   } else {
-    console.log('[Dashboard] Path taken: Using useGitHub for display. Reasons - isFreshGitHubSetup:', freshSetupState?.isFreshGitHubSetup, 'handleForFreshHook:', handleForFreshHook, 'freshGitHubInstallationId:', freshSetupState?.freshGitHubInstallationId);
+    // Not a fresh load attempt, use standard hook
+    console.log('[Dashboard] Standard load: Using useGitHub.');
     gitHubData = standardGitHubHook.gitHubData;
     gitHubDataLoading = standardGitHubHook.loading;
     gitHubDataError = standardGitHubHook.error;
-    usingFreshHook = false;
+    setFreshLoadStatus('idle'); // Reset fresh load status
   }
+
+  // Define initialStateForGitHubData if not already globally available
+  const initialStateForGitHubData = { user: null, repos: [], languages: {}, totalStars: 0, contributions: [] };
 
   console.log('[Dashboard] Initial contextDeveloperProfile:', contextDeveloperProfile);
   console.log('[Dashboard] Initial userProfile from useAuth:', userProfile);
