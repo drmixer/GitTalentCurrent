@@ -80,24 +80,33 @@ const initialState: GitHubData = {
 export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHubDataOnceProps): UseFreshGitHubDataOnceReturn => {
   const [gitHubData, setGitHubData] = useState<GitHubData>(initialState);
   // Initial loading state true only if handle is present, otherwise false.
-  const [loading, setLoading] = useState<boolean>(!!handle);
+  const [loading, setLoading] = useState<boolean>(!!(handle && installationId)); // Initial loading based on both
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchData = useCallback(async () => {
-    // This internal check is still good, though useEffect also gates by handle.
-    if (!handle) {
-      console.log('[useFreshGitHubDataOnce] fetchData: No handle, exiting.');
-      setGitHubData(initialState); // Ensure data is reset if handle becomes null
-      setError(null);
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    let isMounted = true;
 
-    console.log(`[useFreshGitHubDataOnce] fetchData: Fetching for handle: ${handle}, installationId: ${installationId}`);
-    // setLoading(true) and setError(null) will be set by the calling useEffect
+    const fetchDataInternal = async () => {
+      // Double check handle and installationId as they are from closure of useEffect
+      if (!handle || !installationId) {
+        if (isMounted) {
+          setGitHubData(initialState);
+          setLoading(false);
+          setError(null);
+        }
+        return;
+      }
 
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      // Set loading and clear error at the beginning of an actual fetch attempt
+      if (isMounted) {
+        setLoading(true);
+        setError(null);
+      }
+
+      console.log(`[useFreshGitHubDataOnce] fetchDataInternal: Fetching for handle: ${handle}, installationId: ${installationId}`);
+
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
 
       const response = await fetch(apiUrl, {
@@ -130,41 +139,50 @@ export const useFreshGitHubDataOnce = ({ handle, installationId }: UseFreshGitHu
       }
 
       const data = await response.json();
-      console.log(`[useFreshGitHubDataOnce] Data received for ${handle}:`, data);
+      console.log(`[useFreshGitHubDataOnce] fetchDataInternal: Data received for ${handle}:`, data);
       const contributionStats = calculateContributionStats(data.contributions || []);
 
-      setGitHubData({
-        user: data.user || null,
-        repos: data.repos || [],
-        languages: data.languages || {},
-        totalStars: data.totalStars || 0,
-        contributions: data.contributions || [],
-        currentStreak: contributionStats.currentStreak,
-        longestStreak: contributionStats.longestStreak,
-        averageContributions: contributionStats.averagePerDay
-      });
-      setError(null); // Clear error on success
+      if (isMounted) {
+        setGitHubData({
+          user: data.user || null,
+          repos: data.repos || [],
+          languages: data.languages || {},
+          totalStars: data.totalStars || 0,
+          contributions: data.contributions || [],
+          currentStreak: contributionStats.currentStreak,
+          longestStreak: contributionStats.longestStreak,
+          averageContributions: contributionStats.averagePerDay
+        });
+        setError(null); // Clear error on success
+      }
     } catch (err: any) {
-      console.error(`[useFreshGitHubDataOnce] Caught error for ${handle}:`, err);
-      setError(err);
-      setGitHubData(initialState); // Reset data on error
+      console.error(`[useFreshGitHubDataOnce] fetchDataInternal: Caught error for ${handle}:`, err);
+      if (isMounted) {
+        setError(err);
+        setGitHubData(initialState); // Reset data on error
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
-  }, [handle, installationId]);
+  }; // End of fetchDataInternal
 
-  useEffect(() => {
-    if (handle) { // Only run if handle is valid and present
-      setLoading(true);
-      setError(null);
-      fetchData();
+    if (handle && installationId) { // Only run if both handle and installationId are valid and present
+      fetchDataInternal();
     } else {
-      // If handle becomes null/undefined (e.g. nav state cleared), reset to initial non-loading state
-      setGitHubData(initialState);
-      setLoading(false);
-      setError(null);
+      // If handle or installationId becomes null/undefined (e.g. nav state cleared, or not ready yet), reset to initial non-loading state
+      if (isMounted) { // Check isMounted before setting state here too
+        setGitHubData(initialState);
+        setLoading(false);
+        setError(null);
+      }
     }
-  }, [handle, fetchData]); // fetchData's dependency on installationId will also trigger this if ID changes with same handle
+
+    return () => {
+      isMounted = false;
+    };
+  }, [handle, installationId]); // Effect dependencies
 
   return { gitHubData, loading, error };
 };
