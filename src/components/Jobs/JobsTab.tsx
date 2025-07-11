@@ -20,7 +20,7 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
         <Star className={isSaved ? "fill-current" : ""} size={20} />
       </button>
     </div>
-    <p className="text-sm text-gray-500 mb-1 flex items-center"><Briefcase size={14} className="mr-2 text-gray-400" /> {job.recruiters?.company_name || 'Company Confidential'}</p>
+    <p className="text-sm text-gray-500 mb-1 flex items-center"><Briefcase size={14} className="mr-2 text-gray-400" /> {job.recruiter?.company_name || 'Company Confidential'}</p>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
     {job.salary_min && job.salary_max && (
       <p className="text-sm text-gray-500 mb-3 flex items-center">
@@ -64,7 +64,7 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
       </div>
       <div className="p-6 space-y-4 overflow-y-auto">
-        <p className="text-md text-gray-600"><Briefcase size={16} className="inline mr-2 text-gray-500" /> {job.recruiters?.company_name || 'Company Confidential'}</p>
+        <p className="text-md text-gray-600"><Briefcase size={16} className="inline mr-2 text-gray-500" /> {job.recruiter?.company_name || 'Company Confidential'}</p>
         <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
         {job.salary_min && job.salary_max && (
           <p className="text-md text-gray-600"><DollarSign size={16} className="inline mr-2 text-gray-500" /> ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}</p>
@@ -121,12 +121,15 @@ export const JobsTab: React.FC = () => {
     try {
       const { data, error: jobsError } = await supabase
         .from('job_roles')
-        .select('*, recruiters(company_name)') // Changed recruiter:recruiters to recruiters
+        .select('*, recruiter:recruiter_id(company_name)') // Attempting to use FK recruiter_id and alias to 'recruiter'
         .eq('is_active', true)
         // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
 
-      if (jobsError) throw jobsError;
+      if (jobsError) {
+        console.error("Supabase error fetching jobs:", JSON.stringify(jobsError));
+        throw jobsError;
+      }
       setJobs(data || []);
     } catch (e: any) {
       setError(e.message || 'Failed to fetch jobs.');
