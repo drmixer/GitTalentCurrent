@@ -28,7 +28,7 @@ interface DashboardLocationState {
   fromAuthCallback?: boolean;
   ghAppConnected?: boolean;
   focusGitHubHandle?: boolean;
-  fromGitHubSetup?: boolean; // Added for clarity from GitHubAppSetup.tsx
+  fromGitHubSetup?: boolean;
   [key: string]: any;
 }
 
@@ -61,15 +61,12 @@ export const DeveloperDashboard: React.FC = () => {
   const [dashboardPageLoading, setDashboardPageLoading] = useState(true);
   const [hasFreshDataBeenProcessed, setHasFreshDataBeenProcessed] = useState(false);
 
- // ----- GitHub Data Handling -----
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
       const handle = locationState.freshGitHubHandle || contextDeveloperProfile?.github_handle;
       if (handle) {
-        console.log(`[Dashboard] Memoized freshLoadParams: Will use handle='${handle}', installId='${locationState.freshGitHubInstallationId}'`);
         return { handle, installId: locationState.freshGitHubInstallationId };
       }
-      console.log('[Dashboard] Memoized freshLoadParams: Fresh setup but handle missing from navState and contextDeveloperProfile.');
     }
     return null;
   }, [locationState?.isFreshGitHubSetup, locationState?.freshGitHubInstallationId, locationState?.freshGitHubHandle, contextDeveloperProfile?.github_handle]);
@@ -90,66 +87,60 @@ export const DeveloperDashboard: React.FC = () => {
     error: standardGitHubError 
   } = useGitHub(!freshLoadParams);
 
-  const shouldUseFreshData = !!freshLoadParams;
-  const finalGitHubData = shouldUseFreshData ? freshGitHubData : standardGitHubData;
-  const gitHubDataLoadingState = shouldUseFreshData ? freshGitHubLoading : standardGitHubLoading;
-  const gitHubDataErrorState = shouldUseFreshData ? freshGitHubError : standardGitHubError;
-  // ----- End GitHub Data Handling -----
+  const shouldUseFreshDataSource = !!freshLoadParams;
+
+  let finalGitHubDataToShow = standardGitHubData;
+  let gitHubDataLoadingToShow = standardGitHubLoading;
+  let gitHubDataErrorToShow = standardGitHubError;
+
+  if (hasFreshDataBeenProcessed && freshGitHubData?.user) {
+      console.log('[Dashboard RENDER] Prioritizing processed fresh GitHub data.');
+      finalGitHubDataToShow = freshGitHubData;
+      gitHubDataLoadingToShow = false;
+      gitHubDataErrorToShow = null;
+  } else if (shouldUseFreshDataSource) {
+      console.log('[Dashboard RENDER] Using direct fresh GitHub data source.');
+      finalGitHubDataToShow = freshGitHubData;
+      gitHubDataLoadingToShow = freshGitHubLoading;
+      gitHubDataErrorToShow = freshGitHubError;
+  } else {
+      console.log('[Dashboard RENDER] Using standard GitHub data source.');
+  }
 
   const fetchDeveloperPageData = useCallback(async () => {
     if (!authUser?.id) {
-      setDashboardPageLoading(false);
-      return;
+      setDashboardPageLoading(false); return;
     }
     setDashboardPageLoading(true);
     try {
-      const { data: devData, error: devError } = await supabase
-        .from('developers')
-        .select('*, user:users(name, email)')
-        .eq('user_id', authUser.id)
-        .single();
+      const { data: devData, error: devError } = await supabase.from('developers').select('*, user:users(name, email)').eq('user_id', authUser.id).single();
       if (devError && devError.code !== 'PGRST116') console.error('[Dashboard] Error fetching local developer data:', devError);
       else if (devData) setDeveloperData(devData as Developer);
       else setDeveloperData(null);
-    } catch (error) {
-      console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
-    } finally {
-      setDashboardPageLoading(false);
-    }
+    } catch (error) { console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error); }
+    finally { setDashboardPageLoading(false); }
   }, [authUser?.id]);
 
   useEffect(() => {
-    if (!authContextLoading && authUser?.id) {
-      fetchDeveloperPageData();
-    } else if (!authContextLoading && !authUser?.id) {
-      setDashboardPageLoading(false);
-    }
+    if (!authContextLoading && authUser?.id) fetchDeveloperPageData();
+    else if (!authContextLoading && !authUser?.id) setDashboardPageLoading(false);
   }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
   useEffect(() => {
-    if (shouldUseFreshData && !freshGitHubLoading && dashboardPageLoading) {
+    if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) { // shouldUseFreshDataSource here
       setDashboardPageLoading(false);
     }
-  }, [shouldUseFreshData, freshGitHubLoading, dashboardPageLoading]);
+  }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
 
-  // Effect to set initial tab after GitHub App Setup
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
     if (state?.fromGitHubSetup && state?.isFreshGitHubSetup && activeTab !== 'github-activity') {
-      console.log("[Dashboard] Initial Tab Setup: fromGitHubSetup detected, setting to github-activity");
       setActiveTab('github-activity');
-      // Clean the fromGitHubSetup flag from location.state as it has served its purpose for initial tab setting
       const { fromGitHubSetup, ...restOfState } = state;
-      navigate(location.pathname + location.search, {
-        replace: true,
-        state: Object.keys(restOfState).length > 0 ? restOfState : null
-      },
-      );
+      navigate(location.pathname + location.search, { replace: true, state: Object.keys(restOfState).length > 0 ? restOfState : null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationState?.fromGitHubSetup, locationState?.isFreshGitHubSetup, navigate, location.pathname, location.search]);
+  }, [locationState?.fromGitHubSetup, locationState?.isFreshGitHubSetup, navigate, location.pathname, location.search, activeTab]);
 
-  // Effect to synchronize URL tab parameter with activeTab state (Main Sync Effect)
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
@@ -157,7 +148,6 @@ export const DeveloperDashboard: React.FC = () => {
     let newTab = activeTab;
 
     if (state?.fromGitHubSetup && state?.isFreshGitHubSetup && activeTab !== 'github-activity') {
-      // This case should ideally be caught by the previous useEffect, but as a fallback:
       newTab = 'github-activity';
       if(activeTab !== newTab) setActiveTab(newTab);
     } else if (tabFromUrl && tabFromUrl !== activeTab) {
@@ -166,7 +156,6 @@ export const DeveloperDashboard: React.FC = () => {
         setActiveTab(tabFromUrl);
       }
     } else if (!tabFromUrl && activeTab !== 'overview') {
-      // Only default to overview if not in a fresh setup state that should target github-activity
       if (!(state?.isFreshGitHubSetup && activeTab === 'github-activity')) {
          newTab = 'overview';
          setActiveTab('overview');
@@ -184,92 +173,42 @@ export const DeveloperDashboard: React.FC = () => {
         if (key !== 'tab' && !newUrlParams.has(key)) newUrlParams.append(key, value);
       });
       const newSearchString = newUrlParams.toString() ? `?${newUrlParams.toString()}` : '';
-
-      // Important: When updating URL, ensure `isFreshGitHubSetup` is preserved if still relevant,
-      // but `fromGitHubSetup` should have been cleared by the initial tab setting effect.
       const { fromGitHubSetup, ...restOfNavState } = state || {};
       const finalNavState = Object.keys(restOfNavState).length > 0 ? restOfNavState : null;
-
       navigate(`${location.pathname}${newSearchString}`, { replace: true, state: finalNavState });
     }
   }, [activeTab, location.search, location.state, navigate, location.pathname]);
 
-  // Effect to process fresh GitHub data and then allow nav state clearing
   useEffect(() => {
-    if (shouldUseFreshData && !freshGitHubLoading && freshGitHubData?.user && !hasFreshDataBeenProcessed) {
-      console.log('[Dashboard] Fresh GitHub data successfully fetched. Marking as processed.');
+    if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubData?.user && !hasFreshDataBeenProcessed) {
       setHasFreshDataBeenProcessed(true);
-    } else if (shouldUseFreshData && !freshGitHubLoading && freshGitHubError && !hasFreshDataBeenProcessed) {
-      console.log('[Dashboard] Fresh GitHub data fetching failed. Marking as processed for nav state cleanup.');
+    } else if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubError && !hasFreshDataBeenProcessed) {
       setHasFreshDataBeenProcessed(true);
     }
-  }, [shouldUseFreshData, freshGitHubLoading, freshGitHubData, freshGitHubError, hasFreshDataBeenProcessed]);
+  }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubData, freshGitHubError, hasFreshDataBeenProcessed]);
 
-  // Effect to clear navigation state after fresh data has been processed
   useEffect(() => {
-    // Only clear if isFreshGitHubSetup was true and data processing is now marked complete
     if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) {
-      console.log('[Dashboard] Clearing fresh GitHub setup navigation state.');
-      const {
-        freshGitHubHandle,
-        freshGitHubInstallationId,
-        isFreshGitHubSetup,
-        fromGitHubSetup, // Ensure this is also cleared
-        ...restOfState
-      } = locationState;
-      navigate(location.pathname + location.search, {
-          replace: true,
-          state: Object.keys(restOfState).length > 0 ? restOfState : null
-      });
-      // Do not reset hasFreshDataBeenProcessed here, it's for the lifetime of this "fresh load"
+      const { freshGitHubHandle, freshGitHubInstallationId, isFreshGitHubSetup, fromGitHubSetup, ...restOfState } = locationState;
+      navigate(location.pathname + location.search, { replace: true, state: Object.keys(restOfState).length > 0 ? restOfState : null });
     }
   }, [locationState, hasFreshDataBeenProcessed, navigate, location.pathname, location.search]);
 
-  // Show GitHub Connect Prompt logic
   useEffect(() => {
-    const shouldShow = activeTab === 'github-activity' &&
-                       !!contextDeveloperProfile?.github_handle &&
-                       !contextDeveloperProfile?.github_installation_id;
-    if (showGitHubConnectModal !== shouldShow) {
-        setShowGitHubConnectModal(shouldShow);
-    }
+    const show = activeTab === 'github-activity' && !!contextDeveloperProfile?.github_handle && !contextDeveloperProfile?.github_installation_id;
+    if (showGitHubConnectModal !== show) setShowGitHubConnectModal(show);
   }, [contextDeveloperProfile?.github_handle, contextDeveloperProfile?.github_installation_id, activeTab, showGitHubConnectModal]);
 
-  const renderOverview = () => {
-    const displayDeveloperData = developerData || contextDeveloperProfile; 
-    return (
-      <div className="space-y-6">
-        {displayDeveloperData && (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Strength</h3>
-            <ProfileStrengthIndicator strength={displayDeveloperData.profile_strength || 0} showDetails={true} />
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Cards */}
-        </div>
-        {/* FeaturedProject */}
-      </div>
-    );
-  };
+  const renderOverview = () => { /* ... */ };
   
   console.log('[Dashboard RENDER]', 
-    `PageLoad: ${dashboardPageLoading}`, 
-    `AuthLoad: ${authContextLoading}`, 
-    `User: ${authUser?.id?.substring(0,8)}`, 
-    `UP: ${userProfile?.id?.substring(0,8)}`, 
-    `DP: ${contextDeveloperProfile?.user_id?.substring(0,8)}(ghId:${contextDeveloperProfile?.github_installation_id ? 'SET' : 'NULL'})`, 
+    `PageLoad: ${dashboardPageLoading}`, `AuthLoad: ${authContextLoading}`, `User: ${authUser?.id?.substring(0,8)}`,
+    `UP: ${userProfile?.id?.substring(0,8)}`, `DP: ${contextDeveloperProfile?.user_id?.substring(0,8)}(ghId:${contextDeveloperProfile?.github_installation_id ? 'SET' : 'NULL'})`,
     `FreshParams: ${freshLoadParams ? JSON.stringify(freshLoadParams) : 'NULL'}`, 
-    `FreshLoad: ${freshGitHubLoading}`, 
-    `FreshErr: ${!!freshGitHubError}`, 
-    `FreshData: ${!!freshGitHubData?.user}`, 
-    `StdLoad: ${standardGitHubLoading}`, 
-    `StdErr: ${!!standardGitHubError}`, 
-    `StdData: ${!!standardGitHubData?.user}`, 
-    `FinalGHLoad: ${gitHubDataLoadingState}`, 
-    `FinalGHErr: ${!!gitHubDataErrorState}`,
-    `FinalGHData: ${!!finalGitHubData?.user}`,
-    `ActiveTab: ${activeTab}`
+    `FreshLoad(Source): ${freshGitHubLoading}`, `FreshErr(Source): ${!!freshGitHubError}`, `FreshData(Source): ${!!freshGitHubData?.user}`,
+    `StdLoad: ${standardGitHubLoading}`, `StdErr: ${!!standardGitHubError}`, `StdData: ${!!standardGitHubData?.user}`,
+    `FinalGHLoad: ${gitHubDataLoadingToShow}`, `FinalGHErr: ${!!gitHubDataErrorToShow}`, `FinalGHData: ${!!finalGitHubDataToShow?.user}`,
+    `ActiveTab: ${activeTab}`, `shouldUseFreshDataSource: ${shouldUseFreshDataSource}`, `hasFreshDataBeenProcessed: ${hasFreshDataBeenProcessed}`
   );
 
   if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) {
@@ -287,23 +226,13 @@ export const DeveloperDashboard: React.FC = () => {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-screen-xl mx-auto">
       {showGitHubConnectModal && contextDeveloperProfile?.github_handle && (
-        <GitHubConnectPrompt 
-          githubHandle={contextDeveloperProfile.github_handle} 
-          onClose={() => setShowGitHubConnectModal(false)} 
-          onConnect={() => navigate('/github-setup')}
-        />
+        <GitHubConnectPrompt githubHandle={contextDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} />
       )}
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'].map((tabName) => (
-            <button 
-              key={tabName} 
-              onClick={() => setActiveTab(tabName as typeof activeTab)} 
-              className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
-                ${activeTab === tabName 
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
+            <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
+              className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
             </button>
           ))}
@@ -313,16 +242,9 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'overview' && renderOverview()}
       
       {activeTab === 'profile' && (
-        displayDeveloperProfileForForm ? (
-          <DeveloperProfileForm 
-            initialData={displayDeveloperProfileForForm} 
-            onSuccess={async () => { 
-              if(refreshProfile) await refreshProfile(); 
-              await fetchDeveloperPageData();
-            }} 
-            isOnboarding={false} 
-          />
-        ) : <div className="text-center p-8">Loading profile form...</div>
+        displayDeveloperProfileForForm ?
+          <DeveloperProfileForm initialData={displayDeveloperProfileForForm} onSuccess={async () => { if(refreshProfile) await refreshProfile(); await fetchDeveloperPageData();}} isOnboarding={false} />
+          : <div className="text-center p-8">Loading profile form...</div>
       )}
 
       {activeTab === 'portfolio' && <PortfolioManager developerId={authUser?.id || ''} />}
@@ -332,10 +254,28 @@ export const DeveloperDashboard: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="lg:w-2/5"><RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} className="w-full" displayMode='dashboardSnippet' /></div>
             <div className="lg:w-3/5">
-              {gitHubDataLoadingState && <div className="text-center p-8">Loading GitHub activity...</div>}
-              {!gitHubDataLoadingState && gitHubDataErrorState && <div className="text-center p-8 text-red-500">Error: {typeof gitHubDataErrorState === 'string' ? gitHubDataErrorState : 'Could not load GitHub data.'}</div>}
-              {!gitHubDataLoadingState && !gitHubDataErrorState && finalGitHubData?.user && <GitHubUserActivityDetails gitHubData={finalGitHubData} />}
-              {!gitHubDataLoadingState && !gitHubDataErrorState && !finalGitHubData?.user && <div className="text-center p-8">No GitHub data available.</div>}
+              {gitHubDataLoadingToShow && (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" />
+                  <p className="text-gray-600">
+                    {shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}
+                  </p>
+                </div>
+              )}
+              {!gitHubDataLoadingToShow && gitHubDataErrorToShow && (
+                <div className="text-center py-10 px-6 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3>
+                  <p className="text-red-600 mt-2 text-sm">{typeof gitHubDataErrorToShow === 'string' ? gitHubDataErrorToShow : (gitHubDataErrorToShow as Error)?.message || 'An unknown error occurred.'}</p>
+                  <button onClick={() => navigate('/github-setup')} className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600">Re-check</button>
+                </div>
+              )}
+              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && finalGitHubDataToShow?.user && (
+                <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
+              )}
+              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (
+                <div className="text-center p-8">No GitHub data available.</div>
+              )}
             </div>
           </div>
         ) : <div className="text-center p-8">Connect GitHub to see activity.</div>
