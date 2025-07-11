@@ -1,7 +1,8 @@
 import React from 'react';
-import { useGitHub } from '../../hooks/useGitHub';
+// Removed useGitHub hook as data will come from props
 import { useAuth } from '../../hooks/useAuth';
 import { Github, Loader, AlertCircle, Star, GitFork } from 'lucide-react';
+import { GitHubData } from '../../hooks/useGitHub'; // Import the type
 import { 
   getContributionColorClass, 
   getContributionTooltipText, 
@@ -10,17 +11,23 @@ import {
 } from '../../utils/githubUtils';
 
 interface RealGitHubChartProps {
-  githubHandle: string;
+  githubHandle: string; // Still needed for links if data is partial or error
+  gitHubData: GitHubData | null; // Accept full data object
+  loading: boolean;
+  error: Error | null;
   className?: string;
   displayMode?: 'full' | 'dashboardSnippet';
 }
 
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   githubHandle,
+  gitHubData, // Use destructured prop
+  loading,    // Use destructured prop
+  error,      // Use destructured prop
   className = '',
   displayMode = 'full'
 }) => {
-  const { gitHubData, loading, error } = useGitHub();
+  // const { gitHubData, loading, error } = useGitHub(); // Removed internal hook usage
   const { developerProfile } = useAuth();
 
   const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly
@@ -37,7 +44,19 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
     );
   }
 
-  if (!isGitHubAppInstalled) {
+  if (error) { // Check for error first, using the prop
+    return (
+      <div className="text-center p-8 bg-white rounded-xl shadow-md">
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading GitHub Data</h2>
+        <p className="text-red-600 mb-4">
+          {(error as Error)?.message || 'An unknown error occurred while fetching GitHub data.'}
+        </p>
+      </div>
+    );
+  }
+
+  if (!isGitHubAppInstalled && !loading && !gitHubData?.user) { // Added !loading and !gitHubData checks
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
         <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
@@ -54,15 +73,31 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
           <Github className="w-5 h-5 mr-2" />
           Connect GitHub App
         </a>
-        {error && <p className="text-red-500 mt-4">{error.message}</p>}
+      </div>
+    );
+  }
+
+  // If no data yet (but not explicitly loading and no error, or app not installed but data is somehow present which is unlikely)
+  // This also covers the case where data is null due to not being fetched yet.
+  if (!gitHubData || !gitHubData.user) {
+    // If loading was true, it would have been caught above.
+    // If error was true, it would have been caught above.
+    // If app not installed, caught above.
+    // So this implies data is just not there yet for other reasons or is empty.
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Github className="h-12 w-12 text-gray-300" />
+        <p className="ml-4 text-gray-500">GitHub data not available or not yet loaded.</p>
       </div>
     );
   }
 
   const isDashboardSnippet = displayMode === 'dashboardSnippet';
+  // Ensure contributions is an array before slicing or reducing
+  const contributions = Array.isArray(gitHubData.contributions) ? gitHubData.contributions : [];
   const contributionsToDisplay = isDashboardSnippet
-    ? gitHubData.contributions.slice(-84) // Last 12 weeks (12 * 7 = 84 days)
-    : gitHubData.contributions;
+    ? contributions.slice(-84)
+    : contributions;
 
   const totalContributionsForDisplay = contributionsToDisplay.reduce((sum, day) => sum + day.count, 0);
 
