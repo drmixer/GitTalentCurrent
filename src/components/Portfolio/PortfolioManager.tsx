@@ -27,9 +27,16 @@ interface PortfolioManagerProps {
 
 export const PortfolioManager: React.FC<PortfolioManagerProps> = ({ 
   developerId, 
-  isEditable = false 
+  isEditable: isEditableProp // Renamed prop to avoid conflict
 }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, user } = useAuth(); // Added user for direct ID comparison
+
+  // Determine editability:
+  // 1. If isEditableProp is explicitly passed, respect it.
+  // 2. Otherwise, if user is logged in and their ID matches developerId, it's editable.
+  const isCurrentUserProfile = userProfile?.id === developerId;
+  const isEditable = isEditableProp !== undefined ? isEditableProp : isCurrentUserProfile;
+
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
