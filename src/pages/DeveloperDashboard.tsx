@@ -33,6 +33,7 @@ interface DashboardLocationState {
 }
 
 const initialStateForGitHubData = { user: null, repos: [], languages: {}, totalStars: 0, contributions: [] };
+const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'];
 
 export const DeveloperDashboard: React.FC = () => {
   const { 
@@ -47,7 +48,25 @@ export const DeveloperDashboard: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as DashboardLocationState | null;
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'portfolio' | 'github-activity' | 'messages' | 'jobs'>('overview');
+  const getInitialActiveTab = useCallback(() => {
+      const currentLocState = location.state as DashboardLocationState | null;
+      if (currentLocState?.fromGitHubSetup && currentLocState?.isFreshGitHubSetup) {
+          console.log("[Dashboard] Initializing activeTab to 'github-activity' due to fresh setup state.");
+          return 'github-activity';
+      }
+      const params = new URLSearchParams(location.search);
+      const tabFromUrl = params.get('tab') as typeof activeTab | null;
+      if (tabFromUrl && validTabs.includes(tabFromUrl)) {
+          console.log(`[Dashboard] Initializing activeTab to '${tabFromUrl}' from URL.`);
+          return tabFromUrl;
+      }
+      console.log("[Dashboard] Initializing activeTab to 'overview' by default.");
+      return 'overview';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, location.search]); // Called once for useState, but deps for useCallback correctness if reused
+
+  const [activeTab, setActiveTab] = useState(getInitialActiveTab);
+
   const [developerData, setDeveloperData] = useState<Developer | null>(null);
   const [messages, setMessages] = useState<MessageThreadType[]>([]);
   const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]);
@@ -113,16 +132,11 @@ export const DeveloperDashboard: React.FC = () => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);
   }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
 
-  // Effect to set initial tab after GitHub App Setup AND clear the fromGitHubSetup trigger flag
+  // Effect to clear the fromGitHubSetup trigger flag from location.state after initial processing
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
-    if (state?.fromGitHubSetup && state?.isFreshGitHubSetup) {
-      if (activeTab !== 'github-activity') {
-        console.log("[Dashboard] Initial Tab Setup: fromGitHubSetup detected, setting to github-activity");
-        setActiveTab('github-activity');
-      }
-      // Clear the fromGitHubSetup flag immediately after processing it for initial tab set
-      // isFreshGitHubSetup will be cleared later after data processing.
+    if (state?.fromGitHubSetup) { // Only care about fromGitHubSetup here
+      console.log("[Dashboard] Initial Setup Effect: Clearing fromGitHubSetup flag from location.state.");
       const { fromGitHubSetup, ...restOfState } = state;
       navigate(location.pathname + location.search, {
         replace: true,
@@ -130,7 +144,7 @@ export const DeveloperDashboard: React.FC = () => {
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationState?.fromGitHubSetup, locationState?.isFreshGitHubSetup, navigate, location.pathname, location.search]); // activeTab removed from deps
+  }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]); // Runs if fromGitHubSetup flag changes (i.e., present then removed)
 
   // Effect to update URL when activeTab state changes (e.g., from user click)
   useEffect(() => {
@@ -145,37 +159,36 @@ export const DeveloperDashboard: React.FC = () => {
         currentParams.delete('tab');
       }
       const newSearchString = currentParams.toString() ? `?${currentParams.toString()}` : '';
-      // Preserve other location state, but fromGitHubSetup should already be cleared by the initial setup effect.
-      const { fromGitHubSetup, ...restOfState } = locationState || {};
+      const { fromGitHubSetup, ...restOfState } = locationState || {}; // fromGitHubSetup should be gone
       navigate(`${location.pathname}${newSearchString}`, {
         replace: true,
         state: Object.keys(restOfState).length > 0 ? restOfState : null
       });
     }
-  }, [activeTab, location.pathname, navigate, locationState]); // location.search removed to prevent loop with next effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, location.pathname, navigate]); // Removed locationState and location.search to simplify and make this purely activeTab driven
 
   // Effect to update activeTab state when URL changes (e.g., browser back/forward, direct URL edit)
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
-    const state = location.state as DashboardLocationState | null;
 
-    // Avoid interfering if initial setup effect is still about to run or has just run
-    if (state?.fromGitHubSetup && state?.isFreshGitHubSetup) {
-      return;
-    }
+    // Do not fight with the initial tab setting if fromGitHubSetup was just processed
+    // The flag would have been cleared by the effect above, so locationState.fromGitHubSetup is likely null/undefined here.
+    // This effect should primarily handle external URL changes.
+    if (locationState?.fromGitHubSetup) return; // Skip if the initial setup flag is still somehow present (unlikely due to order)
 
-    const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'];
     if (tabFromUrl && validTabs.includes(tabFromUrl)) {
       if (activeTab !== tabFromUrl) {
+        console.log(`[Dashboard] URL to State Sync: Setting activeTab to '${tabFromUrl}' from URL.`);
         setActiveTab(tabFromUrl);
       }
     } else if (!tabFromUrl && activeTab !== 'overview') {
-      // Default to overview if no valid tab in URL,
-      // unless it was a fresh setup that should be on 'github-activity' (already handled by initial effect)
+      console.log(`[Dashboard] URL to State Sync: No tab in URL, setting activeTab to 'overview'.`);
       setActiveTab('overview');
     }
-  }, [location.search, locationState]); // activeTab removed from here to prevent it re-triggering URL update in prev effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]); // Only depends on location.search; activeTab removed to avoid loops. locationState for the guard.
 
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
@@ -187,20 +200,22 @@ export const DeveloperDashboard: React.FC = () => {
   }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubDataFromHook, freshGitHubError, hasFreshDataBeenProcessed]);
 
   useEffect(() => {
-    if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) {
+    if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) { // isFreshGitHubSetup is the important one here
+      console.log('[Dashboard] Clearing isFreshGitHubSetup flag from location.state.');
       const { freshGitHubHandle, freshGitHubInstallationId, isFreshGitHubSetup, fromGitHubSetup, ...restOfState } = locationState;
       navigate(location.pathname + location.search, { replace: true, state: Object.keys(restOfState).length > 0 ? restOfState : null });
     }
-  }, [locationState, hasFreshDataBeenProcessed, navigate, location.pathname, location.search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationState?.isFreshGitHubSetup, hasFreshDataBeenProcessed, navigate, location.pathname, location.search]);
 
   useEffect(() => {
     const show = activeTab === 'github-activity' && !!contextDeveloperProfile?.github_handle && !contextDeveloperProfile?.github_installation_id;
     if (showGitHubConnectModal !== show) setShowGitHubConnectModal(show);
   }, [contextDeveloperProfile?.github_handle, contextDeveloperProfile?.github_installation_id, activeTab, showGitHubConnectModal]);
 
-  const renderOverview = () => { /* ... as before ... */ return <div className="p-4">Overview Content Placeholder</div>; };
+  const renderOverview = () => { /* ... */ return <div className="p-4">Overview Content Placeholder</div>; };
   
-  console.log('[Dashboard RENDER]', /* ... as before ... */);
+  console.log('[Dashboard RENDER]', /* ... */); // Keep this extensive log
 
   if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) { /* ... */ }
   if (dashboardPageLoading && !authContextLoading && authUser) { /* ... */ }
@@ -209,11 +224,14 @@ export const DeveloperDashboard: React.FC = () => {
   const displayDeveloperProfileForForm = contextDeveloperProfile || developerData;
 
   return (
+    // ... Full JSX as previously provided, ensuring it uses *ToShow variables for GitHub data
+    // and the corrected tab rendering logic.
+    // For brevity, I'm not pasting the entire return() again but it should be the same as the last full version.
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-screen-xl mx-auto">
       {showGitHubConnectModal && contextDeveloperProfile?.github_handle && ( <GitHubConnectPrompt githubHandle={contextDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} /> )}
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
-          {['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'].map((tabName) => (
+          {validTabs.map((tabName) => (
             <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
               className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
