@@ -373,8 +373,13 @@ export const DeveloperDashboard: React.FC = () => {
         // For now, I'll pass an empty array to messages for OverviewTab.
         // This needs to be revisited if OverviewTab's unread message logic is critical now.
         messages={[]}
-        savedJobs={savedJobs.map(sj => sj.job_role).filter(Boolean) as JobRole[]} // Adapt if OverviewTab expects JobRole
-        appliedJobs={appliedJobs.map(aj => aj.job_role).filter(Boolean) as JobRole[]} // Adapt if OverviewTab expects JobRole
+        // Note: savedJobs/appliedJobs props passed to OverviewTab are for displaying *actual* job data if needed,
+        // not just counts. The counts (saved_jobs_count, applied_jobs_count) come from the `developer` object itself.
+        // These counts on the `developer` object are not updated in real-time after actions in JobsTab.
+        // TODO: Implement a mechanism (e.g., callback, event, or global state) to refresh `currentDeveloperProfile`
+        // or specifically its job counts when save/apply actions occur in JobsTab for live OverviewTab updates.
+        savedJobs={savedJobs.map(sj => sj.job_role).filter(Boolean) as JobRole[]}
+        appliedJobs={appliedJobs.map(aj => aj.job_role).filter(Boolean) as JobRole[]}
         endorsements={endorsements}
         recentCommits={recentCommits}
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}

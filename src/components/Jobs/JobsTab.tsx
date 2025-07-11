@@ -7,17 +7,18 @@ import { Search, Briefcase, MapPin, DollarSign, Bookmark, Send, Eye, Info, Loade
 // import { JobRoleDetails } from '../JobRoles/JobRoleDetails'; // Potentially reusable
 
 // Minimal JobCard component for now
-const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean }> =
-  ({ job, onSelect, onSave, onApply, isSaved, hasApplied }) => (
+const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
+  ({ job, onSelect, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
   <div className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-200">
     <div className="flex justify-between items-start mb-3">
       <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{job.title}</h3>
       <button
         onClick={(e) => { e.stopPropagation(); onSave(); }}
-        className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${isSaved ? 'text-yellow-500' : 'text-gray-400'}`}
+        className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-400')}`}
         title={isSaved ? "Unsave Job" : "Save Job"}
+        disabled={isProcessingSave}
       >
-        <Star className={isSaved ? "fill-current" : ""} size={20} />
+        {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
       </button>
     </div>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><Briefcase size={14} className="mr-2 text-gray-400" /> {job.recruiter?.company_name || 'Company Confidential'}</p>
@@ -45,18 +46,19 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onApply(); }}
-        className={`flex-1 px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
-        disabled={hasApplied}
+        className={`flex-1 px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600')}`}
+        disabled={hasApplied || isProcessingApply}
       >
-        {hasApplied ? <><CheckCircle size={16} className="mr-2"/> Applied</> : <><Send size={16} className="mr-2"/> Apply</>}
+        {isProcessingApply ? <Loader size={16} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={16} className="mr-2"/> : <Send size={16} className="mr-2"/>)}
+        {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply')}
       </button>
     </div>
   </div>
 );
 
 // Minimal JobDetailsModal component for now
-const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean }> =
-  ({ job, onClose, onSave, onApply, isSaved, hasApplied }) => (
+const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
+  ({ job, onClose, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
       <div className="flex justify-between items-center p-6 border-b border-gray-200">
@@ -87,17 +89,19 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
       <div className="p-6 border-t border-gray-200 flex items-center space-x-3">
         <button
           onClick={onSave}
-          className={`p-3 rounded-lg hover:bg-gray-100 transition-colors ${isSaved ? 'text-yellow-500' : 'text-gray-500'}`}
+          className={`p-3 rounded-lg hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-500')}`}
           title={isSaved ? "Unsave Job" : "Save Job"}
+          disabled={isProcessingSave}
         >
-          <Star className={isSaved ? "fill-current" : ""} size={22} />
+          {isProcessingSave ? <Loader size={22} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={22} />}
         </button>
         <button
           onClick={onApply}
-          className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold text-base flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
-          disabled={hasApplied}
+          className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold text-base flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')}`}
+          disabled={hasApplied || isProcessingApply}
         >
-          {hasApplied ? <><CheckCircle size={20} className="mr-2"/> Applied</> : <><Send size={20} className="mr-2"/> Apply Now</>}
+          {isProcessingApply ? <Loader size={20} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={20} className="mr-2"/> : <Send size={20} className="mr-2"/>)}
+          {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply Now')}
         </button>
       </div>
     </div>
@@ -114,6 +118,7 @@ export const JobsTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+  const [processingJobId, setProcessingJobId] = useState<string | null>(null); // For save/apply loading state
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -169,8 +174,9 @@ export const JobsTab: React.FC = () => {
   }, [fetchJobs, fetchUserJobInteractions]);
 
   const handleSaveJob = async (jobId: string) => {
-    if (!developerProfile?.user_id) return; // Or prompt to complete profile
+    if (!developerProfile?.user_id || processingJobId === jobId) return;
 
+    setProcessingJobId(jobId);
     const alreadySaved = savedJobIds.has(jobId);
     try {
       if (alreadySaved) {
@@ -194,13 +200,17 @@ export const JobsTab: React.FC = () => {
     } catch (e: any) {
       console.error("Error saving/unsaving job:", e);
       alert(`Failed to ${alreadySaved ? 'unsave' : 'save'} job. ${e.message}`);
+  } finally {
+    setProcessingJobId(null);
+    // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
+    // for updated saved_jobs_count on OverviewTab, or use a global state.
     }
   };
 
   const handleApplyJob = async (jobId: string) => {
-    if (!developerProfile?.user_id) return; // Or prompt
-    if (appliedJobIds.has(jobId)) return; // Already applied
+    if (!developerProfile?.user_id || processingJobId === jobId || appliedJobIds.has(jobId)) return;
 
+    setProcessingJobId(jobId);
     // Placeholder: In a real app, this would likely redirect to an application form or ATS.
     // For now, we'll just mark it as "applied".
     try {
@@ -214,6 +224,10 @@ export const JobsTab: React.FC = () => {
     } catch (e:any) {
       console.error("Error applying for job:", e);
       alert(`Failed to apply for job. ${e.message}`);
+  } finally {
+    setProcessingJobId(null);
+    // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
+    // for updated applied_jobs_count on OverviewTab, or use a global state.
     }
   };
 
@@ -276,6 +290,8 @@ export const JobsTab: React.FC = () => {
             onApply={() => handleApplyJob(job.id)}
             isSaved={savedJobIds.has(job.id)}
             hasApplied={appliedJobIds.has(job.id)}
+            isProcessingSave={processingJobId === job.id}
+            isProcessingApply={processingJobId === job.id} // Assuming same processing flag for now
           />
         ))}
       </div>
@@ -292,6 +308,8 @@ export const JobsTab: React.FC = () => {
           onApply={() => handleApplyJob(selectedJob.id)}
           isSaved={savedJobIds.has(selectedJob.id)}
           hasApplied={appliedJobIds.has(selectedJob.id)}
+          isProcessingSave={processingJobId === selectedJob.id}
+          isProcessingApply={processingJobId === selectedJob.id} // Assuming same processing flag for now
         />
       )}
     </div>
