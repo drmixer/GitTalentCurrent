@@ -161,11 +161,11 @@ export const DeveloperDashboard: React.FC = () => {
   // Effect to turn off overall page loading once fresh GitHub data is loaded (if it was a fresh setup)
   // This ensures the main page spinner doesn't stop until fresh GitHub data is also ready (if it was expected).
   useEffect(() => {
-    if (shouldUseFreshGitHubData && !freshGitHubDataResults.loading && dashboardPageLoading) {
+    if (shouldUseFreshData && !freshGitHubLoading && dashboardPageLoading) {
       console.log('[Dashboard] Fresh GitHub data has loaded, and page was still loading. Setting dashboardPageLoading to false.');
       setDashboardPageLoading(false);
     }
-  }, [shouldUseFreshGitHubData, freshGitHubDataResults.loading, dashboardPageLoading]);
+  }, [shouldUseFreshData, freshGitHubLoading, dashboardPageLoading]);
 
   // Effect to handle tab from URL query params on initial load and changes
   useEffect(() => {
