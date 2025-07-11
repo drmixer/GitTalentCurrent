@@ -195,7 +195,9 @@ export const DeveloperDashboard: React.FC = () => {
       // Fetch endorsements
       const { data: endorsementData, error: endorsementError } = await supabase
         .from('endorsements')
-        .select('*, endorser:users!inner(name, title, avatar_url)') // Assuming 'users' table has 'title' and 'avatar_url' for endorsers
+        // Explicitly use endorser_id FK to fetch details from the users table.
+        // Assumes 'users' table has name, title, avatar_url. 'title' might be on a profile table.
+        .select('*, endorser:endorser_id(name, title, avatar_url)')
         .eq('developer_id', authUser.id)
         .order('created_at', { ascending: false });
       if (endorsementError) console.error('[Dashboard] Error fetching endorsements:', endorsementError);
@@ -207,7 +209,7 @@ export const DeveloperDashboard: React.FC = () => {
       // Fetch saved jobs (assuming a 'saved_jobs' table)
       const { data: savedJobsData, error: savedJobsError } = await supabase
         .from('saved_jobs')
-        .select('*, job_role:job_roles(*, recruiter:recruiters(company_name))')
+        .select('*, job_role:job_roles(*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name)))')
         .eq('developer_id', authUser.id)
         .order('saved_at', { ascending: false });
       if (savedJobsError) console.error('[Dashboard] Error fetching saved jobs:', savedJobsError);
@@ -219,7 +221,7 @@ export const DeveloperDashboard: React.FC = () => {
       // Fetch applied jobs (assuming an 'applied_jobs' table)
       const { data: appliedJobsData, error: appliedJobsError } = await supabase
         .from('applied_jobs')
-        .select('*, job_role:job_roles(*, recruiter:recruiters(company_name))')
+        .select('*, job_role:job_roles(*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name)))')
         .eq('developer_id', authUser.id)
         .order('applied_at', { ascending: false });
       if (appliedJobsError) console.error('[Dashboard] Error fetching applied jobs:', appliedJobsError);
