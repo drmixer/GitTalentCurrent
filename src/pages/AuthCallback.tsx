@@ -1,181 +1,189 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth'; 
-import { Loader, CheckCircle, AlertCircle, Github, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { Loader } from 'lucide-react';
 
-const GITHUB_APP_SLUG = 'GitTalentApp'; 
-const MAX_AUTH_RETRIES = 5; 
+// GitHub App slug - must match exactly what's configured in GitHub
+const GITHUB_APP_SLUG = 'gittalentapp'; // Ensure this is correct (lowercase often preferred for slugs)
 
 interface OAuthIntentData {
   name?: string;
   role?: string;
   install_after_auth?: boolean;
+  [key: string]: any;
 }
 
 export const AuthCallback: React.FC = () => {
-  console.log('[AuthCallback] Component rendering. Top Level. Location Href:', window.location.href);
+  const {
+    user, // Supabase auth user
+    userProfile, // Profile from 'users' table
+    developerProfile, // Profile from 'developers' table
+    loading: authContextLoading,
+    authError,
+    refreshProfile, // Function to manually trigger profile refresh in AuthContext
+  } = useAuth();
 
-  const { user, userProfile, developerProfile, loading: authLoading, authError, refreshProfile } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); 
-
-  const [uiState, setUiState] = useState<'loading' | 'success' | 'error' | 'redirect' | 'info'>('loading');
-  const [message, setMessage] = useState('Processing authentication...');
+  const [statusMessage, setStatusMessage] = useState('Processing authentication...');
   const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 8; // Increased max retries
+  const processingRef = useRef(false); // To prevent multiple processing attempts
 
   const redirectToGitHubAppInstall = useCallback(() => {
     if (!user?.id) {
-      console.warn('[AuthCallback] redirectToGitHubAppInstall: No user ID available for GitHub App install redirect.');
-      setMessage('Error: User ID not found. Please ensure you are logged in to connect the GitHub App.');
-      setUiState('error');
+      setStatusMessage('Error: User ID not available for GitHub App installation.');
+      console.warn('[AuthCallback] redirectToGitHubAppInstall: No user ID available.');
       return;
     }
+    setStatusMessage('Redirecting to GitHub App installation...');
     const stateObj = {
       user_id: user.id,
-      redirect_uri: `${window.location.origin}/github-setup`, 
-      from_auth_callback: true, 
+      // The redirect_uri for GitHub App install is where GitHub sends you *after* you install/authorize the app.
+      // This should point to your /github-setup page.
+      redirect_uri: `${window.location.origin}/github-setup`,
+      from_auth_callback: true, // Indicate origin
       timestamp: Date.now(),
     };
     const stateParam = encodeURIComponent(JSON.stringify(stateObj));
+    // You are sent to GitHub to install the app. GitHub then sends you to the redirect_uri specified here.
     const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new?state=${stateParam}`;
-    
-    console.log('[AuthCallback] Redirecting to GitHub App installation:', githubAppInstallUrl);
-    setUiState('redirect');
-    setMessage('Redirecting to GitHub App installation page...');
+    console.log('[AuthCallback] Redirecting to GitHub App Install URL:', githubAppInstallUrl);
     window.location.href = githubAppInstallUrl;
   }, [user]);
 
   useEffect(() => {
-    console.log(`[AuthCallback] useEffect triggered. User: ${user?.id}, authLoading: ${authLoading}, userProfile: ${userProfile?.id}, devProfile loaded: ${developerProfile !== undefined}, retry: ${retryCount}`);
-    let timeoutId: NodeJS.Timeout | undefined = undefined;
+    console.log(`[AuthCallback] useEffect triggered. AuthContext loading: ${authContextLoading}, User: ${user?.id}, UserProfile: ${userProfile?.id}, DeveloperProfile: ${developerProfile?.user_id} (ghInstId: ${developerProfile?.github_installation_id}), Retry: ${retryCount}`);
 
-    if (authLoading && retryCount < MAX_AUTH_RETRIES && !user) {
-      console.log('[AuthCallback] Auth is loading (waiting for user session from AuthContext). Retry:', retryCount);
-      setMessage(`Verifying your session (attempt ${retryCount + 1} of ${MAX_AUTH_RETRIES})...`);
-      setUiState('loading');
-      timeoutId = setTimeout(() => setRetryCount(prev => prev + 1), 1500);
-      return () => clearTimeout(timeoutId);
+    if (processingRef.current) {
+      console.log('[AuthCallback] Already processing, skipping this run.');
+      return;
     }
 
-    if (!user && !authLoading) {
-      console.error('[AuthCallback] No user session after AuthContext loading. Navigating to login.');
-      setMessage('Authentication failed or session could not be established. Redirecting to login...');
-      setUiState('error'); 
-      timeoutId = setTimeout(() => navigate('/login', { replace: true }), 3000);
-      return () => clearTimeout(timeoutId);
+    if (authError) {
+      setStatusMessage(`Authentication error: ${authError}`);
+      console.error('[AuthCallback] Auth error from context:', authError);
+      processingRef.current = false; // Allow retry if error clears
+      return;
     }
 
-    if (user && !authLoading) {
-      if ((!userProfile || developerProfile === undefined) && retryCount < MAX_AUTH_RETRIES) {
-        console.log(`[AuthCallback] User authenticated. Profile data not fully loaded yet. Waiting/retrying (attempt ${retryCount + 1}/${MAX_AUTH_RETRIES}).`);
-        setMessage(`Loading your profile details (attempt ${retryCount + 1}/${MAX_AUTH_RETRIES})...`);
-        setUiState('loading');
-        timeoutId = setTimeout(() => {
-          if (refreshProfile) {
-            console.log('[AuthCallback] Calling refreshProfile() from AuthContext.');
-            refreshProfile();
-          }
-          setRetryCount(prev => prev + 1);
-        }, 1500);
-        return () => clearTimeout(timeoutId);
-      }
+    // Wait for AuthContext to finish loading the initial user session and essential profiles.
+    if (authContextLoading) {
+      setStatusMessage('Waiting for authentication context to initialize...');
+      console.log('[AuthCallback] AuthContext is loading. Waiting...');
+      return; // Wait for authContextLoading to be false
+    }
 
-      console.log('[AuthCallback] User authenticated and profile data loading attempts complete. Proceeding.');
-      const intentDataString = localStorage.getItem('oauth_intent_data');
-      let intent: OAuthIntentData | null = null;
+    // At this point, authContextLoading is false.
+    // We must have a Supabase user object to proceed.
+    if (!user) {
+      setStatusMessage('No active user session. Redirecting to login.');
+      console.log('[AuthCallback] No Supabase user found after AuthContext loaded. Redirecting to /login.');
+      navigate('/login', { replace: true });
+      return;
+    }
 
-      if (intentDataString) {
-        localStorage.removeItem('oauth_intent_data'); 
-        try {
-          intent = JSON.parse(intentDataString);
-          console.log('[AuthCallback] Retrieved and removed oauth_intent_data from localStorage:', intent);
-        } catch (e) {
-          console.error('[AuthCallback] Error parsing oauth_intent_data from localStorage:', e);
-        }
-      }
-
-      if (intent?.install_after_auth && userProfile?.role === 'developer') {
-        if (developerProfile && developerProfile.github_installation_id) {
-          console.log('[AuthCallback] install_after_auth: Developer already has GitHub App connected. Proceeding to dashboard.');
-        } else if (developerProfile === null || (developerProfile && !developerProfile.github_installation_id)) {
-          console.log('[AuthCallback] install_after_auth: User is developer and needs app install. Redirecting.');
-          redirectToGitHubAppInstall();
-          return; 
-        } else if (developerProfile === undefined && retryCount >= MAX_AUTH_RETRIES) { 
-            console.error('[AuthCallback] install_after_auth: developerProfile still undefined after all retries. Proceeding to dashboard with potential issue.');
-            setMessage('Could not fully verify GitHub connection status. Proceeding to dashboard.');
-            setUiState('info'); 
-        } else if (developerProfile === undefined) {
-            console.warn('[AuthCallback] install_after_auth: developerProfile is still undefined, retries not exhausted. Should be temporary.');
-            setMessage('Finalizing profile...'); 
-            setUiState('loading');
-            return; 
-        }
+    // User object exists. Now check for userProfile (from 'users' table).
+    // If userProfile is still missing, it might be due to propagation delays or an issue in AuthContext.
+    if (!userProfile) {
+      if (retryCount < maxRetries) {
+        setStatusMessage(`Waiting for your profile to load (Attempt ${retryCount + 1}/${maxRetries})...`);
+        console.log(`[AuthCallback] User exists, but userProfile not yet available. Retrying... (Attempt ${retryCount + 1})`);
+        // Attempt to refresh profile from AuthContext, then wait for next effect run via timeout.
+        if (refreshProfile) refreshProfile(); 
+        setTimeout(() => setRetryCount(prev => prev + 1), 1000 + retryCount * 500); // Exponential backoff for retries
       } else {
-        console.log('[AuthCallback] No install_after_auth intent, or user not developer, or app already connected. Conditions for app install redirect not met.', 
-                    {intent_install_after_auth: intent?.install_after_auth, userProfile_role: userProfile?.role});
+        setStatusMessage('Failed to load your profile after multiple retries. Please contact support.');
+        console.error('[AuthCallback] Failed to load userProfile after max retries. User ID:', user.id);
+        // Potentially navigate to an error page or login
+        navigate('/login?error=profile_load_failed', { replace: true });
       }
+      return;
+    }
 
-      if (userProfile) {
-        console.log('[AuthCallback] Proceeding to default dashboard navigation based on role.');
-        setMessage('Authentication successful! Redirecting...');
-        setUiState('success');
-        const targetDashboard = userProfile.role === 'developer' ? '/developer'
-                              : userProfile.role === 'recruiter' ? (userProfile.is_approved ? '/recruiter' : '/dashboard') 
-                              : userProfile.role === 'admin' ? '/admin'
-                              : '/dashboard';
-        console.log(`[AuthCallback] Navigating to ${targetDashboard}`);
-        timeoutId = setTimeout(() => navigate(targetDashboard, { replace: true }), 1000);
-        return () => clearTimeout(timeoutId);
-      } else if (retryCount >= MAX_AUTH_RETRIES) {
-        console.error('[AuthCallback] User authenticated, but userProfile failed to load after all retries. Navigating to generic dashboard.');
-        setMessage('Failed to load your full profile details. Taking you to a general dashboard.');
-        setUiState('error');
-        timeoutId = setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
-        return () => clearTimeout(timeoutId);
-      } else {
-        console.log("[AuthCallback] Fallback: userProfile not available yet, and retries not exhausted. Waiting for next effect run.");
-        setMessage('Loading profile information...');
-        setUiState('loading'); 
+    // User and UserProfile are available. Start processing logic.
+    processingRef.current = true; // Mark as processing
+    setStatusMessage('Your profile loaded. Determining next step...');
+    console.log('[AuthCallback] User and UserProfile loaded. Processing intent...');
+
+    const intentDataString = localStorage.getItem('oauth_intent_data');
+    let intentData: OAuthIntentData | null = null;
+    if (intentDataString) {
+      try {
+        intentData = JSON.parse(intentDataString);
+        console.log('[AuthCallback] Parsed oauth_intent_data from localStorage:', intentData);
+      } catch (e) {
+        console.error('[AuthCallback] Error parsing oauth_intent_data from localStorage:', e);
+        setStatusMessage('Error processing OAuth intent. Please try again.');
+        // Decide on a fallback, e.g., navigate to dashboard or login
+        navigate(userProfile.role === 'developer' ? '/developer' : '/dashboard', { replace: true });
+        localStorage.removeItem('oauth_intent_data'); // Clean up invalid data
+        return;
       }
     }
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      console.log('[AuthCallback] useEffect cleanup.');
-    };
-  }, [user, authLoading, userProfile, developerProfile, navigate, redirectToGitHubAppInstall, retryCount, refreshProfile, location.search]);
+    // Clear the intent data from localStorage once read, regardless of outcome next.
+    localStorage.removeItem('oauth_intent_data');
+    console.log('[AuthCallback] Removed oauth_intent_data from localStorage.');
 
-  let iconToShow = <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />;
-  if (uiState === 'success') iconToShow = <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />;
-  if (uiState === 'error') iconToShow = <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />;
-  if (uiState === 'redirect') iconToShow = <Github className="h-12 w-12 text-blue-600 mx-auto mb-4" />;
-  if (uiState === 'info') iconToShow = <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />;
-  
+    const requiresGitHubAppInstall = intentData?.install_after_auth === true && userProfile.role === 'developer';
+    console.log(`[AuthCallback] Decision variables: requiresGitHubAppInstall=${requiresGitHubAppInstall}, developerProfile exists=${!!developerProfile}, ghInstId=${developerProfile?.github_installation_id}`);
+
+    if (requiresGitHubAppInstall) {
+      // Developer role, and intent was to install the app.
+      // Check if developerProfile is loaded and if github_installation_id is already set.
+      // It's possible developerProfile is not yet loaded if ensureDeveloperProfile in AuthContext is still running
+      // or if it's a brand new developer profile being created.
+      if (!developerProfile || !developerProfile.github_installation_id) {
+        // If developerProfile is missing or doesn't have an installation ID, proceed to install.
+        // This is the critical path for new developers.
+        // We add a small delay IF developerProfile itself is missing, to give AuthContext one last chance to load it
+        // in case it was just created and includes an ID from a previous installation by the same GitHub user.
+        if (!developerProfile && retryCount < maxRetries) {
+            setStatusMessage(`Developer profile not yet fully available for GitHub App check (Attempt ${retryCount + 1}/${maxRetries}). Verifying existing installations...`);
+            console.log(`[AuthCallback] Developer user, requires app install, but developerProfile not yet available. Retrying for developerProfile... (Attempt ${retryCount + 1})`);
+            if (refreshProfile) refreshProfile();
+            setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+                processingRef.current = false; // Allow retry
+            }, 1000 + retryCount * 500);
+            return;
+        }
+        // If developerProfile exists but no ghInstId, or if retries exhausted for loading developerProfile:
+        console.log('[AuthCallback] Conditions met: Developer, install intent, and no GitHub App ID found in developerProfile. Redirecting to GitHub App Install.');
+        redirectToGitHubAppInstall();
+        return; // Important: stop further execution
+      } else {
+        // Developer profile exists AND has an installation ID. App is already connected.
+        console.log('[AuthCallback] Developer, install intent, but GitHub App already connected (ghInstId found). Navigating to developer dashboard.');
+        navigate('/developer', { replace: true, state: { fromAuthCallback: true, ghAppConnected: true } });
+      }
+    } else {
+      // Not a developer requiring app install, or no install intent.
+      // Navigate to the appropriate dashboard based on role.
+      const destination = userProfile.role === 'developer' ? '/developer' : '/dashboard';
+      console.log(`[AuthCallback] No GitHub App installation required or different role. Navigating to ${destination}.`);
+      navigate(destination, { replace: true, state: { fromAuthCallback: true } });
+    }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, userProfile, developerProfile, authContextLoading, authError, navigate, redirectToGitHubAppInstall, retryCount, refreshProfile]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-        <div className="flex justify-center mb-6">
-          {iconToShow}
-        </div>
-        <h1 className="text-2xl font-black text-gray-900 mb-4">
-          {uiState === 'loading' && 'Processing Authentication...'}
-          {uiState === 'success' && 'Success!'}
-          {uiState === 'error' && 'Error'}
-          {uiState === 'redirect' && 'Redirecting to GitHub...'}
-          {uiState === 'info' && 'Information'}
-        </h1>
-        <p className="text-gray-600 mb-6">{message}</p>
-        {authError && <p className="text-sm text-red-500 mt-2">Context Error: {authError}</p>}
-        {(uiState === 'error' || (authLoading && retryCount >= MAX_AUTH_RETRIES && !user)) && (
-          <button
-            onClick={() => navigate('/login', { replace: true })}
-            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-          >
-            Go to Login
-          </button>
-        )}
-      </div>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      fontFamily: 'Arial, sans-serif',
+      color: '#333',
+      textAlign: 'center'
+    }}>
+      <Loader className="animate-spin h-12 w-12 text-blue-600 mb-6" />
+      <h1 style={{ fontSize: '24px', marginBottom: '12px' }}>Processing Authentication</h1>
+      <p style={{ fontSize: '16px', color: '#555' }}>{statusMessage}</p>
+      {authError && <p style={{ fontSize: '14px', color: 'red', marginTop: '10px' }}>Error: {authError}</p>}
+      {retryCount > 2 && <p style={{fontSize: '12px', color: '#777', marginTop: '20px'}}>Attempt {retryCount} of {maxRetries}. If this persists, please try logging in again or contact support.</p>}
     </div>
   );
 };
