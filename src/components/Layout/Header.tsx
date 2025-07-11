@@ -97,7 +97,6 @@ export const Header = () => {
           <Link to="/" className="flex items-center group py-8">
             <div className="h-32 w-auto flex items-center justify-center group-hover:scale-105 transition-all duration-300">
               <img 
-                src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo%20(1).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28gKDEpLnBuZyIsImlhdCI6MTc1MTI3ODAzMiwiZXhwIjoxNzgyODE0MDMyfQ.RSxR-UPfLSdds3m-WkyTHHu4y7jy9fL974ce-JdCjPc"
                 src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentLogo%20(2).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudExvZ28gKDIpLnBuZyIsImlhdCI6MTc1MTMxNzQ1OSwiZXhwIjoxNzgyODUzNDU5fQ.PK6RssY3w4Sqwr6wc2AlFy7OwRyq4iMTmxAH1MMaKvs"
                 alt="GitTalent Logo"
                 className="h-full w-auto object-contain"
