@@ -121,7 +121,9 @@ export const JobsTab: React.FC = () => {
     try {
       const { data, error: jobsError } = await supabase
         .from('job_roles')
-        .select('*, recruiter:recruiter_id(company_name)') // Attempting to use FK recruiter_id and alias to 'recruiter'
+        // New query: job_roles.recruiter_id -> users.id -> recruiters.user_id -> recruiters.company_name
+        // Alias the final structure to job.recruiter.company_name
+        .select('*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name))')
         .eq('is_active', true)
         // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
