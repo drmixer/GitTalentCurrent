@@ -119,6 +119,7 @@ export const JobsTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null); // For save/apply loading state
+  const [currentJobView, setCurrentJobView] = useState<'all' | 'saved' | 'applied'>('all');
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -231,11 +232,28 @@ export const JobsTab: React.FC = () => {
     }
   };
 
-  const filteredJobs = jobs.filter(job =>
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.recruiter?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const displayedJobs = useMemo(() => {
+    let jobsToShow = jobs;
+    if (currentJobView === 'saved') {
+      jobsToShow = jobs.filter(job => savedJobIds.has(job.id));
+    } else if (currentJobView === 'applied') {
+      jobsToShow = jobs.filter(job => appliedJobIds.has(job.id));
+    }
+
+    if (!searchTerm.trim()) {
+      return jobsToShow;
+    }
+
+    return jobsToShow.filter(job =>
+      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.recruiter?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [jobs, savedJobIds, appliedJobIds, currentJobView, searchTerm]);
+
+  // Use 'displayedJobs' instead of 'filteredJobs' for rendering the list and checking length
+  // const filteredJobs = ... (This line can be removed or commented out)
+
 
   if (loading && jobs.length === 0) {
     return <div className="flex justify-center items-center p-10"><Loader size={32} className="animate-spin text-blue-600" /></div>;
@@ -260,7 +278,21 @@ export const JobsTab: React.FC = () => {
             className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
           />
         </div>
-        {/* TODO: Add filter buttons (e.g., location, job type, remote) */}
+        {/* Filter Buttons */}
+        <div className="mt-4 flex space-x-2 pb-2 border-b border-gray-200">
+          {(['all', 'saved', 'applied'] as const).map((view) => (
+            <button
+              key={view}
+              onClick={() => setCurrentJobView(view)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                ${currentJobView === view
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 hover:border-gray-300'}`}
+            >
+              {view === 'all' ? 'All Jobs' : view === 'saved' ? 'Saved Jobs' : 'Applied Jobs'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -270,18 +302,25 @@ export const JobsTab: React.FC = () => {
       )}
 
       {/* Job Listings */}
-      {!loading && filteredJobs.length === 0 && (
+      {!loading && displayedJobs.length === 0 && (
         <div className="text-center py-10">
           <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700">No jobs found</h3>
+          <h3 className="text-xl font-semibold text-gray-700">
+            {currentJobView === 'all' && !searchTerm && "No jobs available right now."}
+            {currentJobView === 'saved' && "You haven't saved any jobs yet."}
+            {currentJobView === 'applied' && "You haven't applied to any jobs yet."}
+            {searchTerm && "No jobs match your current search and filter."}
+          </h3>
           <p className="text-gray-500">
-            {searchTerm ? "Try adjusting your search or filters." : "Check back later for new opportunities."}
+            {currentJobView === 'all' && !searchTerm && "Check back later for new opportunities."}
+            {(currentJobView === 'saved' || currentJobView === 'applied') && "Explore all jobs to find opportunities!"}
+            {searchTerm && "Try broadening your search criteria."}
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredJobs.map(job => (
+        {displayedJobs.map(job => (
           <JobCard
             key={job.id}
             job={job}
