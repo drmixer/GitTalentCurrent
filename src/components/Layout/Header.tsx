@@ -184,14 +184,14 @@ export const Header = () => {
                 </Link>
                 <div className="flex items-center space-x-4">
                   <Link
-                    to="/profile"
+                    to={`${getDashboardPath()}?tab=profile`} // Changed to navigate to profile tab
                     className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm font-semibold">{getDisplayName()}</span>
                   </Link>
                   <Link
-                    to={`${getDashboardPath()}?tab=notifications`}
+                    to={`${getDashboardPath()}?tab=messages`} // Changed to navigate to messages tab
                     className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                   >
                     <NotificationBadge />

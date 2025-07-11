@@ -198,7 +198,36 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
         featured: formData.featured
       };
 
+      // If this item is being marked as featured, unfeature other items first
+      if (itemData.featured) {
+        // Get ID of current item if editing, null if new
+        const currentItemId = editingItem ? editingItem.id : null;
+
+        // Find any other item that is currently featured
+        const { data: currentlyFeaturedItems, error: fetchFeaturedError } = await supabase
+          .from('portfolio_items')
+          .select('id')
+          .eq('developer_id', developerId)
+          .eq('featured', true);
+
+        if (fetchFeaturedError) throw fetchFeaturedError;
+
+        for (const featuredItem of currentlyFeaturedItems) {
+          // Unfeature it, unless it's the current item already being saved as featured
+          if (featuredItem.id !== currentItemId) {
+            const { error: unfeatureError } = await supabase
+              .from('portfolio_items')
+              .update({ featured: false })
+              .eq('id', featuredItem.id);
+            if (unfeatureError) throw unfeatureError;
+          }
+        }
+      }
+
       if (editingItem) {
+        // If editing an item that was featured and is now being unfeatured,
+        // itemData.featured will be false.
+        // If editing an item to become featured, the logic above handles unfeaturing others.
         const { error } = await supabase
           .from('portfolio_items')
           .update(itemData)
@@ -206,6 +235,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
 
         if (error) throw error;
       } else {
+        // If adding a new item as featured, the logic above handles unfeaturing others.
         const { error } = await supabase
           .from('portfolio_items')
           .insert(itemData);
@@ -213,7 +243,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
         if (error) throw error;
       }
 
-      await fetchPortfolioItems();
+      await fetchPortfolioItems(); // This will re-fetch and show the correct featured item
       resetForm();
     } catch (error: any) {
       console.error('Error saving portfolio item:', error);
