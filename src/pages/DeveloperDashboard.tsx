@@ -95,23 +95,17 @@ export const DeveloperDashboard: React.FC = () => {
   let gitHubDataErrorToShow = standardGitHubError;
 
   if (latchedSuccessfullyFetchedFreshData) {
-      console.log('[Dashboard RENDER] Prioritizing latched fresh GitHub data.');
       finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
       gitHubDataLoadingToShow = false;
       gitHubDataErrorToShow = null;
   } else if (shouldUseFreshDataSource) {
-      console.log('[Dashboard RENDER] Using direct fresh GitHub data source (pre-latch).');
       finalGitHubDataToShow = freshGitHubDataFromHook;
       gitHubDataLoadingToShow = freshGitHubLoading;
       gitHubDataErrorToShow = freshGitHubError;
-  } else {
-      console.log('[Dashboard RENDER] Using standard GitHub data source.');
   }
 
   const fetchDeveloperPageData = useCallback(async () => {
-    if (!authUser?.id) {
-      setDashboardPageLoading(false); return;
-    }
+    if (!authUser?.id) { setDashboardPageLoading(false); return; }
     setDashboardPageLoading(true);
     try {
       const { data: devData, error: devError } = await supabase.from('developers').select('*, user:users(name, email)').eq('user_id', authUser.id).single();
@@ -225,22 +219,9 @@ export const DeveloperDashboard: React.FC = () => {
               <button onClick={() => setActiveTab('portfolio')} className="text-blue-600 hover:text-blue-700 text-sm font-medium">View All Projects</button>
             </div>
             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-              {featuredPortfolioItem.image_url && (
-                <div className="mb-4">
-                  <img src={featuredPortfolioItem.image_url} alt={featuredPortfolioItem.title} className="w-full h-48 object-cover rounded-xl border border-gray-200" onError={(e) => { const target = e.target as HTMLImageElement; target.style.display = 'none'; }} />
-                </div>
-              )}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h4 className="text-lg font-semibold text-gray-900">{featuredPortfolioItem.title}</h4>
-                  <p className="text-sm text-gray-700 mt-1">{featuredPortfolioItem.description}</p>
-                </div>
-              </div>
-              <div className="flex space-x-4 text-xs text-gray-600">
-                {featuredPortfolioItem.tech_stack?.map((tech: string, idx: number) => (
-                  <span key={idx} className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">{tech}</span>
-                ))}
-              </div>
+              {featuredPortfolioItem.image_url && (<img src={featuredPortfolioItem.image_url} alt={featuredPortfolioItem.title} className="w-full h-48 object-cover rounded-xl border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />)}
+              <div className="flex items-start justify-between mb-3 mt-4"><div className="flex-1"><h4 className="text-lg font-semibold">{featuredPortfolioItem.title}</h4><p className="text-sm text-gray-700 mt-1">{featuredPortfolioItem.description}</p></div></div>
+              <div className="flex space-x-4 text-xs">{featuredPortfolioItem.tech_stack?.map((tech: string, idx: number) => (<span key={idx} className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">{tech}</span>))}</div>
             </div>
           </div>
         )}
@@ -309,7 +290,14 @@ export const DeveloperDashboard: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="lg:w-2/5 flex-shrink-0">
               <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-                <RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} className="w-full" displayMode='dashboardSnippet' />
+                <RealGitHubChart
+                  githubHandle={contextDeveloperProfile.github_handle}
+                  gitHubData={finalGitHubDataToShow}
+                  loading={gitHubDataLoadingToShow}
+                  error={gitHubDataErrorToShow as Error | null}
+                  className="w-full"
+                  displayMode='dashboardSnippet'
+                />
               </div>
             </div>
             <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
@@ -339,19 +327,11 @@ export const DeveloperDashboard: React.FC = () => {
                   <p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity. This might be temporary or due to missing data.</p>
                    <button onClick={async () => {
                        console.log('[Dashboard] Manual refresh GitHub data clicked.');
-                       // When manually refreshing, we probably want to clear latched data and re-trigger fresh if applicable,
-                       // or just trigger standard load.
                        setLatchedSuccessfullyFetchedFreshData(null);
-                       setHasFreshDataBeenProcessed(false); // Allow fresh processing again if nav state is still fresh
+                       setHasFreshDataBeenProcessed(false);
                        if (locationState?.isFreshGitHubSetup || !contextDeveloperProfile?.github_installation_id) {
-                           // If it was a fresh setup or app not fully connected, try to re-trigger fresh flow
-                           // This might involve a navigation to /github-setup or specific logic in useFreshGitHubDataOnce
-                           // For now, just try to refresh context which might re-evaluate freshLoadParams
                            if(refreshProfile) await refreshProfile();
                        } else {
-                           // If not a fresh setup scenario, trigger standard GitHub load if available
-                           // This assumes useGitHub hook has a refetch method or responds to dependency changes.
-                           // For now, also try refreshProfile.
                            if(refreshProfile) await refreshProfile();
                        }
                     }} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh Data</button>
