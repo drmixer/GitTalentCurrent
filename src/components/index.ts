@@ -26,6 +26,7 @@ export { DeveloperList } from './DeveloperList';
 // GitHub components
 export { GitHubChart } from './GitHub/GitHubChart';
 export { RealGitHubChart } from './GitHub/RealGitHubChart';
+export { GitHubConnectPrompt } from './GitHubConnectPrompt';
 
 // Portfolio components
 export { PortfolioManager } from './Portfolio/PortfolioManager';
