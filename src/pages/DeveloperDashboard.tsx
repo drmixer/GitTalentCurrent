@@ -60,6 +60,7 @@ export const DeveloperDashboard: React.FC = () => {
 
   const [dashboardPageLoading, setDashboardPageLoading] = useState(true);
   const [hasFreshDataBeenProcessed, setHasFreshDataBeenProcessed] = useState(false);
+  const [latchedSuccessfullyFetchedFreshData, setLatchedSuccessfullyFetchedFreshData] = useState<typeof initialStateForGitHubData | null>(null);
 
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
@@ -72,7 +73,7 @@ export const DeveloperDashboard: React.FC = () => {
   }, [locationState?.isFreshGitHubSetup, locationState?.freshGitHubInstallationId, locationState?.freshGitHubHandle, contextDeveloperProfile?.github_handle]);
 
   const { 
-    gitHubData: freshGitHubData, 
+    gitHubData: freshGitHubDataFromHook,
     loading: freshGitHubLoading, 
     error: freshGitHubError 
   } = useFreshGitHubDataOnce({
@@ -85,7 +86,7 @@ export const DeveloperDashboard: React.FC = () => {
     gitHubData: standardGitHubData, 
     loading: standardGitHubLoading, 
     error: standardGitHubError 
-  } = useGitHub(!freshLoadParams);
+  } = useGitHub(!freshLoadParams && !latchedSuccessfullyFetchedFreshData);
 
   const shouldUseFreshDataSource = !!freshLoadParams;
 
@@ -93,14 +94,14 @@ export const DeveloperDashboard: React.FC = () => {
   let gitHubDataLoadingToShow = standardGitHubLoading;
   let gitHubDataErrorToShow = standardGitHubError;
 
-  if (hasFreshDataBeenProcessed && freshGitHubData?.user) {
-      console.log('[Dashboard RENDER] Prioritizing processed fresh GitHub data.');
-      finalGitHubDataToShow = freshGitHubData;
+  if (latchedSuccessfullyFetchedFreshData) {
+      console.log('[Dashboard RENDER] Prioritizing latched fresh GitHub data.');
+      finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
       gitHubDataLoadingToShow = false;
       gitHubDataErrorToShow = null;
   } else if (shouldUseFreshDataSource) {
-      console.log('[Dashboard RENDER] Using direct fresh GitHub data source.');
-      finalGitHubDataToShow = freshGitHubData;
+      console.log('[Dashboard RENDER] Using direct fresh GitHub data source (pre-latch).');
+      finalGitHubDataToShow = freshGitHubDataFromHook;
       gitHubDataLoadingToShow = freshGitHubLoading;
       gitHubDataErrorToShow = freshGitHubError;
   } else {
@@ -127,7 +128,7 @@ export const DeveloperDashboard: React.FC = () => {
   }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
   useEffect(() => {
-    if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) { // shouldUseFreshDataSource here
+    if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) {
       setDashboardPageLoading(false);
     }
   }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
@@ -180,12 +181,13 @@ export const DeveloperDashboard: React.FC = () => {
   }, [activeTab, location.search, location.state, navigate, location.pathname]);
 
   useEffect(() => {
-    if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubData?.user && !hasFreshDataBeenProcessed) {
+    if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
+      setLatchedSuccessfullyFetchedFreshData(freshGitHubDataFromHook);
       setHasFreshDataBeenProcessed(true);
     } else if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubError && !hasFreshDataBeenProcessed) {
       setHasFreshDataBeenProcessed(true);
     }
-  }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubData, freshGitHubError, hasFreshDataBeenProcessed]);
+  }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubDataFromHook, freshGitHubError, hasFreshDataBeenProcessed]);
 
   useEffect(() => {
     if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) {
@@ -199,26 +201,79 @@ export const DeveloperDashboard: React.FC = () => {
     if (showGitHubConnectModal !== show) setShowGitHubConnectModal(show);
   }, [contextDeveloperProfile?.github_handle, contextDeveloperProfile?.github_installation_id, activeTab, showGitHubConnectModal]);
 
-  const renderOverview = () => { /* ... */ };
+  const renderOverview = () => {
+    const displayDeveloperData = developerData || contextDeveloperProfile;
+    return (
+      <div className="space-y-6">
+        {displayDeveloperData && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Strength</h3>
+            <ProfileStrengthIndicator strength={displayDeveloperData.profile_strength || 0} showDetails={true} />
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white rounded-lg shadow-sm border p-6"><div className="flex items-center"><div className="p-3 bg-blue-100 rounded-lg"><Github className="w-6 h-6 text-blue-600" /></div><div className="ml-4"><p className="text-sm font-medium text-gray-600">GitHub Connection</p><p className="text-2xl font-bold text-gray-900">{contextDeveloperProfile?.github_installation_id ? 'Active' : 'Not Connected'}</p></div></div></div>
+          <div className="bg-white rounded-lg shadow-sm border p-6"><div className="flex items-center"><div className="p-3 bg-cyan-100 rounded-lg"><SearchCheck className="w-6 h-6 text-cyan-600" /></div><div className="ml-4"><p className="text-sm font-medium text-gray-600">Search Appearances</p><p className="text-2xl font-bold text-gray-900">{displayDeveloperData?.search_appearance_count || 0}</p></div></div></div>
+          <div className="bg-white rounded-lg shadow-sm border p-6"><div className="flex items-center"><div className="p-3 bg-green-100 rounded-lg"><MessageSquare className="w-6 h-6 text-green-600" /></div><div className="ml-4"><p className="text-sm font-medium text-gray-600">Unread Messages</p><p className="text-2xl font-bold text-gray-900">{messages.filter(m => !m.is_read && m.receiver_id === authUser?.id).length}</p></div></div></div>
+          <div className="bg-white rounded-lg shadow-sm border p-6"><div className="flex items-center"><div className="p-3 bg-purple-100 rounded-lg"><Briefcase className="w-6 h-6 text-purple-600" /></div><div className="ml-4"><p className="text-sm font-medium text-gray-600">Job Interests</p><p className="text-2xl font-bold text-gray-900">{recommendedJobs.length > 0 ? recommendedJobs.length : '0'}</p></div></div></div>
+          <div className="bg-white rounded-lg shadow-sm border p-6"><div className="flex items-center"><div className="p-3 bg-yellow-100 rounded-lg"><Eye className="w-6 h-6 text-yellow-600" /></div><div className="ml-4"><p className="text-sm font-medium text-gray-600">Profile Views</p><p className="text-2xl font-bold text-gray-900">{displayDeveloperData?.profile_view_count || 0}</p></div></div></div>
+        </div>
+        {featuredPortfolioItem && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Featured Project</h3>
+              <button onClick={() => setActiveTab('portfolio')} className="text-blue-600 hover:text-blue-700 text-sm font-medium">View All Projects</button>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+              {featuredPortfolioItem.image_url && (
+                <div className="mb-4">
+                  <img src={featuredPortfolioItem.image_url} alt={featuredPortfolioItem.title} className="w-full h-48 object-cover rounded-xl border border-gray-200" onError={(e) => { const target = e.target as HTMLImageElement; target.style.display = 'none'; }} />
+                </div>
+              )}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h4 className="text-lg font-semibold text-gray-900">{featuredPortfolioItem.title}</h4>
+                  <p className="text-sm text-gray-700 mt-1">{featuredPortfolioItem.description}</p>
+                </div>
+              </div>
+              <div className="flex space-x-4 text-xs text-gray-600">
+                {featuredPortfolioItem.tech_stack?.map((tech: string, idx: number) => (
+                  <span key={idx} className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">{tech}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   console.log('[Dashboard RENDER]', 
-    `PageLoad: ${dashboardPageLoading}`, `AuthLoad: ${authContextLoading}`, `User: ${authUser?.id?.substring(0,8)}`,
-    `UP: ${userProfile?.id?.substring(0,8)}`, `DP: ${contextDeveloperProfile?.user_id?.substring(0,8)}(ghId:${contextDeveloperProfile?.github_installation_id ? 'SET' : 'NULL'})`,
+    `PageLoad: ${dashboardPageLoading}`, `AuthLoad: ${authContextLoading}`,
     `FreshParams: ${freshLoadParams ? JSON.stringify(freshLoadParams) : 'NULL'}`, 
-    `FreshLoad(Source): ${freshGitHubLoading}`, `FreshErr(Source): ${!!freshGitHubError}`, `FreshData(Source): ${!!freshGitHubData?.user}`,
+    `FreshLoad(Source): ${freshGitHubLoading}`, `FreshErr(Source): ${!!freshGitHubError}`, `FreshData(Hook): ${!!freshGitHubDataFromHook?.user}`,
+    `LatchedFreshData: ${!!latchedSuccessfullyFetchedFreshData?.user}`,
     `StdLoad: ${standardGitHubLoading}`, `StdErr: ${!!standardGitHubError}`, `StdData: ${!!standardGitHubData?.user}`,
     `FinalGHLoad: ${gitHubDataLoadingToShow}`, `FinalGHErr: ${!!gitHubDataErrorToShow}`, `FinalGHData: ${!!finalGitHubDataToShow?.user}`,
     `ActiveTab: ${activeTab}`, `shouldUseFreshDataSource: ${shouldUseFreshDataSource}`, `hasFreshDataBeenProcessed: ${hasFreshDataBeenProcessed}`
   );
 
   if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) {
-    return <div className="flex justify-center items-center h-screen"><Loader className="animate-spin h-12 w-12 text-blue-600" /><span className="ml-4">Loading Dashboard...</span></div>;
+    return <div className="flex justify-center items-center h-screen"><Loader className="animate-spin h-12 w-12 text-blue-600" /><span className="ml-4 text-lg text-gray-700">Loading Dashboard...</span></div>;
   }
   if (dashboardPageLoading && !authContextLoading && authUser) {
-     return <div className="flex justify-center items-center h-screen"><Loader className="animate-spin h-12 w-12 text-blue-600" /><span className="ml-4">Loading Your Details...</span></div>;
+     return <div className="flex justify-center items-center h-screen"><Loader className="animate-spin h-12 w-12 text-blue-600" /><span className="ml-4 text-lg text-gray-700">Loading Your Details...</span></div>;
   }
   if (!userProfile && !authContextLoading && !dashboardPageLoading) {
-    return <div className="text-center p-8">Error loading profile. Please refresh or log in again.</div>;
+    return (
+        <div className="flex flex-col justify-center items-center h-screen p-4 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Profile Not Loaded</h2>
+            <p className="text-gray-600 mb-6">We encountered an issue loading your profile. Please try refreshing the page or logging out and back in.</p>
+            <button onClick={() => refreshProfile ? refreshProfile() : window.location.reload()} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-2">Refresh Profile</button>
+            <button onClick={() => navigate('/login')} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">Go to Login</button>
+        </div>
+    );
   }
 
   const displayDeveloperProfileForForm = contextDeveloperProfile || developerData;
@@ -244,7 +299,7 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'profile' && (
         displayDeveloperProfileForForm ?
           <DeveloperProfileForm initialData={displayDeveloperProfileForForm} onSuccess={async () => { if(refreshProfile) await refreshProfile(); await fetchDeveloperPageData();}} isOnboarding={false} />
-          : <div className="text-center p-8">Loading profile form...</div>
+          : <div className="text-center p-8 bg-white rounded-lg shadow-md border"><Loader className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" /><p className="text-gray-600">Loading profile information...</p></div>
       )}
 
       {activeTab === 'portfolio' && <PortfolioManager developerId={authUser?.id || ''} />}
@@ -252,8 +307,12 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'github-activity' && (
         contextDeveloperProfile?.github_handle && contextDeveloperProfile?.github_installation_id ? (
           <div className="flex flex-col lg:flex-row gap-6">
-            <div className="lg:w-2/5"><RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} className="w-full" displayMode='dashboardSnippet' /></div>
-            <div className="lg:w-3/5">
+            <div className="lg:w-2/5 flex-shrink-0">
+              <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                <RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} className="w-full" displayMode='dashboardSnippet' />
+              </div>
+            </div>
+            <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
               {gitHubDataLoadingToShow && (
                 <div className="flex flex-col items-center justify-center h-64">
                   <Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" />
@@ -267,18 +326,48 @@ export const DeveloperDashboard: React.FC = () => {
                   <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
                   <h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3>
                   <p className="text-red-600 mt-2 text-sm">{typeof gitHubDataErrorToShow === 'string' ? gitHubDataErrorToShow : (gitHubDataErrorToShow as Error)?.message || 'An unknown error occurred.'}</p>
-                  <button onClick={() => navigate('/github-setup')} className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600">Re-check</button>
+                  <button onClick={() => navigate('/github-setup')} className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Re-check Connection</button>
                 </div>
               )}
               {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && finalGitHubDataToShow?.user && (
                 <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
               )}
               {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (
-                <div className="text-center p-8">No GitHub data available.</div>
+                <div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-yellow-700">No GitHub Data Available</h3>
+                  <p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity. This might be temporary or due to missing data.</p>
+                   <button onClick={async () => {
+                       console.log('[Dashboard] Manual refresh GitHub data clicked.');
+                       // When manually refreshing, we probably want to clear latched data and re-trigger fresh if applicable,
+                       // or just trigger standard load.
+                       setLatchedSuccessfullyFetchedFreshData(null);
+                       setHasFreshDataBeenProcessed(false); // Allow fresh processing again if nav state is still fresh
+                       if (locationState?.isFreshGitHubSetup || !contextDeveloperProfile?.github_installation_id) {
+                           // If it was a fresh setup or app not fully connected, try to re-trigger fresh flow
+                           // This might involve a navigation to /github-setup or specific logic in useFreshGitHubDataOnce
+                           // For now, just try to refresh context which might re-evaluate freshLoadParams
+                           if(refreshProfile) await refreshProfile();
+                       } else {
+                           // If not a fresh setup scenario, trigger standard GitHub load if available
+                           // This assumes useGitHub hook has a refetch method or responds to dependency changes.
+                           // For now, also try refreshProfile.
+                           if(refreshProfile) await refreshProfile();
+                       }
+                    }} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh Data</button>
+                </div>
               )}
             </div>
           </div>
-        ) : <div className="text-center p-8">Connect GitHub to see activity.</div>
+        ) : (
+          <div className="text-center p-8 bg-white rounded-lg shadow-md border">
+            <Github className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-2xl font-semibold text-gray-700 mb-3">Connect Your GitHub Account</h3>
+            <button onClick={() => { if (!contextDeveloperProfile?.github_handle) { setActiveTab('profile'); navigate('/developer?tab=profile', { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm hover:shadow-md">
+              {contextDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Go to Profile to Add GitHub Handle'}
+            </button>
+          </div>
+        )
       )}
 
       {activeTab === 'messages' && (
@@ -287,8 +376,9 @@ export const DeveloperDashboard: React.FC = () => {
           <div className="md:w-2/3">{selectedMessageThreadId ? <MessageThread threadId={selectedMessageThreadId} /> : <div className="p-6 text-center">Select a message.</div>}</div>
         </div>
       )}
-
-      {activeTab === 'jobs' && <div>Job Search Placeholder</div>}
+      {activeTab === 'jobs' && (
+         <div className="p-4 bg-gray-50 rounded-lg shadow"><h3 className="text-lg font-semibold">Job Search (Placeholder)</h3><p>Job listings and search functionality will appear here.</p></div>
+      )}
     </div>
   );
 };
