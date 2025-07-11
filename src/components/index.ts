@@ -52,3 +52,13 @@ export { Pricing } from './Landing/Pricing';
 export { About } from './Landing/About';
 export { FAQ } from './Landing/FAQ';
 export { Contact } from './Landing/Contact';
+
+// Overview Tab components
+export { OverviewTab } from './Overview/OverviewTab';
+export { SnapshotCard } from './Overview/SnapshotCard';
+export { FeaturedProject } from './Overview/FeaturedProject';
+export { RecentGitHubActivity } from './Overview/RecentGitHubActivity';
+export { LatestEndorsements } from './Overview/LatestEndorsements';
+
+// Jobs Tab components
+export { JobsTab } from './Jobs/JobsTab';

@@ -105,6 +105,12 @@ export interface Developer {
   skills?: string[];                // Core skills
   public_repos_count?: number;      // GitHub public repositories count
   annual_contributions?: number;    // GitHub contributions in the last year
+
+  // Fields for Overview tab snapshot cards
+  endorsements_count?: number;
+  saved_jobs_count?: number;
+  applied_jobs_count?: number;
+  public_profile_enabled?: boolean; // For public/private toggle
 }
 
 export interface PortfolioItem {
@@ -119,6 +125,32 @@ export interface PortfolioItem {
   featured: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Endorsement {
+  id: string;
+  endorser_id: string; // User ID of the person giving endorsement
+  developer_id: string; // User ID of the developer being endorsed
+  text: string;
+  created_at: string;
+  endorser?: User; // Optional: for displaying endorser info
+}
+
+export interface SavedJob {
+  id: string;
+  developer_id: string;
+  job_id: string;
+  saved_at: string;
+  job_role?: JobRole; // Optional: for displaying job info
+}
+
+export interface AppliedJob {
+  id: string;
+  developer_id: string;
+  job_id: string;
+  applied_at: string;
+  status: 'applied' | 'viewed' | 'interviewing' | 'offer' | 'rejected' | 'archived';
+  job_role?: JobRole; // Optional: for displaying job info
 }
 
 export interface Recruiter {

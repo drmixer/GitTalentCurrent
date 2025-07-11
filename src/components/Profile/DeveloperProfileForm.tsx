@@ -25,6 +25,7 @@ interface DeveloperProfile {
   resume_url?: string;
   profile_pic_url?: string;
   github_installation_id?: string;
+  public_profile_enabled?: boolean; // Added for public/private toggle
 }
 
 interface DeveloperProfileFormProps {
@@ -89,6 +90,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     resume_url: '',
     profile_pic_url: '',
     github_installation_id: '',
+    public_profile_enabled: initialData?.public_profile_enabled === undefined ? true : initialData.public_profile_enabled, // Default to true if not set
     ...initialData
   });
 
@@ -694,24 +696,78 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               Profile Settings
             </h3>
 
-            {/* Public Profile Slug */}
+            {/* Public Profile Enabled Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Public Profile Visibility
+              </label>
+              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, public_profile_enabled: !prev.public_profile_enabled }))}
+                  className={`${
+                    formData.public_profile_enabled ? 'bg-blue-600' : 'bg-gray-300'
+                  } relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                >
+                  <span
+                    className={`${
+                      formData.public_profile_enabled ? 'translate-x-6' : 'translate-x-1'
+                    } inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-200 ease-in-out`}
+                  />
+                </button>
+                <span className={`text-sm ${formData.public_profile_enabled ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                  {formData.public_profile_enabled ? 'Your profile is PUBLIC' : 'Your profile is PRIVATE'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                When public, your profile will be visible at the URL below. When private, only you can see it.
+              </p>
+            </div>
+
+            {/* Public Profile Slug and URL Display */}
             <div>
               <label htmlFor="public_profile_slug" className="block text-sm font-medium text-gray-700 mb-2">
-                Public Profile URL
+                Public Profile URL Slug
               </label>
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">gittalent.dev/</span> {/* Updated prefix */}
+                <span className="px-3 py-2 bg-gray-100 text-gray-500 border border-r-0 border-gray-300 rounded-l-lg text-sm">
+                  https://gittalent.dev/u/
+                </span>
                 <input
                   type="text"
                   id="public_profile_slug"
                   value={formData.public_profile_slug}
                   onChange={(e) => setFormData(prev => ({ ...prev, public_profile_slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="your-name"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="your-unique-slug"
+                  disabled={!formData.public_profile_enabled}
                 />
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                This will be your public profile URL that you can share with others
+              {formData.public_profile_enabled && formData.public_profile_slug && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center justify-between">
+                  <span>
+                    Your public URL:
+                    <a
+                      href={`https://gittalent.dev/u/${formData.public_profile_slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium hover:underline ml-1"
+                    >
+                      gittalent.dev/u/{formData.public_profile_slug}
+                    </a>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(`https://gittalent.dev/u/${formData.public_profile_slug}`)}
+                    className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    title="Copy URL"
+                  >
+                    Copy
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Customize your unique URL. Only lowercase letters, numbers, and hyphens.
               </p>
               {errors.public_profile_slug && (
                 <p className="text-red-600 text-sm mt-1">{errors.public_profile_slug}</p>

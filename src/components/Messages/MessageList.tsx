@@ -53,19 +53,22 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
       
       // Set up real-time subscription for new messages
       const subscription = supabase
-        .channel('new-messages')
+        .channel('public-messages-thread-list')
         .on(
           'postgres_changes',
           {
-            event: REALTIME_LISTEN_TYPES.INSERT,
+            event: '*', // Listen to INSERT and UPDATE
             schema: 'public',
             table: 'messages',
-            filter: `receiver_id=eq.${userProfile.id}`
+            // Filter for messages where the current user is either sender or receiver,
+            // as changes to 'is_read' status or new messages can affect thread list.
+            filter: `receiver_id=eq.${userProfile.id}` // More specific for updates relevant to this user's unread counts
           },
           (payload) => {
-            console.log('New message received:', payload);
-            // Refresh threads when a new message is received
-            fetchMessageThreads();
+            console.log('Change in messages table detected (relevant to user):', payload);
+            // Could be more granular here by checking payload.eventType
+            // For INSERT: new message. For UPDATE: likely is_read change.
+            fetchMessageThreads(); // Refresh threads to update unread counts and last messages
           }
         )
         .subscribe();
