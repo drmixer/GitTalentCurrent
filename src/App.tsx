@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { Header } from './components/Layout/Header';
 import { LandingPage } from './pages/LandingPage';
