@@ -163,9 +163,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
     try {
       const profileStrength = calculateProfileStrength(formData);
+      // Destructure to remove the 'user' object if it exists, and any other non-column data
+      const { user, ...developerDataOnly } = formData;
       const dataToSave = {
-        ...formData,
+        ...developerDataOnly,
         profile_strength: profileStrength
+        // user_id is already part of formData and thus in developerDataOnly
       };
 
       const { error } = await supabase
