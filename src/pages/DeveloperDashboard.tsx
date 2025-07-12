@@ -435,7 +435,7 @@ export const DeveloperDashboard: React.FC = () => {
         contextDeveloperProfile?.github_handle && contextDeveloperProfile?.github_installation_id ? (
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="lg:w-2/5 flex-shrink-0"><div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-                <RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} gitHubData={finalGitHubDataToShow} loading={gitHubDataLoadingToShow} error={gitHubDataErrorToShow as Error | null} className="w-full" displayMode='dashboardSnippet' />
+                <RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} gitHubData={finalGitHubDataToShow} loading={gitHubDataLoadingToShow} error={gitHubDataErrorToShow as Error | null} className="w-full" displayMode='dashboardSnippet' isGitHubAppInstalled={!!contextDeveloperProfile?.github_installation_id} />
             </div></div>
             <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
               {gitHubDataLoadingToShow && (<div className="flex flex-col items-center justify-center h-64"><Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" /><p className="text-gray-600">{shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}</p></div>)}
