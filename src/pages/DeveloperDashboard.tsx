@@ -198,9 +198,8 @@ export const DeveloperDashboard: React.FC = () => {
       // Fetch endorsements
       const { data: endorsementData, error: endorsementError } = await supabase
         .from('endorsements')
-        // Explicitly use endorser_id FK to fetch details from the users table.
-        // Assumes 'users' table has name, title, avatar_url. 'title' might be on a profile table.
-        .select('*, endorser:endorser_id(name, title, avatar_url)')
+        // Select only 'name' for the endorser, as 'title' and 'avatar_url' are not on the users table.
+        .select('*, endorser:endorser_id(name)')
         .eq('developer_id', authUser.id)
         .order('created_at', { ascending: false });
       if (endorsementError) console.error('[Dashboard] Error fetching endorsements:', endorsementError);
