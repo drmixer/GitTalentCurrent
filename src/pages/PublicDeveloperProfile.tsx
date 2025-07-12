@@ -24,6 +24,8 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
   const { user: currentUser } = useAuth(); // Get the currently authenticated user
+
+  // Fetch GitHub data only when developer data is available
   const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(!!developer?.github_handle);
 
   useEffect(() => {
@@ -140,7 +142,7 @@ export const PublicDeveloperProfile: React.FC = () => {
               {developer.profile_pic_url ? (
                 <img 
                   src={developer.profile_pic_url} 
-                  alt={developer.user.name}
+                  alt={developer.user?.name}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -149,21 +151,21 @@ export const PublicDeveloperProfile: React.FC = () => {
                     if (parent) {
                       const fallback = document.createElement('div');
                       fallback.className = "w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white";
-                      fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                      fallback.textContent = developer.user?.name.split(' ').map(n => n[0]).join('');
                       parent.appendChild(fallback);
                     }
                   }}
                 />
               ) : (
                 <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white">
-                  {developer.user.name.split(' ').map(n => n[0]).join('')}
+                  {developer.user?.name.split(' ').map(n => n[0]).join('')}
                 </div>
               )}
               <div>
                 <h1 className="text-3xl font-black mb-2">
                   {developer.github_handle 
-                    ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
-                    : developer.user.name}
+                    ? `${developer.user?.name.split(' ')[0]} (${developer.github_handle})`
+                    : developer.user?.name}
                 </h1>
                 <div className="flex items-center space-x-4 text-blue-100">
                   <div className="flex items-center">
@@ -233,10 +235,10 @@ export const PublicDeveloperProfile: React.FC = () => {
         {/* Tab Content */}
         <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
           {activeTab === 'profile' && (
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">About</h2>
-              <p className="text-gray-600">{developer.bio}</p>
-            </div>
+            <DeveloperProfileDetails
+              developer={developer}
+              onSendMessage={() => {}} // No messaging from public profile
+            />
           )}
           {activeTab === 'portfolio' && (
             <PortfolioManager
@@ -251,6 +253,7 @@ export const PublicDeveloperProfile: React.FC = () => {
               loading={githubLoading}
               error={githubError}
               className="w-full"
+              displayMode="dashboardSnippet"
             />
           )}
         </div>
