@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth'; // Import useAuth
 import { 
   DeveloperProfileDetails,
   PortfolioManager, 
@@ -23,7 +22,6 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
-  const { user: currentUser } = useAuth(); // Get the currently authenticated user
   const [gitHubData, setGitHubData] = useState(null);
   const [githubLoading, setGithubLoading] = useState(true);
   const [githubError, setGithubError] = useState(null);
@@ -39,7 +37,17 @@ export const PublicDeveloperProfile: React.FC = () => {
       if (developer?.github_handle) {
         setGithubLoading(true);
         try {
-          const response = await fetch(`/api/github/${developer.github_handle}`);
+          const response = await fetch(`/functions/v1/github-proxy`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              handle: developer.github_handle,
+              installationId: developer.github_installation_id
+            })
+          });
           const data = await response.json();
           setGitHubData(data);
         } catch (error) {
@@ -53,27 +61,6 @@ export const PublicDeveloperProfile: React.FC = () => {
     fetchGitHubData();
   }, [developer]);
 
-  // Separate useEffect for incrementing view count, depends on `developer` and `currentUser`
-  useEffect(() => {
-    const incrementViewCount = async () => {
-      if (developer && developer.user_id && currentUser && currentUser.id !== developer.user_id) {
-        try {
-          const { error: funcError } = await supabase.functions.invoke('increment-profile-view', {
-            body: { developer_user_id: developer.user_id },
-          });
-          if (funcError) {
-            console.error('Error incrementing profile view count:', funcError.message);
-          }
-        } catch (e) {
-          console.error('Failed to invoke increment-profile-view function:', e);
-        }
-      }
-    };
-
-    if (developer && developer.user_id) { // Only attempt if developer profile is loaded
-      incrementViewCount();
-    }
-  }, [developer, currentUser]); // Corrected dependencies
 
   const fetchDeveloperBySlug = async (profileSlug: string) => {
     try {
