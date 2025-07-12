@@ -8,7 +8,6 @@ interface DeveloperProfile {
   github_handle: string;
   bio: string;
   availability: boolean;
-  top_languages: string[];
   linked_projects: string[];
   location: string;
   experience_years: number;
@@ -35,12 +34,7 @@ interface DeveloperProfileFormProps {
   isOnboarding?: boolean;
 }
 
-const PROGRAMMING_LANGUAGES = [
-  'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust',
-  'PHP', 'Ruby', 'Swift', 'Kotlin', 'Dart', 'Scala', 'R', 'MATLAB',
-  'HTML', 'CSS', 'SQL', 'Shell', 'PowerShell', 'Perl', 'Lua', 'Haskell',
-  'Clojure', 'F#', 'Elixir', 'Erlang', 'Crystal', 'Nim', 'Zig', 'V'
-];
+// const PROGRAMMING_LANGUAGES = [ ... ]; // Removed
 
 const SKILL_CATEGORIES = {
   'Frontend': ['React', 'Vue.js', 'Angular', 'Svelte', 'Next.js', 'Nuxt.js', 'Gatsby', 'HTML5', 'CSS3', 'Sass', 'Less', 'Tailwind CSS', 'Bootstrap', 'Material-UI', 'Ant Design'],
@@ -62,18 +56,16 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [connectingGitHub, setConnectingGitHub] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
-  const [newLanguage, setNewLanguage] = useState('');
   const [newProject, setNewProject] = useState('');
-  const [filteredLanguageSuggestions, setFilteredLanguageSuggestions] = useState<string[]>([]);
   const [activeSkillCategory, setActiveSkillCategory] = useState<string | null>(null);
   const [newSkill, setNewSkill] = useState('');
+  const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
 
   const [formData, setFormData] = useState<DeveloperProfile>({
     user_id: user?.id || '',
     github_handle: '',
     bio: '',
     availability: true,
-    top_languages: [],
     linked_projects: [],
     location: '',
     experience_years: 0,
@@ -109,18 +101,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     // The dependency array should reflect what `formData` depends on for its initial state.
   }, [initialData, user]); // Rerun if initialData or user changes
 
-  useEffect(() => {
-    if (newLanguage) {
-      const filtered = PROGRAMMING_LANGUAGES.filter(lang =>
-        lang.toLowerCase().startsWith(newLanguage.toLowerCase()) && // Changed to startsWith()
-        !formData.top_languages.includes(lang)
-      );
-      setFilteredLanguageSuggestions(filtered.slice(0, 5));
-    } else {
-      setFilteredLanguageSuggestions([]);
-    }
-  }, [newLanguage, formData.top_languages]);
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -140,9 +120,10 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       newErrors.desired_salary = 'Desired salary cannot be negative';
     }
 
-    if (formData.top_languages.length === 0) {
-      newErrors.top_languages = 'At least one programming language is required';
-    }
+    // Removed top_languages validation
+    // if (formData.top_languages.length === 0) {
+    //   newErrors.top_languages = 'At least one programming language is required';
+    // }
 
     if (formData.public_profile_slug && !/^[a-z0-9-]+$/.test(formData.public_profile_slug)) {
       newErrors.public_profile_slug = 'Profile slug can only contain lowercase letters, numbers, and hyphens';
@@ -158,7 +139,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     if (data.bio.trim()) strength += 15;
     if (data.location.trim()) strength += 10;
     if (data.github_handle.trim()) strength += 15;
-    if (data.top_languages.length > 0) strength += 15;
+    // if (data.top_languages.length > 0) strength += 15; // Removed top_languages from strength calculation
     if (data.linked_projects.length > 0) strength += 10;
     if (data.experience_years > 0) strength += 10;
     if (data.desired_salary > 0) strength += 5;
@@ -171,7 +152,9 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setErrors(prev => ({ ...prev, submit: undefined }));
+    setSaveStatus(null);
+
     if (!validateForm()) {
       return;
     }
@@ -191,12 +174,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
       if (error) throw error;
 
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus(null), 3000); // Reset after 3 seconds
       onSuccess?.();
-    } catch (error: any) { // Ensure 'any' or a more specific error type for Supabase errors
+    } catch (error: any) {
       console.error('Error saving developer profile:', error);
-      // Log the full error object if possible, or specific fields
       console.error('Supabase error details:', error?.message, error?.details, error?.hint, error?.code);
       setErrors({ submit: `Failed to save profile. ${error?.message || 'Please try again.'}` });
+      setSaveStatus('error');
     } finally {
       setLoading(false);
     }
@@ -223,24 +208,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     navigate('/github-setup');
   };
 
-  const addLanguage = (language?: string) => {
-    const langToAdd = language || newLanguage.trim();
-    if (langToAdd && !formData.top_languages.includes(langToAdd)) {
-      setFormData(prev => ({
-        ...prev,
-        top_languages: [...prev.top_languages, langToAdd]
-      }));
-      setNewLanguage('');
-      setFilteredLanguageSuggestions([]);
-    }
-  };
-
-  const removeLanguage = (language: string) => {
-    setFormData(prev => ({
-      ...prev,
-      top_languages: prev.top_languages.filter(lang => lang !== language)
-    }));
-  };
+  // Removed addLanguage and removeLanguage functions
 
   const addProject = () => {
     if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
@@ -540,72 +508,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               Technical Skills
             </h3>
 
-            {/* Programming Languages */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Programming Languages *
-              </label>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {formData.top_languages.map((language) => (
-                    <span
-                      key={language}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
-                    >
-                      {language}
-                      <button
-                        type="button"
-                        onClick={() => removeLanguage(language)}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                
-                <div className="relative">
-                  <div className="flex space-x-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        value={newLanguage}
-                        onChange={(e) => setNewLanguage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addLanguage())}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Search or type a programming language..."
-                      />
-                      
-                      {filteredLanguageSuggestions.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                          {filteredLanguageSuggestions.map((language) => (
-                            <button
-                              key={language}
-                              type="button"
-                              onClick={() => addLanguage(language)}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
-                            >
-                              {language}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addLanguage()}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {errors.top_languages && (
-                <p className="text-red-600 text-sm mt-1">{errors.top_languages}</p>
-              )}
-            </div>
+            {/* Programming Languages section removed */}
 
             {/* Skills by Category */}
             <div>
@@ -805,39 +708,55 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </div>
           </div>
 
-          {/* Submit Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
-            {errors.submit && (
-              <div className="flex items-center space-x-2 text-red-600 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                <span>{errors.submit}</span>
-              </div>
-            )}
-            
-            <div className="flex flex-col sm:flex-row gap-4 sm:ml-auto">
-              {onCancel && (
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {loading ? (
-                  <>
-                    <Loader className="animate-spin w-5 h-5 mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  isOnboarding ? 'Complete Profile' : 'Save Changes'
+          {/* Submit Buttons and Feedback */}
+          <div className="pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex-grow">
+                {errors.submit && (
+                  <div className="flex items-center space-x-2 text-red-600 text-sm p-2 bg-red-50 rounded-md">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{errors.submit}</span>
+                  </div>
                 )}
-              </button>
+                {saveStatus === 'success' && !loading && (
+                  <div className="flex items-center space-x-2 text-green-600 text-sm p-2 bg-green-50 rounded-md">
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                    <span>Profile saved successfully!</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 sm:ml-auto">
+                {onCancel && (
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={loading}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-70"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading || saveStatus === 'success'}
+                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {loading ? (
+                    <>
+                      <Loader className="animate-spin w-5 h-5 mr-2" />
+                      Saving...
+                    </>
+                  ) : saveStatus === 'success' ? (
+                    <>
+                      <Check className="w-5 h-5 mr-2" />
+                      Saved!
+                    </>
+                  ) : (
+                    isOnboarding ? 'Complete Profile' : 'Save Changes'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </form>
