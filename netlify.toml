@@ -3,6 +3,11 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/functions/v1/*"
+  to = "/.netlify/functions/v1/:splat"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
