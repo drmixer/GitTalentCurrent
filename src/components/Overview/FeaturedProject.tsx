@@ -24,7 +24,7 @@ export const FeaturedProject: React.FC<FeaturedProjectProps> = ({ project }) => 
         <h3 className="text-xl font-semibold text-gray-800 mb-3">Featured Project</h3>
       </div>
       {project.image_url ? (
-        <img src={project.image_url} alt={project.title} className="w-full h-48 object-cover" />
+        <img src={project.image_url} alt={project.title} className="w-full h-48 object-contain bg-gray-100" />
       ) : (
         <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
           <ImageIcon size={48} className="text-gray-400" />

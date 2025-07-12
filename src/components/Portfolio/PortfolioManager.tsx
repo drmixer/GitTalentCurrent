@@ -413,7 +413,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                     <img 
                       src={formData.image_url} 
                       alt="Preview" 
-                      className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                      className="w-full h-48 object-contain rounded-xl border border-gray-200 bg-gray-100"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL';
@@ -577,7 +577,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                 <img
                   src={item.image_url}
                   alt={item.title}
-                  className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                  className="w-full h-48 object-contain rounded-xl border border-gray-200 bg-gray-100"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';

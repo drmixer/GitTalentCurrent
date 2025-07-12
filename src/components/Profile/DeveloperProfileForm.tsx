@@ -458,11 +458,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   Years of Experience
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   id="experience_years"
-                  min="0"
                   value={formData.experience_years}
-                  onChange={(e) => setFormData(prev => ({ ...prev, experience_years: parseInt(e.target.value) || 0 }))}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData(prev => ({ ...prev, experience_years: value ? parseInt(value, 10) : 0 }));
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {errors.experience_years && (
@@ -475,11 +478,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   Desired Salary (USD)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   id="desired_salary"
-                  min="0"
                   value={formData.desired_salary}
-                  onChange={(e) => setFormData(prev => ({ ...prev, desired_salary: parseInt(e.target.value) || 0 }))}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData(prev => ({ ...prev, desired_salary: value ? parseInt(value, 10) : 0 }));
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 120000"
                 />
