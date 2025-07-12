@@ -28,15 +28,11 @@ import { Developer, User as UserType } from '../../types';
 interface DeveloperProfileDetailsProps {
   developerId?: string;
   developer?: Developer & { user: UserType };
-  onClose?: () => void;
-  onSendMessage?: (developerId: string, developerName: string) => void;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
   developerId,
   developer: initialDeveloper,
-  onClose,
-  onSendMessage
 }) => {
   const { userProfile } = useAuth();
   const [developer, setDeveloper] = useState<Developer & { user: UserType } | null>(initialDeveloper || null);
@@ -87,12 +83,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
       setDeveloper(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSendMessage = () => {
-    if (developer && onSendMessage) {
-      onSendMessage(developer.user_id, developer.user.name);
     }
   };
 
@@ -163,14 +153,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
             <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
             <p className="text-red-800 font-medium">{error || 'Developer profile not found'}</p>
           </div>
-          {onClose && ( 
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
         </div>
       </div>
     );
@@ -192,120 +174,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-black text-gray-900">Developer Profile</h2>
-        {onClose && (
-          <button
-            onClick={onClose} 
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100"> 
-        <div className="flex items-start md:items-center flex-col md:flex-row md:justify-between">
-          <div className="flex items-center space-x-6 mb-4 md:mb-0">
-            <div className="relative">
-              {developer.profile_pic_url ? (
-              <img 
-                src={developer.profile_pic_url} 
-                alt={developer.user.name}
-                className="w-20 h-20 rounded-2xl object-cover shadow-xl"
-                onError={(e) => {
-                  // Fallback to initials if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    const fallback = document.createElement('div');
-                    fallback.className = "w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl";
-                    fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
-                    parent.appendChild(fallback);
-                  }
-                }}
-              />
-              ) : (
-              <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">
-                {developer.user.name.split(' ').map(n => n[0]).join('')}
-              </div>
-              )}
-              
-              {/* Availability indicator */}
-              <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white ${
-                developer.availability ? 'bg-emerald-500' : 'bg-gray-400'
-              }`}>
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className={`w-2 h-2 rounded-full ${
-                    developer.availability ? 'bg-white animate-pulse' : 'bg-white'
-                  }`}></div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">{displayName}</h2>
-              <div className="flex items-center space-x-4 text-sm text-gray-600"> 
-                {developer.github_handle && (
-                  <a
-                    href={`https://github.com/${developer.github_handle}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center hover:text-blue-600 transition-colors"
-                  >
-                    <Github className="w-4 h-4 mr-1" /> 
-                    @{developer.github_handle}
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                )}
-                {(userProfile?.role === 'admin' || userProfile?.id === developer.user_id) && (
-                  <div className="flex items-center">
-                    <Mail className="w-4 h-4 mr-1" />
-                    {developer.user.email} 
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${
-              developer.availability  
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                : 'bg-gray-100 text-gray-800 border border-gray-200'
-            }`}>
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                developer.availability ? 'bg-emerald-500' : 'bg-gray-500'
-              }`}></div>
-              {developer.availability ? 'Available for hire' : 'Not available'} 
-            </span> 
-            {developer.public_profile_slug && (
-              <button
-                onClick={() => {
-                  const url = `${window.location.origin}/dev/${developer.public_profile_slug}`;
-                  navigator.clipboard.writeText(url);
-                  alert('Public profile URL copied to clipboard!');
-                }}
-                className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200"
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Profile
-              </button>
-            )}
-            <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200">
-              <Calendar className="w-4 h-4 mr-2" />
-              Profile Strength: {developer.profile_strength || 0}%
-            </span>
-            
-            {/* Message Button - Only show for recruiters/admins */}
-            {onSendMessage && userProfile?.role !== 'developer' && (
-              <button
-                onClick={handleSendMessage}
-                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-semibold flex items-center"
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Message
-              </button>
-            )}
-          </div>
-        </div>
       </div>
       
       {/* GitHub Connection */}
@@ -454,59 +322,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               )}
             </div>
           </div>
-
-          {/* Notification Preferences */}
-          {(userProfile?.role === 'admin' || userProfile?.id === developer.user_id) && 
-           developer.notification_preferences && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center mb-4">
-                <Bell className="w-5 h-5 mr-2 text-gray-500" />
-                <h3 className="text-lg font-black text-gray-900">Notification Preferences</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Email Notifications</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    developer.notification_preferences.email 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {developer.notification_preferences.email ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">In-App Notifications</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    developer.notification_preferences.in_app 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {developer.notification_preferences.in_app ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Message Notifications</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    developer.notification_preferences.messages 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {developer.notification_preferences.messages ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Assignment Notifications</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    developer.notification_preferences.assignments 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {developer.notification_preferences.assignments ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-lg font-black text-gray-900 mb-6">Linked Projects</h3>
