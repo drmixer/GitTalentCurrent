@@ -21,10 +21,11 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
         {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
       </button>
     </div>
-    {/* Updated access path for company name */}
+    {/* Accessing company_name directly from the view's job object */}
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
-      {job.recruiter?.recruiters_profile?.company_name || 'Company Confidential'}
+      {job.company_name || 'Company Confidential'}
+      {/* Optionally, display recruiter_name if available: job.recruiter_name */}
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
     {job.salary_min && job.salary_max && (
@@ -70,10 +71,11 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
       </div>
       <div className="p-6 space-y-4 overflow-y-auto">
-        {/* Updated access path for company name */}
+        {/* Accessing company_name directly from the view's job object */}
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          {job.recruiter?.recruiters_profile?.company_name || 'Company Confidential'}
+          {job.company_name || 'Company Confidential'}
+          {/* Optionally, display recruiter_name if available: job.recruiter_name */}
         </p>
         <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
         {job.salary_min && job.salary_max && (
@@ -134,14 +136,14 @@ export const JobsTab: React.FC = () => {
     setError(null);
     try {
       const { data, error: jobsError } = await supabase
-        .from('job_roles')
-        .select('*, recruiter:recruiter_id(users_name:name, recruiter_profile:recruiters(company_name))')
+        .from('job_roles_with_details') // Querying the new view
+        .select('*') // The view should provide all necessary columns directly
         .eq('is_active', true)
         // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
 
       if (jobsError) {
-        console.error("Supabase error fetching jobs:", JSON.stringify(jobsError));
+        console.error("Supabase error fetching jobs from view:", JSON.stringify(jobsError));
         throw jobsError;
       }
       setJobs(data || []);

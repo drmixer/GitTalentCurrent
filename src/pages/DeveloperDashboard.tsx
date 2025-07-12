@@ -107,8 +107,11 @@ export const DeveloperDashboard: React.FC = () => {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]); // Or JobRole[]
-  const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]); // Or JobRole[]
+  const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]); // This will be changed to store count if only for Overview
   const [recentCommits, setRecentCommits] = useState<Commit[]>([]);
+
+  const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
+  const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
 
   // const [messages, setMessages] = useState<MessageThreadType[]>([]); // MessageList will fetch its own
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
@@ -206,29 +209,38 @@ export const DeveloperDashboard: React.FC = () => {
         console.log('[Dashboard] Endorsements fetched:', endorsementData);
       }
 
-      // Fetch saved jobs (assuming a 'saved_jobs' table)
-      const { data: savedJobsData, error: savedJobsError } = await supabase
+      // Fetch saved jobs count
+      const { count: savedCount, error: savedJobsError } = await supabase
         .from('saved_jobs')
-        .select('*, job_role:job_roles(*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name)))')
-        .eq('developer_id', authUser.id)
-        .order('saved_at', { ascending: false });
-      if (savedJobsError) console.error('[Dashboard] Error fetching saved jobs:', savedJobsError);
-      else {
-        setSavedJobs(savedJobsData || []);
-        console.log('[Dashboard] Saved jobs fetched:', savedJobsData);
-      }
+        .select('*', { count: 'exact', head: true })
+        .eq('developer_id', authUser.id);
 
-      // Fetch applied jobs (assuming an 'applied_jobs' table)
-      const { data: appliedJobsData, error: appliedJobsError } = await supabase
-        .from('applied_jobs')
-        .select('*, job_role:job_roles(*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name)))')
-        .eq('developer_id', authUser.id)
-        .order('applied_at', { ascending: false });
-      if (appliedJobsError) console.error('[Dashboard] Error fetching applied jobs:', appliedJobsError);
-      else {
-        setAppliedJobs(appliedJobsData || []);
-        console.log('[Dashboard] Applied jobs fetched:', appliedJobsData);
+      if (savedJobsError) {
+        console.error('[Dashboard] Error fetching saved jobs count:', savedJobsError);
+        setFetchedSavedJobsCount(0); // Default to 0 on error
+      } else {
+        setFetchedSavedJobsCount(savedCount ?? 0);
+        console.log('[Dashboard] Saved jobs count fetched:', savedCount);
       }
+      // Clear the old savedJobs array if it's no longer needed for detailed display in Overview
+      setSavedJobs([]);
+
+
+      // Fetch applied jobs count
+      const { count: appliedCount, error: appliedJobsError } = await supabase
+        .from('applied_jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('developer_id', authUser.id);
+
+      if (appliedJobsError) {
+        console.error('[Dashboard] Error fetching applied jobs count:', appliedJobsError);
+        setFetchedAppliedJobsCount(0); // Default to 0 on error
+      } else {
+        setFetchedAppliedJobsCount(appliedCount ?? 0);
+        console.log('[Dashboard] Applied jobs count fetched:', appliedCount);
+      }
+      // Clear the old appliedJobs array
+      setAppliedJobs([]);
 
     } catch (error) {
       console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
@@ -374,14 +386,15 @@ export const DeveloperDashboard: React.FC = () => {
         // To keep OverviewTab working, we can pass an empty array or adjust its props.
         // For now, I'll pass an empty array to messages for OverviewTab.
         // This needs to be revisited if OverviewTab's unread message logic is critical now.
-        messages={[]}
-        // Note: savedJobs/appliedJobs props passed to OverviewTab are for displaying *actual* job data if needed,
-        // not just counts. The counts (saved_jobs_count, applied_jobs_count) come from the `developer` object itself.
-        // These counts on the `developer` object are not updated in real-time after actions in JobsTab.
-        // TODO: Implement a mechanism (e.g., callback, event, or global state) to refresh `currentDeveloperProfile`
-        // or specifically its job counts when save/apply actions occur in JobsTab for live OverviewTab updates.
-        savedJobs={savedJobs.map(sj => sj.job_role).filter(Boolean) as JobRole[]}
-        appliedJobs={appliedJobs.map(aj => aj.job_role).filter(Boolean) as JobRole[]}
+        messages={[]} // This is for OverviewTab's internal unread message calculation from threads
+        // Pass the fetched counts to OverviewTab. It will prioritize these over developer object's counts or array lengths.
+        savedJobsCountOverride={fetchedSavedJobsCount}
+        appliedJobsCountOverride={fetchedAppliedJobsCount}
+        // The savedJobs/appliedJobs arrays below are now effectively unused by OverviewTab if counts are passed,
+        // but kept for now to avoid breaking prop types if OverviewTab still expects them.
+        // These arrays are now being cleared in fetchDeveloperPageData after counts are fetched.
+        savedJobs={[]}
+        appliedJobs={[]}
         endorsements={endorsements}
         recentCommits={recentCommits}
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}
