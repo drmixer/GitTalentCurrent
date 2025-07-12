@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth
 import { useGitHub } from '../hooks/useGitHub';
 import { 
-  DeveloperProfileDetails,
   PortfolioManager, 
   RealGitHubChart 
 } from '../components';
@@ -236,10 +235,10 @@ export const PublicDeveloperProfile: React.FC = () => {
         {/* Tab Content */}
         <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
           {activeTab === 'profile' && (
-            <DeveloperProfileDetails
-              developer={developer}
-              onSendMessage={() => {}} // No messaging from public profile
-            />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">About</h2>
+              <p className="text-gray-600">{developer.bio}</p>
+            </div>
           )}
           {activeTab === 'portfolio' && (
             <PortfolioManager
