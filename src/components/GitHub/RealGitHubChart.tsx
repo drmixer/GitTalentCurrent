@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+// Removed useGitHub hook as data will come from props
 import { Github, Loader, AlertCircle, Star, GitFork } from 'lucide-react';
 import { GitHubData } from '../../hooks/useGitHub'; // Import the type
 import {
@@ -9,63 +10,25 @@ import {
 } from '../../utils/githubUtils';
 
 interface RealGitHubChartProps {
-  githubHandle: string;
+  githubHandle: string; // Still needed for links if data is partial or error
+  gitHubData: GitHubData | null; // Accept full data object
+  loading: boolean;
+  error: Error | null;
   isGitHubAppInstalled: boolean;
   className?: string;
   displayMode?: 'full' | 'dashboardSnippet';
-  isPublic?: boolean;
-  installationId?: string;
 }
 
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   githubHandle,
+  gitHubData, // Use destructured prop
+  loading,    // Use destructured prop
+  error,      // Use destructured prop
   isGitHubAppInstalled,
   className = '',
-  displayMode = 'full',
-  isPublic = false,
-  installationId,
+  displayMode = 'full'
 }) => {
-  const [gitHubData, setGitHubData] = useState<GitHubData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    const fetchGitHubData = async () => {
-      if (githubHandle) {
-        setLoading(true);
-        try {
-          const requestBody: { handle: string; installationId?: string } = {
-            handle: githubHandle,
-          };
-
-          if (!isPublic && installationId) {
-            requestBody.installationId = installationId;
-          }
-
-          const response = await fetch(`/functions/v1/github-proxy`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify(requestBody)
-          });
-          const data = await response.json();
-          if (response.ok) {
-            setGitHubData(data);
-          } else {
-            throw new Error(data.error || 'Failed to fetch GitHub data');
-          }
-        } catch (error: any) {
-          setError(error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchGitHubData();
-  }, [githubHandle, isPublic, installationId]);
+  // const { gitHubData, loading, error } = useGitHub(); // Removed internal hook usage
 
   const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly
   const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
@@ -79,7 +42,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
     );
   }
 
-  if (error) {
+  if (error) { // Check for error first, using the prop
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -91,7 +54,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
     );
   }
 
-  if (!isPublic && !isGitHubAppInstalled && !loading && !gitHubData?.user) {
+  if (!isGitHubAppInstalled && !loading && !gitHubData?.user) { // Added !loading and !gitHubData checks
     return (
       <div className="text-center p-8 bg-white rounded-xl shadow-md">
         <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
