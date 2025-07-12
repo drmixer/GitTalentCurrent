@@ -45,7 +45,6 @@ export const PublicDeveloperProfile: React.FC = () => {
             },
             body: JSON.stringify({
               handle: developer.github_handle,
-              installationId: developer.github_installation_id
             })
           });
           const data = await response.json();
@@ -148,7 +147,7 @@ export const PublicDeveloperProfile: React.FC = () => {
               {developer.profile_pic_url ? (
                 <img 
                   src={developer.profile_pic_url} 
-                  alt={developer.user?.name}
+                  alt={developer.user?.name || developer.github_handle}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -157,21 +156,19 @@ export const PublicDeveloperProfile: React.FC = () => {
                     if (parent) {
                       const fallback = document.createElement('div');
                       fallback.className = "w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white";
-                      fallback.textContent = developer.user?.name.split(' ').map(n => n[0]).join('');
+                      fallback.textContent = (developer.user?.name || developer.github_handle)?.split(' ').map(n => n[0]).join('');
                       parent.appendChild(fallback);
                     }
                   }}
                 />
               ) : (
                 <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white">
-                  {developer.user?.name.split(' ').map(n => n[0]).join('')}
+                  {(developer.user?.name || developer.github_handle)?.split(' ').map(n => n[0]).join('')}
                 </div>
               )}
               <div>
                 <h1 className="text-3xl font-black mb-2">
-                  {developer.github_handle 
-                    ? `${developer.user?.name.split(' ')[0]} (${developer.github_handle})`
-                    : developer.user?.name}
+                  {developer.user?.name || developer.github_handle}
                 </h1>
                 <div className="flex items-center space-x-4 text-blue-100">
                   <div className="flex items-center">
