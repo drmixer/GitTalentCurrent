@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { JobRole, Developer } from '../types';
-import { ArrowLeft, Send, Loader, AlertCircle, Briefcase, MapPin, Building } from 'lucide-react';
+import { JobRole } from '../types';
+import { ArrowLeft, Send, Loader, AlertCircle, MapPin, Building } from 'lucide-react';
 
 export const ApplyForJob: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
-  const { userProfile, developerProfile } = useAuth();
+  const { developerProfile } = useAuth();
 
   const [job, setJob] = useState<JobRole | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
@@ -40,8 +40,8 @@ export const ApplyForJob: React.FC = () => {
       if (!data) throw new Error('Job not found.');
 
       setJob(data);
-    } catch (e: any) {
-      setError(e.message || 'Failed to load job details.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load job details.');
       console.error("Error fetching job details:", e);
     } finally {
       setLoading(false);
@@ -82,8 +82,7 @@ export const ApplyForJob: React.FC = () => {
           developer_id: developerProfile.user_id,
           job_id: jobId,
           status: 'applied',
-          cover_letter: coverLetter, // Will add this column in a later step
-          // recruiter_id: job.recruiter_id, // Assuming job_roles_with_details has recruiter_id
+          cover_letter: coverLetter,
         });
 
       if (applyError) throw applyError;
@@ -92,8 +91,8 @@ export const ApplyForJob: React.FC = () => {
       // Optionally, redirect after a delay or provide a link back
       setTimeout(() => navigate('/dashboard/jobs'), 3000);
 
-    } catch (e: any) {
-      setError(e.message || 'Failed to submit application.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to submit application.');
       console.error("Error submitting application:", e);
     } finally {
       setApplying(false);
