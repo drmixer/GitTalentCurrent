@@ -172,210 +172,25 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Developer Profile</h2>
-      </div>
-      
-      {/* GitHub Connection */}
-      {isOwnProfile && !developer.github_installation_id && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 mb-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Github className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-gray-900 mb-2">Connect GitHub App</h3>
-                <p className="text-gray-600 mb-4">
-                  Connect your GitHub account to display your real contribution graph and repository data.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleConnectGitHub}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-            >
-              <Github className="w-4 h-4 mr-2 inline" />
-              Connect GitHub
-            </button>
-          </div>
-        </div>
-      )}
-      
-      <div className="mb-8">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${ 
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {activeTab === 'profile' && ( 
-        <div className="space-y-8">
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{developer.experience_years}</div>
-              <div className="text-sm font-semibold text-gray-600">Years Experience</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{developer.top_languages?.length || 0}</div>
-              <div className="text-sm font-semibold text-gray-600">Languages</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-              <div className="text-2xl font-black text-gray-900 mb-1">{developer.linked_projects.length}</div>
-              <div className="text-sm font-semibold text-gray-600">Projects</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-              <div className="text-2xl font-black text-gray-900 mb-1"> 
-                {developer.desired_salary > 0 ? `$${developer.desired_salary.toLocaleString()}` : 'N/A'}
-              </div>
-              <div className="text-sm font-semibold text-gray-600">Desired Salary</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-4">About</h3> 
-            <p className="text-gray-600 leading-relaxed">
-              {developer.bio || 'No bio provided.'}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
-            <div> 
-              <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
-              <div className="flex flex-wrap gap-2">
-                {developer.top_languages.length > 0 ? (
-                  developer.top_languages.map((skill, index) => (
-                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                      {skill}
-                    </span>
-                  )) 
-                ) : (
-                  <p className="text-gray-500">No languages specified</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-6">Experience & Location</h3>
-            <div className="space-y-4 text-gray-600"> 
-              <div className="flex items-center">
-                <Briefcase className="w-5 h-5 mr-3 text-gray-400" />
-                <span className="font-medium">{developer.experience_years} years of experience</span>
-              </div>
-              {developer.location && (
-                <div className="flex items-center">
-                  <MapPin className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">{developer.location}</span> 
-                </div>
-              )}
-              {developer.desired_salary > 0 && (
-                <div className="flex items-center">
-                  <DollarSign className="w-5 h-5 mr-3 text-gray-400" />
-                  <span className="font-medium">${developer.desired_salary.toLocaleString()}/year</span>
-                </div>
-              )}
-              {developer.resume_url && (
-                <div className="flex items-center">
-                  <FileText className="w-5 h-5 mr-3 text-gray-400" />
-                  <a 
-                    href={developer.resume_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center"
-                  >
-                    View Resume
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                </div>
-              )}
-              {developer.public_profile_slug && (
-                <div className="flex items-center">
-                  <LinkIcon className="w-5 h-5 mr-3 text-gray-400" />
-                  <div>
-                    <span className="font-medium">Public Profile:</span>
-                    <a 
-                      href={`/dev/${developer.public_profile_slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-2 text-blue-600 hover:text-blue-800 transition-colors flex items-center"
-                    >
-                      {window.location.origin}/dev/{developer.public_profile_slug}
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-6">Linked Projects</h3>
-            <div className="space-y-4"> 
-              {developer.linked_projects.length > 0 ? (
-                developer.linked_projects.map((project, index) => (
-                  <div key={index} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900 mb-2">Project {index + 1}</h4>
-                        <p className="text-gray-600 text-sm mb-3 break-all">{project}</p>
-                      </div> 
-                      <a
-                        href={project}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a> 
-                    </div>
-                  </div>
+      <div className="space-y-8">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
+          <div>
+            <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
+            <div className="flex flex-wrap gap-2">
+              {developer.top_languages.length > 0 ? (
+                developer.top_languages.map((skill, index) => (
+                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                    {skill}
+                  </span>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <Github className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No projects linked</p>
-                </div>
+                <p className="text-gray-500">No languages specified</p>
               )}
             </div>
           </div>
-
-          {isOwnProfile && (
-            <ProfileStrengthIndicator
-              strength={developer.profile_strength || 0}
-              suggestions={generateProfileSuggestions()}
-            />
-          )}
         </div>
-      )}
-
-      {activeTab === 'portfolio' && (
-        <PortfolioManager 
-          developerId={developer.user_id}  
-          isEditable={false}
-        />
-      )}
-
-      {activeTab === 'github' && (
-        <RealGitHubChart
-          githubHandle={developer.github_handle || ''}
-          className="w-full max-w-4xl mx-auto"
-        />
-      )}
+      </div>
     </div>
   );
 };

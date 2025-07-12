@@ -26,7 +26,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const { user: currentUser } = useAuth(); // Get the currently authenticated user
 
   // Fetch GitHub data only when developer data is available
-  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(!!developer?.github_handle);
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer);
 
   useEffect(() => {
     if (slug) {
@@ -235,10 +235,9 @@ export const PublicDeveloperProfile: React.FC = () => {
         {/* Tab Content */}
         <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
           {activeTab === 'profile' && (
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">About</h2>
-              <p className="text-gray-600">{developer.bio}</p>
-            </div>
+            <DeveloperProfileDetails
+              developer={developer}
+            />
           )}
           {activeTab === 'portfolio' && (
             <PortfolioManager
