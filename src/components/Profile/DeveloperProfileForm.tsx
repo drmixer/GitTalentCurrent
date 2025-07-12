@@ -112,7 +112,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   useEffect(() => {
     if (newLanguage) {
       const filtered = PROGRAMMING_LANGUAGES.filter(lang =>
-        lang.toLowerCase().includes(newLanguage.toLowerCase()) &&
+        lang.toLowerCase().startsWith(newLanguage.toLowerCase()) && // Changed to startsWith()
         !formData.top_languages.includes(lang)
       );
       setFilteredLanguageSuggestions(filtered.slice(0, 5));
@@ -192,9 +192,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       if (error) throw error;
 
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) { // Ensure 'any' or a more specific error type for Supabase errors
       console.error('Error saving developer profile:', error);
-      setErrors({ submit: 'Failed to save profile. Please try again.' });
+      // Log the full error object if possible, or specific fields
+      console.error('Supabase error details:', error?.message, error?.details, error?.hint, error?.code);
+      setErrors({ submit: `Failed to save profile. ${error?.message || 'Please try again.'}` });
     } finally {
       setLoading(false);
     }
