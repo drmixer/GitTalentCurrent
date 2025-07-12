@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth
+import { useGitHub } from '../hooks/useGitHub';
 import { 
-  DeveloperProfileDetails, 
   PortfolioManager, 
   RealGitHubChart 
 } from '../components';
@@ -13,21 +13,18 @@ import {
   AlertCircle, 
   User, 
   Code, 
-  Briefcase,
-  Network // Added for Jobs tab
+  Briefcase
 } from 'lucide-react';
 import { Developer, User as UserType } from '../types';
-import { JobsTab } from '../components/Jobs/JobsTab'; // Added for Jobs tab
 
 export const PublicDeveloperProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [developer, setDeveloper] = useState<Developer & { user: UserType } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github' | 'jobs'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
   const { user: currentUser } = useAuth(); // Get the currently authenticated user
-
-  const isOwner = currentUser && currentUser.id === developer?.user_id;
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(!!developer?.github_handle);
 
   useEffect(() => {
     if (slug) {
@@ -210,13 +207,12 @@ export const PublicDeveloperProfile: React.FC = () => {
                 { id: 'profile', label: 'Profile', icon: User },
                 { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
                 { id: 'github', label: 'GitHub Activity', icon: Code },
-                ...(isOwner ? [{ id: 'jobs', label: 'Jobs', icon: Network }] : []),
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                      onClick={() => setActiveTab(tab.id as 'profile' | 'portfolio' | 'github' | 'jobs')}
+                      onClick={() => setActiveTab(tab.id as 'profile' | 'portfolio' | 'github')}
                     className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === tab.id
                         ? 'border-blue-500 text-blue-600'
@@ -237,10 +233,10 @@ export const PublicDeveloperProfile: React.FC = () => {
         {/* Tab Content */}
         <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
           {activeTab === 'profile' && (
-            <DeveloperProfileDetails
-              developer={developer}
-              onSendMessage={() => {}} // No messaging from public profile
-            />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">About</h2>
+              <p className="text-gray-600">{developer.bio}</p>
+            </div>
           )}
           {activeTab === 'portfolio' && (
             <PortfolioManager
@@ -251,11 +247,11 @@ export const PublicDeveloperProfile: React.FC = () => {
           {activeTab === 'github' && developer.github_handle && (
             <RealGitHubChart
               githubHandle={developer.github_handle}
+              gitHubData={gitHubData}
+              loading={githubLoading}
+              error={githubError}
               className="w-full"
             />
-          )}
-          {activeTab === 'jobs' && isOwner && (
-            <JobsTab />
           )}
         </div>
       </div>
