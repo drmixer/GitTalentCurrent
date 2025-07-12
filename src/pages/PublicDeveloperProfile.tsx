@@ -79,9 +79,9 @@ export const PublicDeveloperProfile: React.FC = () => {
       } else {
         setDeveloper(data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching developer profile by slug:', err);
-      setError(err.message || 'Failed to load developer profile');
+      setError(err instanceof Error ? err.message : 'Failed to load developer profile');
       setDeveloper(null);
     } finally {
       setLoading(false);
@@ -216,7 +216,7 @@ export const PublicDeveloperProfile: React.FC = () => {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                      onClick={() => setActiveTab(tab.id as 'profile' | 'portfolio' | 'github' | 'jobs')}
                     className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === tab.id
                         ? 'border-blue-500 text-blue-600'

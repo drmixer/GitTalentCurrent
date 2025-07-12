@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { JobRole, SavedJob, AppliedJob, Developer } from '../../types';
-import { Search, Briefcase, MapPin, DollarSign, Bookmark, Send, Eye, Info, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
+import { JobRole } from '../../types';
+import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
 
 // Minimal JobCard component for now
 const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
@@ -120,7 +120,7 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
 
 export const JobsTab: React.FC = () => {
   const navigate = useNavigate();
-  const { userProfile, developerProfile } = useAuth();
+  const { developerProfile } = useAuth();
   const [jobs, setJobs] = useState<JobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -147,8 +147,8 @@ export const JobsTab: React.FC = () => {
         throw jobsError;
       }
       setJobs(data || []);
-    } catch (e: any) {
-      setError(e.message || 'Failed to fetch jobs.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to fetch jobs.');
       console.error("Error fetching jobs:", e);
     } finally {
       setLoading(false);
@@ -171,7 +171,7 @@ export const JobsTab: React.FC = () => {
         .eq('developer_id', developerProfile.user_id);
       if (appliedError) throw appliedError;
       setAppliedJobIds(new Set(applied?.map(a => a.job_id) || []));
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error fetching user job interactions:", e);
       // Non-critical, so don't set main error state
     }
@@ -206,9 +206,9 @@ export const JobsTab: React.FC = () => {
         if (error) throw error;
         setSavedJobIds(prev => new Set(prev).add(jobId));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error saving/unsaving job:", e);
-      alert(`Failed to ${alreadySaved ? 'unsave' : 'save'} job. ${e.message}`);
+      alert(`Failed to ${alreadySaved ? 'unsave' : 'save'} job. ${e instanceof Error ? e.message : ''}`);
   } finally {
     setProcessingJobId(null);
     // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile

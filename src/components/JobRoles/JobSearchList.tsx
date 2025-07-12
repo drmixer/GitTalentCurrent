@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { 
   Briefcase, 
@@ -11,7 +10,6 @@ import {
   Building,
   Calendar,
   Star,
-  MessageSquare,
   Loader,
   AlertCircle,
   ExternalLink
@@ -21,7 +19,7 @@ import { JobRole } from '../../types';
 interface JobSearchListProps {
   onViewJobDetails?: (jobRoleId: string) => void;
   onViewRecruiter?: (recruiterId: string) => void;
-  onViewDetails?: (jobRoleId: string) => void;
+  onExpressInterest?: (jobRoleId: string) => void;
 }
 
 export const JobSearchList: React.FC<JobSearchListProps> = ({
@@ -29,7 +27,6 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
   onExpressInterest,
   onViewRecruiter
 }) => {
-  const { userProfile } = useAuth();
   const [jobs, setJobs] = useState<JobRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,9 +72,9 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
       })) || [];
       
       setJobs(formattedJobs);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching jobs:', error);
-      setError(error.message || 'Failed to load jobs');
+      setError(error instanceof Error ? error.message : 'Failed to load jobs');
     } finally {
       setLoading(false);
     }
