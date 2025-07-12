@@ -21,11 +21,15 @@ interface Commit {
 interface OverviewTabProps {
   developer: Developer | null;
   portfolioItems: PortfolioItem[];
-  messages: MessageThreadType[];
-  savedJobs: JobRole[]; // Assuming JobRole for now, might need a SavedJob type from types.ts
-  appliedJobs: JobRole[]; // Assuming JobRole for now, might need an AppliedJob type from types.ts
+  messages: MessageThreadType[]; // Used for unread messages count
+  // savedJobs and appliedJobs props might be removed if only counts are needed and they come from developer object or overrides
+  // For now, keeping them, but they might be empty arrays from DeveloperDashboard
+  savedJobs: JobRole[];
+  appliedJobs: JobRole[];
+  savedJobsCountOverride?: number | null;    // New prop
+  appliedJobsCountOverride?: number | null;  // New prop
   endorsements: Endorsement[];
-  recentCommits?: Commit[]; // Renamed from gitHubActivity for clarity
+  recentCommits?: Commit[];
   githubProfileUrl?: string;
   loading?: boolean;
   onNavigateToTab?: (tabName: string) => void;
@@ -67,8 +71,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   // Use optional chaining and nullish coalescing for safety
   const endorsementsCount = developer.endorsements_count ?? endorsements.length;
   const commitsYTD = developer.annual_contributions ?? 0;
-  const savedJobsCount = developer.saved_jobs_count ?? savedJobs.length;
-  const appliedJobsCount = developer.applied_jobs_count ?? appliedJobs.length;
+
+  // Use override if available, then developer object, then length of passed array (which might be empty)
+  const savedJobsCount = props.savedJobsCountOverride ?? developer.saved_jobs_count ?? props.savedJobs.length;
+  const appliedJobsCount = props.appliedJobsCountOverride ?? developer.applied_jobs_count ?? props.appliedJobs.length;
 
   const handleNavigation = (tab: string) => {
     if (onNavigateToTab) {
