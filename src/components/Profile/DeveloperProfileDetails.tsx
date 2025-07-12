@@ -158,9 +158,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  const displayName = developer.github_handle  
-    ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
-    : developer.user.name;
+  const displayName = developer.user?.name || developer.github_handle;
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
