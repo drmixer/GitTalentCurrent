@@ -1,6 +1,5 @@
 import React from 'react';
 // Removed useGitHub hook as data will come from props
-import { useAuth } from '../../hooks/useAuth';
 import { Github, Loader, AlertCircle, Star, GitFork } from 'lucide-react';
 import { GitHubData } from '../../hooks/useGitHub'; // Import the type
 import { 
