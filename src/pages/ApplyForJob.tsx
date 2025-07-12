@@ -89,7 +89,7 @@ export const ApplyForJob: React.FC = () => {
 
       setApplicationSuccess(true);
       // Optionally, redirect after a delay or provide a link back
-      setTimeout(() => navigate('/dashboard/jobs'), 3000);
+      setTimeout(() => navigate('/developer?tab=jobs'), 3000);
 
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to submit application.');

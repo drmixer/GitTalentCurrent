@@ -29,6 +29,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/recruiter" element={<RecruiterDashboard />} />
           <Route path="/developer" element={<DeveloperDashboard />} />
+          <Route path="/dashboard/jobs" element={<Navigate to="/developer?tab=jobs" />} />
           <Route path="/dev/:slug" element={<PublicDeveloperProfile />} />
           <Route path="/github-setup" element={<GitHubAppSetup />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
