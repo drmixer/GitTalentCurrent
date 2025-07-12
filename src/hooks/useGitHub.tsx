@@ -66,10 +66,10 @@ interface GitHubContextType {
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
-export const useGitHub = (developerProfile?: Developer) => {
+export const useGitHub = () => {
   const context = useContext(GitHubContext);
-  if (context === undefined && !developerProfile) {
-    throw new Error('useGitHub must be used within a GitHubProvider or be provided with a developer profile.');
+  if (context === undefined) {
+    throw new Error('useGitHub must be used within a GitHubProvider');
   }
   return context;
 };

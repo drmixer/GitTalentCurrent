@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth
-import { useGitHub } from '../hooks/useGitHub';
 import { 
   DeveloperProfileDetails,
   PortfolioManager, 
@@ -25,15 +24,34 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
   const { user: currentUser } = useAuth(); // Get the currently authenticated user
-
-  // Fetch GitHub data only when developer data is available
-  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer);
+  const [gitHubData, setGitHubData] = useState(null);
+  const [githubLoading, setGithubLoading] = useState(true);
+  const [githubError, setGithubError] = useState(null);
 
   useEffect(() => {
     if (slug) {
       fetchDeveloperBySlug(slug);
     }
   }, [slug]);
+
+  useEffect(() => {
+    const fetchGitHubData = async () => {
+      if (developer?.github_handle) {
+        setGithubLoading(true);
+        try {
+          const response = await fetch(`/api/github/${developer.github_handle}`);
+          const data = await response.json();
+          setGitHubData(data);
+        } catch (error) {
+          setGithubError(error);
+        } finally {
+          setGithubLoading(false);
+        }
+      }
+    };
+
+    fetchGitHubData();
+  }, [developer]);
 
   // Separate useEffect for incrementing view count, depends on `developer` and `currentUser`
   useEffect(() => {
