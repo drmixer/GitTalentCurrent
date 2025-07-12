@@ -37,7 +37,8 @@ export const PublicDeveloperProfile: React.FC = () => {
       if (developer?.github_handle) {
         setGithubLoading(true);
         try {
-          const response = await fetch(`/functions/v1/github-proxy`, {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const response = await fetch(`${supabaseUrl}/functions/v1/github-proxy`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
