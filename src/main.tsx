@@ -10,9 +10,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <GitHubProvider>
-          <App />
-        </GitHubProvider>
+        <App />
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>

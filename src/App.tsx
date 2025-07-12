@@ -14,6 +14,7 @@ import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
 import { GitHubAppSetup } from './pages/GitHubAppSetup';
 import { AuthCallback } from './pages/AuthCallback';
 import { ApplyForJob } from './pages/ApplyForJob';
+import { GitHubProvider } from './hooks/useGitHub';
 
 function App() {
   return (
@@ -26,9 +27,9 @@ function App() {
           <Route path="/signup" element={<SignupForm />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/onboarding" element={<DeveloperOnboarding />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/recruiter" element={<RecruiterDashboard />} />
-          <Route path="/developer" element={<DeveloperDashboard />} />
+          <Route path="/admin" element={<GitHubProvider><AdminDashboard /></GitHubProvider>} />
+          <Route path="/recruiter" element={<GitHubProvider><RecruiterDashboard /></GitHubProvider>} />
+          <Route path="/developer" element={<GitHubProvider><DeveloperDashboard /></GitHubProvider>} />
           <Route path="/dashboard/jobs" element={<Navigate to="/developer?tab=jobs" />} />
           <Route path="/u/:slug" element={<PublicDeveloperProfile />} />
           <Route path="/github-setup" element={<GitHubAppSetup />} />

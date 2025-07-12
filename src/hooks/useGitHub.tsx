@@ -204,9 +204,6 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [developerProfile?.github_handle, fetchInProgress, lastFetchedHandle, refreshGitHubDataInternal]);
 
   useEffect(() => {
-    if (window.location.pathname.includes('/profile/')) {
-      return;
-    }
     const currentDevProfile = developerProfile;
     const currentAuthLoading = authLoading;
 

@@ -45,7 +45,6 @@ export const PublicDeveloperProfile: React.FC = () => {
             },
             body: JSON.stringify({
               handle: developer.github_handle,
-              installationId: developer.github_installation_id
             })
           });
           const data = await response.json();
