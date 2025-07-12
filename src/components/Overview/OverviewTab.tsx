@@ -41,6 +41,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   messages,
   savedJobs,
   appliedJobs,
+  savedJobsCountOverride, // Added to destructuring
+  appliedJobsCountOverride, // Added to destructuring
   endorsements,
   recentCommits,
   githubProfileUrl,
