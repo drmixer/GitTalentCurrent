@@ -21,7 +21,11 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
         {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
       </button>
     </div>
-    <p className="text-sm text-gray-500 mb-1 flex items-center"><Briefcase size={14} className="mr-2 text-gray-400" /> {job.recruiter?.company_name || 'Company Confidential'}</p>
+    {/* Updated access path for company name */}
+    <p className="text-sm text-gray-500 mb-1 flex items-center">
+      <Briefcase size={14} className="mr-2 text-gray-400" />
+      {job.recruiter?.recruiters_profile?.company_name || 'Company Confidential'}
+    </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
     {job.salary_min && job.salary_max && (
       <p className="text-sm text-gray-500 mb-3 flex items-center">
@@ -66,7 +70,11 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
       </div>
       <div className="p-6 space-y-4 overflow-y-auto">
-        <p className="text-md text-gray-600"><Briefcase size={16} className="inline mr-2 text-gray-500" /> {job.recruiter?.company_name || 'Company Confidential'}</p>
+        {/* Updated access path for company name */}
+        <p className="text-md text-gray-600">
+          <Briefcase size={16} className="inline mr-2 text-gray-500" />
+          {job.recruiter?.recruiters_profile?.company_name || 'Company Confidential'}
+        </p>
         <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
         {job.salary_min && job.salary_max && (
           <p className="text-md text-gray-600"><DollarSign size={16} className="inline mr-2 text-gray-500" /> ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}</p>
@@ -127,9 +135,7 @@ export const JobsTab: React.FC = () => {
     try {
       const { data, error: jobsError } = await supabase
         .from('job_roles')
-        // New query: job_roles.recruiter_id -> users.id -> recruiters.user_id -> recruiters.company_name
-        // Alias the final structure to job.recruiter.company_name
-        .select('*, recruiter:users!job_roles_recruiter_id_fkey(company_name:recruiters!user_id(company_name))')
+        .select('*, recruiter:recruiter_id(users_name:name, recruiter_profile:recruiters(company_name))')
         .eq('is_active', true)
         // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
@@ -244,11 +250,13 @@ export const JobsTab: React.FC = () => {
       return jobsToShow;
     }
 
-    return jobsToShow.filter(job =>
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.recruiter?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    return jobsToShow.filter(job => {
+      const searchTermLower = searchTerm.toLowerCase();
+      const titleMatch = job.title.toLowerCase().includes(searchTermLower);
+      const companyMatch = job.recruiter?.recruiters_profile?.company_name?.toLowerCase().includes(searchTermLower);
+      const techMatch = job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTermLower));
+      return titleMatch || companyMatch || techMatch;
+    });
   }, [jobs, savedJobIds, appliedJobIds, currentJobView, searchTerm]);
 
   // Use 'displayedJobs' instead of 'filteredJobs' for rendering the list and checking length
