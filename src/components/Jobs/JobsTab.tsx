@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { JobRole, SavedJob, AppliedJob, Developer } from '../../types';
 import { Search, Briefcase, MapPin, DollarSign, Bookmark, Send, Eye, Info, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
-// import { JobSearchList } from '../JobRoles/JobSearchList'; // Potentially reusable
-// import { JobRoleDetails } from '../JobRoles/JobRoleDetails'; // Potentially reusable
 
 // Minimal JobCard component for now
 const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
@@ -120,6 +119,7 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
 
 
 export const JobsTab: React.FC = () => {
+  const navigate = useNavigate();
   const { userProfile, developerProfile } = useAuth();
   const [jobs, setJobs] = useState<JobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
@@ -216,28 +216,11 @@ export const JobsTab: React.FC = () => {
     }
   };
 
-  const handleApplyJob = async (jobId: string) => {
-    if (!developerProfile?.user_id || processingJobId === jobId || appliedJobIds.has(jobId)) return;
+  const handleApplyJob = (jobId: string) => {
+    if (!developerProfile?.user_id || appliedJobIds.has(jobId)) return;
 
-    setProcessingJobId(jobId);
-    // Placeholder: In a real app, this would likely redirect to an application form or ATS.
-    // For now, we'll just mark it as "applied".
-    try {
-      const { error } = await supabase
-        .from('applied_jobs')
-        .insert({ developer_id: developerProfile.user_id, job_id: jobId, status: 'applied' });
-      if (error) throw error;
-      setAppliedJobIds(prev => new Set(prev).add(jobId));
-      alert('Application submitted successfully (simulated)!');
-      if (selectedJob?.id === jobId) setSelectedJob(null); // Close modal after applying
-    } catch (e:any) {
-      console.error("Error applying for job:", e);
-      alert(`Failed to apply for job. ${e.message}`);
-  } finally {
-    setProcessingJobId(null);
-    // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
-    // for updated applied_jobs_count on OverviewTab, or use a global state.
-    }
+    // Navigate to the dedicated application page
+    navigate(`/apply/job/${jobId}`);
   };
 
   const displayedJobs = useMemo(() => {
