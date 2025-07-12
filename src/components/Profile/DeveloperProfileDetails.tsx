@@ -174,6 +174,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
       <div className="space-y-8">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
+          <p className="text-gray-600 leading-relaxed">
+            {developer.bio || 'No bio provided.'}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-6">Skills & Technologies</h3>
           <div>
             <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
