@@ -14,6 +14,7 @@ interface RealGitHubChartProps {
   gitHubData: GitHubData | null; // Accept full data object
   loading: boolean;
   error: Error | null;
+  isGitHubAppInstalled: boolean;
   className?: string;
   displayMode?: 'full' | 'dashboardSnippet';
 }
@@ -23,6 +24,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   gitHubData, // Use destructured prop
   loading,    // Use destructured prop
   error,      // Use destructured prop
+  isGitHubAppInstalled,
   className = '',
   displayMode = 'full'
 }) => {
@@ -30,8 +32,6 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
 
   const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly
   const githubAppInstallUrl = `https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`;
-
-  const isGitHubAppInstalled = !!developerProfile?.github_installation_id;
 
   if (loading) {
     return (

@@ -255,6 +255,7 @@ export const PublicDeveloperProfile: React.FC = () => {
               error={githubError}
               className="w-full"
               displayMode="dashboardSnippet"
+              isGitHubAppInstalled={!!developer?.github_installation_id}
             />
           )}
         </div>
