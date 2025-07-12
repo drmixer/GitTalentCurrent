@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth
 import { useGitHub } from '../hooks/useGitHub';
 import { 
+  DeveloperProfileDetails,
   PortfolioManager, 
   RealGitHubChart 
 } from '../components';
