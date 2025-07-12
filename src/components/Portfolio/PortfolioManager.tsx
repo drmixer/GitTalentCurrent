@@ -151,7 +151,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
       
       // Upload the file to Supabase Storage
       const { data, error } = await supabase.storage
-        .from('portfolio_images')
+        .from('portfolio-images')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -161,7 +161,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
       
       // Get the public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('portfolio_images')
+        .from('portfolio-images')
         .getPublicUrl(filePath);
       
       // Update the form data with the image URL
