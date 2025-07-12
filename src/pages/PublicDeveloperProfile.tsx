@@ -207,30 +207,29 @@ export const PublicDeveloperProfile: React.FC = () => {
           <div className="px-6 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               {[
-                {[
-                  { id: 'profile', label: 'Profile', icon: User },
-                  { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
-                  { id: 'github', label: 'GitHub Activity', icon: Code },
-                  ...(isOwner ? [{ id: 'jobs', label: 'Jobs', icon: Network }] : []),
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                        activeTab === tab.id
-                          ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Icon className={`mr-2 h-5 w-5 ${
-                        activeTab === tab.id ? 'text-blue-500' : 'text-gray-400'
-                      }`} />
-                      {tab.label}
-                    </button>
-                  );
-                })}
+                { id: 'profile', label: 'Profile', icon: User },
+                { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
+                { id: 'github', label: 'GitHub Activity', icon: Code },
+                ...(isOwner ? [{ id: 'jobs', label: 'Jobs', icon: Network }] : []),
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icon className={`mr-2 h-5 w-5 ${
+                      activeTab === tab.id ? 'text-blue-500' : 'text-gray-400'
+                    }`} />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </nav>
           </div>
         </div>
