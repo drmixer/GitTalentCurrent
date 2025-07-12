@@ -22,12 +22,44 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
+  const [gitHubData, setGitHubData] = useState(null);
+  const [githubLoading, setGithubLoading] = useState(true);
+  const [githubError, setGithubError] = useState(null);
 
   useEffect(() => {
     if (slug) {
       fetchDeveloperBySlug(slug);
     }
   }, [slug]);
+
+  useEffect(() => {
+    const fetchGitHubData = async () => {
+      if (developer?.github_handle) {
+        setGithubLoading(true);
+        try {
+          const response = await fetch(`/functions/v1/github-proxy`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              handle: developer.github_handle,
+              installationId: developer.github_installation_id
+            })
+          });
+          const data = await response.json();
+          setGitHubData(data);
+        } catch (error) {
+          setGithubError(error);
+        } finally {
+          setGithubLoading(false);
+        }
+      }
+    };
+
+    fetchGitHubData();
+  }, [developer]);
 
 
   const fetchDeveloperBySlug = async (profileSlug: string) => {
@@ -220,10 +252,12 @@ export const PublicDeveloperProfile: React.FC = () => {
           {activeTab === 'github' && developer.github_handle && (
             <RealGitHubChart
               githubHandle={developer.github_handle}
+              gitHubData={gitHubData}
+              loading={githubLoading}
+              error={githubError}
               className="w-full"
               displayMode="dashboardSnippet"
               isGitHubAppInstalled={!!developer?.github_installation_id}
-              isPublic={true}
             />
           )}
         </div>
