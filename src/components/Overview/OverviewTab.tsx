@@ -73,8 +73,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const commitsYTD = developer.annual_contributions ?? 0;
 
   // Use override if available, then developer object, then length of passed array (which might be empty)
-  const savedJobsCount = props.savedJobsCountOverride ?? developer.saved_jobs_count ?? props.savedJobs.length;
-  const appliedJobsCount = props.appliedJobsCountOverride ?? developer.applied_jobs_count ?? props.appliedJobs.length;
+  // The props 'savedJobsCountOverride', 'appliedJobsCountOverride', 'savedJobs', 'appliedJobs'
+  // are destructured in the function signature, so we use them directly.
+  const savedJobsCount = savedJobsCountOverride ?? developer.saved_jobs_count ?? savedJobs.length;
+  const appliedJobsCount = appliedJobsCountOverride ?? developer.applied_jobs_count ?? appliedJobs.length;
 
   const handleNavigation = (tab: string) => {
     if (onNavigateToTab) {
