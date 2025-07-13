@@ -245,7 +245,11 @@ Deno.serve(async (req: Request) => {
     console.error("Error in GitHub proxy:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch GitHub data" }),
+      JSON.stringify({
+        error: "Failed to fetch GitHub data",
+        message: error.message,
+        stack: error.stack,
+      }),
       {
         status: 500,
         headers: {
