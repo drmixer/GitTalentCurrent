@@ -4,15 +4,18 @@
 
 [[redirects]]
   from = "/functions/v1/*"
-  to = "/.netlify/functions/:splat"
+  to = "/.netlify/functions/v1/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/auth/callback"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = true
-  conditions = { "path" = "!^/functions/v1/.*" }
 
 [build.environment]
   NODE_VERSION = "18"
