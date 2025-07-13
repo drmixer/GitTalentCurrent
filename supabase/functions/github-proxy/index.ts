@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
-import { create } from 'npm:jsonwebtoken@9.0.2';
+import { create as createJwt } from "https://deno.land/x/djwt@v2.2/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
           iss: GITHUB_APP_ID
         };
         
-        const jwt = create(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
+        const jwt = await createJwt({ alg: "RS256", typ: "JWT" }, payload, GITHUB_APP_PRIVATE_KEY);
         
         // Exchange the JWT for an installation access token
         const tokenResponse = await fetch(
