@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Developer, AppliedJob, JobRole } from '../types';
-import { X, GitHub, Briefcase, Mail, Phone, MapPin, Award, Code } from 'lucide-react';
+import { X, Github, Briefcase, Mail, Phone, MapPin, Award, Code } from 'lucide-react';
 import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 
 interface DeveloperProfileModalProps {
@@ -43,7 +43,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
               <h3 className="text-xl font-bold">{developer.user.name}</h3>
               <p className="text-gray-600">{developer.user.headline}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                <a href={`https://github.com/${developer.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><GitHub size={16} className="mr-1" />{developer.github_handle}</a>
+                <a href={`https://github.com/${developer.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_handle}</a>
                 {developer.user.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.user.email}</span>}
                 {developer.user.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.user.location}</span>}
               </div>
