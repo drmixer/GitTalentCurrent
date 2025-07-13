@@ -182,15 +182,24 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           <div>
             <h4 className="font-bold text-gray-900 mb-3">Programming Languages</h4>
             <div className="flex flex-wrap gap-2">
-              {developer.skills && developer.skills.length > 0 ? (
-                developer.skills.map((skill, index) => (
-                  <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
-                    {skill}
-                  </span>
-                ))
-              ) : (
-                <p className="text-gray-500">No languages specified</p>
-              )}
+              {(() => {
+                const allSkills = [
+                  ...(developer.skills || []),
+                  ...(developer.top_languages || []),
+                  ...(developer.technologies || []),
+                ];
+                const uniqueSkills = [...new Set(allSkills)];
+
+                return uniqueSkills.length > 0 ? (
+                  uniqueSkills.map((skill, index) => (
+                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg">
+                      {skill}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-gray-500">No skills specified</p>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -174,13 +174,10 @@ export const PublicDeveloperProfile: React.FC = () => {
                 <div className="flex items-center space-x-4 text-blue-100">
                   <div className="flex items-center">
                     <Code className="w-4 h-4 mr-1" />
-                    {developer.skills && developer.skills.length > 0 ? (
-                      <>
-                        {developer.skills.slice(0, 3).join(', ')}
-                        {developer.skills.length > 3 && '...'}
-                      </>
+                    {developer.preferred_title ? (
+                      <>{developer.preferred_title}</>
                     ) : (
-                      'No skills specified'
+                      'No title specified'
                     )}
                   </div>
                   {developer.location && (
