@@ -45,6 +45,7 @@ export const PublicDeveloperProfile: React.FC = () => {
             },
             body: JSON.stringify({
               handle: developer.github_handle,
+              installationId: developer.github_installation_id,
             })
           });
           const data = await response.json();
@@ -173,10 +174,10 @@ export const PublicDeveloperProfile: React.FC = () => {
                 <div className="flex items-center space-x-4 text-blue-100">
                   <div className="flex items-center">
                     <Code className="w-4 h-4 mr-1" />
-                    {developer.skills && developer.skills.length > 0 ? (
+                    {developer.top_languages && developer.top_languages.length > 0 ? (
                       <>
-                        {developer.skills.slice(0, 3).join(', ')}
-                        {developer.skills.length > 3 && '...'}
+                        {developer.top_languages.slice(0, 3).join(', ')}
+                        {developer.top_languages.length > 3 && '...'}
                       </>
                     ) : (
                       'No skills specified'
