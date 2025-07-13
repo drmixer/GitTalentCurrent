@@ -50,6 +50,19 @@ Deno.serve(async (req: Request) => {
 
     // If we have GitHub App credentials and an installation ID, use GitHub App authentication
     if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
+      if (!GITHUB_APP_ID || !GITHUB_APP_PRIVATE_KEY) {
+        console.error("GitHub App credentials are not set in the environment.");
+        return new Response(
+          JSON.stringify({ error: "GitHub App credentials are not configured." }),
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            },
+          }
+        );
+      }
       console.log("Using GitHub App authentication with installation ID:", installationId);
       
       try {

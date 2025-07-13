@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS developers (
   location text DEFAULT '',
   experience_years integer DEFAULT 0,
   hourly_rate integer DEFAULT 0,
+  skills text[] DEFAULT '{}',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
