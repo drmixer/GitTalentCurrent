@@ -35,6 +35,7 @@ import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobRole, Hire, Message } from '../types';
+import { CandidateTracker } from '../components/Jobs/CandidateTracker';
 
 interface MessageThread {
   otherUserId: string;
@@ -51,7 +52,7 @@ interface MessageThread {
 
 export const RecruiterDashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'search-devs' | 'messages' | 'notifications' | 'hires'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('overview');
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
@@ -1053,6 +1054,17 @@ export const RecruiterDashboard = () => {
                 <DollarSign className="w-5 h-5 mr-2" />
                 Hires
               </button>
+              <button
+                onClick={() => setActiveTab('tracker')}
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                  activeTab === 'tracker'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Users className="w-5 h-5 mr-2" />
+                Candidate Tracker
+              </button>
             </nav>
           </div>
         </div>
@@ -1106,6 +1118,7 @@ export const RecruiterDashboard = () => {
             }}
           />
         )}
+        {activeTab === 'tracker' && <CandidateTracker />}
 
         {/* Job Form Modal */}
         {showJobForm && (
