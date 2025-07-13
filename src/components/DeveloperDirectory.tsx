@@ -15,7 +15,8 @@ const DeveloperDirectory: React.FC = () => {
           .from('developers')
           .select('*, user:users(*)')
           .eq('availability', true)
-          .eq('user.is_approved', true);
+          .eq('user.is_approved', true)
+          .not('github_handle', 'is', null);
 
         if (error) {
           throw error;
