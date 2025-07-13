@@ -66,6 +66,7 @@ export const RecruiterDashboard = () => {
     totalRevenue: 0
   });
   
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -96,6 +97,7 @@ export const RecruiterDashboard = () => {
       setError('');
       
       await Promise.all([
+        fetchJobRoles(),
         fetchStats(),
         fetchHires(),
         fetchUnreadNotificationsCount()
@@ -105,6 +107,23 @@ export const RecruiterDashboard = () => {
       setError(error.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchJobRoles = async () => {
+    try {
+      if (!userProfile?.id) return;
+
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .eq('recruiter_id', userProfile.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setJobRoles(data || []);
+    } catch (error: any) {
+      console.error('Error fetching job roles:', error);
     }
   };
 
@@ -226,6 +245,11 @@ export const RecruiterDashboard = () => {
       setSuccess('');
     }, 3000);
   };
+
+  const handleJobUpdate = () => {
+    fetchJobRoles();
+    fetchStats();
+  }
 
   // Filter hires based on search term
   const filteredHires = hires.filter(hire => 
@@ -500,7 +524,7 @@ export const RecruiterDashboard = () => {
     </div>
   );
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -572,6 +596,7 @@ export const RecruiterDashboard = () => {
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
             <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
             <p className="text-red-800 font-medium">{error}</p>
+            <button onClick={fetchDashboardData} className="ml-auto px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200">Retry</button>
           </div>
         )}
 
@@ -672,7 +697,7 @@ export const RecruiterDashboard = () => {
 
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'my-jobs' && <JobsDashboard onViewApplicants={handleViewApplicants} />}
+        {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
         {activeTab === 'job-details' && selectedJobId && (
           <JobDetailView
             jobId={selectedJobId}
