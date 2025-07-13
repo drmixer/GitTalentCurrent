@@ -13,7 +13,10 @@ const DeveloperDirectory: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('developers')
-          .select('*, user:users(*)');
+          .select('*, user:users(*)')
+          .eq('availability', true)
+          .eq('looking_for_job', true)
+          .eq('user.is_approved', true);
 
         if (error) {
           throw error;
@@ -40,16 +43,20 @@ const DeveloperDirectory: React.FC = () => {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Developer Directory</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {developers.map(dev => (
-          <DeveloperCard
-            key={dev.user_id}
-            developer={dev}
-            onViewProfile={() => {}}
-            onSendMessage={() => {}}
-          />
-        ))}
-      </div>
+      {developers.length === 0 ? (
+        <p>No developers found.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {developers.map(dev => (
+            <DeveloperCard
+              key={dev.user_id}
+              developer={dev}
+              onViewProfile={() => {}}
+              onSendMessage={() => {}}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
