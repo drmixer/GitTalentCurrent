@@ -22,6 +22,13 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   onViewProfile,
   onSendMessage
 }) => {
+  // Gracefully handle cases where user data might be missing
+  if (!developer.user) {
+    console.warn('DeveloperCard: Developer object is missing user data for user_id:', developer.user_id);
+    // Optionally render a placeholder or return null
+    return null;
+  }
+
   console.log('Rendering DeveloperCard for:', developer.user_id, developer.user.name);
   
   // Get display name in format: FirstName (GitHubUsername)

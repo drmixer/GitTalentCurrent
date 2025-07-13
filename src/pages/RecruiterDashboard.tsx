@@ -1098,7 +1098,7 @@ export const RecruiterDashboard = () => {
         {activeTab === 'messages' && renderMessages()}
         {activeTab === 'hires' && renderHires()}
         {activeTab === 'notifications' && (
-          <NotificationList 
+          <NotificationList
             onViewJobRole={handleViewNotificationJobRole}
             onViewMessage={(messageId) => {
               // Handle viewing message

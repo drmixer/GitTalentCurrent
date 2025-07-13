@@ -95,6 +95,7 @@ export const DeveloperList: React.FC<DeveloperListProps> = ({
         *,
         user:users(*)
       `)
+      .not('user', 'is', null)
       .eq('user.is_approved', true);
       
     // Apply filters
