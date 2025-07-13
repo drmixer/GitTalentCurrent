@@ -13,10 +13,7 @@ const DeveloperDirectory: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('developers')
-          .select('*, user:users(*)')
-          .eq('availability', true)
-          .eq('user.is_approved', true)
-          .not('github_handle', 'is', null);
+          .select('*, user:users(*)');
 
         if (error) {
           throw error;
