@@ -33,7 +33,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
   onHire,
   onCancel
 }) => {
-  const { createHire } = useAuth();
+  const { createHire, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
