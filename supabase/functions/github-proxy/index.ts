@@ -15,8 +15,10 @@ const GITHUB_APP_CLIENT_ID = Deno.env.get("GITHUB_APP_CLIENT_ID");
 const GITHUB_APP_CLIENT_SECRET = Deno.env.get("GITHUB_APP_CLIENT_SECRET");
 
 Deno.serve(async (req: Request) => {
+  console.log("GitHub proxy function invoked.");
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("Handling OPTIONS preflight request.");
     return new Response(null, {
       status: 200,
       headers: corsHeaders,
@@ -25,9 +27,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Get GitHub handle and installation ID from request
+    console.log("Parsing request body...");
     const { handle, installationId } = await req.json();
+    console.log(`Request body parsed. Handle: ${handle}, Installation ID: ${installationId}`);
     
     if (!handle) {
+      console.error("GitHub handle is missing from the request.");
       return new Response(
         JSON.stringify({ error: "GitHub handle is required" }),
         {
@@ -62,8 +67,10 @@ Deno.serve(async (req: Request) => {
         };
         
         const jwt = create(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
+        console.log("JWT generated for GitHub App authentication.");
         
         // Exchange the JWT for an installation access token
+        console.log(`Fetching installation access token for installation ID: ${installationId}...`);
         const tokenResponse = await fetch(
           `https://api.github.com/app/installations/${installationId}/access_tokens`,
           {
@@ -101,10 +108,13 @@ Deno.serve(async (req: Request) => {
     const reposUrl = `https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`;
 
     // Fetch user data
+    console.log(`Fetching user data from: ${userUrl}`);
     const userResponse = await fetch(userUrl, { headers });
+    console.log(`User data response status: ${userResponse.status}`);
     
     if (!userResponse.ok) {
       if (userResponse.status === 404) {
+        console.error(`GitHub user '${handle}' not found.`);
         return new Response(
           JSON.stringify({ error: `GitHub user '${handle}' not found` }),
           {
@@ -143,9 +153,12 @@ Deno.serve(async (req: Request) => {
     const userData = await userResponse.json();
 
     // Fetch repositories
+    console.log(`Fetching repositories from: ${reposUrl}`);
     const reposResponse = await fetch(reposUrl, { headers });
+    console.log(`Repositories response status: ${reposResponse.status}`);
     
     if (!reposResponse.ok) {
+      console.error(`Failed to fetch repositories: ${reposResponse.status}`);
       return new Response(
         JSON.stringify({ error: `Failed to fetch repositories: ${reposResponse.status}` }),
         {
