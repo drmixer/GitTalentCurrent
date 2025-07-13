@@ -35,7 +35,9 @@ import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobRole, Hire, Message } from '../types';
-import { CandidateTracker } from '../components/Jobs/CandidateTracker';
+import JobsDashboard from '../components/Jobs/JobsDashboard';
+import DeveloperDirectory from '../components/DeveloperDirectory';
+import HiringPipeline from '../components/HiringPipeline';
 
 interface MessageThread {
   otherUserId: string;
@@ -1063,7 +1065,7 @@ export const RecruiterDashboard = () => {
                 }`}
               >
                 <Users className="w-5 h-5 mr-2" />
-                Candidate Tracker
+                Hiring Pipeline
               </button>
             </nav>
           </div>
@@ -1071,42 +1073,8 @@ export const RecruiterDashboard = () => {
 
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'my-jobs' && (showJobDetails && selectedJobId ? (
-          <div className="space-y-6">
-            <button
-              onClick={() => {
-                setShowJobDetails(false);
-                setSelectedJobId(null);
-              }}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Job Listings
-            </button>
-            
-            <JobRoleDetails
-              jobRoleId={selectedJobId}
-              onEdit={() => {
-                const job = jobRoles.find(j => j.id === selectedJobId);
-                if (job) {
-                  setEditingJob(job);
-                  setShowJobForm(true);
-                  setShowJobDetails(false);
-                }
-              }}
-              onSendMessage={handleMessageDeveloper}
-              onViewDeveloper={(developerId) => {
-                handleMessageDeveloper(
-                  developerId,
-                  "Developer", // This will be updated when the message thread is created
-                  selectedJobId,
-                  jobRoles.find(j => j.id === selectedJobId)?.title || "Job"
-                );
-              }}
-            />
-          </div>
-        ) : renderMyJobListings())}
-        {activeTab === 'search-devs' && renderSearchDevelopers()}
+        {activeTab === 'my-jobs' && <JobsDashboard />}
+        {activeTab === 'search-devs' && <DeveloperDirectory />}
         {activeTab === 'messages' && renderMessages()}
         {activeTab === 'hires' && renderHires()}
         {activeTab === 'notifications' && (
@@ -1118,7 +1086,7 @@ export const RecruiterDashboard = () => {
             }}
           />
         )}
-        {activeTab === 'tracker' && <CandidateTracker />}
+        {activeTab === 'tracker' && <HiringPipeline />}
 
         {/* Job Form Modal */}
         {showJobForm && (
