@@ -35,9 +35,10 @@ import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobRole, Hire, Message } from '../types';
-import JobsDashboard from '../components/Jobs/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
+import JobsDashboard from '../components/Jobs/JobsDashboard';
+import { JobDetailView } from '../components/Jobs/JobDetailView';
 
 interface MessageThread {
   otherUserId: string;
@@ -54,7 +55,7 @@ interface MessageThread {
 
 export const RecruiterDashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('overview');
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
@@ -65,24 +66,17 @@ export const RecruiterDashboard = () => {
     totalRevenue: 0
   });
   
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  const [showJobForm, setShowJobForm] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [showJobDetails, setShowJobDetails] = useState(false);
   
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
-  const [showHireModal, setShowHireModal] = useState(false);
-  const [editingJob, setEditingJob] = useState<JobRole | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [jobInterestCounts, setJobInterestCounts] = useState<{[jobId: string]: number}>({});
 
   // Check if the user is approved
   const isApproved = userProfile?.is_approved === true;
@@ -103,9 +97,7 @@ export const RecruiterDashboard = () => {
       
       await Promise.all([
         fetchStats(),
-        fetchJobRoles(),
         fetchHires(),
-        fetchJobInterestCounts(),
         fetchUnreadNotificationsCount()
       ]);
     } catch (error: any) {
@@ -158,23 +150,6 @@ export const RecruiterDashboard = () => {
     }
   };
 
-  const fetchJobRoles = async () => {
-    try {
-      if (!userProfile?.id) return;
-      
-      const { data, error } = await supabase
-        .from('job_roles')
-        .select('*')
-        .eq('recruiter_id', userProfile.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setJobRoles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching job roles:', error);
-    }
-  };
-
   const fetchHires = async () => {
     try {
       if (!userProfile?.id) return;
@@ -199,34 +174,6 @@ export const RecruiterDashboard = () => {
     }
   };
 
-  const fetchJobInterestCounts = async () => {
-    try {
-      if (!userProfile?.id) return;
-      
-      // Get all job IDs
-      const jobIds = jobRoles.map(job => job.id);
-      if (jobIds.length === 0) return;
-      
-      // For each job, count messages that mention it
-      const counts: {[jobId: string]: number} = {};
-      
-      for (const jobId of jobIds) {
-        const { count, error } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('receiver_id', userProfile.id)
-          .eq('job_role_id', jobId);
-        
-        if (error) throw error;
-        counts[jobId] = count || 0;
-      }
-      
-      setJobInterestCounts(counts);
-    } catch (error: any) {
-      console.error('Error fetching job interest counts:', error);
-    }
-  };
-
   const fetchUnreadNotificationsCount = async () => {
     try {
       if (!userProfile?.id) return;
@@ -244,135 +191,9 @@ export const RecruiterDashboard = () => {
     }
   };
 
-  const handleJobSubmit = async (jobData: Partial<JobRole>) => {
-    try {
-      setError('');
-      
-      if (editingJob) {
-        // Update existing job
-        const { error } = await supabase
-          .from('job_roles')
-          .update(jobData)
-          .eq('id', editingJob.id);
-        
-        if (error) throw error;
-        
-        setSuccess('Job updated successfully!');
-      } else {
-        // Create new job
-        const { error } = await supabase
-          .from('job_roles')
-          .insert([{ ...jobData, recruiter_id: userProfile?.id }]);
-        
-        if (error) throw error;
-        
-        setSuccess('Job created successfully!');
-      }
-      
-      // Refresh data
-      await fetchJobRoles();
-      await fetchStats();
-      
-      // Reset form state
-      setShowJobForm(false);
-      setEditingJob(null);
-      
-      // Clear success message after delay
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error saving job:', error);
-      setError(error.message || 'Failed to save job');
-    }
-  };
-
-  const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) return;
-    
-    try {
-      setError('');
-      
-      const { error } = await supabase
-        .from('job_roles')
-        .delete()
-        .eq('id', jobId);
-      
-      if (error) throw error;
-      
-      setSuccess('Job deleted successfully!');
-      
-      // Refresh data
-      await fetchJobRoles();
-      await fetchStats();
-      
-      // Clear success message after delay
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error deleting job:', error);
-      setError(error.message || 'Failed to delete job');
-    }
-  };
-
-  const handleToggleJobStatus = async (jobId: string, isActive: boolean) => {
-    try {
-      setError('');
-      
-      const { error } = await supabase
-        .from('job_roles')
-        .update({ is_active: !isActive })
-        .eq('id', jobId);
-      
-      if (error) throw error;
-      
-      setSuccess(`Job ${isActive ? 'paused' : 'activated'} successfully!`);
-      
-      // Refresh data
-      await fetchJobRoles();
-      await fetchStats();
-      
-      // Clear success message after delay
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error updating job status:', error);
-      setError(error.message || 'Failed to update job status');
-    }
-  };
-
-  const handleToggleFeatureJob = async (jobId: string, isFeatured: boolean) => {
-    try {
-      setError('');
-      
-      const { error } = await supabase
-        .from('job_roles')
-        .update({ is_featured: !isFeatured })
-        .eq('id', jobId);
-      
-      if (error) throw error;
-      
-      setSuccess(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully!`);
-      
-      // Refresh data
-      await fetchJobRoles();
-      await fetchStats();
-      
-      // Clear success message after delay
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error featuring job:', error);
-      setError(error.message || 'Failed to feature job');
-    }
-  };
-
-  const handleViewJobDetails = (jobId: string) => {
+  const handleViewApplicants = (jobId: string) => {
     setSelectedJobId(jobId);
-    setShowJobDetails(true);
+    setActiveTab('job-details');
   };
 
   const handleMessageDeveloper = (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
@@ -392,7 +213,6 @@ export const RecruiterDashboard = () => {
 
   const handleViewNotificationJobRole = (jobRoleId: string) => {
     setSelectedJobId(jobRoleId);
-    setShowJobDetails(true);
     setActiveTab('my-jobs');
   };
 
@@ -406,13 +226,6 @@ export const RecruiterDashboard = () => {
       setSuccess('');
     }, 3000);
   };
-
-  // Filter jobs based on search term
-  const filteredJobs = jobRoles.filter(job => 
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.tech_stack.some(tech => tech.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
 
   // Filter hires based on search term
   const filteredHires = hires.filter(hire => 
@@ -474,24 +287,21 @@ export const RecruiterDashboard = () => {
         <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
         <div className="grid md:grid-cols-3 gap-6">
           <button
-            onClick={() => {
-              setEditingJob(null);
-              setShowJobForm(true);
-            }}
+            onClick={() => setActiveTab('my-jobs')}
             className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
           >
             <Briefcase className="w-8 h-8 text-blue-600 mb-3" />
-            <span className="font-semibold text-gray-900">Post New Job</span>
-            <span className="text-sm text-gray-600 mt-1">Create a new job listing</span>
+            <span className="font-semibold text-gray-900">Manage Jobs</span>
+            <span className="text-sm text-gray-600 mt-1">View, edit, and create job listings</span>
           </button>
           
           <button
-            onClick={() => setShowImportModal(true)}
+            onClick={() => setActiveTab('tracker')}
             className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
           >
-            <Plus className="w-8 h-8 text-purple-600 mb-3" />
-            <span className="font-semibold text-gray-900">Bulk Import Jobs</span>
-            <span className="text-sm text-gray-600 mt-1">Import multiple jobs via CSV</span>
+            <Users className="w-8 h-8 text-purple-600 mb-3" />
+            <span className="font-semibold text-gray-900">Hiring Pipeline</span>
+            <span className="text-sm text-gray-600 mt-1">Track candidates across all jobs</span>
           </button>
           
           <button
@@ -508,43 +318,6 @@ export const RecruiterDashboard = () => {
       {/* Recent Activity */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
-        
-        {/* Recent Jobs */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Job Listings</h3>
-          {jobRoles.length > 0 ? (
-            <div className="space-y-4">
-              {jobRoles.slice(0, 3).map(job => (
-                <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{job.title}</h4>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Posted {new Date(job.created_at).toLocaleDateString()} • 
-                      {jobInterestCounts[job.id] || 0} interested developers
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleViewJobDetails(job.id)}
-                    className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-                  >
-                    View Details
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">No job listings yet. Create your first job posting!</p>
-          )}
-          
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setActiveTab('my-jobs')}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              View All Job Listings
-            </button>
-          </div>
-        </div>
         
         {/* Recent Hires */}
         <div>
@@ -584,180 +357,6 @@ export const RecruiterDashboard = () => {
           )}
         </div>
       </div>
-    </div>
-  );
-
-  const renderMyJobListings = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-900">My Job Listings</h2>
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="px-4 py-2 text-purple-600 border border-purple-200 rounded-xl hover:bg-purple-50 transition-colors font-semibold"
-          >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            Import Jobs
-          </button>
-          <button
-            onClick={() => {
-              setEditingJob(null);
-              setShowJobForm(true);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            Post New Job
-          </button>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Search job listings..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Job Listings */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-          <span className="text-gray-600 font-medium">Loading job listings...</span>
-        </div>
-      ) : filteredJobs.length > 0 ? (
-        <div className="space-y-6">
-          {filteredJobs.map((job) => (
-            <div key={job.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{job.title}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {job.is_active ? 'Active' : 'Paused'}
-                    </span>
-                    {job.is_featured && (
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
-                        Featured
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {job.location}
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      {job.job_type}
-                    </div>
-                    <div className="flex items-center">
-                      <DollarSign className="w-4 h-4 mr-1" />
-                      ${job.salary_min}k - ${job.salary_max}k
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Posted {new Date(job.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {job.tech_stack.map((tech, index) => (
-                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">
-                      <MessageSquare className="w-4 h-4 inline mr-1" />
-                      {jobInterestCounts[job.id] || 0} interested developers
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleToggleFeatureJob(job.id, !!job.is_featured)}
-                    className={`p-2 rounded-lg ${
-                      job.is_featured 
-                        ? 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50' 
-                        : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
-                    }`}
-                    title={job.is_featured ? "Unfeature Job" : "Feature Job"}
-                  >
-                    <Star className="w-5 h-5" fill={job.is_featured ? "currentColor" : "none"} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingJob(job);
-                      setShowJobForm(true);
-                    }}
-                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
-                    title="Edit Job"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteJob(job.id)}
-                    className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
-                    title="Delete Job"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => handleViewJobDetails(job.id)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                >
-                  <Eye className="w-4 h-4 mr-2 inline" />
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleToggleJobStatus(job.id, job.is_active)}
-                  className={`px-4 py-2 ${
-                    job.is_active 
-                      ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-                      : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                  } rounded-lg transition-colors font-semibold`}
-                >
-                  {job.is_active ? 'Pause Listing' : 'Activate Listing'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
-          <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Job Listings Found</h3>
-          <p className="text-gray-600 mb-6">
-            {searchTerm ? "No jobs match your search criteria" : "You haven't created any job listings yet"}
-          </p>
-          <button
-            onClick={() => {
-              setEditingJob(null);
-              setShowJobForm(true);
-            }}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            Post Your First Job
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -1073,7 +672,14 @@ export const RecruiterDashboard = () => {
 
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'my-jobs' && <JobsDashboard />}
+        {activeTab === 'my-jobs' && <JobsDashboard onViewApplicants={handleViewApplicants} />}
+        {activeTab === 'job-details' && selectedJobId && (
+          <JobDetailView
+            jobId={selectedJobId}
+            onBack={() => setActiveTab('my-jobs')}
+            onMessageDeveloper={handleMessageDeveloper}
+          />
+        )}
         {activeTab === 'search-devs' && <DeveloperDirectory />}
         {activeTab === 'messages' && renderMessages()}
         {activeTab === 'hires' && renderHires()}
@@ -1087,34 +693,6 @@ export const RecruiterDashboard = () => {
           />
         )}
         {activeTab === 'tracker' && <HiringPipeline />}
-
-        {/* Job Form Modal */}
-        {showJobForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <JobRoleForm
-                jobRole={editingJob}
-                onSuccess={handleJobSubmit}
-                onCancel={() => {
-                  setShowJobForm(false);
-                  setEditingJob(null);
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Job Import Modal */}
-        {showImportModal && (
-          <JobImportModal
-            isOpen={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSuccess={() => {
-              fetchJobRoles();
-              fetchStats();
-            }}
-          />
-        )}
       </div>
     </div>
   );
