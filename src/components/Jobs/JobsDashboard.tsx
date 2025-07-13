@@ -21,13 +21,14 @@ import { JobRoleForm } from '../JobRoles/JobRoleForm';
 import { JobImportModal } from '../JobRoles/JobImportModal';
 
 interface JobsDashboardProps {
+  jobRoles: JobRole[];
   onViewApplicants: (jobId: string) => void;
+  onJobUpdate: () => void;
 }
 
-const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
+const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicants, onJobUpdate }) => {
   const { userProfile } = useAuth();
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,33 +38,10 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
   const [jobInterestCounts, setJobInterestCounts] = useState<{[jobId: string]: number}>({});
 
   useEffect(() => {
-    if (userProfile?.id) {
-      fetchJobRoles();
+    if (jobRoles.length > 0) {
+      fetchJobInterestCounts(jobRoles.map(j => j.id));
     }
-  }, [userProfile]);
-
-  const fetchJobRoles = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      if (!userProfile?.id) return;
-
-      const { data, error } = await supabase
-        .from('job_roles')
-        .select('*')
-        .eq('recruiter_id', userProfile.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setJobRoles(data || []);
-      await fetchJobInterestCounts(data.map(j => j.id));
-    } catch (error: any) {
-      console.error('Error fetching job roles:', error);
-      setError(error.message || 'Failed to fetch job roles');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [jobRoles]);
 
   const fetchJobInterestCounts = async (jobIds: string[]) => {
     try {
@@ -90,6 +68,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
 
   const handleJobSubmit = async (jobData: Partial<JobRole>) => {
     try {
+      setLoading(true);
       setError('');
 
       if (editingJob) {
@@ -109,7 +88,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
         setSuccess('Job created successfully!');
       }
 
-      await fetchJobRoles();
+      onJobUpdate();
       setShowJobForm(false);
       setEditingJob(null);
 
@@ -117,6 +96,8 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
     } catch (error: any) {
       console.error('Error saving job:', error);
       setError(error.message || 'Failed to save job');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,43 +105,52 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
     if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) return;
 
     try {
+      setLoading(true);
       setError('');
       const { error } = await supabase.from('job_roles').delete().eq('id', jobId);
       if (error) throw error;
       setSuccess('Job deleted successfully!');
-      await fetchJobRoles();
+      onJobUpdate();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error deleting job:', error);
       setError(error.message || 'Failed to delete job');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleToggleJobStatus = async (jobId: string, isActive: boolean) => {
     try {
+      setLoading(true);
       setError('');
       const { error } = await supabase.from('job_roles').update({ is_active: !isActive }).eq('id', jobId);
       if (error) throw error;
       setSuccess(`Job ${isActive ? 'paused' : 'activated'} successfully!`);
-      await fetchJobRoles();
+      onJobUpdate();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error updating job status:', error);
       setError(error.message || 'Failed to update job status');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleToggleFeatureJob = async (jobId: string, isFeatured: boolean) => {
     try {
+      setLoading(true);
       setError('');
       const { error } = await supabase.from('job_roles').update({ is_featured: !isFeatured }).eq('id', jobId);
       if (error) throw error;
       setSuccess(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully!`);
-      await fetchJobRoles();
+      onJobUpdate();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error featuring job:', error);
       setError(error.message || 'Failed to feature job');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -206,7 +196,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
-          <span className="text-gray-600 font-medium">Loading job listings...</span>
+          <span className="text-gray-600 font-medium">Loading...</span>
         </div>
       ) : filteredJobs.length > 0 ? (
         <div className="space-y-6">
@@ -268,7 +258,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ onViewApplicants }) => {
         </div>
       )}
 
-      {showImportModal && <JobImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} onSuccess={fetchJobRoles} />}
+      {showImportModal && <JobImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} onSuccess={onJobUpdate} />}
     </div>
   );
 };
