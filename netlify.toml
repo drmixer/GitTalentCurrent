@@ -3,7 +3,7 @@
   publish = "dist"
 
 [[redirects]]
-  from = "/.netlify/functions/*"
+  from = "/functions/v1/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
@@ -11,6 +11,8 @@
   from = "/*"
   to = "/index.html"
   status = 200
+  force = true
+  conditions = { "path" = "!^/functions/v1/.*" }
 
 [build.environment]
   NODE_VERSION = "18"
