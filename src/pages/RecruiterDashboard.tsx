@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { DeveloperList } from '../components/DeveloperList';
 import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
@@ -388,10 +387,7 @@ export const RecruiterDashboard = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
       
-      <DeveloperList 
-        fetchType="all"
-        onSendMessage={handleMessageDeveloper}
-      />
+      <DeveloperDirectory onSendMessage={handleMessageDeveloper} />
     </div>
   );
 
@@ -705,7 +701,7 @@ export const RecruiterDashboard = () => {
             onMessageDeveloper={handleMessageDeveloper}
           />
         )}
-        {activeTab === 'search-devs' && <DeveloperDirectory />}
+        {activeTab === 'search-devs' && renderSearchDevelopers()}
         {activeTab === 'messages' && renderMessages()}
         {activeTab === 'hires' && renderHires()}
         {activeTab === 'notifications' && (
