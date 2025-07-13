@@ -85,6 +85,7 @@ export interface Developer {
   bio: string;
   availability: boolean;
   top_languages: string[];
+  skills: string[];
   linked_projects: string[];
   location: string;
   experience_years: number;
