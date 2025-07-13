@@ -15,7 +15,6 @@ const DeveloperDirectory: React.FC = () => {
           .from('developers')
           .select('*, user:users(*)')
           .eq('availability', true)
-          .eq('looking_for_job', true)
           .eq('user.is_approved', true);
 
         if (error) {
