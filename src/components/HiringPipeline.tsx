@@ -1,149 +1,84 @@
-import React, { useState } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { User, JobRole } from '../types';
 
-const initialData = {
-  candidates: {
-    'candidate-1': { id: 'candidate-1', content: 'John Doe' },
-    'candidate-2': { id: 'candidate-2', content: 'Jane Smith' },
-    'candidate-3': { id: 'candidate-3', content: 'Peter Jones' },
-  },
-  columns: {
-    'column-1': {
-      id: 'column-1',
-      title: 'New',
-      candidateIds: ['candidate-1', 'candidate-2', 'candidate-3'],
-    },
-    'column-2': {
-      id: 'column-2',
-      title: 'Contacted',
-      candidateIds: [],
-    },
-    'column-3': {
-        id: 'column-3',
-        title: 'Interviewing',
-        candidateIds: [],
-    },
-    'column-4': {
-        id: 'column-4',
-        title: 'Offer',
-        candidateIds: [],
-    },
-    'column-5': {
-        id: 'column-5',
-        title: 'Hired/Rejected',
-        candidateIds: [],
-    },
-  },
-  columnOrder: ['column-1', 'column-2', 'column-3', 'column-4', 'column-5'],
+interface SavedCandidate {
+    id: string;
+    developer: User;
+    stage: string;
+    notes: string;
+    job_role_id: string;
+}
+
+const STAGES = ['New', 'Contacted', 'Interviewing', 'Offer', 'Hired/Rejected'];
+
+const KanbanView: React.FC<{ candidates: SavedCandidate[] }> = ({ candidates }) => {
+    return (
+        <div className="flex space-x-4">
+            {STAGES.map(stage => (
+                <div key={stage} className="w-1/4 bg-gray-100 p-2 rounded-lg">
+                    <h2 className="font-bold mb-2">{stage}</h2>
+                    {candidates.filter(c => c.stage === stage).map(c => (
+                        <div key={c.id} className="p-2 bg-white rounded shadow mb-2">
+                            {c.developer.name}
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
 };
 
 const HiringPipeline: React.FC = () => {
-  const [state, setState] = useState(initialData);
+    const { user } = useAuth();
+    const [candidates, setCandidates] = useState<SavedCandidate[]>([]);
+    const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+    const [view, setView] = useState('list'); // 'list' or 'kanban'
+    // ... other states
 
-  const onDragEnd = (result: any) => {
-    const { destination, source, draggableId } = result;
-
-    if (!destination) {
-      return;
-    }
-
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return;
-    }
-
-    const start = state.columns[source.droppableId];
-    const finish = state.columns[destination.droppableId];
-
-    if (start === finish) {
-        const newCandidateIds = Array.from(start.candidateIds);
-        newCandidateIds.splice(source.index, 1);
-        newCandidateIds.splice(destination.index, 0, draggableId);
-
-        const newColumn = {
-          ...start,
-          candidateIds: newCandidateIds,
+    useEffect(() => {
+        const fetchJobRoles = async () => {
+            if (!user) return;
+            const { data, error } = await supabase
+                .from('job_roles')
+                .select('*')
+                .eq('recruiter_id', user.id);
+            if (error) console.error("Error fetching job roles:", error);
+            else setJobRoles(data);
         };
+        fetchJobRoles();
+        // ... fetchCandidates logic
+    }, [user]);
 
-        const newState = {
-          ...state,
-          columns: {
-            ...state.columns,
-            [newColumn.id]: newColumn,
-          },
-        };
+    // ... handlers
 
-        setState(newState);
-        return;
-    }
-
-    const startCandidateIds = Array.from(start.candidateIds);
-    startCandidateIds.splice(source.index, 1);
-    const newStart = {
-        ...start,
-        candidateIds: startCandidateIds,
-    };
-
-    const finishCandidateIds = Array.from(finish.candidateIds);
-    finishCandidateIds.splice(destination.index, 0, draggableId);
-    const newFinish = {
-        ...finish,
-        candidateIds: finishCandidateIds,
-    };
-
-    const newState = {
-        ...state,
-        columns: {
-            ...state.columns,
-            [newStart.id]: newStart,
-            [newFinish.id]: newFinish,
-        },
-    };
-    setState(newState);
-
-  };
-
-  return (
-    <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex">
-      {state.columnOrder.map(columnId => {
-        const column = state.columns[columnId];
-        const candidates = column.candidateIds.map(
-          candidateId => state.candidates[candidateId],
-        );
-
-        return (
-            <div key={column.id} className="m-2 border rounded w-64">
-            <h3 className="p-2 font-bold">{column.title}</h3>
-            <Droppable droppableId={column.id}>
-              {provided => (
-                <div ref={provided.innerRef} {...provided.droppableProps} className="p-2 min-h-[100px]">
-                  {candidates.map((candidate, index) => (
-                    <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
-                        {(provided) => (
-                            <div
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            ref={provided.innerRef}
-                            className="p-2 mb-2 border rounded bg-white"
-                            >
-                            {candidate.content}
-                            </div>
-                        )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+    return (
+        <div className="p-4 flex space-x-4">
+            <div className="flex-grow">
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-bold">Hiring Pipeline</h1>
+                    <div>
+                        <button onClick={() => setView('list')} className={`p-2 ${view === 'list' ? 'bg-blue-500 text-white' : ''}`}>List</button>
+                        <button onClick={() => setView('kanban')} className={`p-2 ${view === 'kanban' ? 'bg-blue-500 text-white' : ''}`}>Pipeline</button>
+                    </div>
                 </div>
-              )}
-            </Droppable>
-          </div>
-        );
-      })}
-      </div>
-    </DragDropContext>
-  );
+                {/* ... controls ... */}
+                {view === 'list' ? (
+                    <div className="space-y-4">
+                        {/* ... list view implementation ... */}
+                    </div>
+                ) : (
+                    <KanbanView candidates={candidates} />
+                )}
+            </div>
+            <div className="w-1/3">
+                <AISuggestionsPanel />
+            </div>
+        </div>
+    );
 };
+
+import AISuggestionsPanel from './AISuggestionsPanel';
 
 export default HiringPipeline;
