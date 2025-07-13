@@ -21,7 +21,6 @@ export { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 
 // Developer components
 export { DeveloperCard } from './DeveloperCard';
-export { DeveloperList } from './DeveloperList';
 
 // GitHub components
 export { GitHubChart } from './GitHub/GitHubChart';

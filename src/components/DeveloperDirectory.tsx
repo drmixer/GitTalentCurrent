@@ -3,7 +3,11 @@ import { supabase } from '../lib/supabase';
 import { DeveloperCard } from './DeveloperCard';
 import { Developer } from '../types';
 
-const DeveloperDirectory: React.FC = () => {
+interface DeveloperDirectoryProps {
+  onSendMessage: (developerId: string, developerName: string) => void;
+}
+
+const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }) => {
   const [developers, setDevelopers] = useState<Developer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +92,7 @@ const DeveloperDirectory: React.FC = () => {
               key={dev.user_id}
               developer={dev}
               onViewProfile={() => {}}
-              onSendMessage={() => {}}
+              onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
             />
           ))}
         </div>
