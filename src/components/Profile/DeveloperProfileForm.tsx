@@ -12,6 +12,7 @@ interface DeveloperProfile {
   location: string;
   experience_years: number;
   desired_salary: number;
+  skills: string[];
   skills_categories: Record<string, string[]>;
   profile_strength: number;
   public_profile_slug: string;
@@ -70,6 +71,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     location: '',
     experience_years: 0,
     desired_salary: 0,
+    skills: [],
     skills_categories: {},
     profile_strength: 0,
     public_profile_slug: '',
@@ -168,7 +170,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       const skills = Object.values(skills_categories).flat();
       const dataToSave = {
         ...developerDataOnly,
-        skills,
+        skills: skills,
         skills_categories,
         profile_strength: profileStrength
         // user_id is already part of formData and thus in developerDataOnly
