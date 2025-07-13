@@ -26,6 +26,7 @@ interface DeveloperProfile {
   profile_pic_url?: string;
   github_installation_id?: string;
   public_profile_enabled?: boolean; // Added for public/private toggle
+  preferred_title?: string;
 }
 
 interface DeveloperProfileFormProps {
@@ -433,6 +434,21 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               {errors.bio && (
                 <p className="text-red-600 text-sm mt-1">{errors.bio}</p>
               )}
+            </div>
+
+            {/* Preferred Title */}
+            <div>
+              <label htmlFor="preferred_title" className="block text-sm font-medium text-gray-700 mb-2">
+                Preferred Title
+              </label>
+              <input
+                type="text"
+                id="preferred_title"
+                value={formData.preferred_title || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, preferred_title: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., Full Stack Engineer"
+              />
             </div>
 
             {/* Location */}
