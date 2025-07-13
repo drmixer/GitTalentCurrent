@@ -164,7 +164,7 @@ export const AdminDashboard = () => {
           email,
           name,
           created_at,
-          recruiters!inner(company_name)
+          recruiter:recruiters!user_id(company_name)
         `)
         .eq('role', 'recruiter')
         .eq('is_approved', false)
@@ -180,7 +180,7 @@ export const AdminDashboard = () => {
           email,
           name,
           created_at,
-          recruiters!inner(company_name)
+          recruiter:recruiters!user_id(company_name)
         `)
         .eq('role', 'recruiter')
         .eq('is_approved', true)
@@ -193,7 +193,7 @@ export const AdminDashboard = () => {
         user_id: item.id,
         email: item.email,
         name: item.name,
-        company_name: item.recruiters.company_name,
+        company_name: item.recruiter.company_name,
         created_at: item.created_at
       })) || [];
 
@@ -201,7 +201,7 @@ export const AdminDashboard = () => {
         user_id: item.id,
         email: item.email,
         name: item.name,
-        company_name: item.recruiters.company_name,
+        company_name: item.recruiter.company_name,
         created_at: item.created_at
       })) || [];
 
