@@ -15,7 +15,8 @@ const DeveloperDirectory: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('developers')
-          .select('*, user:users(*)');
+          .select('*, user:users(*)')
+          .not('user', 'is', null);
 
         if (error) {
           throw error;
@@ -40,6 +41,9 @@ const DeveloperDirectory: React.FC = () => {
   }
 
   const filteredDevelopers = developers.filter(developer => {
+    if (!developer.user) {
+      return false;
+    }
     const searchTermLower = searchTerm.toLowerCase();
     const nameMatch = developer.user.name.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
