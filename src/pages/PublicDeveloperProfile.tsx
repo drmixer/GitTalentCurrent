@@ -37,21 +37,20 @@ export const PublicDeveloperProfile: React.FC = () => {
       if (developer?.github_handle) {
         setGithubLoading(true);
         try {
-          const response = await fetch(`/functions/v1/github-proxy`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabase.functions.invoke('github-proxy', {
+            body: {
               handle: developer.github_handle,
               installationId: developer.github_installation_id,
-            })
+            },
           });
-          const data = await response.json();
+
+          if (error) {
+            throw error;
+          }
+
           setGitHubData(data);
         } catch (error) {
-          setGithubError(error);
+          setGithubError(error as any);
         } finally {
           setGithubLoading(false);
         }
