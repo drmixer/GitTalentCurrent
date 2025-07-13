@@ -43,9 +43,48 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   useEffect(() => {
     if (initialDeveloper) {
       setDeveloper(initialDeveloper);
+      console.log('DeveloperProfileDetails: Using provided developer data:', initialDeveloper);
+      setLoading(false);
+    } else if (developerId) {
+      console.log('DeveloperProfileDetails: Fetching developer profile for ID:', developerId);
+      fetchDeveloperProfile();
     }
-    setLoading(false);
-  }, [initialDeveloper]);
+  }, [developerId, initialDeveloper]);
+
+  const fetchDeveloperProfile = async () => {
+    try {
+      setLoading(true);
+      console.log('DeveloperProfileDetails: Starting fetch for developer ID:', developerId);
+      setError('');
+
+      // Fetch developer with user data
+      const { data, error: fetchError } = await supabase
+        .from('developers')
+        .select(`
+          *,
+          user:users(*)
+        `)
+        .eq('user_id', developerId)
+        .single();
+
+      if (fetchError) {
+        console.error('DeveloperProfileDetails: Error fetching developer profile:', fetchError);
+        console.error('Error fetching developer profile:', fetchError.message);
+        setError(fetchError.message || 'Failed to load developer profile');
+        setDeveloper(null);
+      } else {
+        console.log('Developer profile fetched successfully:', data);
+        setDeveloper(data);
+      }
+
+    } catch (err) {
+      console.error('Error in fetchDeveloperProfile:', err);
+      setError('Unexpected error loading developer profile');
+      setDeveloper(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConnectGitHub = () => {
     // Navigate to GitHub setup page instead of direct GitHub App URL
