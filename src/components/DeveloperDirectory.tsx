@@ -46,7 +46,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
   const filteredDevelopers = developers.filter(developer => {
     const searchTermLower = searchTerm.toLowerCase();
-    const nameMatch = developer.user?.name.toLowerCase().includes(searchTermLower);
+    const nameMatch = developer.user?.name.toLowerCase().includes(searchTermLower) || developer.github_handle?.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
     const availabilityMatch = availabilityFilter === null || developer.availability === availabilityFilter;
 
