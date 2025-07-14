@@ -3,6 +3,7 @@ import { Developer } from '../types';
 import { X, Github, Briefcase, Mail, Phone, MapPin, Award, Code } from 'lucide-react';
 import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
+import { useGitHub } from '@/hooks/useGitHub';
 
 interface DeveloperProfileModalProps {
   developer: Developer;
@@ -11,6 +12,7 @@ interface DeveloperProfileModalProps {
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer, onClose }) => {
   const { applications, loading, error } = useDeveloperProfile(developer.user_id);
+  const { data: gitHubData } = useGitHub(developer.github_username);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -26,7 +28,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
               <h3 className="text-xl font-bold">{developer.user?.raw_user_meta_data?.name || 'Unnamed Developer'}</h3>
               <p className="text-gray-600">{developer.user?.raw_user_meta_data?.headline}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                <a href={`https://github.com/${developer.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_handle}</a>
+                <a href={`https://github.com/${developer.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_username}</a>
                 {developer.user?.raw_user_meta_data?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.user.raw_user_meta_data.email}</span>}
                 {developer.user?.raw_user_meta_data?.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.user.raw_user_meta_data.location}</span>}
               </div>
@@ -65,7 +67,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
           <div className="mt-6">
             <h4 className="font-bold text-lg mb-2">GitHub Activity</h4>
             <div className="border rounded-lg p-4">
-              <GitHubUserActivityDetails username={developer.github_handle} />
+              <GitHubUserActivityDetails gitHubData={gitHubData} />
             </div>
           </div>
         </div>
