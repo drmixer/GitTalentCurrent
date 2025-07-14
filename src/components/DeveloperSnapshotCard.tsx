@@ -54,7 +54,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
   const displayName = developer.user
     ? developer.github_handle
-      ? `${developer.user.name.split(' ')[0]} (@${developer.github_handle})`
+      ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
       : developer.user.name
     : developer.github_handle || 'Unnamed Developer';
   const displayEmail = developer.user?.email || '';
