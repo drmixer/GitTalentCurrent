@@ -21,14 +21,14 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
         </div>
         <div className="p-6">
           <div className="flex items-start space-x-6">
-            <img src={developer.user?.avatar_url || ''} alt={developer.user?.name || ''} className="w-24 h-24 rounded-full" />
+            <img src={developer.user?.raw_user_meta_data?.avatar_url || ''} alt={developer.user?.raw_user_meta_data?.name || ''} className="w-24 h-24 rounded-full" />
             <div>
-              <h3 className="text-xl font-bold">{developer.user?.name || 'Unnamed Developer'}</h3>
-              <p className="text-gray-600">{developer.user?.headline}</p>
+              <h3 className="text-xl font-bold">{developer.user?.raw_user_meta_data?.name || 'Unnamed Developer'}</h3>
+              <p className="text-gray-600">{developer.user?.raw_user_meta_data?.headline}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                 <a href={`https://github.com/${developer.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_handle}</a>
-                {developer.user?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.user.email}</span>}
-                {developer.user?.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.user.location}</span>}
+                {developer.user?.raw_user_meta_data?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.user.raw_user_meta_data.email}</span>}
+                {developer.user?.raw_user_meta_data?.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.user.raw_user_meta_data.location}</span>}
               </div>
             </div>
           </div>

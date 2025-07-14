@@ -24,15 +24,15 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   onSendMessage
 }) => {
   const displayName = formatDisplayName(developer.user, developer);
-  const userInitial = developer.user ? (developer.user.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
+  const userInitial = developer.user?.raw_user_meta_data?.name ? (developer.user.raw_user_meta_data.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
       <div className="flex items-start space-x-4">
         <div className="relative">
-          {developer.user?.avatar_url ? (
+          {developer.user?.raw_user_meta_data?.avatar_url ? (
             <img 
-              src={developer.user.avatar_url}
+              src={developer.user.raw_user_meta_data.avatar_url}
               alt={displayName}
               className="w-16 h-16 rounded-xl object-cover shadow-lg"
               onError={(e) => {

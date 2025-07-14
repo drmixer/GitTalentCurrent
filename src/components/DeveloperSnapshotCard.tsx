@@ -31,7 +31,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 }) => {
   const { portfolioItems, loading } = useDeveloperProfile(developer.user_id);
   const displayName = formatDisplayName(developer.user, developer);
-  const displayEmail = developer.user?.email || '';
+  const displayEmail = developer.user?.raw_user_meta_data?.email || '';
 
   const formatRate = (rate: number | null) => {
     if (!rate) return 'Rate not specified';
