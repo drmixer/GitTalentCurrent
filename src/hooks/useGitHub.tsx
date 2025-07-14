@@ -270,7 +270,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     }
-  }, [developerProfile, authLoading, refreshGitHubData, lastProfileUpdateTime, loading, error]); // Added loading and error to deps
+  }, [developerProfile, authLoading, refreshGitHubData, lastProfileUpdateTime]);
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
