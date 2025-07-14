@@ -54,7 +54,7 @@ interface MessageThread {
 
 export const RecruiterDashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('search-devs');
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
