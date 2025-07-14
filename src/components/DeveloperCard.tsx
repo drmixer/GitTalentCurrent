@@ -81,10 +81,6 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           </div>
           
           <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-            <div className="flex items-center">
-              <Briefcase className="w-4 h-4 mr-1" />
-              {developer.experience_years} years
-            </div>
             {developer.location && (
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1" />
@@ -106,23 +102,6 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
               </div>
             )}
           </div>
-          
-          <div className="flex flex-wrap gap-2 mb-4">
-            {developer.top_languages.slice(0, 5).map((lang, index) => (
-              <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
-                {lang}
-              </span>
-            ))}
-            {developer.top_languages.length > 5 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg">
-                +{developer.top_languages.length - 5} more
-              </span>
-            )}
-          </div>
-          
-          {developer.bio && (
-            <p className="text-sm text-gray-600 line-clamp-2 mb-4">{developer.bio}</p>
-          )}
           
           <div className="flex items-center space-x-3">
             <button
