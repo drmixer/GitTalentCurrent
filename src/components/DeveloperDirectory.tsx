@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { DeveloperCard } from './DeveloperCard';
-import { Developer } from '../types';
+import { Developer } from '@/types';
 import { DeveloperSnapshotModal } from './DeveloperSnapshotModal';
 import { DeveloperProfileModal } from './DeveloperProfileModal';
 
