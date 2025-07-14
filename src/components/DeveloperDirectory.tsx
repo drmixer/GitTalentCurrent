@@ -21,21 +21,33 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   useEffect(() => {
     const fetchDevelopers = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: profiles, error: profilesError } = await supabase
           .from('developer_profiles')
-          .select(`
-            *,
-            users (
-              id,
-              raw_user_meta_data
-            )
-          `);
+          .select('*');
 
-        if (error) {
-          throw error;
+        if (profilesError) {
+          throw profilesError;
         }
-        console.log('Fetched developers:', data);
-        setDevelopers(data as Developer[]);
+
+        const developerData = await Promise.all(
+          profiles.map(async (profile) => {
+            const { data: user, error: userError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', profile.id)
+              .single();
+
+            if (userError) {
+              console.error(`Error fetching user for profile ${profile.id}:`, userError);
+              return { ...profile, user: null };
+            }
+
+            return { ...profile, user };
+          })
+        );
+
+        console.log('Fetched developers:', developerData);
+        setDevelopers(developerData as unknown as Developer[]);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -73,8 +85,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
   const filteredDevelopers = developers.filter(developer => {
     const searchTermLower = searchTerm.toLowerCase();
-    // @ts-ignore
-    const nameMatch = developer.users?.raw_user_meta_data?.full_name.toLowerCase().includes(searchTermLower) || developer.github_handle?.toLowerCase().includes(searchTermLower);
+    const nameMatch = developer.user?.name.toLowerCase().includes(searchTermLower) || developer.github_handle?.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
     const availabilityMatch = availabilityFilter === null || developer.availability === availabilityFilter;
 
@@ -119,8 +130,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
               key={dev.user_id}
               developer={dev}
               onViewProfile={() => handleViewSnapshot(dev)}
-              // @ts-ignore
-              onSendMessage={() => onSendMessage(dev.user_id, dev.users.raw_user_meta_data.full_name)}
+              onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
             />
           ))}
         </div>
