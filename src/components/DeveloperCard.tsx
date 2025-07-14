@@ -13,7 +13,7 @@ import { Developer, User as UserType } from '../types';
 
 interface DeveloperCardProps {
   developer: Developer & { user: UserType };
-  onViewProfile: () => void;
+  onViewProfile: (developer: Developer) => void;
   onSendMessage: () => void;
 }
 
@@ -140,7 +140,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           
           <div className="flex items-center space-x-3">
             <button
-              onClick={onViewProfile}
+              onClick={() => onViewProfile(developer)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
             >
               <Eye className="w-4 h-4 mr-2" />

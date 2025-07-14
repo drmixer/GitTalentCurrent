@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { DeveloperCard } from './DeveloperCard';
 import { Developer } from '../types';
+import { DeveloperSnapshotModal } from './DeveloperSnapshotModal';
+import { DeveloperProfileModal } from './DeveloperProfileModal';
 
 interface DeveloperDirectoryProps {
   onSendMessage: (developerId: string, developerName: string) => void;
@@ -13,6 +15,9 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [availabilityFilter, setAvailabilityFilter] = useState<boolean | null>(null);
+  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
+  const [isSnapshotModalOpen, setSnapshotModalOpen] = useState(false);
+  const [isProfileModalOpen, setProfileModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchDevelopers = async () => {
@@ -35,6 +40,23 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
     fetchDevelopers();
   }, []);
+
+  const handleViewSnapshot = (developer: Developer) => {
+    setSelectedDeveloper(developer);
+    setSnapshotModalOpen(true);
+  };
+
+  const handleViewProfile = (developer: Developer) => {
+    setSelectedDeveloper(developer);
+    setSnapshotModalOpen(false);
+    setProfileModalOpen(true);
+  };
+
+  const handleCloseModals = () => {
+    setSelectedDeveloper(null);
+    setSnapshotModalOpen(false);
+    setProfileModalOpen(false);
+  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -90,11 +112,26 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
             <DeveloperCard
               key={dev.user_id}
               developer={dev}
-              onViewProfile={() => {}}
+              onViewProfile={() => handleViewSnapshot(dev)}
               onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
             />
           ))}
         </div>
+      )}
+
+      {isSnapshotModalOpen && selectedDeveloper && (
+        <DeveloperSnapshotModal
+          developer={selectedDeveloper}
+          onClose={handleCloseModals}
+          onViewProfile={handleViewProfile}
+        />
+      )}
+
+      {isProfileModalOpen && selectedDeveloper && (
+        <DeveloperProfileModal
+          developer={selectedDeveloper}
+          onClose={handleCloseModals}
+        />
       )}
     </div>
   );
