@@ -4,6 +4,7 @@ import { DeveloperCard } from './DeveloperCard';
 import { Developer } from '@/types';
 import { DeveloperSnapshotModal } from './DeveloperSnapshotModal';
 import { DeveloperProfileModal } from './DeveloperProfileModal';
+import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 
 interface DeveloperDirectoryProps {
   onSendMessage: (developerId: string, developerName: string) => void;
@@ -18,6 +19,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
   const [isSnapshotModalOpen, setSnapshotModalOpen] = useState(false);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
+
+  const { developer, loading, error } = useDeveloperProfile('');
 
   useEffect(() => {
     const fetchDevelopers = async () => {

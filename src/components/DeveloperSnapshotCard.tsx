@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   User, 
   Github, 
@@ -16,8 +16,9 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
-import { Developer, User as UserType, PortfolioItem } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { Developer, PortfolioItem } from '@/types';
+import { formatDisplayName } from '@/utils/displayName';
+import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 
 interface DeveloperSnapshotCardProps {
   developer: Developer;
@@ -28,35 +29,8 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   developer, 
   onViewProfile 
 }) => {
-  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPortfolioItems = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('portfolio_items')
-          .select('*')
-          .eq('developer_id', developer.id)
-          .limit(3);
-
-        if (error) throw error;
-        setPortfolioItems(data || []);
-      } catch (error) {
-        console.error('Error fetching portfolio items:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPortfolioItems();
-  }, [developer.id]);
-
-  const displayName = developer.user
-    ? developer.github_handle
-      ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
-      : developer.user.name
-    : developer.github_handle || 'Unnamed Developer';
+  const { portfolioItems, loading } = useDeveloperProfile(developer.user_id);
+  const displayName = formatDisplayName(developer.user, developer);
   const displayEmail = developer.user?.email || '';
 
   const formatRate = (rate: number | null) => {
