@@ -23,7 +23,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
       try {
         const { data: profiles, error: profilesError } = await supabase
           .from('developer_profiles')
-          .select('*');
+          .select('*, user:users!inner(*)');
 
         if (profilesError) {
           throw profilesError;
