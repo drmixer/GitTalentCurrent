@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Developer, AppliedJob, JobRole } from '../types';
+import React from 'react';
+import { Developer } from '../types';
 import { X, Github, Briefcase, Mail, Phone, MapPin, Award, Code } from 'lucide-react';
 import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
+import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 
 interface DeveloperProfileModalProps {
   developer: Developer;
@@ -10,24 +10,7 @@ interface DeveloperProfileModalProps {
 }
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer, onClose }) => {
-  const [applications, setApplications] = useState<(AppliedJob & { job_role: JobRole })[]>([]);
-
-  useEffect(() => {
-    const fetchApplications = async () => {
-      const { data, error } = await supabase
-        .from('applied_jobs')
-        .select('*, job_role:job_roles(*)')
-        .eq('developer_id', developer.id);
-
-      if (error) {
-        console.error('Error fetching applications:', error);
-      } else {
-        setApplications(data as any);
-      }
-    };
-
-    fetchApplications();
-  }, [developer]);
+  const { applications, loading, error } = useDeveloperProfile(developer.user_id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
