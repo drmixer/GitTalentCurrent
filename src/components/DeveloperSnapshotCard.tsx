@@ -5,18 +5,14 @@ import {
   Linkedin, 
   Mail, 
   MapPin, 
-  Calendar, 
-  DollarSign, 
   Star,
   ExternalLink,
   Code,
-  Briefcase,
-  Award,
-  Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader
 } from 'lucide-react';
-import { Developer, PortfolioItem } from '@/types';
+import { Developer } from '@/types';
 import { formatDisplayName } from '@/utils/displayName';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 
@@ -26,20 +22,19 @@ interface DeveloperSnapshotCardProps {
 }
 
 const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({ 
-  developer, 
+  developer: initialDeveloper,
   onViewProfile 
 }) => {
-  const { portfolioItems, loading } = useDeveloperProfile(developer.user_id);
-  const displayName = formatDisplayName(developer.user, developer);
-  const displayEmail = developer.email || '';
+  const { developer, portfolioItems, loading } = useDeveloperProfile(initialDeveloper.user_id);
 
-  const formatRate = (rate: number | null) => {
-    if (!rate) return 'Rate not specified';
-    return `$${rate}/hour`;
-  };
+  const currentDeveloper = developer || initialDeveloper;
+  const featuredProject = portfolioItems.find(p => p.featured);
+
+  const displayName = formatDisplayName(currentDeveloper.user, currentDeveloper);
+  const displayEmail = currentDeveloper.email || '';
 
   const getAvailabilityStatus = () => {
-    if (developer.availability) {
+    if (currentDeveloper.availability) {
       return { text: 'Available', color: 'text-emerald-600', icon: CheckCircle };
     }
     return { text: 'Unavailable', color: 'text-red-600', icon: XCircle };
@@ -48,43 +43,33 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   const availabilityStatus = getAvailabilityStatus();
   const AvailabilityIcon = availabilityStatus.icon;
 
+  if (loading && !developer) {
+    return (
+      <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 flex items-center justify-center h-full">
+        <Loader className="animate-spin h-8 w-8 text-blue-600" />
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
+    <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1 h-full flex flex-col">
       <div className="flex items-start space-x-4">
           <div className="relative">
-            {developer.avatar_url ? (
+            {currentDeveloper.avatar_url ? (
               <img 
-                src={developer.avatar_url}
-                alt={developer.name || ''}
+                src={currentDeveloper.avatar_url}
+                alt={currentDeveloper.name || ''}
                 className="w-16 h-16 rounded-2xl object-cover shadow-lg"
-                onError={(e) => {
-                  // Fallback to initials if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    const fallback = document.createElement('div');
-                    fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
-                    fallback.textContent = (developer.name || 'U').split(' ').map(n => n[0]).join('');
-                    parent.appendChild(fallback);
-                  }
-                }}
               />
             ) : (
               <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {(developer.name || 'U').split(' ').map(n => n[0]).join('')}
+                {(currentDeveloper.name || 'U').split(' ').map(n => n[0]).join('')}
               </div>
             )}
             
-            {/* Availability indicator */}
             <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
-              developer.availability ? 'bg-emerald-500' : 'bg-gray-400'
+              currentDeveloper.availability ? 'bg-emerald-500' : 'bg-gray-400'
             }`}>
-              <div className="w-full h-full flex items-center justify-center">
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  developer.availability ? 'bg-white animate-pulse' : 'bg-white'
-                }`}></div>
-              </div>
             </div>
           </div>
           <div>
@@ -95,83 +80,80 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                 <span className="text-sm font-medium">{availabilityStatus.text}</span>
               </div>
             </div>
-            <p className="text-gray-600">{developer.preferred_title}</p>
+            <p className="text-gray-600">{currentDeveloper.preferred_title}</p>
             
-            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-              {developer.location && (
-                <div className="flex items-center space-x-1">
-                  <MapPin size={14} />
-                  <span>{developer.location}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-      {/* Skills */}
-      {developer.skills && developer.skills.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Code size={16} className="text-blue-600" />
-            <h4 className="font-semibold text-gray-900">Skills</h4>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {developer.skills.slice(0, 6).map((skill, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-200"
-              >
-                {skill}
-              </span>
-            ))}
-            {developer.skills.length > 6 && (
-              <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                +{developer.skills.length - 6} more
-              </span>
+            {currentDeveloper.location && (
+              <div className="flex items-center space-x-1 text-sm text-gray-600 mt-1">
+                <MapPin size={14} />
+                <span>{currentDeveloper.location}</span>
+              </div>
             )}
           </div>
         </div>
-      )}
 
-      {/* Featured Project */}
-      {developer.featured_project && (
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Star size={16} className="text-yellow-500" />
-            <h4 className="font-semibold text-gray-900">Featured Project</h4>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h5 className="font-medium text-gray-900 mb-1">{developer.featured_project.title}</h5>
-                <p className="text-sm text-gray-600 line-clamp-2">{developer.featured_project.description}</p>
-                {developer.featured_project.technologies && developer.featured_project.technologies.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {developer.featured_project.technologies.slice(0, 3).map((tech, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-white text-gray-600 rounded text-xs border"
-                      >
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {(developer.featured_project.url || developer.featured_project.image_url) && (
-                <ExternalLink size={16} className="text-gray-400 ml-2 flex-shrink-0" />
+      <div className="flex-grow mt-6">
+        {currentDeveloper.skills && currentDeveloper.skills.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-2 mb-3">
+              <Code size={16} className="text-blue-600" />
+              <h4 className="font-semibold text-gray-900">Skills</h4>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {currentDeveloper.skills.slice(0, 6).map((skill, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-200"
+                >
+                  {skill}
+                </span>
+              ))}
+              {currentDeveloper.skills.length > 6 && (
+                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                  +{currentDeveloper.skills.length - 6} more
+                </span>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Contact Links */}
+        {featuredProject && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-2 mb-3">
+              <Star size={16} className="text-yellow-500" />
+              <h4 className="font-semibold text-gray-900">Featured Project</h4>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h5 className="font-medium text-gray-900 mb-1">{featuredProject.title}</h5>
+                  <p className="text-sm text-gray-600 line-clamp-2">{featuredProject.description}</p>
+                  {featuredProject.technologies && featuredProject.technologies.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {featuredProject.technologies.slice(0, 3).map((tech, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-white text-gray-600 rounded text-xs border"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {(featuredProject.url || featuredProject.image_url) && (
+                  <ExternalLink size={16} className="text-gray-400 ml-2 flex-shrink-0" />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {developer.github_url && (
+          {currentDeveloper.github_url && (
             <a
-              href={developer.github_url}
+              href={currentDeveloper.github_url}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
@@ -179,9 +161,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
               <Github size={16} className="text-gray-600" />
             </a>
           )}
-          {developer.linkedin_url && (
+          {currentDeveloper.linkedin_url && (
             <a
-              href={developer.linkedin_url}
+              href={currentDeveloper.linkedin_url}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
@@ -200,7 +182,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
         </div>
         
         <button
-          onClick={() => onViewProfile(developer)}
+          onClick={() => onViewProfile(currentDeveloper)}
           className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
         >
           View Profile
