@@ -30,9 +30,9 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
       <div className="flex items-start space-x-4">
         <div className="relative">
-          {developer.profile_pic_url ? (
+          {developer.user?.avatar_url ? (
             <img 
-              src={developer.profile_pic_url} 
+              src={developer.user.avatar_url}
               alt={displayName}
               className="w-16 h-16 rounded-xl object-cover shadow-lg"
               onError={(e) => {

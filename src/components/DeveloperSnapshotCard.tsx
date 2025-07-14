@@ -52,9 +52,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
     <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
       <div className="flex items-start space-x-4">
           <div className="relative">
-            {developer.profile_pic_url ? (
+            {developer.user?.avatar_url ? (
               <img 
-                src={developer.profile_pic_url} 
+                src={developer.user.avatar_url}
                 alt={developer.user?.name || ''}
                 className="w-16 h-16 rounded-2xl object-cover shadow-lg"
                 onError={(e) => {
