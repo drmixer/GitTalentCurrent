@@ -25,7 +25,10 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
           .from('developer_profiles')
           .select(`
             *,
-            user:users(*)
+            users (
+              id,
+              raw_user_meta_data
+            )
           `);
 
         if (error) {
@@ -70,7 +73,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
   const filteredDevelopers = developers.filter(developer => {
     const searchTermLower = searchTerm.toLowerCase();
-    const nameMatch = developer.user?.name.toLowerCase().includes(searchTermLower) || developer.github_handle?.toLowerCase().includes(searchTermLower);
+    // @ts-ignore
+    const nameMatch = developer.users?.raw_user_meta_data?.full_name.toLowerCase().includes(searchTermLower) || developer.github_handle?.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
     const availabilityMatch = availabilityFilter === null || developer.availability === availabilityFilter;
 
@@ -115,7 +119,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
               key={dev.user_id}
               developer={dev}
               onViewProfile={() => handleViewSnapshot(dev)}
-              onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
+              // @ts-ignore
+              onSendMessage={() => onSendMessage(dev.user_id, dev.users.raw_user_meta_data.full_name)}
             />
           ))}
         </div>
