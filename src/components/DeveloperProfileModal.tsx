@@ -23,29 +23,14 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
         </div>
         <div className="p-6">
           <div className="flex items-start space-x-6">
-            <img src={developer.user?.raw_user_meta_data?.avatar_url || ''} alt={developer.user?.raw_user_meta_data?.name || ''} className="w-24 h-24 rounded-full" />
+            <img src={developer.avatar_url || ''} alt={developer.name || ''} className="w-24 h-24 rounded-full" />
             <div>
-              <h3 className="text-xl font-bold">{developer.user?.raw_user_meta_data?.name || 'Unnamed Developer'}</h3>
-              <p className="text-gray-600">{developer.user?.raw_user_meta_data?.headline}</p>
+              <h3 className="text-xl font-bold">{developer.name || 'Unnamed Developer'}</h3>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                 <a href={`https://github.com/${developer.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_username}</a>
-                {developer.user?.raw_user_meta_data?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.user.raw_user_meta_data.email}</span>}
-                {developer.user?.raw_user_meta_data?.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.user.raw_user_meta_data.location}</span>}
+                {developer.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.email}</span>}
+                {developer.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{developer.location}</span>}
               </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-bold text-lg mb-2">Skills</h4>
-              <div className="flex flex-wrap gap-2">
-                {developer.skills?.map(skill => <span key={skill} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{skill}</span>)}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-2">Experience</h4>
-              {/* This would be built out with more structured data */}
-              <p className="text-sm text-gray-600">{developer.experience_level}</p>
             </div>
           </div>
 

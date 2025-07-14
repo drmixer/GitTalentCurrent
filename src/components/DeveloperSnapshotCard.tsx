@@ -30,8 +30,8 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   onViewProfile 
 }) => {
   const { portfolioItems, loading } = useDeveloperProfile(developer.user_id);
-  const displayName = formatDisplayName(developer.user, { ...developer, github_handle: developer.github_username });
-  const displayEmail = developer.user?.raw_user_meta_data?.email || '';
+  const displayName = formatDisplayName(developer.user, developer);
+  const displayEmail = developer.email || '';
 
   const formatRate = (rate: number | null) => {
     if (!rate) return 'Rate not specified';
@@ -103,44 +103,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                   <span>{developer.location}</span>
                 </div>
               )}
-              <div className="flex items-center space-x-1">
-                <DollarSign size={14} />
-                <span className="font-medium">{formatRate(developer.hourly_rate)}</span>
-              </div>
             </div>
-
-            {developer.bio && (
-              <p className="text-gray-700 text-sm leading-relaxed mb-4 line-clamp-2">
-                {developer.bio}
-              </p>
-            )}
           </div>
         </div>
-
-      {/* Skills */}
-      {developer.skills && developer.skills.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Code size={16} className="text-blue-600" />
-            <h4 className="font-semibold text-gray-900">Skills</h4>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {developer.skills.slice(0, 6).map((skill, index) => (
-              <span 
-                key={index}
-                className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-200"
-              >
-                {skill}
-              </span>
-            ))}
-            {developer.skills.length > 6 && (
-              <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                +{developer.skills.length - 6} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Portfolio Preview */}
       {portfolioItems.length > 0 && (
@@ -182,26 +147,6 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
       {/* Contact Links */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {developer.github_url && (
-            <a 
-              href={developer.github_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <Github size={16} className="text-gray-600" />
-            </a>
-          )}
-          {developer.linkedin_url && (
-            <a 
-              href={developer.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-            >
-              <Linkedin size={16} className="text-blue-600" />
-            </a>
-          )}
           {displayEmail && (
             <a 
               href={`mailto:${displayEmail}`}
