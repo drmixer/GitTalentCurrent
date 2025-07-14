@@ -52,10 +52,10 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
     <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
       <div className="flex items-start space-x-4">
           <div className="relative">
-            {developer.user?.avatar_url ? (
+            {developer.avatar_url ? (
               <img 
-                src={developer.user.avatar_url}
-                alt={developer.user?.name || ''}
+                src={developer.avatar_url}
+                alt={developer.name || ''}
                 className="w-16 h-16 rounded-2xl object-cover shadow-lg"
                 onError={(e) => {
                   // Fallback to initials if image fails to load
@@ -65,14 +65,14 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                   if (parent) {
                     const fallback = document.createElement('div');
                     fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
-                    fallback.textContent = (developer.user?.name || 'U').split(' ').map(n => n[0]).join('');
+                    fallback.textContent = (developer.name || 'U').split(' ').map(n => n[0]).join('');
                     parent.appendChild(fallback);
                   }
                 }}
               />
             ) : (
               <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {(developer.user?.name || 'U').split(' ').map(n => n[0]).join('')}
+                {(developer.name || 'U').split(' ').map(n => n[0]).join('')}
               </div>
             )}
             
