@@ -24,18 +24,19 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
 }) => {
   // Gracefully handle cases where user data might be missing
   if (!developer.user) {
+    // Even if user is null, we can still render a basic card.
+    // The displayName and other user-specific fields will have fallbacks.
     console.warn('DeveloperCard: Developer object is missing user data for user_id:', developer.user_id);
-    console.log('Developer object:', developer);
-    // Optionally render a placeholder or return null
-    return null;
   }
 
-  console.log('Rendering DeveloperCard for:', developer.user_id, developer.user.name);
+  console.log('Rendering DeveloperCard for:', developer.user_id, developer.user?.name);
   
   // Get display name in format: FirstName (GitHubUsername)
-  const displayName = developer.github_handle 
-    ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
-    : developer.user.name;
+  const displayName = developer.user
+    ? developer.github_handle
+      ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
+      : developer.user.name
+    : developer.github_handle || 'Unnamed Developer';
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
