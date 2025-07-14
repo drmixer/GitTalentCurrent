@@ -25,6 +25,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   // Gracefully handle cases where user data might be missing
   if (!developer.user) {
     console.warn('DeveloperCard: Developer object is missing user data for user_id:', developer.user_id);
+    console.log('Developer object:', developer);
     // Optionally render a placeholder or return null
     return null;
   }
