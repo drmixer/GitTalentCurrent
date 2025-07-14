@@ -34,7 +34,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   // Get display name in format: FirstName (GitHubUsername)
   const displayName = developer.user
     ? developer.github_handle
-      ? `${developer.user.name.split(' ')[0]} (@${developer.github_handle})`
+      ? `${developer.user.name.split(' ')[0]} (${developer.github_handle})`
       : developer.user.name
     : developer.github_handle || 'Unnamed Developer';
 
@@ -141,14 +141,14 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           <div className="flex items-center space-x-3">
             <button
               onClick={() => onViewProfile(developer)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center w-full justify-center"
             >
               <Eye className="w-4 h-4 mr-2" />
               View Snapshot
             </button>
             <button
               onClick={onSendMessage}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center"
+              className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center w-full justify-center"
             >
               <MessageSquare className="w-4 h-4 mr-2" />
               Message
