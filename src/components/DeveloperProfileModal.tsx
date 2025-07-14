@@ -21,7 +21,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
         </div>
         <div className="p-6">
           <div className="flex items-start space-x-6">
-            <img src={developer.user?.profile_pic_url || ''} alt={developer.user?.name || ''} className="w-24 h-24 rounded-full" />
+            <img src={developer.user?.avatar_url || ''} alt={developer.user?.name || ''} className="w-24 h-24 rounded-full" />
             <div>
               <h3 className="text-xl font-bold">{developer.user?.name || 'Unnamed Developer'}</h3>
               <p className="text-gray-600">{developer.user?.headline}</p>
