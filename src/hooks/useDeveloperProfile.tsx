@@ -23,8 +23,8 @@ export function useDeveloperProfile(userId: string) {
 
         // Fetch developer profile
         const { data: devData, error: devError } = await supabase
-          .from('developers')
-          .select('*, user:users!user_id(id, raw_user_meta_data)')
+          .from('developer_profiles')
+          .select('*')
           .eq('user_id', userId)
           .eq('public_profile_enabled', true)
           .single();
