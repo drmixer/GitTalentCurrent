@@ -38,7 +38,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
       : developer.user.name
     : developer.github_handle || 'Unnamed Developer';
 
-  const userInitial = developer.user ? developer.user.name.split(' ').map(n => n[0]).join('') : 'U';
+  const userInitial = developer.user ? (developer.user.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
