@@ -24,7 +24,7 @@ export function useDeveloperProfile(userId: string) {
         // Fetch developer profile
         const { data: devData, error: devError } = await supabase
           .from('developers')
-          .select('*, user:users!user_id(*)')
+          .select('*, user:users!user_id(id, name, email, profile_pic_url)')
           .eq('user_id', userId)
           .single();
 
