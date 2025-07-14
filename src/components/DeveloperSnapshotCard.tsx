@@ -143,39 +143,35 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
         </div>
       )}
 
-      {/* Portfolio Preview */}
-      {portfolioItems.length > 0 && (
+      {/* Featured Project */}
+      {developer.featured_project && (
         <div className="mb-6">
           <div className="flex items-center space-x-2 mb-3">
-            <Briefcase size={16} className="text-purple-600" />
-            <h4 className="font-semibold text-gray-900">Recent Work</h4>
+            <Star size={16} className="text-yellow-500" />
+            <h4 className="font-semibold text-gray-900">Featured Project</h4>
           </div>
-          <div className="grid grid-cols-1 gap-3">
-            {portfolioItems.slice(0, 2).map((item) => (
-              <div key={item.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h5 className="font-medium text-gray-900 mb-1">{item.title}</h5>
-                    <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                    {item.technologies && item.technologies.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {item.technologies.slice(0, 3).map((tech, index) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-1 bg-white text-gray-600 rounded text-xs border"
-                          >
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h5 className="font-medium text-gray-900 mb-1">{developer.featured_project.title}</h5>
+                <p className="text-sm text-gray-600 line-clamp-2">{developer.featured_project.description}</p>
+                {developer.featured_project.technologies && developer.featured_project.technologies.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {developer.featured_project.technologies.slice(0, 3).map((tech, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-white text-gray-600 rounded text-xs border"
+                      >
+                        {tech}
+                      </span>
+                    ))}
                   </div>
-                  {(item.project_url || item.github_url) && (
-                    <ExternalLink size={16} className="text-gray-400 ml-2 flex-shrink-0" />
-                  )}
-                </div>
+                )}
               </div>
-            ))}
+              {(developer.featured_project.url || developer.featured_project.image_url) && (
+                <ExternalLink size={16} className="text-gray-400 ml-2 flex-shrink-0" />
+              )}
+            </div>
           </div>
         </div>
       )}
