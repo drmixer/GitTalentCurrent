@@ -56,6 +56,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
     return (nameMatch || skillsMatch) && availabilityMatch;
   });
 
+  console.log('Filtered developers:', filteredDevelopers);
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Developer Directory</h1>
