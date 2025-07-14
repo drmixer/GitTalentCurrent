@@ -57,8 +57,11 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
           </div>
 
           <div className="mt-6">
-            <h4 className="font-bold text-lg mb-2">Featured Project</h4>
-            <p className="text-sm text-gray-600">{developer.featured_project}</p>
+            <h4 className="font-bold text-lg mb-2">Portfolio</h4>
+            <PortfolioManager
+              developerId={developer.user_id}
+              isEditable={false}
+            />
           </div>
 
           <div className="mt-6">

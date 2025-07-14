@@ -1,0 +1,2 @@
+ALTER TABLE public.developer_profiles
+DROP COLUMN github_personal_access_token;
