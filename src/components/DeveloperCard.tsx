@@ -38,6 +38,8 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
       : developer.user.name
     : developer.github_handle || 'Unnamed Developer';
 
+  const userInitial = developer.user ? developer.user.name.split(' ').map(n => n[0]).join('') : 'U';
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
       <div className="flex items-start space-x-4">
@@ -45,7 +47,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           {developer.profile_pic_url ? (
             <img 
               src={developer.profile_pic_url} 
-              alt={developer.user.name}
+              alt={displayName}
               className="w-16 h-16 rounded-xl object-cover shadow-lg"
               onError={(e) => {
                 // Fallback to initials if image fails to load
@@ -55,14 +57,14 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
                 if (parent) {
                   const fallback = document.createElement('div');
                   fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
-                  fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                  fallback.textContent = userInitial;
                   parent.appendChild(fallback);
                 }
               }}
             />
           ) : (
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-              {developer.user.name.split(' ').map(n => n[0]).join('')}
+              {userInitial}
             </div>
           )}
           
