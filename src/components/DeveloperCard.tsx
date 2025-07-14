@@ -18,11 +18,21 @@ interface DeveloperCardProps {
   onSendMessage: () => void;
 }
 
+import { Loader } from 'lucide-react';
+
 export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   developer,
   onViewProfile,
   onSendMessage
 }) => {
+  if (!developer) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-center">
+        <Loader className="animate-spin h-8 w-8 text-blue-600" />
+      </div>
+    );
+  }
+
   const displayName = formatDisplayName(developer.user, developer);
   const userInitial = developer.user?.name ? (developer.user.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
 
@@ -35,18 +45,6 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
               src={developer.avatar_url}
               alt={displayName}
               className="w-16 h-16 rounded-xl object-cover shadow-lg"
-              onError={(e) => {
-                // Fallback to initials if image fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const fallback = document.createElement('div');
-                  fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
-                  fallback.textContent = userInitial;
-                  parent.appendChild(fallback);
-                }
-              }}
             />
           ) : (
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
@@ -58,11 +56,6 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
             developer.availability ? 'bg-emerald-500' : 'bg-gray-400'
           }`}>
-            <div className="w-full h-full flex items-center justify-center">
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                developer.availability ? 'bg-white animate-pulse' : 'bg-white'
-              }`}></div>
-            </div>
           </div>
         </div>
         <div className="flex-1 min-w-0">

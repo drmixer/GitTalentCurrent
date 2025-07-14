@@ -25,9 +25,18 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   developer: initialDeveloper,
   onViewProfile 
 }) => {
-  const { developer, portfolioItems, loading } = useDeveloperProfile(initialDeveloper.user_id);
+  const { developer, portfolioItems, loading } = useDeveloperProfile(initialDeveloper?.user_id);
 
   const currentDeveloper = developer || initialDeveloper;
+
+  if (!currentDeveloper) {
+    return (
+      <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 flex items-center justify-center h-full">
+        <Loader className="animate-spin h-8 w-8 text-blue-600" />
+      </div>
+    );
+  }
+
   const featuredProject = portfolioItems.find(p => p.featured);
 
   const displayName = formatDisplayName(currentDeveloper.user, currentDeveloper);
