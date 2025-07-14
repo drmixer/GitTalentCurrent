@@ -23,7 +23,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
   onViewProfile,
   onSendMessage
 }) => {
-  const displayName = formatDisplayName(developer.user, developer);
+  const displayName = formatDisplayName(developer.user, { ...developer, github_handle: developer.github_username });
   const userInitial = developer.user?.raw_user_meta_data?.name ? (developer.user.raw_user_meta_data.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
 
   return (

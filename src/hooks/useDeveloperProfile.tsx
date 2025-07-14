@@ -26,7 +26,6 @@ export function useDeveloperProfile(userId: string) {
           .from('developer_profiles')
           .select('*')
           .eq('user_id', userId)
-          .eq('public_profile_enabled', true)
           .single();
 
         if (devError) throw devError;
