@@ -22,8 +22,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
     const fetchDevelopers = async () => {
       try {
         const { data, error } = await supabase
-          .from('developers')
-          .select('*, user:users!user_id(id, raw_user_meta_data)')
+          .from('developer_profiles')
+          .select('*')
           .eq('public_profile_enabled', true);
 
         if (error) {
