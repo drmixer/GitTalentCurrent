@@ -62,6 +62,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         .from('developers')
         .select(`
           *,
+          featured_project,
           user:users(*)
         `)
         .eq('user_id', developerId)
@@ -200,6 +201,12 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               )}
             </div>
           </div>
+        </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
+          <p className="text-gray-600 leading-relaxed">
+            {developer.featured_project || 'No featured project provided.'}
+          </p>
         </div>
       </div>
     </div>

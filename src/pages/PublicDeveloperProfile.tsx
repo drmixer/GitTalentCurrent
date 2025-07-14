@@ -72,6 +72,7 @@ export const PublicDeveloperProfile: React.FC = () => {
           *,
           skills,
           skills_categories,
+          featured_project,
           user:users(*)
         `)
         .eq('public_profile_slug', profileSlug)

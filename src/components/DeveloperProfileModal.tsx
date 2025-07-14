@@ -26,6 +26,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
             <img src={developer.avatar_url || ''} alt={developer.name || ''} className="w-24 h-24 rounded-full" />
             <div>
               <h3 className="text-xl font-bold">{developer.name || 'Unnamed Developer'}</h3>
+              <p className="text-gray-600">{developer.preferred_title}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                 <a href={`https://github.com/${developer.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600"><Github size={16} className="mr-1" />{developer.github_username}</a>
                 {developer.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{developer.email}</span>}
@@ -34,19 +35,30 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
             </div>
           </div>
 
-          <div className="mt-6">
-            <h4 className="font-bold text-lg mb-2">Application History</h4>
-            <div className="space-y-2">
-              {applications.map(app => (
-                <div key={app.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{app.job_role.title}</p>
-                    <p className="text-sm text-gray-500">Applied on {new Date(app.applied_at).toLocaleDateString()}</p>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 capitalize">{app.status}</span>
-                </div>
-              ))}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-bold text-lg mb-2">Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {developer.skills?.map(skill => <span key={skill} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{skill}</span>)}
+              </div>
             </div>
+            <div>
+              <h4 className="font-bold text-lg mb-2">Experience</h4>
+              {/* This would be built out with more structured data */}
+              <p className="text-sm text-gray-600">{developer.experience_years} years</p>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h4 className="font-bold text-lg mb-2">Tech Skills</h4>
+            <div className="flex flex-wrap gap-2">
+              {developer.skills?.map(skill => <span key={skill} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{skill}</span>)}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h4 className="font-bold text-lg mb-2">Featured Project</h4>
+            <p className="text-sm text-gray-600">{developer.featured_project}</p>
           </div>
 
           <div className="mt-6">
