@@ -16,8 +16,8 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
-import { Developer, User as UserType, PortfolioItem } from '../../types';
-import { supabase } from '../../lib/supabase';
+import { Developer, User as UserType, PortfolioItem } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 interface DeveloperSnapshotCardProps {
   developer: Developer;
