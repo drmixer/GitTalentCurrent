@@ -25,6 +25,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
         if (error) {
           throw error;
         }
+        console.log('Fetched developers:', data);
         setDevelopers(data as Developer[]);
       } catch (err: any) {
         setError(err.message);
