@@ -104,17 +104,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                   <span>{developer.location}</span>
                 </div>
               )}
-              <div className="flex items-center space-x-1">
-                <DollarSign size={14} />
-                <span className="font-medium">{formatRate(developer.hourly_rate)}</span>
-              </div>
             </div>
-
-            {developer.bio && (
-              <p className="text-gray-700 text-sm leading-relaxed mb-4 line-clamp-2">
-                {developer.bio}
-              </p>
-            )}
           </div>
         </div>
 

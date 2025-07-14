@@ -4,6 +4,7 @@ import { X, Github, Briefcase, Mail, Phone, MapPin, Award, Code } from 'lucide-r
 import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 import { useGitHub } from '@/hooks/useGitHub';
+import { PortfolioManager } from './Portfolio/PortfolioManager';
 
 interface DeveloperProfileModalProps {
   developer: Developer;
