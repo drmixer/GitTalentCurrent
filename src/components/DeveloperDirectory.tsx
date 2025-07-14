@@ -21,38 +21,14 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   useEffect(() => {
     const fetchDevelopers = async () => {
       try {
-        const { data: developers, error: developersError } = await supabase
-          .from('developers')
-          .select('*');
+        const { data, error } = await supabase.rpc('get_all_developers');
 
-        if (developersError) {
-          throw developersError;
+        if (error) {
+          throw error;
         }
 
-        const { data: users, error: usersError } = await supabase
-          .from('users')
-          .select('*');
-
-        if (usersError) {
-          throw usersError;
-        }
-
-        const { data: portfolioItems, error: portfolioItemsError } = await supabase
-          .from('portfolio_items')
-          .select('*');
-
-        if (portfolioItemsError) {
-          throw portfolioItemsError;
-        }
-
-        const developerData = developers.map(developer => {
-          const user = users.find(user => user.id === developer.user_id);
-          const portfolio = portfolioItems.filter(item => item.developer_id === developer.user_id);
-          return { ...developer, user, portfolio_items: portfolio };
-        });
-
-        console.log('Fetched developers:', developerData);
-        setDevelopers(developerData as unknown as Developer[]);
+        console.log('Fetched developers:', data);
+        setDevelopers(data as unknown as Developer[]);
       } catch (err: any) {
         setError(err.message);
       } finally {
