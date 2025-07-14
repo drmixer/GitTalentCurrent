@@ -104,17 +104,21 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
           <option value="unavailable">Unavailable</option>
         </select>
       </div>
-      {filteredDevelopers.length === 0 ? (
+      {loading ? (
+        <div>Loading...</div>
+      ) : filteredDevelopers.length === 0 ? (
         <p>No developers found.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDevelopers.map(dev => (
-            <DeveloperCard
-              key={dev.user_id}
-              developer={dev}
-              onViewProfile={() => handleViewSnapshot(dev)}
-              onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
-            />
+            dev && dev.user_id ? (
+              <DeveloperCard
+                key={dev.user_id}
+                developer={dev}
+                onViewProfile={() => handleViewSnapshot(dev)}
+                onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
+              />
+            ) : null
           ))}
         </div>
       )}

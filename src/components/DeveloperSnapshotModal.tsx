@@ -9,7 +9,19 @@ interface DeveloperSnapshotModalProps {
   onViewProfile: (developer: Developer) => void;
 }
 
+import { Loader } from 'lucide-react';
+
 export const DeveloperSnapshotModal: React.FC<DeveloperSnapshotModalProps> = ({ developer, onClose, onViewProfile }) => {
+  if (!developer) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl flex items-center justify-center h-96">
+          <Loader className="animate-spin h-8 w-8 text-blue-600" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
