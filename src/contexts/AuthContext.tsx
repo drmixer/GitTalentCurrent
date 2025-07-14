@@ -368,6 +368,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
         email, password, options: { data: { name: userData.name, role: userData.role } }
       });
       if (error) { setAuthError(error.message); setLoading(false); return { error }; }
+      if (data.user && userData.role === 'developer') {
+        await createDeveloperProfile(data.user.id, {});
+      }
       // onAuthStateChange will pick this up. setLoading(true) remains until processing completes.
       return { data, error: null };
     } catch (error: any) {
@@ -454,10 +457,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  const createDeveloperProfile = async (profileData: Partial<Developer>): Promise<{ data: any | null; error: any | null }> => {
+  const createDeveloperProfile = async (userId: string, profileData: Partial<Developer>): Promise<{ data: any | null; error: any | null }> => {
     try {
-      if (!user) { throw new Error('User must be authenticated to create developer profile'); }
-      const { data, error } = await supabase.from('developers').insert([{ user_id: user.id, ...profileData }]).select().single();
+      const { data, error } = await supabase.from('developers').insert([{ user_id: userId, ...profileData }]).select().single();
       if (error) { throw error; }
       setDeveloperProfile(data);
       return { data, error: null };
