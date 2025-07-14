@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Developer, User, PortfolioItem, AppliedJob, JobRole } from '@/types';
+import { Developer, User, PortfolioItem } from '@/types';
 
 export function useDeveloperProfile(userId: string) {
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
-  const [applications, setApplications] = useState<(AppliedJob & { job_role: JobRole })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,10 +20,13 @@ export function useDeveloperProfile(userId: string) {
         setLoading(true);
         setError(null);
 
-        // Fetch developer profile
+        // Fetch developer profile and user data
         const { data: devData, error: devError } = await supabase
-          .from('developer_profiles')
-          .select('*')
+          .from('developers')
+          .select(`
+            *,
+            user:users(*)
+          `)
           .eq('user_id', userId)
           .single();
 
@@ -41,15 +43,6 @@ export function useDeveloperProfile(userId: string) {
         if (portfolioError) throw portfolioError;
         setPortfolioItems(portfolioData || []);
 
-        // Fetch applications
-        const { data: appData, error: appError } = await supabase
-          .from('applied_jobs')
-          .select('*, job_role:job_roles(*)')
-          .eq('developer_id', devData.id);
-
-        if (appError) throw appError;
-        setApplications(appData as any);
-
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -60,5 +53,5 @@ export function useDeveloperProfile(userId: string) {
     fetchProfileData();
   }, [userId]);
 
-  return { developer, user, portfolioItems, applications, loading, error };
+  return { developer, user, portfolioItems, loading, error };
 }
