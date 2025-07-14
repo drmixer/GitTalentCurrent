@@ -77,7 +77,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
             {developer.profile_pic_url ? (
               <img 
                 src={developer.profile_pic_url} 
-                alt={developer.user.name}
+                alt={developer.user?.name || ''}
                 className="w-16 h-16 rounded-2xl object-cover shadow-lg"
                 onError={(e) => {
                   // Fallback to initials if image fails to load
@@ -87,14 +87,14 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
                   if (parent) {
                     const fallback = document.createElement('div');
                     fallback.className = "w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg";
-                    fallback.textContent = developer.user.name.split(' ').map(n => n[0]).join('');
+                    fallback.textContent = (developer.user?.name || 'U').split(' ').map(n => n[0]).join('');
                     parent.appendChild(fallback);
                   }
                 }}
               />
             ) : (
               <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {developer.user.name.split(' ').map(n => n[0]).join('')}
+                {(developer.user?.name || 'U').split(' ').map(n => n[0]).join('')}
               </div>
             )}
             
