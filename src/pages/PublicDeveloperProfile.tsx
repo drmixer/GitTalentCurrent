@@ -24,7 +24,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
 
-  const { developer, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
+  const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
   const { gitHubData, loading: githubLoading, error: githubError, refreshGitHubData } = useGitHub();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
@@ -114,20 +114,20 @@ export const PublicDeveloperProfile: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-8 text-white shadow-xl">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-6 mb-6 md:mb-0">
-              {developer.user.avatar_url ? (
+              {user?.avatar_url ? (
                 <img
-                  src={developer.user.avatar_url}
-                  alt={developer.name || developer.github_username}
+                  src={user.avatar_url}
+                  alt={user.name || developer.github_handle}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                 />
               ) : (
                 <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white">
-                  {(developer.name || developer.github_username)?.split(' ').map(n => n[0]).join('')}
+                  {(user?.name || developer.github_handle)?.split(' ').map(n => n[0]).join('')}
                 </div>
               )}
               <div>
                 <h1 className="text-3xl font-black mb-2">
-                  {developer.name || developer.github_username}
+                  {user?.name || developer.github_handle}
                 </h1>
                 <div className="flex items-center space-x-4 text-blue-100">
                   <div className="flex items-center">
