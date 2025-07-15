@@ -181,7 +181,6 @@ export interface JobRole {
   created_at: string;
   updated_at: string;
   recruiter?: Recruiter;
-    id: string;
 }
 
 export interface CSVJobImport {

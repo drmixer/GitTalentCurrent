@@ -77,11 +77,21 @@ export const RecruiterDashboard = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
 
   // Check if the user is approved
   const isApproved = userProfile?.is_approved === true;
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const company = params.get('company');
+    if (company) {
+      setCompanyFilter(company);
+      setActiveTab('my-jobs');
+    }
+  }, []);
 
   useEffect(() => {
     if (userProfile?.role === 'recruiter') {
@@ -113,11 +123,24 @@ export const RecruiterDashboard = () => {
     try {
       if (!userProfile?.id) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('job_roles')
-        .select('*')
-        .eq('recruiter_id', userProfile.id)
+        .select(`
+          *,
+          recruiter:recruiters (
+            *,
+            user:users(*)
+          )
+        `)
         .order('created_at', { ascending: false });
+
+      if (companyFilter) {
+        query = query.ilike('recruiter.company_name', `%${companyFilter}%`);
+      } else {
+        query = query.eq('recruiter_id', userProfile.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setJobRoles(data || []);
