@@ -208,6 +208,13 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
           {featuredProject ? (
             <div>
+              {featuredProject.image_url && (
+                <img
+                  src={featuredProject.image_url}
+                  alt={featuredProject.title}
+                  className="w-full h-auto rounded-lg mb-4"
+                />
+              )}
               <h4 className="font-bold text-gray-900">{featuredProject.title}</h4>
               <p className="text-gray-600 my-2">{featuredProject.description}</p>
               <a href={featuredProject.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
