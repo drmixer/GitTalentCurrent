@@ -36,7 +36,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters (
+          recruiter:recruiters!job_roles_recruiter_id_fkey (
             *,
             user:users(*)
           )
