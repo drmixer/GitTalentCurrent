@@ -15,6 +15,7 @@ import {
 import { Developer } from '@/types';
 import { formatDisplayName } from '@/utils/displayName';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
+import { useGitHub } from '@/hooks/useGitHub';
 
 interface DeveloperSnapshotCardProps {
   developer: Developer;
@@ -26,8 +27,10 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   onViewProfile 
 }) => {
   const { developer, portfolioItems, loading } = useDeveloperProfile(initialDeveloper?.user_id);
+  const { gitHubData } = useGitHub();
 
   const currentDeveloper = developer || initialDeveloper;
+  const githubUser = gitHubData?.user;
 
   if (!currentDeveloper) {
     return (
@@ -160,9 +163,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {currentDeveloper.github_url && (
+          {githubUser?.html_url && (
             <a
-              href={currentDeveloper.github_url}
+              href={githubUser.html_url}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
