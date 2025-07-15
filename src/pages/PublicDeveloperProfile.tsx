@@ -114,9 +114,9 @@ export const PublicDeveloperProfile: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-8 text-white shadow-xl">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-6 mb-6 md:mb-0">
-              {user?.avatar_url ? (
+              {developer.profile_pic_url ? (
                 <img
-                  src={user.avatar_url}
+                  src={developer.profile_pic_url}
                   alt={user.name || developer.github_handle}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                 />
