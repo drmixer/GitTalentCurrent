@@ -114,9 +114,9 @@ export const PublicDeveloperProfile: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-8 text-white shadow-xl">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-6 mb-6 md:mb-0">
-              {developer.avatar_url ? (
+              {developer.user.avatar_url ? (
                 <img
-                  src={developer.avatar_url}
+                  src={developer.user.avatar_url}
                   alt={developer.name || developer.github_username}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                 />
@@ -189,9 +189,9 @@ export const PublicDeveloperProfile: React.FC = () => {
           {activeTab === 'portfolio' && (
             <PortfolioManager developerId={developer.user_id} isEditable={false} />
           )}
-          {activeTab === 'github' && developer.github_username && (
+          {activeTab === 'github' && developer.github_handle && (
             <RealGitHubChart
-              githubHandle={developer.github_username}
+              githubHandle={developer.github_handle}
               gitHubData={gitHubData}
               loading={githubLoading}
               error={githubError}
