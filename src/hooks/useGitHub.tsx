@@ -86,6 +86,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
@@ -141,6 +142,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
         longestStreak: contributionStats.longestStreak,
         averageContributions: contributionStats.averagePerDay
       });
+      setLastFetchedHandle(handleToUse);
 
       if (handleToUse === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         // These can be run in the background
