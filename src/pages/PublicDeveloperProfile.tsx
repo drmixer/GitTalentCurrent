@@ -117,7 +117,7 @@ export const PublicDeveloperProfile: React.FC = () => {
               {developer.profile_pic_url ? (
                 <img
                   src={developer.profile_pic_url}
-                  alt={user.name || developer.github_handle}
+                  alt={user?.name || developer.github_handle}
                   className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
                 />
               ) : (
