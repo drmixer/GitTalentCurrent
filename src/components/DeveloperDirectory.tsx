@@ -66,7 +66,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
   const filteredDevelopers = developers.filter(developer => {
     const searchTermLower = searchTerm.toLowerCase();
-    const nameMatch = developer.user?.name.toLowerCase().includes(searchTermLower) || developer.github_username?.toLowerCase().includes(searchTermLower);
+  const nameMatch = developer.name?.toLowerCase().includes(searchTermLower) || developer.github_username?.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
     const availabilityMatch = availabilityFilter === null || developer.availability === availabilityFilter;
 
@@ -114,7 +114,7 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
                 key={dev.user_id}
                 developer={dev}
                 onViewProfile={() => handleViewSnapshot(dev)}
-                onSendMessage={() => onSendMessage(dev.user_id, dev.user.name)}
+                onSendMessage={() => onSendMessage(dev.user_id, dev.name)}
               />
             ) : null
           ))}

@@ -29,6 +29,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [authUserToProcess, setAuthUserToProcess] = useState<SupabaseUser | null>(null);
   const [authProcessingEventType, setAuthProcessingEventType] = useState<string | null>(null);
 
+  async function ensureUserProfileExists() {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+      console.error('Failed to get session:', sessionError);
+      return;
+    }
+
+    const user = session.user;
+
+    const { error: rpcError } = await supabase.rpc('create_user_profile', {
+      user_id: user.id,
+      user_email: user.email,
+      user_name: user.user_metadata?.name || user.email,
+      user_role: 'developer', // or 'recruiter', based on user
+      company_name: ''        // only required if recruiter
+    });
+
+    if (rpcError) {
+      console.error('Failed to call create_user_profile RPC:', rpcError.message);
+    } else {
+      console.log('User profile created or already exists.');
+    }
+  }
+
   const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser): Promise<boolean> => {
     try {
       const { data: existingProfileFromDb, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
@@ -161,6 +189,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
   setAuthError(null);
+  await ensureUserProfileExists();
   console.log(`[AuthContext] fetchUserProfile START for user_id: ${authUser.id}, email: ${authUser.email}`);
   try {
     const { data: profile, error, status } = await supabase // Added status here
