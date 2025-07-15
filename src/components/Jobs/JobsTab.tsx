@@ -22,13 +22,13 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
     </div>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
-      <a href={`/jobs?company=${job.recruiter?.company_name}`} className="hover:underline">
-        {job.recruiter?.company_name || 'Company Confidential'}
+      <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">
+        {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
       </a>
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
-        <a href={`/recruiters/${job.recruiter?.user_id}`} className="hover:underline">
-            {job.recruiter?.user?.name || 'Recruiter'}
+        <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
+            {job.recruiter?.name || 'Recruiter'}
         </a>
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
@@ -77,13 +77,13 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
       <div className="p-6 space-y-4 overflow-y-auto">
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          <a href={`/jobs?company=${job.recruiter?.company_name}`} className="hover:underline">
-            {job.recruiter?.company_name || 'Company Confidential'}
+          <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">
+            {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
           </a>
         </p>
         <p className="text-md text-gray-600">
-            <a href={`/recruiters/${job.recruiter?.user_id}`} className="hover:underline">
-                {job.recruiter?.user?.name || 'Recruiter'}
+            <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
+                {job.recruiter?.name || 'Recruiter'}
             </a>
         </p>
         <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
@@ -149,9 +149,11 @@ export const JobsTab: React.FC = () => {
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters!job_roles_recruiter_id_fkey (
+          recruiter:users!job_roles_recruiter_id_fkey (
             *,
-            user:users(*)
+            recruiters (
+              *
+            )
           )
         `)
         .eq('is_active', true)
@@ -254,7 +256,7 @@ export const JobsTab: React.FC = () => {
     return jobsToShow.filter(job => {
       const searchTermLower = searchTerm.toLowerCase();
       const titleMatch = job.title.toLowerCase().includes(searchTermLower);
-      const companyMatch = job.recruiter?.company_name?.toLowerCase().includes(searchTermLower);
+      const companyMatch = job.recruiter?.recruiters[0]?.company_name?.toLowerCase().includes(searchTermLower);
       const techMatch = job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTermLower));
       return titleMatch || companyMatch || techMatch;
     });

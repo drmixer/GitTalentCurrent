@@ -36,9 +36,11 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters!job_roles_recruiter_id_fkey (
+          recruiter:users!job_roles_recruiter_id_fkey (
             *,
-            user:users(*)
+            recruiters (
+              *
+            )
           )
         `)
         .eq('id', jobId)
@@ -117,11 +119,11 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
           <p className="text-gray-600 mb-4">{job.description}</p>
           {job.recruiter && (
             <div className="flex items-center space-x-4">
-              <img src={job.recruiter.user?.profile_pic_url || ''} alt={job.recruiter.user?.name} className="w-12 h-12 rounded-full" />
+              <img src={job.recruiter?.profile_pic_url || ''} alt={job.recruiter?.name} className="w-12 h-12 rounded-full" />
               <div>
-                <a href={`/recruiters/${job.recruiter.user_id}`} className="font-bold hover:underline">{job.recruiter.user?.name}</a>
+                <a href={`/recruiters/${job.recruiter?.id}`} className="font-bold hover:underline">{job.recruiter?.name}</a>
                 <p className="text-sm text-gray-600">
-                  <a href={`/jobs?company=${job.recruiter.company_name}`} className="hover:underline">{job.recruiter.company_name}</a>
+                  <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">{job.recruiter?.recruiters[0]?.company_name}</a>
                 </p>
               </div>
             </div>

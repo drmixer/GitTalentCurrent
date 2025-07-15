@@ -127,9 +127,11 @@ export const RecruiterDashboard = () => {
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters!job_roles_recruiter_id_fkey (
+          recruiter:users!job_roles_recruiter_id_fkey (
             *,
-            user:users(*)
+            recruiters (
+              *
+            )
           )
         `)
         .order('created_at', { ascending: false });
