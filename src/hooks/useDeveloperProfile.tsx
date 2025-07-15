@@ -20,35 +20,20 @@ export function useDeveloperProfile(userId: string) {
         setLoading(true);
         setError(null);
 
-        // Fetch developer profile, user data, and portfolio items
+        // Fetch developer profile, user data, and portfolio items in a single query
         const { data: devData, error: devError } = await supabase
           .from('developers')
           .select(`
             *,
+            user:users(*),
             portfolio_items:portfolio_items(*)
           `)
           .eq('user_id', userId)
           .single();
 
         if (devError) throw devError;
-
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (userError) throw userError;
-
-        // Merge developer and user data
-        const mergedDeveloperData = {
-          ...devData,
-          name: userData.name,
-          avatar_url: userData.avatar_url,
-        };
-
-        setDeveloper(mergedDeveloperData as Developer);
-        setUser(userData as User);
+        setDeveloper(devData as Developer);
+        setUser(devData.user as User);
         setPortfolioItems(devData.portfolio_items || []);
 
       } catch (err: any) {

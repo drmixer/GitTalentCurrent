@@ -26,24 +26,23 @@ import {
 import { Developer, User as UserType } from '../../types';
 
 interface DeveloperProfileDetailsProps {
-  developer: Developer;
+  developerId: string;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
-  developer: initialDeveloper,
+  developerId,
 }) => {
   const { userProfile } = useAuth();
-  const [developer, setDeveloper] = useState<Developer | null>(initialDeveloper || null);
+  const [developer, setDeveloper] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
-    if (initialDeveloper) {
-      setDeveloper(initialDeveloper);
-      setLoading(false);
+    if (developerId) {
+      fetchDeveloperProfile();
     }
-  }, [initialDeveloper]);
+  }, [developerId]);
 
   const fetchDeveloperProfile = async () => {
     try {
