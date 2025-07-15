@@ -44,10 +44,11 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     }
   }, [developerId]);
 
+  const [featuredProject, setFeaturedProject] = useState<PortfolioItem | null>(null);
+
   const fetchDeveloperProfile = async () => {
     try {
       setLoading(true);
-      console.log('DeveloperProfileDetails: Starting fetch for developer ID:', developerId);
       setError('');
 
       // Fetch developer with user data
@@ -55,24 +56,32 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         .from('developers')
         .select(`
           *,
-          featured_project,
           user:users(*)
         `)
         .eq('user_id', developerId)
         .single();
 
       if (fetchError) {
-        console.error('DeveloperProfileDetails: Error fetching developer profile:', fetchError);
-        console.error('Error fetching developer profile:', fetchError.message);
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
       } else {
-        console.log('Developer profile fetched successfully:', data);
         setDeveloper(data);
+
+        // Fetch portfolio items and find the featured one
+        const { data: portfolioItems, error: portfolioError } = await supabase
+          .from('portfolio_items')
+          .select('*')
+          .eq('developer_id', developerId);
+
+        if (portfolioError) {
+          console.error('Error fetching portfolio items:', portfolioError);
+        } else {
+          const featured = portfolioItems.find(item => item.featured);
+          setFeaturedProject(featured || null);
+        }
       }
 
     } catch (err) {
-      console.error('Error in fetchDeveloperProfile:', err);
       setError('Unexpected error loading developer profile');
       setDeveloper(null);
     } finally {
@@ -152,7 +161,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  const displayName = developer.name || developer.github_handle;
+  const displayName = developer?.user?.name || developer?.github_handle;
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
@@ -197,10 +206,14 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         </div>
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
-          {developer.featured_project ? (
-            <a href={developer.featured_project} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-              {developer.featured_project}
-            </a>
+          {featuredProject ? (
+            <div>
+              <h4 className="font-bold text-gray-900">{featuredProject.title}</h4>
+              <p className="text-gray-600 my-2">{featuredProject.description}</p>
+              <a href={featuredProject.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                View Project
+              </a>
+            </div>
           ) : (
             <p className="text-gray-500">No featured project provided.</p>
           )}
