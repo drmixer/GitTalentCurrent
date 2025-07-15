@@ -22,8 +22,8 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
     </div>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
-      <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">
-        {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
+      <a href={`/jobs?company=${job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name}`} className="hover:underline">
+        {job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name || 'Company Confidential'}
       </a>
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
@@ -77,8 +77,8 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
       <div className="p-6 space-y-4 overflow-y-auto">
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">
-            {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
+          <a href={`/jobs?company=${job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name}`} className="hover:underline">
+            {job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name || 'Company Confidential'}
           </a>
         </p>
         <p className="text-md text-gray-600">
