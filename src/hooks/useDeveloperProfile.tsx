@@ -20,12 +20,13 @@ export function useDeveloperProfile(userId: string) {
         setLoading(true);
         setError(null);
 
-        // Fetch developer profile and user data
+        // Fetch developer profile, user data, and portfolio items in a single query
         const { data: devData, error: devError } = await supabase
           .from('developers')
           .select(`
             *,
-            user:users(*)
+            user:users(*),
+            portfolio_items:portfolio_items(*)
           `)
           .eq('user_id', userId)
           .single();
@@ -33,15 +34,7 @@ export function useDeveloperProfile(userId: string) {
         if (devError) throw devError;
         setDeveloper(devData as Developer);
         setUser(devData.user as User);
-
-        // Fetch portfolio items
-        const { data: portfolioData, error: portfolioError } = await supabase
-          .from('portfolio_items')
-          .select('*')
-          .eq('developer_id', devData.id);
-
-        if (portfolioError) throw portfolioError;
-        setPortfolioItems(portfolioData || []);
+        setPortfolioItems(devData.portfolio_items || []);
 
       } catch (err: any) {
         setError(err.message);
