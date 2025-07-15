@@ -34,12 +34,18 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
       setError('');
       const { data, error } = await supabase
         .from('job_roles')
-        .select('*')
+        .select(`
+          *,
+          recruiter:recruiters (
+            *,
+            user:users(*)
+          )
+        `)
         .eq('id', jobId)
         .single();
 
       if (error) throw error;
-      setJob(data);
+      setJob(data as JobRole);
     } catch (err: any) {
       setError('Failed to fetch job details. ' + err.message);
     } finally {
@@ -109,7 +115,17 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-2xl font-bold mb-4">{job.title}</h2>
           <p className="text-gray-600 mb-4">{job.description}</p>
-          {/* Add other job details here */}
+          {job.recruiter && (
+            <div className="flex items-center space-x-4">
+              <img src={job.recruiter.user?.profile_pic_url || ''} alt={job.recruiter.user?.name} className="w-12 h-12 rounded-full" />
+              <div>
+                <a href={`/recruiters/${job.recruiter.user_id}`} className="font-bold hover:underline">{job.recruiter.user?.name}</a>
+                <p className="text-sm text-gray-600">
+                  <a href={`/jobs?company=${job.recruiter.company_name}`} className="hover:underline">{job.recruiter.company_name}</a>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

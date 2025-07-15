@@ -373,43 +373,45 @@ export const RecruiterProfileDetails: React.FC<RecruiterProfileDetailsProps> = (
             <div className="space-y-4">
               {jobs.map((job) => (
                 <div key={job.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="text-lg font-bold text-gray-900">{job.title}</h4>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {job.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          {job.location}
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {job.job_type}
-                        </div>
-                        <div className="flex items-center">
-                          <DollarSign className="w-4 h-4 mr-1" />
-                          ${job.salary_min}k - ${job.salary_max}k
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {job.tech_stack.map((tech, index) => (
-                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                            {tech}
+                  <a href={`/jobs/${job.id}`} className="block">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className="text-lg font-bold text-gray-900 hover:underline">{job.title}</h4>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            job.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {job.is_active ? 'Active' : 'Inactive'}
                           </span>
-                        ))}
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                          <div className="flex items-center">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            {job.location}
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {job.job_type}
+                          </div>
+                          <div className="flex items-center">
+                            <DollarSign className="w-4 h-4 mr-1" />
+                            ${job.salary_min}k - ${job.salary_max}k
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {job.tech_stack.map((tech, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-sm text-gray-600 line-clamp-2">{job.description}</p>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">{job.description}</p>
+                      <div className="text-sm text-gray-500">
+                        Posted {new Date(job.created_at).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      Posted {new Date(job.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
+                  </a>
                 </div>
               ))}
             </div>

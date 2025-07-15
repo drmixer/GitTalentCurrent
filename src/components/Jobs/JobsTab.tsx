@@ -20,11 +20,16 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
         {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
       </button>
     </div>
-    {/* Accessing company_name directly from the view's job object */}
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
-      {job.company_name || 'Company Confidential'}
-      {/* Optionally, display recruiter_name if available: job.recruiter_name */}
+      <a href={`/jobs?company=${job.recruiter?.company_name}`} className="hover:underline">
+        {job.recruiter?.company_name || 'Company Confidential'}
+      </a>
+    </p>
+    <p className="text-sm text-gray-500 mb-1 flex items-center">
+        <a href={`/recruiters/${job.recruiter?.user_id}`} className="hover:underline">
+            {job.recruiter?.user?.name || 'Recruiter'}
+        </a>
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
     {job.salary_min && job.salary_max && (
@@ -70,11 +75,16 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
       </div>
       <div className="p-6 space-y-4 overflow-y-auto">
-        {/* Accessing company_name directly from the view's job object */}
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          {job.company_name || 'Company Confidential'}
-          {/* Optionally, display recruiter_name if available: job.recruiter_name */}
+          <a href={`/jobs?company=${job.recruiter?.company_name}`} className="hover:underline">
+            {job.recruiter?.company_name || 'Company Confidential'}
+          </a>
+        </p>
+        <p className="text-md text-gray-600">
+            <a href={`/recruiters/${job.recruiter?.user_id}`} className="hover:underline">
+                {job.recruiter?.user?.name || 'Recruiter'}
+            </a>
         </p>
         <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
         {job.salary_min && job.salary_max && (
@@ -136,8 +146,14 @@ export const JobsTab: React.FC = () => {
     setError(null);
     try {
       const { data, error: jobsError } = await supabase
-        .from('job_roles_with_details') // Querying the new view
-        .select('*') // The view should provide all necessary columns directly
+        .from('job_roles')
+        .select(`
+          *,
+          recruiter:recruiters (
+            *,
+            user:users(*)
+          )
+        `)
         .eq('is_active', true)
         // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
@@ -238,7 +254,7 @@ export const JobsTab: React.FC = () => {
     return jobsToShow.filter(job => {
       const searchTermLower = searchTerm.toLowerCase();
       const titleMatch = job.title.toLowerCase().includes(searchTermLower);
-      const companyMatch = job.recruiter?.recruiters_profile?.company_name?.toLowerCase().includes(searchTermLower);
+      const companyMatch = job.recruiter?.company_name?.toLowerCase().includes(searchTermLower);
       const techMatch = job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTermLower));
       return titleMatch || companyMatch || techMatch;
     });
