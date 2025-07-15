@@ -26,16 +26,14 @@ import {
 import { Developer, User as UserType } from '../../types';
 
 interface DeveloperProfileDetailsProps {
-  developerId?: string;
-  developer?: Developer & { user: UserType };
+  developer: Developer;
 }
 
 export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = ({
-  developerId,
   developer: initialDeveloper,
 }) => {
   const { userProfile } = useAuth();
-  const [developer, setDeveloper] = useState<Developer & { user: UserType } | null>(initialDeveloper || null);
+  const [developer, setDeveloper] = useState<Developer | null>(initialDeveloper || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('profile');
@@ -43,13 +41,9 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   useEffect(() => {
     if (initialDeveloper) {
       setDeveloper(initialDeveloper);
-      console.log('DeveloperProfileDetails: Using provided developer data:', initialDeveloper);
       setLoading(false);
-    } else if (developerId) {
-      console.log('DeveloperProfileDetails: Fetching developer profile for ID:', developerId);
-      fetchDeveloperProfile();
     }
-  }, [developerId, initialDeveloper]);
+  }, [initialDeveloper]);
 
   const fetchDeveloperProfile = async () => {
     try {
@@ -159,13 +153,13 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  const displayName = developer.user?.name || developer.github_handle;
+  const displayName = developer.name || developer.github_handle;
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
     { id: 'portfolio', label: 'Portfolio' },
     { id: 'github', label: 'GitHub Activity' },
-  ]; 
+  ];
 
   const isOwnProfile = userProfile?.id === developer.user_id;
 
@@ -204,9 +198,13 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         </div>
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
-          <p className="text-gray-600 leading-relaxed">
-            {developer.featured_project || 'No featured project provided.'}
-          </p>
+          {developer.featured_project ? (
+            <a href={developer.featured_project} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+              {developer.featured_project}
+            </a>
+          ) : (
+            <p className="text-gray-500">No featured project provided.</p>
+          )}
         </div>
       </div>
     </div>
