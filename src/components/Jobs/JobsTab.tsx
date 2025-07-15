@@ -149,7 +149,7 @@ export const JobsTab: React.FC = () => {
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters (
+          recruiter:recruiters!job_roles_recruiter_id_fkey (
             *,
             user:users(*)
           )
