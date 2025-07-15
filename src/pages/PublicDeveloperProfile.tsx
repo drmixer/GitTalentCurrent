@@ -184,7 +184,7 @@ export const PublicDeveloperProfile: React.FC = () => {
 
         <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
           {activeTab === 'profile' && (
-            <DeveloperProfileDetails developer={developer} />
+            <DeveloperProfileDetails developerId={developer.user_id} />
           )}
           {activeTab === 'portfolio' && (
             <PortfolioManager developerId={developer.user_id} isEditable={false} />
