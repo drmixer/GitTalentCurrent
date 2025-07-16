@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import { create as createJwt } from "https://deno.land/x/djwt@v2.2/mod.ts";
+import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,6 +84,7 @@ Deno.serve(async (req: Request) => {
         );
 
         const jwt = await createJwt({ alg: "RS256", typ: "JWT" }, payload, privateKey);
+        console.log("JWT generated successfully.");
         
         // Exchange the JWT for an installation access token
         const tokenResponse = await fetch(
@@ -104,6 +106,7 @@ Deno.serve(async (req: Request) => {
         }
         
         const { token } = await tokenResponse.json();
+        console.log("Installation token received.");
         
         // Use the installation token for subsequent requests
         headers["Authorization"] = `token ${token}`;
