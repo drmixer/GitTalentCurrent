@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
-import { usePublicGitHub } from '@/hooks/usePublicGitHub';
+import { useGitHub } from '@/hooks/useGitHub';
 import {
   DeveloperProfileDetails,
   PortfolioManager,
@@ -25,7 +25,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [profileError, setProfileError] = useState('');
 
   const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer);
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
 

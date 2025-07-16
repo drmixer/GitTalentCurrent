@@ -142,7 +142,7 @@ export const DeveloperDashboard: React.FC = () => {
 
   const { 
     gitHubData: standardGitHubData, loading: standardGitHubLoading, error: standardGitHubError
-  } = useGitHub(contextDeveloperProfile?.github_handle);
+  } = useGitHub();
 
   const shouldUseFreshDataSource = !!freshLoadParams;
   let finalGitHubDataToShow = standardGitHubData;

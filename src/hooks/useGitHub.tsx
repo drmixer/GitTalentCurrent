@@ -66,8 +66,10 @@ interface GitHubContextType {
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
-export const useGitHub = (initialHandle?: string) => {
+export const useGitHub = (developer?: Developer) => {
   const { user, developerProfile, updateDeveloperProfile } = useAuth();
+  const targetDeveloper = developer || developerProfile;
+
   const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
     repos: [],
@@ -125,10 +127,10 @@ export const useGitHub = (initialHandle?: string) => {
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
 
-  const refreshGitHubData = useCallback(async (handle?: string) => {
-    const handleToUse = handle || initialHandle;
-    if (!handleToUse) {
-      //setError(new Error('No GitHub handle provided for refresh.'));
+  const refreshGitHubData = useCallback(async (dev?: Developer) => {
+    const devToFetch = dev || targetDeveloper;
+    if (!devToFetch?.github_handle) {
+      // setError(new Error('No GitHub handle provided for refresh.'));
       return;
     }
 
@@ -136,25 +138,19 @@ export const useGitHub = (initialHandle?: string) => {
     setError(null);
 
     try {
-      // The installation ID should correspond to the developer whose data is being fetched.
-      // If we are fetching for the logged-in user, we can get it from their profile.
-      // For other developers, this might need to be passed in or handled differently if they have connected the app.
-      const installationId = (handleToUse === developerProfile?.github_handle)
-        ? developerProfile.github_installation_id
-        : undefined; // Or fetch it if a mechanism exists
-
+      const { github_handle, github_installation_id } = devToFetch;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
-      
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify({ 
-          handle: handleToUse,
-          installationId // This may be null, and the backend should handle it
+        body: JSON.stringify({
+          handle: github_handle,
+          installationId: github_installation_id,
         })
       });
 
@@ -181,10 +177,9 @@ export const useGitHub = (initialHandle?: string) => {
         longestStreak: contributionStats.longestStreak,
         averageContributions: contributionStats.averagePerDay
       });
-      setLastFetchedHandle(handleToUse);
+      setLastFetchedHandle(github_handle);
 
-      // Syncing should only happen for the logged-in user's own data
-      if (handleToUse === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
+      if (github_handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         syncLanguagesToProfile();
         syncProjectsToProfile();
       }
@@ -193,14 +188,13 @@ export const useGitHub = (initialHandle?: string) => {
     } finally {
       setLoading(false);
     }
-  }, [initialHandle, developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
+  }, [targetDeveloper, developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
 
   useEffect(() => {
-    if (initialHandle) {
-      refreshGitHubData(initialHandle);
+    if (targetDeveloper?.github_handle) {
+      refreshGitHubData(targetDeveloper);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialHandle]); // Intentionally re-running only when the initial handle changes.
+  }, [targetDeveloper, refreshGitHubData]);
 
   return {
     gitHubData,
