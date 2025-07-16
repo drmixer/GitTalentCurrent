@@ -14,9 +14,15 @@ interface DeveloperProfileModalProps {
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
-  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub();
+  const { gitHubData, loading: githubLoading, error: githubError, refreshGitHubData } = useGitHub();
 
   const currentDeveloper = developer || initialDeveloper;
+
+  useEffect(() => {
+    if (currentDeveloper) {
+      refreshGitHubData(currentDeveloper);
+    }
+  }, [currentDeveloper, refreshGitHubData]);
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
   const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.profile_pic_url;
 

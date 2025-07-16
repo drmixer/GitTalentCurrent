@@ -58,7 +58,7 @@ interface GitHubContextType {
   gitHubData: GitHubData;
   loading: boolean;
   error: Error | null;
-  refreshGitHubData: (handle?: string) => Promise<void>;
+  refreshGitHubData: (developer?: Developer) => Promise<void>;
   getTopLanguages: (limit?: number) => string[];
   getTopRepos: (limit?: number) => GitHubRepo[];
   syncLanguagesToProfile: () => Promise<void>;
@@ -67,8 +67,9 @@ interface GitHubContextType {
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
-export const useGitHub = () => {
+export const useGitHub = (developer?: Developer) => {
   const { user, developerProfile, updateDeveloperProfile } = useAuth();
+  const targetDeveloper = developer || developerProfile;
 
   const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
@@ -127,9 +128,9 @@ export const useGitHub = () => {
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
 
-  const refreshGitHubData = useCallback(async (handle?: string) => {
-    const handleToUse = handle || developerProfile?.github_handle;
-    if (!handleToUse) {
+  const refreshGitHubData = useCallback(async (dev?: Developer) => {
+    const devToFetch = dev || targetDeveloper;
+    if (!devToFetch?.github_handle) {
       // setError(new Error('No GitHub handle provided for refresh.'));
       return;
     }
@@ -138,7 +139,7 @@ export const useGitHub = () => {
     setError(null);
 
     try {
-      const { github_installation_id } = developerProfile || {};
+      const { github_handle, github_installation_id } = devToFetch;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
 
@@ -149,7 +150,7 @@ export const useGitHub = () => {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
-          handle: handleToUse,
+          handle: github_handle,
           installationId: github_installation_id,
         })
       });
@@ -177,9 +178,9 @@ export const useGitHub = () => {
         longestStreak: contributionStats.longestStreak,
         averageContributions: contributionStats.averagePerDay
       });
-      setLastFetchedHandle(handleToUse);
+      setLastFetchedHandle(github_handle);
 
-      if (handleToUse === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
+      if (github_handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
         syncLanguagesToProfile();
         syncProjectsToProfile();
       }
@@ -188,13 +189,13 @@ export const useGitHub = () => {
     } finally {
       setLoading(false);
     }
-  }, [developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
+  }, [targetDeveloper, developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
 
   useEffect(() => {
-    if (developerProfile?.github_handle) {
-      refreshGitHubData(developerProfile.github_handle);
+    if (targetDeveloper?.github_handle) {
+      refreshGitHubData(targetDeveloper);
     }
-  }, [developerProfile?.github_handle, refreshGitHubData]);
+  }, [targetDeveloper, refreshGitHubData]);
 
   return {
     gitHubData,
