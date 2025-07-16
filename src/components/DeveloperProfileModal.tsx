@@ -48,14 +48,14 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
         </div>
         <div className="p-6">
           <div className="flex items-start space-x-6">
-            <img src={currentDeveloper.avatar_url || ''} alt={currentDeveloper.name || ''} className="w-24 h-24 rounded-full shadow-lg" />
+            <img src={currentDeveloper.user?.avatar_url || ''} alt={currentDeveloper.name || ''} className="w-24 h-24 rounded-full shadow-lg" />
             <div>
               <h3 className="text-2xl font-bold">{currentDeveloper.name || 'Unnamed Developer'}</h3>
               <p className="text-gray-600 text-lg">{currentDeveloper.preferred_title}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                {currentDeveloper.github_username && (
-                  <a href={`https://github.com/${currentDeveloper.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600">
-                    <Github size={16} className="mr-1" />{currentDeveloper.github_username}
+                {currentDeveloper.github_handle && (
+                  <a href={`https://github.com/${currentDeveloper.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600">
+                    <Github size={16} className="mr-1" />{currentDeveloper.github_handle}
                   </a>
                 )}
                 {currentDeveloper.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{currentDeveloper.email}</span>}
@@ -87,8 +87,10 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
                 <div className="flex items-center justify-center h-48">
                   <Loader className="animate-spin h-8 w-8 text-blue-600" />
                 </div>
-              ) : (
+              ) : gitHubData ? (
                 <GitHubUserActivityDetails gitHubData={gitHubData} />
+              ) : (
+                <div className="text-center text-gray-500">No GitHub data available.</div>
               )}
             </div>
           </div>

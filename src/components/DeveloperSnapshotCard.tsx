@@ -135,6 +135,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
               <h4 className="font-semibold text-gray-900">Featured Project</h4>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              {featuredProject.image_url && (
+                <img src={featuredProject.image_url} alt={featuredProject.title} className="rounded-lg mb-4" />
+              )}
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h5 className="font-medium text-gray-900 mb-1">{featuredProject.title}</h5>
@@ -163,9 +166,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {githubUser?.html_url && (
+          {currentDeveloper.github_handle && (
             <a
-              href={githubUser.html_url}
+              href={`https://github.com/${currentDeveloper.github_handle}`}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
