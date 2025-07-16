@@ -33,16 +33,17 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
     );
   }
 
-  const displayName = developer.name || 'Unnamed Developer';
-  const userInitial = developer.name ? (developer.name || 'U').split(' ').map(n => n[0]).join('') : 'U';
+  const displayName = formatDisplayName(developer.user, developer);
+  const userInitial = displayName ? displayName.split(' ').map(n => n[0]).join('') : 'U';
+  const avatarUrl = developer.user?.avatar_url || developer.avatar_url;
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
       <div className="flex items-start space-x-4">
         <div className="relative">
-          {developer.user?.avatar_url ? (
-            <img 
-              src={developer.user.avatar_url}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
               alt={displayName}
               className="w-16 h-16 rounded-xl object-cover shadow-lg"
             />

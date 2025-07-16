@@ -44,6 +44,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
   const displayName = formatDisplayName(currentDeveloper.user, currentDeveloper);
   const displayEmail = currentDeveloper.email || '';
+  const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.avatar_url;
 
   const getAvailabilityStatus = () => {
     if (currentDeveloper.availability) {
@@ -67,15 +68,15 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
     <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1 h-full flex flex-col">
       <div className="flex items-start space-x-4">
           <div className="relative">
-            {currentDeveloper.avatar_url ? (
-              <img 
-                src={currentDeveloper.avatar_url}
-                alt={currentDeveloper.name || ''}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName}
                 className="w-16 h-16 rounded-2xl object-cover shadow-lg"
               />
             ) : (
               <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {(currentDeveloper.name || 'U').split(' ').map(n => n[0]).join('')}
+                {displayName ? displayName.split(' ').map(n => n[0]).join('') : 'U'}
               </div>
             )}
             
@@ -163,9 +164,9 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {githubUser?.html_url && (
+          {currentDeveloper.github_handle && (
             <a
-              href={githubUser.html_url}
+              href={`https://github.com/${currentDeveloper.github_handle}`}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"

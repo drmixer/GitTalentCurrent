@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { RealGitHubChart } from '../GitHub/RealGitHubChart';
+import { GitHubUserActivityDetails } from '../GitHub/GitHubUserActivityDetails';
 import { PortfolioManager } from '../Portfolio/PortfolioManager';
 import { ProfileStrengthIndicator } from './ProfileStrengthIndicator';
 import { 
@@ -24,6 +25,7 @@ import {
   Share2
 } from 'lucide-react';
 import { Developer, User as UserType } from '../../types';
+import { formatDisplayName } from '@/utils/displayName';
 
 interface DeveloperProfileDetailsProps {
   developerId: string;
@@ -161,7 +163,8 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  const displayName = developer?.user?.name || developer?.github_handle;
+  const displayName = formatDisplayName(developer?.user, developer);
+  const avatarUrl = developer?.user?.avatar_url || developer?.avatar_url;
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
@@ -173,6 +176,19 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-5xl mx-auto">
+      <div className="flex items-center space-x-4 mb-6">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={displayName} className="w-24 h-24 rounded-full" />
+        ) : (
+          <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-3xl">
+            {displayName ? displayName.split(' ').map(n => n[0]).join('') : 'U'}
+          </div>
+        )}
+        <div>
+          <h2 className="text-2xl font-bold">{displayName}</h2>
+          <p className="text-gray-600">{developer.preferred_title}</p>
+        </div>
+      </div>
       <div className="space-y-8">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-4">About</h3>
@@ -203,6 +219,19 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
               )}
             </div>
           </div>
+        </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-black text-gray-900 mb-4">GitHub Activity</h3>
+          {developer.github_handle && developer.github_installation_id ? (
+            <>
+              <RealGitHubChart developerId={developer.user_id} />
+              <GitHubUserActivityDetails githubHandle={developer.github_handle} />
+            </>
+          ) : (
+            <p className="text-gray-500">
+              GitHub activity not available. The developer may need to connect their GitHub account.
+            </p>
+          )}
         </div>
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
