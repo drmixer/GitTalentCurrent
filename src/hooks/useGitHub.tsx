@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useAuth } from './useAuth';
 import { supabase } from '../lib/supabase';
 import { calculateContributionStats } from '../utils/githubUtils';
+import { Developer } from '../types';
 
 interface GitHubRepo {
   id: number;
@@ -57,7 +58,7 @@ interface GitHubContextType {
   gitHubData: GitHubData;
   loading: boolean;
   error: Error | null;
-  refreshGitHubData: (handle?: string) => Promise<void>;
+  refreshGitHubData: (developer?: Developer) => Promise<void>;
   getTopLanguages: (limit?: number) => string[];
   getTopRepos: (limit?: number) => GitHubRepo[];
   syncLanguagesToProfile: () => Promise<void>;
@@ -67,7 +68,7 @@ interface GitHubContextType {
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
 export const useGitHub = (developer?: Developer) => {
-  const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth();
+  const { user, developerProfile, updateDeveloperProfile } = useAuth();
   const targetDeveloper = developer || developerProfile;
 
   const [gitHubData, setGitHubData] = useState<GitHubData>({
@@ -80,80 +81,6 @@ export const useGitHub = (developer?: Developer) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
-
-  const refreshGitHubData = useCallback(async (handle?: string) => {
-    const handleToUse = handle || targetDeveloper?.github_handle;
-    if (!handleToUse) {
-      setError(new Error('No GitHub handle provided'));
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const installationId = developerProfile?.github_installation_id;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          handle: handleToUse,
-          installationId
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = `GitHub API error: ${response.status}`;
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          errorMessage = errorText;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      const contributionStats = calculateContributionStats(data.contributions || []);
-
-      setGitHubData({
-        user: data.user || null,
-        repos: data.repos || [],
-        languages: data.languages || {},
-        totalStars: data.totalStars || 0,
-        contributions: data.contributions || [],
-        currentStreak: contributionStats.currentStreak,
-        longestStreak: contributionStats.longestStreak,
-        averageContributions: contributionStats.averagePerDay
-      });
-      setLastFetchedHandle(handleToUse);
-
-      if (handleToUse === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
-        // These can be run in the background
-        syncLanguagesToProfile();
-        syncProjectsToProfile();
-      }
-    } catch (err: any) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [developerProfile, user]);
-
-  useEffect(() => {
-    if (targetDeveloper?.github_handle) {
-      refreshGitHubData(targetDeveloper.github_handle);
-    }
-  }, [targetDeveloper?.github_handle, refreshGitHubData]);
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
@@ -200,6 +127,75 @@ export const useGitHub = (developer?: Developer) => {
       });
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
+
+  const refreshGitHubData = useCallback(async (dev?: Developer) => {
+    const devToFetch = dev || targetDeveloper;
+    if (!devToFetch?.github_handle) {
+      // setError(new Error('No GitHub handle provided for refresh.'));
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { github_handle, github_installation_id } = devToFetch;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          handle: github_handle,
+          installationId: github_installation_id,
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `GitHub API error: ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) errorMessage = errorData.error;
+        } catch (e) { errorMessage = errorText; }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      const contributionStats = calculateContributionStats(data.contributions || []);
+
+      setGitHubData({
+        user: data.user || null,
+        repos: data.repos || [],
+        languages: data.languages || {},
+        totalStars: data.totalStars || 0,
+        contributions: data.contributions || [],
+        currentStreak: contributionStats.currentStreak,
+        longestStreak: contributionStats.longestStreak,
+        averageContributions: contributionStats.averagePerDay
+      });
+      setLastFetchedHandle(github_handle);
+
+      if (github_handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
+        syncLanguagesToProfile();
+        syncProjectsToProfile();
+      }
+    } catch (err: any) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [targetDeveloper, developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
+
+  useEffect(() => {
+    if (targetDeveloper?.github_handle) {
+      refreshGitHubData(targetDeveloper);
+    }
+  }, [targetDeveloper, refreshGitHubData]);
 
   return {
     gitHubData,
