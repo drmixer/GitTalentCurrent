@@ -105,18 +105,29 @@ Deno.serve(async (req: Request) => {
       console.log('Current installation ID:', developerData.github_installation_id || 'none');
       console.log('New installation ID to set:', installationId);
 
-      // Get GitHub handle
-      const githubHandle = await getGithubHandle(installationId);
+      // Get GitHub user data
+      const { login, avatar_url } = await getGithubUserData(installationId);
       
       // Update the existing developer profile
-      const { data, error } = await supabaseClient
+      await supabaseClient
         .from('users')
-        .update({ 
+        .update({
           github_installation_id: installationId,
-          github_handle: githubHandle,
+          github_handle: login,
+          avatar_url: avatar_url,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId)
+        .eq('id', userId);
+
+      const { data, error } = await supabaseClient
+        .from('developers')
+        .update({
+          github_installation_id: installationId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
         .select();
       
       if (error) {
@@ -175,19 +186,36 @@ Deno.serve(async (req: Request) => {
       console.log('User found, creating new developer profile with installation ID');
       console.log('User data found:', userData);
 
-      // Get GitHub handle
-      const githubHandle = await getGithubHandle(installationId);
+      // Get GitHub user data
+      const { login, avatar_url } = await getGithubUserData(installationId);
       
       // Create a new developer profile with the installation ID
-      const { data, error } = await supabaseClient
+      await supabaseClient
         .from('users')
         .update({
           github_installation_id: installationId,
-          github_handle: githubHandle,
+          github_handle: login,
+          avatar_url: avatar_url,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId)
-        .select(); 
+        .eq('id', userId);
+
+      const { data, error } = await supabaseClient
+        .from('developers')
+        .insert({
+          user_id: userId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          bio: '',
+          availability: true,
+          top_languages: [],
+          linked_projects: [],
+          profile_strength: 10,
+          github_installation_id: installationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select();
 
       if (error) {
         console.error('Error creating developer profile:', error);
@@ -241,7 +269,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function getGithubHandle(installationId: string): Promise<string> {
+async function getGithubUserData(installationId: string): Promise<{ login: string, avatar_url: string }> {
   const privateKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY');
   if (!privateKey) {
     throw new Error('GITHUB_APP_PRIVATE_KEY is not set');
@@ -283,5 +311,5 @@ async function getGithubHandle(installationId: string): Promise<string> {
   }
 
   const userData = await userResponse.json();
-  return userData.login;
+  return { login: userData.login, avatar_url: userData.avatar_url };
 }
