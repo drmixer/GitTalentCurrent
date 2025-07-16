@@ -7,22 +7,18 @@ import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
 import { RealGitHubChart } from './GitHub/RealGitHubChart';
 
+import { GitHubData } from '@/hooks/useGitHub';
+
 interface DeveloperProfileModalProps {
-  developer: Developer;
+  developer: Developer & { gitHubData: GitHubData | null, githubLoading: boolean, githubError: Error | null };
   onClose: () => void;
 }
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
-  const { gitHubData, loading: githubLoading, error: githubError, refreshGitHubData } = useGitHub();
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer);
 
   const currentDeveloper = developer || initialDeveloper;
-
-  useEffect(() => {
-    if (currentDeveloper) {
-      refreshGitHubData(currentDeveloper);
-    }
-  }, [currentDeveloper, refreshGitHubData]);
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
   const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.profile_pic_url;
 
