@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
-import { usePublicGitHub } from '@/hooks/usePublicGitHub';
+import { useGitHub } from '@/hooks/useGitHub';
 import {
   DeveloperProfileDetails,
   PortfolioManager,
@@ -25,20 +25,15 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [profileError, setProfileError] = useState('');
 
   const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer);
+  const { gitHubData, loading: githubLoading, error: githubError, refreshGitHubData } = useGitHub();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
 
   useEffect(() => {
     if (developer) {
-      // Manually trigger the refresh once the developer data is available.
-      // This is a workaround for the hook not re-triggering on developer object change.
-      // A better solution would be to make the hook more robust.
-      // For now, this should work.
-      const { refreshGitHubData } = usePublicGitHub(developer);
       refreshGitHubData(developer);
     }
-  }, [developer]);
+  }, [developer, refreshGitHubData]);
 
   useEffect(() => {
     const fetchUserIdBySlug = async () => {
