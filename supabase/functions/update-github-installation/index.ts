@@ -112,7 +112,6 @@ Deno.serve(async (req: Request) => {
       await supabaseClient
         .from('users')
         .update({
-          github_installation_id: installationId,
           github_handle: login,
           avatar_url: avatar_url,
           updated_at: new Date().toISOString()
@@ -193,7 +192,6 @@ Deno.serve(async (req: Request) => {
       await supabaseClient
         .from('users')
         .update({
-          github_installation_id: installationId,
           github_handle: login,
           avatar_url: avatar_url,
           updated_at: new Date().toISOString()
