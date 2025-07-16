@@ -15,7 +15,6 @@ interface DeveloperProfileModalProps {
 }
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
-  console.log('DeveloperProfileModal rendered with initialDeveloper:', initialDeveloper);
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
 
   const currentDeveloper = developer || initialDeveloper;
