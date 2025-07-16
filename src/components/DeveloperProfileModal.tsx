@@ -88,7 +88,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
           <div className="mt-8">
             <h4 className="font-bold text-lg mb-3">GitHub Activity</h4>
             <div className="border rounded-lg p-4">
-              {initialDeveloper.githubLoading ? (
+              {githubLoading ? (
                 <div className="flex items-center justify-center h-48">
                   <Loader className="animate-spin h-8 w-8 text-blue-600" />
                 </div>
@@ -96,12 +96,12 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
                 <>
                   <RealGitHubChart
                     githubHandle={currentDeveloper.github_handle}
-                    gitHubData={initialDeveloper.gitHubData}
-                    loading={initialDeveloper.githubLoading}
-                    error={initialDeveloper.githubError}
+                    gitHubData={gitHubData}
+                    loading={githubLoading}
+                    error={githubError}
                     isGitHubAppInstalled={!!currentDeveloper.github_installation_id}
                   />
-                  <GitHubUserActivityDetails gitHubData={initialDeveloper.gitHubData} />
+                  <GitHubUserActivityDetails gitHubData={gitHubData} />
                 </>
               ) : (
                 <div className="text-center text-gray-500">No GitHub data available.</div>
