@@ -33,8 +33,8 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
     );
   }
 
-  const displayName = formatDisplayName(developer.user, developer);
-  const userInitial = displayName ? displayName.split(' ').map(n => n[0]).join('') : 'U';
+  const displayName = developer.user?.name || developer.name || 'Unnamed Developer';
+  const userInitial = displayName.split(' ').map(n => n[0]).join('');
   const avatarUrl = developer.user?.avatar_url || developer.avatar_url;
 
   return (
@@ -63,10 +63,10 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
           <div className="flex items-center space-x-3 mb-1">
             <h3 className="text-lg font-bold text-gray-900 truncate">{displayName}</h3>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-              developer.availability 
-                ? 'bg-emerald-100 text-emerald-800' 
+              developer.availability
+                ? 'bg-emerald-100 text-emerald-800'
                 : 'bg-gray-100 text-gray-800'
-            }`}>
+              }`}>
               <div className={`w-2 h-2 rounded-full mr-2 ${
                 developer.availability ? 'bg-emerald-500' : 'bg-gray-500'
               }`}></div>

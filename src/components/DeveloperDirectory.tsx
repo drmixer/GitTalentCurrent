@@ -21,14 +21,16 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   useEffect(() => {
     const fetchDevelopers = async () => {
       try {
-        const { data, error } = await supabase.rpc('get_all_developers');
+        const { data, error } = await supabase
+          .from('developers')
+          .select('*, user:users(*)');
 
         if (error) {
           throw error;
         }
 
         console.log('Fetched developers:', data);
-        setDevelopers(data as unknown as Developer[]);
+        setDevelopers(data as Developer[]);
       } catch (err: any) {
         setError(err.message);
       } finally {

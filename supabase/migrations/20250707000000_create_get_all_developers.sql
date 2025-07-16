@@ -13,7 +13,7 @@ RETURNS TABLE (
   -- Add other developer fields as needed
   profile_pic_url text,
   github_handle text,
-  user_data json
+  "user" json
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -30,7 +30,7 @@ BEGIN
     d.desired_salary::text as preferred_title,
     d.profile_pic_url,
     d.github_handle,
-    json_build_object('name', u.name, 'avatar_url', u.avatar_url) as user_data
+    json_build_object('name', u.name, 'avatar_url', u.avatar_url) as "user"
   FROM
     developers d
   JOIN
