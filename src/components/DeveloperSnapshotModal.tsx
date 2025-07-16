@@ -2,7 +2,6 @@ import React from 'react';
 import { Developer } from '../types';
 import { X } from 'lucide-react';
 import DeveloperSnapshotCard from './DeveloperSnapshotCard';
-import { GitHubProvider } from '@/hooks/useGitHub';
 
 import { GitHubData } from '@/hooks/useGitHub';
 
@@ -33,9 +32,7 @@ export const DeveloperSnapshotModal: React.FC<DeveloperSnapshotModalProps> = ({ 
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
         </div>
         <div className="p-6">
-          <GitHubProvider>
-            <DeveloperSnapshotCard developer={developer} onViewProfile={onViewProfile} />
-          </GitHubProvider>
+          <DeveloperSnapshotCard developer={developer} onViewProfile={onViewProfile} />
         </div>
       </div>
     </div>
