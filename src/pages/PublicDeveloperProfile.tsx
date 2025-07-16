@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
-import { usePublicGitHub } from '@/hooks/usePublicGitHub';
+import { useGitHub } from '@/hooks/useGitHub';
 import {
   DeveloperProfileDetails,
   PortfolioManager,
