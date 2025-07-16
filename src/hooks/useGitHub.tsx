@@ -79,6 +79,52 @@ export const useGitHub = (initialHandle?: string) => {
   const [error, setError] = useState<Error | null>(null);
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
+  const getTopLanguages = useCallback((limit: number = 10): string[] => {
+    return Object.entries(gitHubData.languages)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, limit)
+      .map(([language]) => language);
+  }, [gitHubData.languages]);
+
+  const getTopRepos = useCallback((limit: number = 10): GitHubRepo[] => {
+    return gitHubData.repos
+      .filter(repo => !repo.name.includes('.github.io') && !repo.fork)
+      .sort((a, b) => b.stargazers_count - a.stargazers_count)
+      .slice(0, limit);
+  }, [gitHubData.repos]);
+
+  const syncLanguagesToProfile = useCallback(async () => {
+    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
+      return;
+    }
+
+    const topLanguages = getTopLanguages(15);
+    if (topLanguages.length > 0) {
+      const existingLanguages = developerProfile.top_languages || [];
+      const mergedLanguages = [...new Set([...existingLanguages, ...topLanguages])];
+
+      await updateDeveloperProfile?.({
+        top_languages: mergedLanguages
+      });
+    }
+  }, [developerProfile, loading, user, lastFetchedHandle, getTopLanguages, updateDeveloperProfile]);
+
+  const syncProjectsToProfile = useCallback(async () => {
+    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
+      return;
+    }
+
+    const topRepos = getTopRepos(8).map(repo => repo.html_url);
+    if (topRepos.length > 0) {
+      const existingProjects = developerProfile.linked_projects || [];
+      const uniqueProjects = [...new Set([...existingProjects, ...topRepos])];
+
+      await updateDeveloperProfile?.({
+        linked_projects: uniqueProjects
+      });
+    }
+  }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
+
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || initialHandle;
     if (!handleToUse) {
@@ -155,52 +201,6 @@ export const useGitHub = (initialHandle?: string) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialHandle]); // Intentionally re-running only when the initial handle changes.
-
-  const getTopLanguages = useCallback((limit: number = 10): string[] => {
-    return Object.entries(gitHubData.languages)
-      .sort(([, a], [, b]) => (b as number) - (a as number))
-      .slice(0, limit) 
-      .map(([language]) => language);
-  }, [gitHubData.languages]);
-
-  const getTopRepos = useCallback((limit: number = 10): GitHubRepo[] => {
-    return gitHubData.repos
-      .filter(repo => !repo.name.includes('.github.io') && !repo.fork)
-      .sort((a, b) => b.stargazers_count - a.stargazers_count)
-      .slice(0, limit); 
-  }, [gitHubData.repos]);
-
-  const syncLanguagesToProfile = useCallback(async () => {
-    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
-      return;
-    }
-
-    const topLanguages = getTopLanguages(15); 
-    if (topLanguages.length > 0) {
-      const existingLanguages = developerProfile.top_languages || [];
-      const mergedLanguages = [...new Set([...existingLanguages, ...topLanguages])];
-
-      await updateDeveloperProfile?.({
-        top_languages: mergedLanguages
-      });
-    }
-  }, [developerProfile, loading, user, lastFetchedHandle, getTopLanguages, updateDeveloperProfile]);
-
-  const syncProjectsToProfile = useCallback(async () => {
-    if (!developerProfile || loading || !user || developerProfile.github_handle !== lastFetchedHandle) {
-      return;
-    }
-    
-    const topRepos = getTopRepos(8).map(repo => repo.html_url);
-    if (topRepos.length > 0) {
-      const existingProjects = developerProfile.linked_projects || [];
-      const uniqueProjects = [...new Set([...existingProjects, ...topRepos])];
-
-      await updateDeveloperProfile?.({
-        linked_projects: uniqueProjects
-      });
-    }
-  }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
 
   return {
     gitHubData,
