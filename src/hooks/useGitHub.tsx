@@ -179,11 +179,6 @@ export const useGitHub = (developer?: Developer) => {
         averageContributions: contributionStats.averagePerDay
       });
       setLastFetchedHandle(github_handle);
-
-      if (github_handle === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
-        syncLanguagesToProfile();
-        syncProjectsToProfile();
-      }
     } catch (err: any) {
       setError(err);
     } finally {
@@ -195,7 +190,7 @@ export const useGitHub = (developer?: Developer) => {
     if (targetDeveloper?.github_handle) {
       refreshGitHubData(targetDeveloper);
     }
-  }, [targetDeveloper, refreshGitHubData]);
+  }, [targetDeveloper]);
 
   return {
     gitHubData,
