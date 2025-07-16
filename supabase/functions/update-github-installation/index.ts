@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { sign } from 'npm:jsonwebtoken@9.0.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,12 +104,16 @@ Deno.serve(async (req: Request) => {
       console.log('Developer profile found, updating installation ID');
       console.log('Current installation ID:', developerData.github_installation_id || 'none');
       console.log('New installation ID to set:', installationId);
+
+      // Get GitHub handle
+      const githubHandle = await getGithubHandle(installationId);
       
       // Update the existing developer profile
       const { data, error } = await supabaseClient
         .from('developers')
         .update({ 
           github_installation_id: installationId,
+          github_handle: githubHandle,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId)
@@ -169,13 +174,16 @@ Deno.serve(async (req: Request) => {
 
       console.log('User found, creating new developer profile with installation ID');
       console.log('User data found:', userData);
+
+      // Get GitHub handle
+      const githubHandle = await getGithubHandle(installationId);
       
       // Create a new developer profile with the installation ID
       const { data, error } = await supabaseClient
         .from('developers') 
         .insert({
           user_id: userId,
-          github_handle: '',
+          github_handle: githubHandle,
           bio: '',
           availability: true, 
           top_languages: [],
@@ -238,3 +246,48 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function getGithubHandle(installationId: string): Promise<string> {
+  const privateKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY');
+  if (!privateKey) {
+    throw new Error('GITHUB_APP_PRIVATE_KEY is not set');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iat: now,
+    exp: now + 60,
+    iss: Deno.env.get('GITHUB_APP_ID'),
+  };
+
+  const token = sign(payload, privateKey, { algorithm: 'RS256' });
+
+  const installationTokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+    },
+  });
+
+  if (!installationTokenResponse.ok) {
+    throw new Error('Failed to get installation access token');
+  }
+
+  const installationTokenData = await installationTokenResponse.json();
+  const installationToken = installationTokenData.token;
+
+  const userResponse = await fetch('https://api.github.com/user', {
+    headers: {
+      'Authorization': `Bearer ${installationToken}`,
+      'Accept': 'application/vnd.github.v3+json',
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw new Error('Failed to get user from GitHub');
+  }
+
+  const userData = await userResponse.json();
+  return userData.login;
+}
