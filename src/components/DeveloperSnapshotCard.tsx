@@ -27,7 +27,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
   onViewProfile 
 }) => {
   const { developer, portfolioItems, loading } = useDeveloperProfile(initialDeveloper?.user_id);
-  const { gitHubData } = useGitHub();
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub();
 
   const currentDeveloper = developer || initialDeveloper;
   const githubUser = gitHubData?.user;
@@ -44,7 +44,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
   const displayEmail = currentDeveloper.email || '';
-  const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.avatar_url;
+  const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.profile_pic_url;
 
   const getAvailabilityStatus = () => {
     if (currentDeveloper.availability) {
@@ -197,7 +197,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
         </div>
         
         <button
-          onClick={() => onViewProfile(currentDeveloper)}
+          onClick={() => onViewProfile(currentDeveloper, gitHubData, githubLoading, githubError)}
           className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
         >
           View Profile

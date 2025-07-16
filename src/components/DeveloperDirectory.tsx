@@ -47,8 +47,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
     setSnapshotModalOpen(true);
   };
 
-  const handleViewProfile = (developer: Developer) => {
-    setSelectedDeveloper(developer);
+  const handleViewProfile = (developer: Developer, gitHubData, githubLoading, githubError) => {
+    setSelectedDeveloper({ ...developer, gitHubData, githubLoading, githubError });
     setSnapshotModalOpen(false);
     setProfileModalOpen(true);
   };
