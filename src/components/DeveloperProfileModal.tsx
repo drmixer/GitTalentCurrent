@@ -7,10 +7,8 @@ import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
 import { RealGitHubChart } from './GitHub/RealGitHubChart';
 
-import { GitHubData } from '@/hooks/useGitHub';
-
 interface DeveloperProfileModalProps {
-  developer: Developer & { gitHubData: GitHubData | null, githubLoading: boolean, githubError: Error | null };
+  developer: Developer;
   onClose: () => void;
 }
 

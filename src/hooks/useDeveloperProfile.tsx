@@ -26,7 +26,8 @@ export function useDeveloperProfile(userId: string) {
           .select(`
             *,
             user:users(*),
-            portfolio_items:portfolio_items(*)
+            portfolio_items:portfolio_items(*),
+            github_installation_id
           `)
           .eq('user_id', userId)
           .single();
