@@ -87,24 +87,32 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
 
           <div className="mt-8">
             <h4 className="font-bold text-lg mb-3">GitHub Activity</h4>
-            <div className="border rounded-lg p-4">
+            <div className="flex flex-col lg:flex-row gap-6">
               {githubLoading ? (
-                <div className="flex items-center justify-center h-48">
+                <div className="flex items-center justify-center h-48 w-full">
                   <Loader className="animate-spin h-8 w-8 text-blue-600" />
                 </div>
               ) : currentDeveloper.github_handle ? (
                 <>
-                  <RealGitHubChart
-                    githubHandle={currentDeveloper.github_handle}
-                    gitHubData={gitHubData}
-                    loading={githubLoading}
-                    error={githubError}
-                    isGitHubAppInstalled={!!currentDeveloper.github_installation_id}
-                  />
-                  <GitHubUserActivityDetails gitHubData={gitHubData} />
+                  <div className="lg:w-2/5 flex-shrink-0">
+                    <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                      <RealGitHubChart
+                        githubHandle={currentDeveloper.github_handle}
+                        gitHubData={gitHubData}
+                        loading={githubLoading}
+                        error={githubError}
+                        isGitHubAppInstalled={!!currentDeveloper.github_installation_id}
+                        className="w-full"
+                        displayMode="dashboardSnippet"
+                      />
+                    </div>
+                  </div>
+                  <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                    <GitHubUserActivityDetails gitHubData={gitHubData} />
+                  </div>
                 </>
               ) : (
-                <div className="text-center text-gray-500">No GitHub data available.</div>
+                <div className="text-center text-gray-500 w-full">No GitHub data available.</div>
               )}
             </div>
           </div>
