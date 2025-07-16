@@ -9,7 +9,11 @@ RETURNS TABLE (
   location text,
   skills text[],
   availability boolean,
-  preferred_title text
+  preferred_title text,
+  -- Add other developer fields as needed
+  profile_pic_url text,
+  github_handle text,
+  user_data json
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -18,12 +22,15 @@ BEGIN
     d.user_id,
     u.name,
     u.email,
-    d.profile_pic_url as avatar_url,
+    u.avatar_url,
     d.github_handle as github_username,
     d.location,
     d.skills,
     d.availability,
-    d.desired_salary::text as preferred_title
+    d.desired_salary::text as preferred_title,
+    d.profile_pic_url,
+    d.github_handle,
+    json_build_object('name', u.name, 'avatar_url', u.avatar_url) as user_data
   FROM
     developers d
   JOIN
