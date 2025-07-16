@@ -7,14 +7,15 @@ import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
 import { RealGitHubChart } from './GitHub/RealGitHubChart';
 
+import { GitHubData } from '@/hooks/useGitHub';
+
 interface DeveloperProfileModalProps {
-  developer: Developer;
+  developer: Developer & { gitHubData: GitHubData | null, githubLoading: boolean, githubError: Error | null };
   onClose: () => void;
 }
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
-  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub();
 
   const currentDeveloper = developer || initialDeveloper;
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
@@ -86,7 +87,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
           <div className="mt-8">
             <h4 className="font-bold text-lg mb-3">GitHub Activity</h4>
             <div className="border rounded-lg p-4">
-              {githubLoading ? (
+              {initialDeveloper.githubLoading ? (
                 <div className="flex items-center justify-center h-48">
                   <Loader className="animate-spin h-8 w-8 text-blue-600" />
                 </div>
@@ -94,12 +95,12 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
                 <>
                   <RealGitHubChart
                     githubHandle={currentDeveloper.github_handle}
-                    gitHubData={gitHubData}
-                    loading={githubLoading}
-                    error={githubError}
+                    gitHubData={initialDeveloper.gitHubData}
+                    loading={initialDeveloper.githubLoading}
+                    error={initialDeveloper.githubError}
                     isGitHubAppInstalled={!!currentDeveloper.github_installation_id}
                   />
-                  <GitHubUserActivityDetails gitHubData={gitHubData} />
+                  <GitHubUserActivityDetails gitHubData={initialDeveloper.gitHubData} />
                 </>
               ) : (
                 <div className="text-center text-gray-500">No GitHub data available.</div>
