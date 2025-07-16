@@ -42,7 +42,7 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
   const featuredProject = portfolioItems.find(p => p.featured);
 
-  const displayName = formatDisplayName(currentDeveloper.user, currentDeveloper);
+  const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
   const displayEmail = currentDeveloper.email || '';
   const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.avatar_url;
 
@@ -95,6 +95,18 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
             </div>
             <p className="text-gray-600">{currentDeveloper.preferred_title}</p>
             
+            {currentDeveloper.github_handle && (
+              <a
+                href={`https://github.com/${currentDeveloper.github_handle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 transition-colors mt-1"
+              >
+                <Github size={14} />
+                <span>@{currentDeveloper.github_handle}</span>
+              </a>
+            )}
+
             {currentDeveloper.location && (
               <div className="flex items-center space-x-1 text-sm text-gray-600 mt-1">
                 <MapPin size={14} />
@@ -164,16 +176,6 @@ const DeveloperSnapshotCard: React.FC<DeveloperSnapshotCardProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <div className="flex items-center space-x-3">
-          {currentDeveloper.github_handle && (
-            <a
-              href={`https://github.com/${currentDeveloper.github_handle}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <Github size={16} className="text-gray-600" />
-            </a>
-          )}
           {currentDeveloper.linkedin_url && (
             <a
               href={currentDeveloper.linkedin_url}
