@@ -25,15 +25,9 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [profileError, setProfileError] = useState('');
 
   const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  const { gitHubData, loading: githubLoading, error: githubError, refreshGitHubData } = useGitHub();
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer?.github_handle);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
-
-  useEffect(() => {
-    if (developer?.github_handle) {
-      refreshGitHubData(developer.github_handle);
-    }
-  }, [developer?.github_handle, refreshGitHubData]);
 
   useEffect(() => {
     const fetchUserIdBySlug = async () => {

@@ -66,10 +66,8 @@ interface GitHubContextType {
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
-export const useGitHub = (developer?: Developer) => {
-  const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth();
-  const targetDeveloper = developer || developerProfile;
-
+export const useGitHub = (initialHandle?: string) => {
+  const { user, developerProfile, updateDeveloperProfile } = useAuth();
   const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
     repos: [],
@@ -82,9 +80,9 @@ export const useGitHub = (developer?: Developer) => {
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
-    const handleToUse = handle || targetDeveloper?.github_handle;
+    const handleToUse = handle || initialHandle;
     if (!handleToUse) {
-      setError(new Error('No GitHub handle provided'));
+      //setError(new Error('No GitHub handle provided for refresh.'));
       return;
     }
 
@@ -92,7 +90,13 @@ export const useGitHub = (developer?: Developer) => {
     setError(null);
 
     try {
-      const installationId = developerProfile?.github_installation_id;
+      // The installation ID should correspond to the developer whose data is being fetched.
+      // If we are fetching for the logged-in user, we can get it from their profile.
+      // For other developers, this might need to be passed in or handled differently if they have connected the app.
+      const installationId = (handleToUse === developerProfile?.github_handle)
+        ? developerProfile.github_installation_id
+        : undefined; // Or fetch it if a mechanism exists
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/github-proxy`;
       
@@ -104,7 +108,7 @@ export const useGitHub = (developer?: Developer) => {
         },
         body: JSON.stringify({ 
           handle: handleToUse,
-          installationId
+          installationId // This may be null, and the backend should handle it
         })
       });
 
@@ -113,12 +117,8 @@ export const useGitHub = (developer?: Developer) => {
         let errorMessage = `GitHub API error: ${response.status}`;
         try {
           const errorData = JSON.parse(errorText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          errorMessage = errorText;
-        }
+          if (errorData.error) errorMessage = errorData.error;
+        } catch (e) { errorMessage = errorText; }
         throw new Error(errorMessage);
       }
 
@@ -137,8 +137,8 @@ export const useGitHub = (developer?: Developer) => {
       });
       setLastFetchedHandle(handleToUse);
 
+      // Syncing should only happen for the logged-in user's own data
       if (handleToUse === developerProfile?.github_handle && developerProfile?.user_id === user?.id) {
-        // These can be run in the background
         syncLanguagesToProfile();
         syncProjectsToProfile();
       }
@@ -147,13 +147,14 @@ export const useGitHub = (developer?: Developer) => {
     } finally {
       setLoading(false);
     }
-  }, [developerProfile, user]);
+  }, [initialHandle, developerProfile, user, syncLanguagesToProfile, syncProjectsToProfile]);
 
   useEffect(() => {
-    if (targetDeveloper?.github_handle) {
-      refreshGitHubData(targetDeveloper.github_handle);
+    if (initialHandle) {
+      refreshGitHubData(initialHandle);
     }
-  }, [targetDeveloper?.github_handle, refreshGitHubData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialHandle]); // Intentionally re-running only when the initial handle changes.
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
