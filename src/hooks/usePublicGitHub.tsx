@@ -129,7 +129,7 @@ export const usePublicGitHub = (developer?: Developer) => {
     if (developer?.github_handle) {
       refreshGitHubData(developer);
     }
-  }, [developer]);
+  }, [developer, developer?.github_installation_id, refreshGitHubData]);
 
   return {
     gitHubData,
