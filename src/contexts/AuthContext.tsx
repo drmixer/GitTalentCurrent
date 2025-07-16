@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser): Promise<boolean> => {
+  const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser, currentDeveloperProfile: Developer | null | undefined): Promise<boolean> => {
     try {
       const { data: existingProfileFromDb, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
       if (checkError && checkError.code !== 'PGRST116') { console.error(`ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); return false; }
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
-      const currentGhInstIdInState = developerProfile?.github_installation_id; // Get ID from current React state
+      const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id; // Get ID from current React state
 
       if (existingProfileFromDb) {
         let profileToSet = { ...existingProfileFromDb }; // Clone to make mutable
@@ -152,9 +152,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLastProfileUpdateTime(Date.now());
       return true;
     } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
-  }, [developerProfile, lastProfileUpdateTime]); // Depends on current developerProfile for ghInstId preservation
+  }, []);
 
-  const fetchDeveloperProfile = useCallback(async (userId: string): Promise<Developer | null> => {
+  const fetchDeveloperProfile = useCallback(async (userId: string, currentDeveloperProfile: Developer | null | undefined): Promise<Developer | null> => {
     try {
       const { data: devProfileFromDb, error } = await supabase.from('developers').select('*').eq('user_id', userId).single();
       if (error) {
@@ -173,7 +173,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       let profileToSet = { ...devProfileFromDb };
-      const currentGhInstIdInState = developerProfile?.github_installation_id;
+      const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id;
 
       if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
         console.log(`[AuthContext] fetchDeveloperProfile: Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null for user ${userId}.`);
@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLastProfileUpdateTime(Date.now());
       return profileToSet;
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
-  }, [developerProfile, lastProfileUpdateTime]); // Depends on current developerProfile for ghInstId preservation
+  }, []);
 
 const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
   setAuthError(null);
@@ -246,7 +246,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       setUserProfile(newProfile); // Set the main user profile
       if (newProfile.role === 'developer') {
         console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
-        await ensureDeveloperProfile(authUser); 
+        await ensureDeveloperProfile(authUser, developerProfile);
       }
       return newProfile;
 
@@ -266,7 +266,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     setUserProfile(profile);
     if (profile.role === 'developer') {
       console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
-      await ensureDeveloperProfile(authUser); 
+      await ensureDeveloperProfile(authUser, developerProfile);
     }
     return profile;
 
