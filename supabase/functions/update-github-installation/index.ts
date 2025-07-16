@@ -110,13 +110,13 @@ Deno.serve(async (req: Request) => {
       
       // Update the existing developer profile
       const { data, error } = await supabaseClient
-        .from('developers')
+        .from('users')
         .update({ 
           github_installation_id: installationId,
           github_handle: githubHandle,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', userId)
+        .eq('id', userId)
         .select();
       
       if (error) {
@@ -180,19 +180,13 @@ Deno.serve(async (req: Request) => {
       
       // Create a new developer profile with the installation ID
       const { data, error } = await supabaseClient
-        .from('developers') 
-        .insert({
-          user_id: userId,
-          github_handle: githubHandle,
-          bio: '',
-          availability: true, 
-          top_languages: [],
-          linked_projects: [],
-          profile_strength: 10,
+        .from('users')
+        .update({
           github_installation_id: installationId,
-          created_at: new Date().toISOString(),
+          github_handle: githubHandle,
           updated_at: new Date().toISOString()
         })
+        .eq('id', userId)
         .select(); 
 
       if (error) {
