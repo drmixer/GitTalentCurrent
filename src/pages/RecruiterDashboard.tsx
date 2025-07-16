@@ -38,6 +38,7 @@ import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
+import { GitHubProvider } from '@/hooks/useGitHub';
 
 interface MessageThread {
   otherUserId: string;
@@ -595,10 +596,11 @@ export const RecruiterDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
+    <GitHubProvider>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header */}
+          <div className="mb-8">
           <h1 className="text-3xl font-black text-gray-900 mb-2">
             Welcome, {userProfile.name}!
           </h1>
@@ -741,5 +743,6 @@ export const RecruiterDashboard = () => {
         {activeTab === 'tracker' && <HiringPipeline />}
       </div>
     </div>
+    </GitHubProvider>
   );
 };

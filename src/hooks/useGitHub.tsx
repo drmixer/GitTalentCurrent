@@ -90,14 +90,11 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
     const handleToUse = handle || developerProfile?.github_handle;
-    console.log('refreshGitHubData called with handle:', handleToUse);
     if (!handleToUse) {
-      console.log('No GitHub handle provided, returning.');
       setError(new Error('No GitHub handle provided'));
       return;
     }
 
-    console.log('Setting loading to true');
     setLoading(true);
     setError(null);
 
@@ -133,7 +130,6 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const data = await response.json();
-      console.log('GitHub API response:', data);
       const contributionStats = calculateContributionStats(data.contributions || []);
 
       setGitHubData({
@@ -161,9 +157,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [developerProfile, user]);
 
   useEffect(() => {
-    console.log('useGitHub useEffect triggered. developerProfile:', developerProfile);
     if (developerProfile?.github_handle) {
-      console.log('Calling refreshGitHubData from useEffect');
       refreshGitHubData(developerProfile.github_handle);
     }
   }, [developerProfile?.github_handle, refreshGitHubData]);

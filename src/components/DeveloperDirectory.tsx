@@ -4,7 +4,6 @@ import { DeveloperCard } from './DeveloperCard';
 import { Developer } from '@/types';
 import { DeveloperSnapshotModal } from './DeveloperSnapshotModal';
 import { DeveloperProfileModal } from './DeveloperProfileModal';
-import { GitHubProvider } from '@/hooks/useGitHub';
 interface DeveloperDirectoryProps {
   onSendMessage: (developerId: string, developerName: string) => void;
 }
@@ -133,12 +132,10 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
       )}
 
       {isProfileModalOpen && selectedDeveloper && (
-        <GitHubProvider>
-          <DeveloperProfileModal
-            developer={selectedDeveloper}
-            onClose={handleCloseModals}
-          />
-        </GitHubProvider>
+        <DeveloperProfileModal
+          developer={selectedDeveloper}
+          onClose={handleCloseModals}
+        />
       )}
     </div>
   );
