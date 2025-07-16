@@ -14,11 +14,11 @@ interface DeveloperProfileModalProps {
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
-  const { gitHubData, loading: githubLoading } = useGitHub();
+  const { gitHubData, loading: githubLoading, error: githubError } = useGitHub();
 
   const currentDeveloper = developer || initialDeveloper;
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
-  const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.avatar_url;
+  const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.profile_pic_url;
 
   if (loading && !developer) {
     return (
@@ -92,8 +92,14 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
                 </div>
               ) : currentDeveloper.github_handle ? (
                 <>
-                  <RealGitHubChart developerId={currentDeveloper.user_id} />
-                  <GitHubUserActivityDetails githubHandle={currentDeveloper.github_handle} />
+                  <RealGitHubChart
+                    githubHandle={currentDeveloper.github_handle}
+                    gitHubData={gitHubData}
+                    loading={githubLoading}
+                    error={githubError}
+                    isGitHubAppInstalled={!!currentDeveloper.github_installation_id}
+                  />
+                  <GitHubUserActivityDetails gitHubData={gitHubData} />
                 </>
               ) : (
                 <div className="text-center text-gray-500">No GitHub data available.</div>

@@ -35,7 +35,7 @@ export const DeveloperCard: React.FC<DeveloperCardProps> = ({
 
   const displayName = developer.user?.name || developer.name || 'Unnamed Developer';
   const userInitial = displayName.split(' ').map(n => n[0]).join('');
-  const avatarUrl = developer.user?.avatar_url || developer.avatar_url;
+  const avatarUrl = developer.user?.avatar_url || developer.profile_pic_url;
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
