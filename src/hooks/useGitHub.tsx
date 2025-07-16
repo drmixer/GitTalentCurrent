@@ -66,16 +66,9 @@ interface GitHubContextType {
 
 const GitHubContext = createContext<GitHubContextType | undefined>(undefined);
 
-export const useGitHub = () => {
-  const context = useContext(GitHubContext);
-  if (context === undefined) {
-    throw new Error('useGitHub must be used within a GitHubProvider');
-  }
-  return context;
-};
-
-export const GitHubProvider = ({ children }: { children: ReactNode }) => {
+export const useGitHub = (developer?: Developer) => {
   const { user, developerProfile, updateDeveloperProfile, loading: authLoading } = useAuth();
+  const targetDeveloper = developer || developerProfile;
 
   const [gitHubData, setGitHubData] = useState<GitHubData>({
     user: null,
@@ -89,7 +82,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   const [lastFetchedHandle, setLastFetchedHandle] = useState<string | null>(null);
 
   const refreshGitHubData = useCallback(async (handle?: string) => {
-    const handleToUse = handle || developerProfile?.github_handle;
+    const handleToUse = handle || targetDeveloper?.github_handle;
     if (!handleToUse) {
       setError(new Error('No GitHub handle provided'));
       return;
@@ -157,10 +150,10 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
   }, [developerProfile, user]);
 
   useEffect(() => {
-    if (developerProfile?.github_handle) {
-      refreshGitHubData(developerProfile.github_handle);
+    if (targetDeveloper?.github_handle) {
+      refreshGitHubData(targetDeveloper.github_handle);
     }
-  }, [developerProfile?.github_handle, refreshGitHubData]);
+  }, [targetDeveloper?.github_handle, refreshGitHubData]);
 
   const getTopLanguages = useCallback((limit: number = 10): string[] => {
     return Object.entries(gitHubData.languages)
@@ -208,7 +201,7 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [developerProfile, loading, user, lastFetchedHandle, getTopRepos, updateDeveloperProfile]);
 
-  const value = {
+  return {
     gitHubData,
     loading,
     error,
@@ -218,6 +211,4 @@ export const GitHubProvider = ({ children }: { children: ReactNode }) => {
     syncLanguagesToProfile,
     syncProjectsToProfile
   };
-
-  return <GitHubContext.Provider value={value}>{children}</GitHubContext.Provider>;
 };
