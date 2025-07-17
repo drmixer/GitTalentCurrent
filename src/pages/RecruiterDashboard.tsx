@@ -629,7 +629,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('overview')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'overview'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -640,7 +640,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('my-jobs')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'my-jobs'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -651,7 +651,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('search-devs')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'search-devs'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -662,7 +662,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('messages')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'messages'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -678,7 +678,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('notifications')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'notifications'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -694,7 +694,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('hires')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'hires'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -705,7 +705,7 @@ export const RecruiterDashboard = () => {
                 onClick={() => setActiveTab('tracker')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'tracker'
-                    ? 'border-blue-500 text-blue-600'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
