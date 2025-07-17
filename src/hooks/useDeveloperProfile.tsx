@@ -32,6 +32,7 @@ export function useDeveloperProfile(userId: string) {
           .single();
 
         if (devError) throw devError;
+        console.log("useDeveloperProfile: devData", devData);
         setDeveloper(devData as Developer);
         setUser(devData.user as User);
         setPortfolioItems(devData.portfolio_items || []);

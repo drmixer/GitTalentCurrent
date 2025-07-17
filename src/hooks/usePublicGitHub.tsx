@@ -66,6 +66,7 @@ export const usePublicGitHub = (developer?: Developer) => {
 
   const refreshGitHubData = useCallback(async (developerToFetch?: Developer) => {
     const targetDeveloper = developerToFetch || developer;
+    console.log("usePublicGitHub: targetDeveloper", targetDeveloper);
     if (!targetDeveloper?.github_handle) {
       setError(new Error('No GitHub handle provided'));
       return;
@@ -106,6 +107,7 @@ export const usePublicGitHub = (developer?: Developer) => {
       }
 
       const data = await response.json();
+      console.log("usePublicGitHub: data", data);
       const contributionStats = calculateContributionStats(data.contributions || []);
 
       setGitHubData({

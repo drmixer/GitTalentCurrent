@@ -107,9 +107,12 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Get GitHub user data
+        console.log("Getting GitHub user data for installation ID:", installationId);
         const { login, avatar_url } = await getGithubUserData(installationId);
+        console.log("GitHub user data received:", { login, avatar_url });
 
         // Update the existing developer profile
+        console.log("Updating user profile for user ID:", userId);
         await supabaseClient
           .from('users')
           .update({
@@ -119,7 +122,9 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);
+        console.log("User profile updated successfully");
 
+        console.log("Updating developer profile for user ID:", userId);
         const { data, error } = await supabaseClient
           .from('developers')
           .update({
@@ -130,6 +135,7 @@ Deno.serve(async (req: Request) => {
           })
           .eq('user_id', userId)
           .select();
+        console.log("Developer profile updated successfully");
 
         if (error) {
           throw error;
@@ -192,9 +198,12 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Get GitHub user data
+        console.log("Getting GitHub user data for installation ID:", installationId);
         const { login, avatar_url } = await getGithubUserData(installationId);
+        console.log("GitHub user data received:", { login, avatar_url });
 
         // Create a new developer profile with the installation ID
+        console.log("Updating user profile for user ID:", userId);
         await supabaseClient
           .from('users')
           .update({
@@ -204,7 +213,9 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);
+        console.log("User profile updated successfully");
 
+        console.log("Creating new developer profile for user ID:", userId);
         const { data, error } = await supabaseClient
           .from('developers')
           .insert({
@@ -221,6 +232,7 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           })
           .select();
+        console.log("New developer profile created successfully");
 
         if (error) {
           throw error;
