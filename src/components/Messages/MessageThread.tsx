@@ -84,47 +84,29 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
 
-    // Recruiters can always message developers
-    if (userProfile.role === 'recruiter' && otherUserRole === 'developer') {
-      setCanSendMessage(true);
-      return;
-    }
-    
-    // Admins can always message anyone
-    if (userProfile.role === 'admin') {
-      setCanSendMessage(true);
-      return;
-    }
-    
-    // Anyone can message admins
-    if (otherUserRole === 'admin') {
-      setCanSendMessage(true);
-      return;
-    }
-    
-    // Developers can only message recruiters who have messaged them first
+    // Simplified check, as RLS policies now handle the core logic.
+    // We can perform a quick check to provide a better UX, but the database is the source of truth.
+
+    // Developers messaging recruiters is the main case we need to handle for the UI.
     if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
       try {
-        // Check if there are any messages from the recruiter to the developer
-        const { count, error: messagesError } = await supabase
+        const { count, error } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('sender_id', otherUserId)
           .eq('receiver_id', userProfile.id);
-          
-        if (messagesError) throw messagesError;
-        
-        // Developer can only send messages if the recruiter has messaged first
+
+        if (error) throw error;
+
         setCanSendMessage(count ? count > 0 : false);
       } catch (error) {
-        console.error('Error checking message permissions:', error);
-        setCanSendMessage(false);
+        console.error('Error checking recruiter contact status:', error);
+        setCanSendMessage(false); // Default to false on error
       }
-      return;
+    } else {
+      // For all other roles, we can assume they can send, and RLS will enforce it.
+      setCanSendMessage(true);
     }
-    
-    // Default: no messaging allowed
-    setCanSendMessage(false);
   };
 
   const fetchNewMessage = async (messageId: string) => {
