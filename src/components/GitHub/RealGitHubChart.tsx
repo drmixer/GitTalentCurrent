@@ -169,11 +169,11 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
         <div className="grid grid-cols-3 gap-4 mb-6 text-center">
            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100">
             <div className="text-2xl font-black text-gray-900">{gitHubData.repos.length}</div>
-            <div className="text-xs font-semibold text-gray-600">Repositories</div>
+            <div className="text-xs font-semibold text-gray-600 truncate">Repositories</div>
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 border border-purple-100">
             <div className="text-2xl font-black text-gray-900">{totalContributionsForDisplay}</div>
-            <div className="text-xs font-semibold text-gray-600">Contributions</div>
+            <div className="text-xs font-semibold text-gray-600 truncate">Contributions</div>
           </div>
           <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-3 border border-yellow-100">
              <div className="flex items-center justify-center">
