@@ -25,6 +25,7 @@ interface MessageThreadProps {
     title: string;
   };
   onBack?: () => void;
+  onNewMessage?: () => void;
 }
 
 export const MessageThread: React.FC<MessageThreadProps> = ({
@@ -33,7 +34,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   otherUserRole,
   otherUserProfilePicUrl,
   jobContext,
-  onBack
+  onBack,
+  onNewMessage
 }) => {
   const { userProfile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -261,6 +263,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       setSubject('');
       setHasInitiatedContact(true);
       await fetchMessages();
+      if (onNewMessage) {
+        onNewMessage();
+      }
 
     } catch (error: any) {
       console.error('Error sending message:', error);

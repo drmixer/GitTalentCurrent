@@ -34,14 +34,14 @@ interface MessageThread {
 
 interface MessageListProps {
   onThreadSelect?: (thread: MessageThread) => void;
+  searchTerm?: string;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, searchTerm = '' }) => {
   const { userProfile } = useAuth();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [availableContacts, setAvailableContacts] = useState<UserType[]>([]);
   const [canInitiateContacts, setCanInitiateContacts] = useState<{[key: string]: boolean}>({});
@@ -363,17 +363,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Search conversations..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
 
       {/* Message Threads */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -495,13 +484,15 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect }) => {
                       }`}
                       onClick={() => {
                         if (canInitiate || userProfile?.role !== 'developer' || contact.role !== 'recruiter') {
-                          onThreadSelect?.({
-                            otherUserId: contact.id,
-                            otherUserName: contact.name,
-                            otherUserRole: contact.role,
-                            lastMessage: {} as Message,
-                            unreadCount: 0
-                          });
+                          if (onThreadSelect) {
+                            onThreadSelect({
+                              otherUserId: contact.id,
+                              otherUserName: contact.name,
+                              otherUserRole: contact.role,
+                              lastMessage: {} as Message,
+                              unreadCount: 0
+                            });
+                          }
                           setShowNewMessageModal(false);
                         }
                       }}
