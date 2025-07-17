@@ -108,6 +108,7 @@ export const usePublicGitHub = (developer?: Developer) => {
 
       const data = await response.json();
       console.log("usePublicGitHub: data", data);
+      console.log("usePublicGitHub: data.user", data.user);
       const contributionStats = calculateContributionStats(data.contributions || []);
 
       setGitHubData({
