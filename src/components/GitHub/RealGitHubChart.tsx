@@ -28,7 +28,6 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   className = '',
   displayMode = 'full'
 }) => {
-  console.log("RealGitHubChart: props", { githubHandle, gitHubData, loading, error, isGitHubAppInstalled });
   // const { gitHubData, loading, error } = useGitHub(); // Removed internal hook usage
 
   const GITHUB_APP_SLUG = 'GitTalentApp'; // IMPORTANT: Must match your GitHub App slug exactly

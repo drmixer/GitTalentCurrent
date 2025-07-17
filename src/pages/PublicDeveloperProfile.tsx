@@ -25,9 +25,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [profileError, setProfileError] = useState('');
 
   const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  console.log("PublicDeveloperProfile: developer", developer);
-  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer || undefined);
-  console.log("PublicDeveloperProfile: gitHubData", gitHubData);
+  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
 
@@ -185,7 +183,7 @@ export const PublicDeveloperProfile: React.FC = () => {
           {activeTab === 'portfolio' && (
             <PortfolioManager developerId={developer.user_id} isEditable={false} />
           )}
-          {activeTab === 'github' && developer.github_handle && gitHubData && gitHubData.user && (
+          {activeTab === 'github' && developer.github_handle && (
             <RealGitHubChart
               githubHandle={developer.github_handle}
               gitHubData={gitHubData}
@@ -193,10 +191,9 @@ export const PublicDeveloperProfile: React.FC = () => {
               error={githubError}
               className="w-full"
               displayMode="dashboardSnippet"
-              isGitHubAppInstalled={!!user?.github_installation_id}
+              isGitHubAppInstalled={!!developer?.github_installation_id}
             />
           )}
-          {activeTab === 'github' && developer.github_handle && console.log("PublicDeveloperProfile: isGitHubAppInstalled", !!user?.github_installation_id)}
         </div>
       </div>
     </div>
