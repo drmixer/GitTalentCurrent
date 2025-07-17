@@ -193,10 +193,10 @@ export const PublicDeveloperProfile: React.FC = () => {
               error={githubError}
               className="w-full"
               displayMode="dashboardSnippet"
-              isGitHubAppInstalled={!!developer?.github_installation_id}
+              isGitHubAppInstalled={!!user?.github_installation_id}
             />
           )}
-          {activeTab === 'github' && developer.github_handle && console.log("PublicDeveloperProfile: isGitHubAppInstalled", !!developer?.github_installation_id)}
+          {activeTab === 'github' && developer.github_handle && console.log("PublicDeveloperProfile: isGitHubAppInstalled", !!user?.github_installation_id)}
         </div>
       </div>
     </div>
