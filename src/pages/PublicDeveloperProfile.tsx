@@ -25,7 +25,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const [profileError, setProfileError] = useState('');
 
   const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer);
+  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer || undefined);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
 
