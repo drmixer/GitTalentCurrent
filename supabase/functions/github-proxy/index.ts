@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "GitTalent-App", 
     };
+    console.log("Initial headers:", headers);
 
     // If we have GitHub App credentials and an installation ID, use GitHub App authentication
     if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
@@ -111,6 +112,7 @@ Deno.serve(async (req: Request) => {
         // Use the installation token for subsequent requests
         headers["Authorization"] = `token ${token}`;
         console.log("Successfully obtained installation access token for installation ID:", installationId);
+        console.log("Headers with auth token:", headers);
       } catch (error) {
         console.error("Error generating GitHub App token:", error);
         // Fall back to public access if token generation fails
@@ -118,6 +120,7 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log("Using public access (no GitHub App credentials or installation ID provided)");
+      console.log("Headers for public access:", headers);
     }
 
     // GitHub API URLs
@@ -396,16 +399,23 @@ function generateContributionsFromRepos(repos: any[]): { date: string; count: nu
 }
 
 function pemToBinary(pem: string): ArrayBuffer {
+  console.log("Converting PEM to binary");
   const pemContents = pem
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
     .replace(/\s/g, "");
 
-  const binaryDer = atob(pemContents);
-  const buffer = new ArrayBuffer(binaryDer.length);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < binaryDer.length; i++) {
-    view[i] = binaryDer.charCodeAt(i);
+  try {
+    const binaryDer = atob(pemContents);
+    const buffer = new ArrayBuffer(binaryDer.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < binaryDer.length; i++) {
+      view[i] = binaryDer.charCodeAt(i);
+    }
+    console.log("PEM successfully converted to binary");
+    return buffer;
+  } catch (e) {
+    console.error("Error converting PEM to binary:", e);
+    throw e;
   }
-  return buffer;
 }
