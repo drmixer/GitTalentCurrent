@@ -20,15 +20,11 @@ export function useDeveloperProfile(userId: string) {
         setLoading(true);
         setError(null);
 
-        // Fetch developer profile, user data, and portfolio items in a single query
+        // Fetch developer profile
         const { data: devData, error: devError } = await supabase
           .from('developers')
           .select(`
             *,
-            user:users(
-              *,
-              github_installation_id
-            ),
             portfolio_items:portfolio_items(*)
           `)
           .eq('user_id', userId)
@@ -37,8 +33,21 @@ export function useDeveloperProfile(userId: string) {
         if (devError) throw devError;
         console.log("useDeveloperProfile: devData", devData);
         setDeveloper(devData as Developer);
-        setUser(devData.user as User);
         setPortfolioItems(devData.portfolio_items || []);
+
+        // Fetch user data
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select(`
+            *,
+            github_installation_id
+          `)
+          .eq('id', userId)
+          .single();
+
+        if (userError) throw userError;
+        console.log("useDeveloperProfile: userData", userData);
+        setUser(userData as User);
 
       } catch (err: any) {
         setError(err.message);
