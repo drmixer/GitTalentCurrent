@@ -221,19 +221,6 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
           </div>
         </div>
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-black text-gray-900 mb-4">GitHub Activity</h3>
-          {developer.github_handle && developer.github_installation_id ? (
-            <>
-              <RealGitHubChart developerId={developer.user_id} />
-              <GitHubUserActivityDetails githubHandle={developer.github_handle} />
-            </>
-          ) : (
-            <p className="text-gray-500">
-              GitHub activity not available. The developer may need to connect their GitHub account.
-            </p>
-          )}
-        </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-black text-gray-900 mb-4">Featured Project</h3>
           {featuredProject ? (
             <div>

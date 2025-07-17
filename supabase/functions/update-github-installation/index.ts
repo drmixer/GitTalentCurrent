@@ -105,45 +105,32 @@ Deno.serve(async (req: Request) => {
       console.log('Current installation ID:', developerData.github_installation_id || 'none');
       console.log('New installation ID to set:', installationId);
 
-      try {
-        // Get GitHub user data
-        console.log("Getting GitHub user data for installation ID:", installationId);
-        const { login, avatar_url } = await getGithubUserData(installationId);
-        console.log("GitHub user data received:", { login, avatar_url });
+      // Get GitHub user data
+      const { login, avatar_url } = await getGithubUserData(installationId);
 
-        // Update the existing developer profile
-        console.log("Updating user profile for user ID:", userId);
-        await supabaseClient
-          .from('users')
-          .update({
-            github_installation_id: installationId,
-            github_handle: login,
-            avatar_url: avatar_url,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-        console.log("User profile updated successfully");
+      // Update the existing developer profile
+      await supabaseClient
+        .from('users')
+        .update({
+          github_installation_id: installationId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
-        console.log("Updating developer profile for user ID:", userId);
-        const { data, error } = await supabaseClient
-          .from('developers')
-          .update({
-            github_installation_id: installationId,
-            github_handle: login,
-            avatar_url: avatar_url,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', userId)
-          .select();
-        console.log("Developer profile updated successfully");
+      const { data, error } = await supabaseClient
+        .from('developers')
+        .update({
+          github_installation_id: installationId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .select();
 
-        if (error) {
-          throw error;
-        }
-
-        result = { updated: true, data, previous_installation_id: developerData.github_installation_id };
-        console.log('Developer profile updated successfully');
-      } catch (error) {
+      if (error) {
         console.error('Error updating developer profile:', error);
         return new Response( 
           JSON.stringify({ success: false, error: `Error updating developer profile: ${error.message}` }),
@@ -156,6 +143,9 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
+
+      result = { updated: true, data, previous_installation_id: developerData.github_installation_id };
+      console.log('Developer profile updated successfully');
     } else {
       console.log('Developer profile not found, checking if user exists');
       // Check if user exists in the users table
@@ -196,51 +186,38 @@ Deno.serve(async (req: Request) => {
       console.log('User found, creating new developer profile with installation ID');
       console.log('User data found:', userData);
 
-      try {
-        // Get GitHub user data
-        console.log("Getting GitHub user data for installation ID:", installationId);
-        const { login, avatar_url } = await getGithubUserData(installationId);
-        console.log("GitHub user data received:", { login, avatar_url });
+      // Get GitHub user data
+      const { login, avatar_url } = await getGithubUserData(installationId);
 
-        // Create a new developer profile with the installation ID
-        console.log("Updating user profile for user ID:", userId);
-        await supabaseClient
-          .from('users')
-          .update({
-            github_installation_id: installationId,
-            github_handle: login,
-            avatar_url: avatar_url,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-        console.log("User profile updated successfully");
+      // Create a new developer profile with the installation ID
+      await supabaseClient
+        .from('users')
+        .update({
+          github_installation_id: installationId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
-        console.log("Creating new developer profile for user ID:", userId);
-        const { data, error } = await supabaseClient
-          .from('developers')
-          .insert({
-            user_id: userId,
-            github_handle: login,
-            avatar_url: avatar_url,
-            bio: '',
-            availability: true,
-            top_languages: [],
-            linked_projects: [],
-            profile_strength: 10,
-            github_installation_id: installationId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select();
-        console.log("New developer profile created successfully");
+      const { data, error } = await supabaseClient
+        .from('developers')
+        .insert({
+          user_id: userId,
+          github_handle: login,
+          avatar_url: avatar_url,
+          bio: '',
+          availability: true,
+          top_languages: [],
+          linked_projects: [],
+          profile_strength: 10,
+          github_installation_id: installationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select();
 
-        if (error) {
-          throw error;
-        }
-
-        result = { created: true, data, user: userData };
-        console.log('New developer profile created successfully');
-      } catch (error) {
+      if (error) {
         console.error('Error creating developer profile:', error);
         return new Response( 
           JSON.stringify({ success: false, error: `Error creating developer profile: ${error.message}` }),
@@ -253,6 +230,9 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
+
+      result = { created: true, data, user: userData };
+      console.log('New developer profile created successfully');
     }
     
     // Return the result
