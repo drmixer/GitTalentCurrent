@@ -45,6 +45,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [subject, setSubject] = useState('');
   const [hasInitiatedContact, setHasInitiatedContact] = useState(false);
   const [canSendMessage, setCanSendMessage] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,27 +54,40 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       fetchMessages();
       checkCanSendMessage();
       
-      // Set up real-time subscription for new messages
-      const subscription = supabase
-        .channel('messages-changes')
+      // Set up real-time subscription for new messages and typing events
+      const channel = supabase.channel(`messaging:${userProfile.id}`);
+
+      channel
         .on(
           'postgres_changes',
           {
-            event: REALTIME_LISTEN_TYPES.INSERT,
+            event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            filter: `sender_id=eq.${otherUserId},receiver_id=eq.${userProfile.id}`
+            filter: `receiver_id=eq.${userProfile.id},sender_id=eq.${otherUserId}`
           },
           (payload) => {
-            console.log('New message received:', payload);
-            // Fetch the complete message with sender/receiver info
             fetchNewMessage(payload.new.id);
           }
         )
+        .on('broadcast', { event: 'typing' }, (payload) => {
+          if (payload.senderId === otherUserId) {
+            setIsTyping(true);
+            if (typingTimeoutRef.current) {
+              clearTimeout(typingTimeoutRef.current);
+            }
+            typingTimeoutRef.current = setTimeout(() => {
+              setIsTyping(false);
+            }, 3000);
+          }
+        })
         .subscribe();
-      
+
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
       };
     }
   }, [userProfile, otherUserId, jobContext]);
@@ -300,6 +315,17 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       e.preventDefault();
       sendMessage();
     }
+    broadcastTyping();
+  };
+
+  const broadcastTyping = () => {
+    if (!userProfile) return;
+    const channel = supabase.channel(`messaging:${otherUserId}`);
+    channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { senderId: userProfile.id },
+    });
   };
 
   // Determine if we should show limited info for the other user
@@ -426,6 +452,13 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           </div>
         )}
         <div ref={messagesEndRef} />
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
+              <p className="text-sm leading-relaxed italic">Typing...</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Message Input */}
