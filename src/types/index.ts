@@ -222,6 +222,8 @@ export interface Message {
   sent_at: string;
   read_at?: string;
   is_read: boolean;
+  is_archived: boolean;
+  is_deleted: boolean;
   sender?: User;
   receiver?: User;
   job_role?: JobRole;

@@ -15,7 +15,9 @@ import {
   Loader,
   AlertCircle,
   X,
-  Lock
+  Lock,
+  Archive,
+  Trash2
 } from 'lucide-react';
 import { Message, User as UserType } from '../../types';
 
@@ -289,9 +291,60 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
     }
   };
 
+  const [viewArchived, setViewArchived] = useState(false);
+
+  const archiveThread = async (otherUserId: string, jobRoleId?: string) => {
+    if (!userProfile) return;
+    try {
+      let query = supabase
+        .from('messages')
+        .update({ is_archived: true })
+        .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
+
+      if (jobRoleId) {
+        query = query.eq('job_role_id', jobRoleId);
+      } else {
+        query = query.is('job_role_id', null);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+      fetchMessageThreads();
+    } catch (error) {
+      console.error('Error archiving thread:', error);
+    }
+  };
+
+  const deleteThread = async (otherUserId: string, jobRoleId?: string) => {
+    if (!userProfile) return;
+    if (!window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      let query = supabase
+        .from('messages')
+        .update({ is_deleted: true })
+        .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
+
+      if (jobRoleId) {
+        query = query.eq('job_role_id', jobRoleId);
+      } else {
+        query = query.is('job_role_id', null);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+      fetchMessageThreads();
+    } catch (error) {
+      console.error('Error deleting thread:', error);
+    }
+  };
+
   const filteredThreads = threads.filter(thread =>
-    thread.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (thread.jobContext?.title && thread.jobContext.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    (viewArchived ? thread.lastMessage.is_archived : !thread.lastMessage.is_archived) &&
+    !thread.lastMessage.is_deleted &&
+    (thread.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (thread.jobContext?.title && thread.jobContext.title.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const formatTime = (dateString: string) => {
@@ -352,15 +405,23 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-gray-900">Messages</h2>
-        {availableContacts.length > 0 && (
+        <div className="flex items-center space-x-4">
           <button
-            onClick={() => setShowNewMessageModal(true)}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+            onClick={() => setViewArchived(!viewArchived)}
+            className="text-gray-600 hover:text-gray-900"
           >
-            <Plus className="w-4 h-4 mr-2 inline" />
-            New Message
+            {viewArchived ? 'View Inbox' : 'View Archived'}
           </button>
-        )}
+          {availableContacts.length > 0 && (
+            <button
+              onClick={() => setShowNewMessageModal(true)}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+            >
+              <Plus className="w-4 h-4 mr-2 inline" />
+              New Message
+            </button>
+          )}
+        </div>
       </div>
 
 
@@ -371,7 +432,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
             {filteredThreads.map((thread, index) => (
               <div
                 key={`${thread.otherUserId}-${thread.jobContext?.id || 'general'}`}
-                className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
+                className="group p-6 hover:bg-gray-50 cursor-pointer transition-colors relative"
                 onClick={() => onThreadSelect?.(thread)}
               >
                 <div className="flex items-start space-x-4">
@@ -441,6 +502,28 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
                       </p>
                     </div>
                   </div>
+                </div>
+                <div className="absolute top-4 right-4 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      archiveThread(thread.otherUserId, thread.jobContext?.id);
+                    }}
+                    className="p-2 text-gray-500 hover:bg-gray-200 rounded-full"
+                    title="Archive"
+                  >
+                    <Archive className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteThread(thread.otherUserId, thread.jobContext?.id);
+                    }}
+                    className="p-2 text-red-500 hover:bg-red-100 rounded-full"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             ))}
