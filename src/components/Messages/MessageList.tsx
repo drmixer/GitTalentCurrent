@@ -328,12 +328,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
     }
   };
 
-  const filteredThreads = threads.filter(thread =>
-    (viewArchived ? thread.lastMessage.is_archived : !thread.lastMessage.is_archived) &&
-    !thread.lastMessage.is_deleted &&
-    (thread.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (thread.jobContext?.title && thread.jobContext.title.toLowerCase().includes(searchTerm.toLowerCase())))
-  );
+  const filteredThreads = threads.filter(thread => {
+    const isSender = thread.lastMessage.sender_id === userProfile?.id;
+    const isArchived = isSender ? thread.lastMessage.archived_by_sender : thread.lastMessage.archived_by_receiver;
+    const isDeleted = isSender ? thread.lastMessage.deleted_by_sender : thread.lastMessage.deleted_by_receiver;
+
+    return (viewArchived ? isArchived : !isArchived) &&
+      !isDeleted &&
+      (thread.otherUserName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (thread.jobContext?.title && thread.jobContext.title.toLowerCase().includes(searchTerm.toLowerCase())))
+  });
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
