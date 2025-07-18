@@ -296,18 +296,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
   const archiveThread = async (otherUserId: string, jobRoleId?: string) => {
     if (!userProfile) return;
     try {
-      let query = supabase
-        .from('messages')
-        .update({ is_archived: true })
-        .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
+      const { data, error } = await supabase.rpc('archive_thread', {
+        p_user_id: userProfile.id,
+        p_other_user_id: otherUserId,
+        p_job_role_id: jobRoleId,
+      });
 
-      if (jobRoleId) {
-        query = query.eq('job_role_id', jobRoleId);
-      } else {
-        query = query.is('job_role_id', null);
-      }
-
-      const { error } = await query;
       if (error) throw error;
       fetchMessageThreads();
     } catch (error) {
@@ -321,18 +315,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       return;
     }
     try {
-      let query = supabase
-        .from('messages')
-        .update({ is_deleted: true })
-        .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
+      const { data, error } = await supabase.rpc('delete_thread', {
+        p_user_id: userProfile.id,
+        p_other_user_id: otherUserId,
+        p_job_role_id: jobRoleId,
+      });
 
-      if (jobRoleId) {
-        query = query.eq('job_role_id', jobRoleId);
-      } else {
-        query = query.is('job_role_id', null);
-      }
-
-      const { error } = await query;
       if (error) throw error;
       fetchMessageThreads();
     } catch (error) {
