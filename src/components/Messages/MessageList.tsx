@@ -299,7 +299,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       const { data, error } = await supabase.rpc('archive_thread', {
         p_user_id: userProfile.id,
         p_other_user_id: otherUserId,
-        p_job_role_id: jobRoleId,
+        p_job_role_id: jobRoleId || null,
       });
 
       if (error) throw error;
@@ -318,7 +318,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       const { data, error } = await supabase.rpc('delete_thread', {
         p_user_id: userProfile.id,
         p_other_user_id: otherUserId,
-        p_job_role_id: jobRoleId,
+        p_job_role_id: jobRoleId || null,
       });
 
       if (error) throw error;
