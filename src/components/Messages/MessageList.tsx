@@ -296,14 +296,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
   const archiveThread = async (otherUserId: string, jobRoleId?: string) => {
     if (!userProfile) return;
     try {
-      const params: any = {
+      const { data, error } = await supabase.rpc('archive_thread', {
         p_user_id: userProfile.id,
         p_other_user_id: otherUserId,
-      };
-      if (jobRoleId) {
-        params.p_job_role_id = jobRoleId;
-      }
-      const { data, error } = await supabase.rpc('archive_thread', params);
+        p_job_role_id: jobRoleId || null,
+      });
 
       if (error) throw error;
       fetchMessageThreads();
@@ -318,14 +315,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       return;
     }
     try {
-      const params: any = {
+      const { data, error } = await supabase.rpc('delete_thread', {
         p_user_id: userProfile.id,
         p_other_user_id: otherUserId,
-      };
-      if (jobRoleId) {
-        params.p_job_role_id = jobRoleId;
-      }
-      const { data, error } = await supabase.rpc('delete_thread', params);
+        p_job_role_id: jobRoleId || null,
+      });
 
       if (error) throw error;
       fetchMessageThreads();
