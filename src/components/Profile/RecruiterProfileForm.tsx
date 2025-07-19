@@ -54,6 +54,14 @@ export const RecruiterProfileForm: React.FC = () => {
     let companyLogoUrl = userProfile?.company_logo_url;
 
     try {
+      console.log('user.id:', user.id);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+      } else {
+        console.log('auth.uid():', session?.user?.id);
+      }
+
       if (profilePicFile) {
         const { data, error } = await supabase.storage
           .from('profile-pics')
