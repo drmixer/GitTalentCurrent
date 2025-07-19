@@ -40,7 +40,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 const { data: recruiterData, error: recruiterError } = await supabase
                     .from('users')
-                    .select('*, recruiters(*)')
+                    .select('*, company:companies(*)')
                     .eq('id', recruiterId)
                     .single();
 
@@ -101,41 +101,55 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     }
 
     return (
-        <div className="p-4">
-            <div className="flex items-center space-x-4 mb-4">
-                <img src={recruiter.profile_pic_url || ''} alt={recruiter.name} className="w-24 h-24 rounded-full" />
-                <div>
-                    <h1 className="text-2xl font-bold">{recruiter.name}</h1>
+        <div className="container mx-auto p-4">
+            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                <div className="relative">
+                    <div className="h-48 bg-gray-200"></div>
+                    <div className="absolute top-24 left-8">
+                        <img className="h-32 w-32 bg-gray-300 rounded-full border-4 border-white" src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id} alt={`${recruiter.name}'s profile`} />
+                    </div>
+                    <div className="absolute top-36 right-8">
+                        <img className="h-16" src={recruiter.company?.logo_url || 'https://logo.clearbit.com/' + recruiter.company_name + '.com'} alt={`${recruiter.company_name} logo`} />
+                    </div>
+                </div>
+
+                <div className="pt-20 pb-8 px-8">
+                    <h1 className="text-3xl font-bold">{recruiter.name}</h1>
                     <p className="text-gray-600">{recruiter.company_name}</p>
                 </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="p-4 border rounded-lg shadow-sm">
-                    <h2 className="text-xl font-semibold">Total Jobs</h2>
-                    <p>{stats.totalJobs}</p>
-                </div>
-                <div className="p-4 border rounded-lg shadow-sm">
-                    <h2 className="text-xl font-semibold">Open Jobs</h2>
-                    <p>{stats.openJobs}</p>
-                </div>
-                <div className="p-4 border rounded-lg shadow-sm">
-                    <h2 className="text-xl font-semibold">Total Applicants</h2>
-                    <p>{stats.totalApplicants}</p>
-                </div>
-                <div className="p-4 border rounded-lg shadow-sm">
-                    <h2 className="text-xl font-semibold">Total Hires</h2>
-                    <p>{stats.totalHires}</p>
-                </div>
-            </div>
-            <div>
-                <h2 className="text-xl font-bold mb-2">Posted Jobs</h2>
-                <div className="space-y-4">
-                    {jobs.map(job => (
-                        <div key={job.id} className="p-4 border rounded-lg shadow-sm">
-                            <h3 className="text-lg font-semibold">{job.title}</h3>
-                            <p>{job.is_active ? 'Active' : 'Closed'}</p>
+
+                <div className="px-8 pb-8">
+                    <h2 className="text-xl font-semibold mb-4">Company Activity</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p className="text-2xl font-bold">{stats.totalJobs}</p>
+                            <p className="text-gray-600">Total Jobs</p>
                         </div>
-                    ))}
+                        <div>
+                            <p className="text-2xl font-bold">{stats.openJobs}</p>
+                            <p className="text-gray-600">Open Jobs</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.totalApplicants}</p>
+                            <p className="text-gray-600">Total Applicants</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.totalHires}</p>
+                            <p className="text-gray-600">Total Hires</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="px-8 pb-8">
+                    <h2 className="text-xl font-semibold mb-4">Open Positions</h2>
+                    <div className="space-y-4">
+                        {jobs.filter(j => j.is_active).map(job => (
+                            <div key={job.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                                <h3 className="text-lg font-semibold text-blue-600">{job.title}</h3>
+                                <p className="text-gray-700">{job.description?.substring(0, 100)}...</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
