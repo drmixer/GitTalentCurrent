@@ -63,29 +63,39 @@ export const RecruiterProfileForm: React.FC = () => {
       }
 
       if (profilePicFile) {
-        const { data, error } = await supabase.storage
+        const filePath = `${user.id}/${profilePicFile.name}`;
+        const { error: uploadError } = await supabase.storage
           .from('profile-pics')
-          .upload(`${user.id}/${profilePicFile.name}`, profilePicFile, {
+          .upload(filePath, profilePicFile, {
             cacheControl: '3600',
             upsert: true,
           });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
 
-        profilePicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/profile-pics/${data.path}`;
+        const { data: publicUrlData } = supabase.storage
+          .from('profile-pics')
+          .getPublicUrl(filePath);
+
+        profilePicUrl = publicUrlData.publicUrl;
       }
 
       if (companyLogoFile) {
-        const { data, error } = await supabase.storage
+        const filePath = `${user.id}/${companyLogoFile.name}`;
+        const { error: uploadError } = await supabase.storage
           .from('company-logos')
-          .upload(`${user.id}/${companyLogoFile.name}`, companyLogoFile, {
+          .upload(filePath, companyLogoFile, {
             cacheControl: '3600',
             upsert: true,
           });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
 
-        companyLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
+        const { data: publicUrlData } = supabase.storage
+          .from('company-logos')
+          .getPublicUrl(filePath);
+
+        companyLogoUrl = publicUrlData.publicUrl;
       }
 
       const { error: rpcError } = await supabase.rpc('update_user_profile', {
