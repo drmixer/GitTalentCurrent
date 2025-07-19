@@ -765,7 +765,7 @@ export const RecruiterDashboard = () => {
           />
         )}
         {activeTab === 'tracker' && <HiringPipeline />}
-        {activeTab === 'profile' && <RecruiterProfileForm onProfileUpdate={refreshProfile} />}
+        {activeTab === 'profile' && <RecruiterProfileForm />}
       </div>
     </div>
   );
