@@ -20,13 +20,13 @@ export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onPr
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userProfile?.profile_pic_url && !profilePicPreview) {
+    if (userProfile?.profile_pic_url) {
       setProfilePicPreview(userProfile.profile_pic_url);
     }
-    if (userProfile?.company_logo_url && !companyLogoPreview) {
+    if (userProfile?.company_logo_url) {
       setCompanyLogoPreview(userProfile.company_logo_url);
     }
-  }, [userProfile, profilePicPreview, companyLogoPreview]);
+  }, [userProfile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'profilePic' | 'companyLogo') => {
     const file = e.target.files?.[0];
