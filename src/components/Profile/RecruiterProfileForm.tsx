@@ -16,21 +16,17 @@ export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onPr
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
 
-  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(userProfile?.profile_pic_url || null);
-  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(userProfile?.company_logo_url || null);
-
-  console.log("RecruiterProfileForm userProfile", userProfile);
-  console.log("RecruiterProfileForm profilePicPreview", profilePicPreview);
-  console.log("RecruiterProfileForm companyLogoPreview", companyLogoPreview);
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userProfile?.profile_pic_url) {
+    if (userProfile?.profile_pic_url && !profilePicPreview) {
       setProfilePicPreview(userProfile.profile_pic_url);
     }
-    if (userProfile?.company_logo_url) {
+    if (userProfile?.company_logo_url && !companyLogoPreview) {
       setCompanyLogoPreview(userProfile.company_logo_url);
     }
-  }, [userProfile]);
+  }, [userProfile, profilePicPreview, companyLogoPreview]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'profilePic' | 'companyLogo') => {
     const file = e.target.files?.[0];
