@@ -96,13 +96,6 @@ export const RecruiterProfileForm: React.FC = () => {
       if(refreshProfile) {
         await refreshProfile();
       }
-      // Manually update the preview state after successful upload and profile refresh
-      if (profilePicUrl) {
-        setProfilePicPreview(profilePicUrl);
-      }
-      if (companyLogoUrl) {
-        setCompanyLogoPreview(companyLogoUrl);
-      }
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
     } finally {
