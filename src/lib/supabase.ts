@@ -17,6 +17,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Export Supabase storage bucket names
 export const STORAGE_BUCKETS = {
   PROFILE_IMAGES: 'profile_images',
+  PROFILE_PICS: 'profile-pics',
+  COMPANY_LOGOS: 'company-logos',
 };
 
 export const signOut = async () => {

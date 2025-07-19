@@ -40,7 +40,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 const { data: recruiterData, error: recruiterError } = await supabase
                     .from('users')
-                    .select('*')
+                    .select('*, company:companies(logo_url)')
                     .eq('id', recruiterId)
                     .single();
 
@@ -50,20 +50,6 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 }
                 console.log("Recruiter data fetched:", recruiterData);
                 setRecruiter(recruiterData);
-
-                if (recruiterData && recruiterData.company_id) {
-                    const { data: companyData, error: companyError } = await supabase
-                        .from('companies')
-                        .select('logo_url')
-                        .eq('id', recruiterData.company_id)
-                        .single();
-
-                    if (companyError) {
-                        console.error(`Error fetching company data for ID ${recruiterData.company_id}:`, companyError);
-                    } else {
-                        setRecruiter(prev => prev ? ({ ...prev, company: { logo_url: companyData.logo_url } }) : null);
-                    }
-                }
 
                 const { data: jobsData, error: jobsError } = await supabase
                     .from('job_roles')
@@ -123,7 +109,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         <img className="h-32 w-32 bg-gray-300 rounded-full border-4 border-white" src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id} alt={`${recruiter.name}'s profile`} />
                     </div>
                     <div className="absolute top-36 right-8">
-                        <img className="h-16" src={recruiter.company?.logo_url || 'https://logo.clearbit.com/' + recruiter.company_name + '.com'} alt={`${recruiter.company_name} logo`} />
+                        <img className="h-16" src={recruiter.company_logo_url || 'https://logo.clearbit.com/' + (recruiter.company_name || 'default') + '.com'} alt={`${recruiter.company_name} logo`} />
                     </div>
                 </div>
 
