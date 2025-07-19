@@ -1,55 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { JobRole } from '../../types';
+import { JobRole, Company } from '../../types';
 
 interface CompanyProfileProps {
-  companyName: string;
+  companyId: string;
 }
 
-const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyName }) => {
+const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId }) => {
+    const [company, setCompany] = useState<Company | null>(null);
     const [jobs, setJobs] = useState<JobRole[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchCompanyJobs = async () => {
-            if (!companyName) {
-                console.error("CompanyProfile: companyName is missing.");
+        const fetchCompanyProfile = async () => {
+            if (!companyId) {
+                console.error("CompanyProfile: companyId is missing.");
                 setLoading(false);
                 return;
             }
 
             try {
                 setLoading(true);
-                console.log(`Fetching jobs for company: ${companyName}`);
+                console.log(`Fetching profile for company ID: ${companyId}`);
+
+                const { data: companyData, error: companyError } = await supabase
+                    .from('companies')
+                    .select('*')
+                    .eq('id', companyId)
+                    .single();
+
+                if (companyError) {
+                    console.error(`Error fetching company data for ID ${companyId}:`, companyError);
+                    throw companyError;
+                }
+                console.log("Company data fetched:", companyData);
+                setCompany(companyData);
 
                 const { data: jobsData, error: jobsError } = await supabase
                     .from('job_roles')
-                    .select('*, recruiter:users!job_roles_recruiter_id_fkey(company_name)')
-                    .eq('recruiter.company_name', companyName);
+                    .select('*, recruiter:users!inner(company_id)')
+                    .eq('recruiter.company_id', companyId);
 
                 if (jobsError) {
-                    console.error(`Error fetching jobs for company ${companyName}:`, jobsError);
+                    console.error(`Error fetching jobs for company ID ${companyId}:`, jobsError);
                     throw jobsError;
                 }
                 console.log("Company jobs data fetched:", jobsData);
                 setJobs(jobsData || []);
             } catch (error: any) {
-                console.error('Error in fetchCompanyJobs:', error);
+                console.error('Error in fetchCompanyProfile:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchCompanyJobs();
-    }, [companyName]);
+        fetchCompanyProfile();
+    }, [companyId]);
 
     if (loading) {
         return <div>Loading company profile...</div>;
     }
 
+    if (!company) {
+        return <div>Company profile not found.</div>;
+    }
+
     return (
         <div className="p-4">
-            <h1 className="text-2xl font-bold mb-4">{companyName}</h1>
+            <h1 className="text-2xl font-bold mb-4">{company.name}</h1>
             <div>
                 <h2 className="text-xl font-bold mb-2">Job Listings</h2>
                 <div className="space-y-4">

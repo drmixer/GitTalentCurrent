@@ -3,15 +3,15 @@ import { useParams } from 'react-router-dom';
 import CompanyProfile from '../components/Profile/CompanyProfile';
 
 const CompanyProfilePage: React.FC = () => {
-  const { name } = useParams<{ name: string }>();
+  const { id } = useParams<{ id: string }>();
 
-  if (!name) {
+  if (!id) {
     return <div>Company not found.</div>;
   }
 
   return (
     <div>
-      <CompanyProfile companyName={name} />
+      <CompanyProfile companyId={id} />
     </div>
   );
 };
