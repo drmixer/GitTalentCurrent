@@ -18,50 +18,77 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (recruiterId) {
-            const fetchProfileData = async () => {
-                try {
-                    const { data: recruiterData, error: recruiterError } = await supabase
-                        .from('users')
-                        .select('*, recruiters(*)')
-                        .eq('id', recruiterId)
-                        .single();
+        const fetchProfileData = async () => {
+            if (!recruiterId) {
+                console.error("RecruiterProfile: recruiterId is missing.");
+                setLoading(false);
+                return;
+            }
 
-                    if (recruiterError) throw recruiterError;
-                    setRecruiter(recruiterData);
+            // Basic UUID validation
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(recruiterId)) {
+                console.error(`RecruiterProfile: Invalid recruiterId format: ${recruiterId}`);
+                setLoading(false);
+                return;
+            }
 
-                    const { data: jobsData, error: jobsError } = await supabase
-                        .from('job_roles')
-                        .select('*')
-                        .eq('recruiter_id', recruiterId);
+            try {
+                setLoading(true);
+                console.log(`Fetching data for recruiter ID: ${recruiterId}`);
 
-                    if (jobsError) throw jobsError;
+                const { data: recruiterData, error: recruiterError } = await supabase
+                    .from('users')
+                    .select('*, recruiters(*)')
+                    .eq('id', recruiterId)
+                    .single();
 
-                    const { count: hiresCount, error: hiresError } = await supabase
-                        .from('hires')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('marked_by', recruiterId);
-
-                    if (hiresError) throw hiresError;
-
-                    const totalApplicants = (jobsData as any[]).reduce((acc, job) => acc + (job.applicant_count || 0), 0);
-
-                    setJobs(jobsData || []);
-                    setStats({
-                        totalJobs: jobsData.length,
-                        openJobs: jobsData.filter(job => job.is_active).length,
-                        totalApplicants: totalApplicants,
-                        totalHires: hiresCount || 0,
-                    });
-                } catch (error: any) {
-                    console.error('Error fetching recruiter profile data:', error);
-                } finally {
-                    setLoading(false);
+                if (recruiterError) {
+                    console.error(`Error fetching recruiter data for ID ${recruiterId}:`, recruiterError);
+                    throw recruiterError;
                 }
-            };
+                console.log("Recruiter data fetched:", recruiterData);
+                setRecruiter(recruiterData);
 
-            fetchProfileData();
-        }
+                const { data: jobsData, error: jobsError } = await supabase
+                    .from('job_roles')
+                    .select('*')
+                    .eq('recruiter_id', recruiterId);
+
+                if (jobsError) {
+                    console.error(`Error fetching jobs for recruiter ID ${recruiterId}:`, jobsError);
+                    throw jobsError;
+                }
+                console.log("Jobs data fetched:", jobsData);
+
+                const { count: hiresCount, error: hiresError } = await supabase
+                    .from('hires')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('marked_by', recruiterId);
+
+                if (hiresError) {
+                    console.error(`Error fetching hires count for recruiter ID ${recruiterId}:`, hiresError);
+                    throw hiresError;
+                }
+                console.log("Hires count:", hiresCount);
+
+                const totalApplicants = (jobsData || []).reduce((acc, job) => acc + (job.applicant_count || 0), 0);
+
+                setJobs(jobsData || []);
+                setStats({
+                    totalJobs: jobsData?.length || 0,
+                    openJobs: jobsData?.filter(job => job.is_active).length || 0,
+                    totalApplicants: totalApplicants,
+                    totalHires: hiresCount || 0,
+                });
+            } catch (error: any) {
+                console.error('Error in fetchProfileData:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProfileData();
     }, [recruiterId]);
 
     if (loading) {
@@ -74,7 +101,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 <img src={recruiter?.profile_pic_url || ''} alt={recruiter?.name} className="w-24 h-24 rounded-full" />
                 <div>
                     <h1 className="text-2xl font-bold">{recruiter?.name}</h1>
-                    <p className="text-gray-600">{recruiter?.recruiters[0]?.company_name}</p>
+                    <p className="text-gray-600">{recruiter?.company_name}</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
