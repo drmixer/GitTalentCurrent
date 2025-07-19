@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import RecruiterProfilePage from './pages/RecruiterProfilePage';
+import CompanyProfilePage from './pages/CompanyProfilePage';
 import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
 import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
@@ -35,6 +36,7 @@ function App() {
           <Route path="/github-setup" element={<GitHubAppSetup />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/recruiter-profile" element={<RecruiterProfilePage />} />
+          <Route path="/company/:name" element={<CompanyProfilePage />} />
           <Route path="/apply/job/:jobId" element={<ApplyForJob />} />
           <Route path="/features" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Features Coming Soon</h1></div>} />
           <Route path="/pricing" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Pricing Coming Soon</h1></div>} />
