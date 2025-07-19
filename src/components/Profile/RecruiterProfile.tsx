@@ -40,7 +40,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 const { data: recruiterData, error: recruiterError } = await supabase
                     .from('users')
-                    .select('*, company:companies(*)')
+                    .select('*')
                     .eq('id', recruiterId)
                     .single();
 
@@ -50,6 +50,20 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 }
                 console.log("Recruiter data fetched:", recruiterData);
                 setRecruiter(recruiterData);
+
+                if (recruiterData && recruiterData.company_id) {
+                    const { data: companyData, error: companyError } = await supabase
+                        .from('companies')
+                        .select('logo_url')
+                        .eq('id', recruiterData.company_id)
+                        .single();
+
+                    if (companyError) {
+                        console.error(`Error fetching company data for ID ${recruiterData.company_id}:`, companyError);
+                    } else {
+                        setRecruiter(prev => prev ? ({ ...prev, company: { logo_url: companyData.logo_url } }) : null);
+                    }
+                }
 
                 const { data: jobsData, error: jobsError } = await supabase
                     .from('job_roles')
