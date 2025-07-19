@@ -109,7 +109,7 @@ export const RecruiterProfileForm: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="shrink-0">
             {profilePicPreview ? (
-              <img className="h-20 w-20 object-cover rounded-full" src={profilePicPreview} alt="Profile preview" />
+              <img className="h-20 w-20 object-cover rounded-full" src={`${profilePicPreview}?t=${new Date().getTime()}`} alt="Profile preview" />
             ) : (
               <div className="h-20 w-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
                 <span>Pic</span>
@@ -129,7 +129,7 @@ export const RecruiterProfileForm: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="shrink-0">
             {companyLogoPreview ? (
-              <img className="h-20 w-20 object-contain" src={companyLogoPreview} alt="Company logo preview" />
+              <img className="h-20 w-20 object-contain" src={`${companyLogoPreview}?t=${new Date().getTime()}`} alt="Company logo preview" />
             ) : (
               <div className="h-20 w-20 bg-gray-200 flex items-center justify-center text-gray-500">
                 <span>Logo</span>
