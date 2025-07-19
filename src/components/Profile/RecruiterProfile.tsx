@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useAuth';
-import { JobRole } from '../../types';
+import { JobRole, User } from '../../types';
 
-const RecruiterProfile: React.FC = () => {
-    const { user } = useAuth();
+interface RecruiterProfileProps {
+  recruiterId: string;
+}
+
+const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
+    const [recruiter, setRecruiter] = useState<User | null>(null);
     const [jobs, setJobs] = useState<JobRole[]>([]);
     const [stats, setStats] = useState({
         totalJobs: 0,
@@ -15,25 +18,33 @@ const RecruiterProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (user) {
+        if (recruiterId) {
             const fetchProfileData = async () => {
                 try {
+                    const { data: recruiterData, error: recruiterError } = await supabase
+                        .from('users')
+                        .select('*, recruiters(*)')
+                        .eq('id', recruiterId)
+                        .single();
+
+                    if (recruiterError) throw recruiterError;
+                    setRecruiter(recruiterData);
+
                     const { data: jobsData, error: jobsError } = await supabase
                         .from('job_roles')
                         .select('*')
-                        .eq('recruiter_id', user.id);
+                        .eq('recruiter_id', recruiterId);
 
                     if (jobsError) throw jobsError;
 
                     const { count: hiresCount, error: hiresError } = await supabase
                         .from('hires')
                         .select('*', { count: 'exact', head: true })
-                        .eq('marked_by', user.id);
+                        .eq('marked_by', recruiterId);
 
                     if (hiresError) throw hiresError;
 
-                    // This is a simplification. A real implementation would need to count distinct applicants across all jobs.
-                    const totalApplicants = jobsData.reduce((acc, job) => acc + (job.applicant_count || 0), 0);
+                    const totalApplicants = (jobsData as any[]).reduce((acc, job) => acc + (job.applicant_count || 0), 0);
 
                     setJobs(jobsData || []);
                     setStats({
@@ -51,7 +62,7 @@ const RecruiterProfile: React.FC = () => {
 
             fetchProfileData();
         }
-    }, [user]);
+    }, [recruiterId]);
 
     if (loading) {
         return <div>Loading profile...</div>;
@@ -59,7 +70,13 @@ const RecruiterProfile: React.FC = () => {
 
     return (
         <div className="p-4">
-            <h1 className="text-2xl font-bold mb-4">Recruiter Profile</h1>
+            <div className="flex items-center space-x-4 mb-4">
+                <img src={recruiter?.profile_pic_url || ''} alt={recruiter?.name} className="w-24 h-24 rounded-full" />
+                <div>
+                    <h1 className="text-2xl font-bold">{recruiter?.name}</h1>
+                    <p className="text-gray-600">{recruiter?.recruiters[0]?.company_name}</p>
+                </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="p-4 border rounded-lg shadow-sm">
                     <h2 className="text-xl font-semibold">Total Jobs</h2>
