@@ -16,10 +16,10 @@ export const RecruiterProfileForm: React.FC = () => {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userProfile?.profile_pic_url) {
+    if (userProfile && userProfile.profile_pic_url) {
       setProfilePicPreview(userProfile.profile_pic_url);
     }
-    if (userProfile?.company_logo_url) {
+    if (userProfile && userProfile.company_logo_url) {
       setCompanyLogoPreview(userProfile.company_logo_url);
     }
   }, [userProfile]);
