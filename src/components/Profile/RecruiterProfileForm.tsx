@@ -3,7 +3,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { User } from '../../types';
 
-export const RecruiterProfileForm: React.FC = () => {
+interface RecruiterProfileFormProps {
+  onProfileUpdate: (updatedProfile: User) => void;
+}
+
+export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onProfileUpdate }) => {
   const { user, userProfile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
@@ -16,10 +20,10 @@ export const RecruiterProfileForm: React.FC = () => {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userProfile && userProfile.profile_pic_url) {
+    if (userProfile?.profile_pic_url) {
       setProfilePicPreview(userProfile.profile_pic_url);
     }
-    if (userProfile && userProfile.company_logo_url) {
+    if (userProfile?.company_logo_url) {
       setCompanyLogoPreview(userProfile.company_logo_url);
     }
   }, [userProfile]);
@@ -66,6 +70,7 @@ export const RecruiterProfileForm: React.FC = () => {
 
         const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
         profilePicUrl = publicUrlData.publicUrl;
+        setProfilePicPreview(profilePicUrl);
       }
 
       if (companyLogoFile) {
@@ -80,6 +85,7 @@ export const RecruiterProfileForm: React.FC = () => {
 
         const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
         companyLogoUrl = publicUrlData.publicUrl;
+        setCompanyLogoPreview(companyLogoUrl);
       }
 
       const { error: updateError } = await supabase
@@ -94,6 +100,16 @@ export const RecruiterProfileForm: React.FC = () => {
 
       setSuccess('Profile updated successfully!');
       if(refreshProfile) await refreshProfile();
+      if (onProfileUpdate) {
+        const { data: updatedProfile, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (updatedProfile) {
+          onProfileUpdate(updatedProfile);
+        }
+      }
 
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
@@ -109,7 +125,7 @@ export const RecruiterProfileForm: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="shrink-0">
             {profilePicPreview ? (
-              <img className="h-20 w-20 object-cover rounded-full" src={`${profilePicPreview}?t=${new Date().getTime()}`} alt="Profile preview" />
+              <img key={profilePicPreview} className="h-20 w-20 object-cover rounded-full" src={profilePicPreview} alt="Profile preview" />
             ) : (
               <div className="h-20 w-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
                 <span>Pic</span>
@@ -129,7 +145,7 @@ export const RecruiterProfileForm: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="shrink-0">
             {companyLogoPreview ? (
-              <img className="h-20 w-20 object-contain" src={`${companyLogoPreview}?t=${new Date().getTime()}`} alt="Company logo preview" />
+              <img key={companyLogoPreview} className="h-20 w-20 object-contain" src={companyLogoPreview} alt="Company logo preview" />
             ) : (
               <div className="h-20 w-20 bg-gray-200 flex items-center justify-center text-gray-500">
                 <span>Logo</span>
