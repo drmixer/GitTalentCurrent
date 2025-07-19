@@ -46,8 +46,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       user_id: user.id,
       user_email: user.email,
       user_name: user.user_metadata?.name || user.email,
-      user_role: 'developer', // or 'recruiter', based on user
-      company_name: ''        // only required if recruiter
+      user_role: localStorage.getItem('gittalent_signup_role') || 'developer',
+      company_name: localStorage.getItem('gittalent_signup_company_name') || ''
     });
 
     if (rpcError) {
@@ -204,9 +204,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     if (error && error.code === 'PGRST116') { // This also covers the 406 scenario for .single()
       console.log(`[AuthContext] fetchUserProfile: Profile not found for ${authUser.id} (PGRST116 / implies 406 with .single()). Attempting to create via RPC.`);
       
-      const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'developer');
-      const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'GitHub User';
-      const companyName = authUser.user_metadata?.company_name || 'Company';
+      const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
+      const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'User';
+      const companyName = localStorage.getItem('gittalent_signup_company_name') || authUser.user_metadata?.company_name || '';
       
       console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' params: user_id=${authUser.id}, email=${authUser.email || 'unknown@example.com'}, name=${userName}, role=${userRole}, company=${companyName}`);
 
