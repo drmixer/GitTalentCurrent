@@ -36,19 +36,21 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
         .from('job_roles')
         .select(`
           *,
-          recruiter:users!job_roles_recruiter_id_fkey (
-            *,
-            recruiters (
-              *
-            )
+          recruiter:users (
+            *
           )
         `)
         .eq('id', jobId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching job details:", error);
+        throw error;
+      }
+      console.log("Job details fetched:", data);
       setJob(data as JobRole);
     } catch (err: any) {
+      console.error("Caught error in fetchJobDetails:", err);
       setError('Failed to fetch job details. ' + err.message);
     } finally {
       setLoading(false);
@@ -123,8 +125,8 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
               <div>
                 <a href={`/recruiters/${job.recruiter?.id}`} className="font-bold hover:underline">{job.recruiter?.name}</a>
                 <p className="text-sm text-gray-600">
-                  <a href={`/jobs?company=${job.recruiter?.recruiters[0]?.company_name}`} className="hover:underline">
-                    {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
+                  <a href={`/company/${job.recruiter?.company_name}`} className="hover:underline">
+                    {job.recruiter?.company_name || 'Company Confidential'}
                   </a>
                 </p>
               </div>
