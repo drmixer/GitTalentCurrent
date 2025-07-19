@@ -5,6 +5,8 @@ export interface User {
   email: string;
   is_approved: boolean;
   created_at: string;
+  profile_pic_url?: string;
+  company_logo_url?: string;
 }
 
 export interface SkillCategory {
