@@ -88,15 +88,13 @@ export const RecruiterProfileForm: React.FC = () => {
         companyLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
       }
 
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          profile_pic_url: profilePicUrl,
-          company_logo_url: companyLogoUrl,
-        })
-        .eq('id', user.id);
+      const { error: rpcError } = await supabase.rpc('update_user_profile', {
+        user_id: user.id,
+        profile_pic_url: profilePicUrl,
+        company_logo_url: companyLogoUrl,
+      });
 
-      if (updateError) throw updateError;
+      if (rpcError) throw rpcError;
 
       setSuccess('Profile updated successfully!');
       if(refreshProfile) {
