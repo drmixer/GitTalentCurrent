@@ -37,7 +37,9 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
         .select(`
           *,
           recruiter:users (
-            *
+            *,
+            company_id,
+            company_name
           )
         `)
         .eq('id', jobId)
@@ -125,7 +127,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
               <div>
                 <a href={`/recruiters/${job.recruiter?.id}`} className="font-bold hover:underline">{job.recruiter?.name}</a>
                 <p className="text-sm text-gray-600">
-                  <a href={`/company/${job.recruiter?.company_name}`} className="hover:underline">
+                  <a href={`/company/${job.recruiter?.company_id}`} className="hover:underline">
                     {job.recruiter?.company_name || 'Company Confidential'}
                   </a>
                 </p>
