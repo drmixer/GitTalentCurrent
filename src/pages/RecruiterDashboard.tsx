@@ -57,6 +57,8 @@ export const RecruiterDashboard = () => {
   const { user, userProfile: initialProfile, loading: authLoading } = useAuth();
   const [userProfile, setUserProfile] = useState(initialProfile);
   const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker' | 'profile'>('search-devs');
+
+  console.log("RecruiterDashboard userProfile", userProfile);
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
