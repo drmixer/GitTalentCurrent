@@ -64,10 +64,7 @@ export const RecruiterProfileForm: React.FC = () => {
 
         if (error) throw error;
 
-        const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
-        const url = new URL(publicUrlData.publicUrl);
-        const path = url.pathname.split('/').slice(4).join('/');
-        profilePicUrl = `${url.protocol}//${url.host}/storage/v1/object/public/profile-pics/${path}`;
+        profilePicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/profile-pics/${data.path}`;
       }
 
       if (companyLogoFile) {
@@ -80,10 +77,7 @@ export const RecruiterProfileForm: React.FC = () => {
 
         if (error) throw error;
 
-        const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
-        const url = new URL(publicUrlData.publicUrl);
-        const path = url.pathname.split('/').slice(4).join('/');
-        companyLogoUrl = `${url.protocol}//${url.host}/storage/v1/object/public/company-logos/${path}`;
+        companyLogoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
       }
 
       const { error: updateError } = await supabase
