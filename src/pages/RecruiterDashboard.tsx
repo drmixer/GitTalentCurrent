@@ -652,6 +652,17 @@ export const RecruiterDashboard = () => {
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab('profile')}
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                  activeTab === 'profile'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Edit className="w-5 h-5 mr-2" />
+                Profile
+              </button>
+              <button
                 onClick={() => setActiveTab('my-jobs')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                   activeTab === 'my-jobs'
@@ -726,17 +737,6 @@ export const RecruiterDashboard = () => {
               >
                 <Users className="w-5 h-5 mr-2" />
                 Hiring Pipeline
-              </button>
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'profile'
-                    ? 'border-blue-500 text-blue-600 bg-gray-100'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Edit className="w-5 h-5 mr-2" />
-                Profile
               </button>
             </nav>
           </div>
