@@ -18,6 +18,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        console.log("RecruiterProfile component rendered/updated");
         const fetchProfileData = async () => {
             if (!recruiterId) {
                 console.error("RecruiterProfile: recruiterId is missing.");
@@ -60,6 +61,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     throw jobsError;
                 }
                 console.log("Jobs data fetched:", jobsData);
+                setJobs(jobsData || []);
 
                 const { count: hiresCount, error: hiresError } = await supabase
                     .from('hires')
@@ -74,7 +76,6 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 const totalApplicants = (jobsData || []).reduce((acc, job) => acc + (job.applicant_count || 0), 0);
 
-                setJobs(jobsData || []);
                 setStats({
                     totalJobs: jobsData?.length || 0,
                     openJobs: jobsData?.filter(job => job.is_active).length || 0,
@@ -95,13 +96,17 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         return <div>Loading profile...</div>;
     }
 
+    if (!recruiter) {
+        return <div>Recruiter profile not found.</div>;
+    }
+
     return (
         <div className="p-4">
             <div className="flex items-center space-x-4 mb-4">
-                <img src={recruiter?.profile_pic_url || ''} alt={recruiter?.name} className="w-24 h-24 rounded-full" />
+                <img src={recruiter.profile_pic_url || ''} alt={recruiter.name} className="w-24 h-24 rounded-full" />
                 <div>
-                    <h1 className="text-2xl font-bold">{recruiter?.name}</h1>
-                    <p className="text-gray-600">{recruiter?.company_name}</p>
+                    <h1 className="text-2xl font-bold">{recruiter.name}</h1>
+                    <p className="text-gray-600">{recruiter.company_name}</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
