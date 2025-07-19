@@ -54,15 +54,8 @@ interface MessageThread {
 }
 
 export const RecruiterDashboard = () => {
-  const { user, userProfile: initialProfile, loading: authLoading } = useAuth();
-  const [userProfile, setUserProfile] = useState(initialProfile);
+  const { user, userProfile, loading: authLoading, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker' | 'profile'>('search-devs');
-
-  useEffect(() => {
-    if (initialProfile) {
-      setUserProfile(initialProfile);
-    }
-  }, [initialProfile]);
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
@@ -772,7 +765,7 @@ export const RecruiterDashboard = () => {
           />
         )}
         {activeTab === 'tracker' && <HiringPipeline />}
-        {activeTab === 'profile' && <RecruiterProfileForm onProfileUpdate={setUserProfile} />}
+        {activeTab === 'profile' && <RecruiterProfileForm onProfileUpdate={refreshProfile} />}
       </div>
     </div>
   );

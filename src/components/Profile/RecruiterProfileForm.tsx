@@ -3,11 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { User } from '../../types';
 
-interface RecruiterProfileFormProps {
-  onProfileUpdate: (updatedProfile: User) => void;
-}
-
-export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onProfileUpdate }) => {
+export const RecruiterProfileForm: React.FC = () => {
   const { user, userProfile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
@@ -100,16 +96,6 @@ export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onPr
 
       setSuccess('Profile updated successfully!');
       if(refreshProfile) await refreshProfile();
-      if (onProfileUpdate) {
-        const { data: updatedProfile, error: fetchError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        if (updatedProfile) {
-          onProfileUpdate(updatedProfile);
-        }
-      }
 
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
