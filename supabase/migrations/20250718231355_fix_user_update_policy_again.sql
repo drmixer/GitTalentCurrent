@@ -6,7 +6,18 @@ CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   TO authenticated
   USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK (
+    auth.uid() = id AND
+    (current_setting('request.is_admin', true) = 'true' OR
+     (
+       (SELECT array_agg(column_name)
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+          AND column_name IN ('name', 'profile_pic_url', 'company_logo_url'))
+       IS NOT NULL
+     )
+    )
+  );
 
 -- Grant update permissions on specific columns
 GRANT UPDATE (name, profile_pic_url, company_logo_url) ON public.users TO authenticated;
