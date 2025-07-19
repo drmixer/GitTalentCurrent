@@ -19,6 +19,10 @@ export const RecruiterProfileForm: React.FC<RecruiterProfileFormProps> = ({ onPr
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(userProfile?.profile_pic_url || null);
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(userProfile?.company_logo_url || null);
 
+  console.log("RecruiterProfileForm userProfile", userProfile);
+  console.log("RecruiterProfileForm profilePicPreview", profilePicPreview);
+  console.log("RecruiterProfileForm companyLogoPreview", companyLogoPreview);
+
   useEffect(() => {
     if (userProfile?.profile_pic_url) {
       setProfilePicPreview(userProfile.profile_pic_url);
