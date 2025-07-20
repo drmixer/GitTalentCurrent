@@ -178,6 +178,14 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                                 showBackButton={false}
                             />
                         </div>
+                        <div className="p-6 border-t border-gray-200">
+                            <button
+                                onClick={() => navigate(`/apply/job/${selectedJob.id}`)}
+                                className="w-full px-6 py-3 rounded-lg transition-colors font-semibold text-base bg-green-600 text-white hover:bg-green-700"
+                            >
+                                Apply Now
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

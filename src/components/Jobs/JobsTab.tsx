@@ -145,7 +145,7 @@ export const JobsTab: React.FC = () => {
           *,
           recruiter:users!job_roles_recruiter_id_fkey (
             *,
-            recruiters (
+            recruiters!user_id (
               *
             )
           )
@@ -158,6 +158,7 @@ export const JobsTab: React.FC = () => {
         console.error("Supabase error fetching jobs from view:", JSON.stringify(jobsError));
         throw jobsError;
       }
+      console.log('Fetched jobs data:', data);
       setJobs(data || []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch jobs.');
