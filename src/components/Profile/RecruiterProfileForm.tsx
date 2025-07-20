@@ -49,8 +49,11 @@ export const RecruiterProfileForm = () => {
             upsert: true,
           });
         if (error) throw error;
-        const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
-        return `${publicUrlData.publicUrl}?t=${Date.now()}`;
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(data.path, 60 * 60 * 24 * 365 * 10); // 10 years
+        if (signedUrlError) throw signedUrlError;
+        return signedUrlData.signedUrl;
       };
 
       const newProfilePicUrl = profilePic ? await uploadFile(profilePic, 'profile-pics') : profilePicUrl;
