@@ -16,29 +16,21 @@ export const RecruiterProfileForm = () => {
 
   useEffect(() => {
     const fetchRecruiterProfile = async () => {
-      if (user) {
+      if (userProfile) {
         const { data: recruiterData, error: recruiterError } = await supabase
           .from('recruiters')
           .select('company_name')
-          .eq('user_id', user.id)
+          .eq('user_id', userProfile.id)
           .single();
         if (recruiterData) {
           setCompanyName(recruiterData.company_name || '');
         }
-
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('profile_pic_url, company_logo_url')
-          .eq('id', user.id)
-          .single();
-        if (userData) {
-          setProfilePicUrl(userData.profile_pic_url || '');
-          setCompanyLogoUrl(userData.company_logo_url || '');
-        }
+        setProfilePicUrl(userProfile.profile_pic_url || '');
+        setCompanyLogoUrl(userProfile.company_logo_url || '');
       }
     };
     fetchRecruiterProfile();
-  }, [user]);
+  }, [userProfile]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,42 +41,29 @@ export const RecruiterProfileForm = () => {
     try {
       if (!user) throw new Error('You must be logged in to update your profile.');
 
-      let newProfilePicUrl = profilePicUrl;
-      if (profilePic) {
+      const uploadFile = async (file: File, bucket: string) => {
         const { data, error } = await supabase.storage
-          .from('profile-pics')
-          .upload(`${user.id}/${profilePic.name}`, profilePic, {
+          .from(bucket)
+          .upload(`${user.id}/${file.name}`, file, {
             cacheControl: '3600',
             upsert: true,
           });
         if (error) throw error;
-        const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
-        newProfilePicUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
-        setProfilePicUrl(newProfilePicUrl);
-      }
+        const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+        return `${publicUrlData.publicUrl}?t=${Date.now()}`;
+      };
 
-      let newCompanyLogoUrl = companyLogoUrl;
-      if (companyLogo) {
-        const { data, error } = await supabase.storage
-          .from('company-logos')
-          .upload(`${user.id}/${companyLogo.name}`, companyLogo, {
-            cacheControl: '3600',
-            upsert: true,
-          });
-        if (error) throw error;
-        const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
-        newCompanyLogoUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
-        setCompanyLogoUrl(newCompanyLogoUrl);
-      }
+      const newProfilePicUrl = profilePic ? await uploadFile(profilePic, 'profile-pics') : profilePicUrl;
+      const newCompanyLogoUrl = companyLogo ? await uploadFile(companyLogo, 'company-logos') : companyLogoUrl;
 
-      const { data: updatedRecruiter, error: updateRecruiterError } = await supabase
+      const { error: updateRecruiterError } = await supabase
         .from('recruiters')
         .update({ company_name: companyName })
         .eq('user_id', user.id);
 
       if (updateRecruiterError) throw updateRecruiterError;
 
-      const { data: updatedUser, error: updateUserError } = await supabase
+      const { error: updateUserError } = await supabase
         .from('users')
         .update({
           profile_pic_url: newProfilePicUrl,
