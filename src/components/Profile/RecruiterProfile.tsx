@@ -66,7 +66,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         *,
                         recruiter:users!job_roles_recruiter_id_fkey (
                             *,
-                            recruiters!user_id (
+                            recruiters (
                                 *
                             )
                         )
@@ -132,7 +132,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 <div className="pt-20 pb-8 px-8">
                     <h1 className="text-3xl font-bold">{recruiter.name}</h1>
-                    <p className="text-gray-600">{recruiter.recruiter?.[0]?.company_name || ''}</p>
+                    <p className="text-gray-600">{recruiter.company_name || recruiter.recruiter?.[0]?.company_name || ''}</p>
                 </div>
 
                 <div className="px-8 pb-8">
