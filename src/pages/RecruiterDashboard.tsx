@@ -38,6 +38,7 @@ import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
+import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 
 interface MessageThread {
   otherUserId: string;
@@ -54,7 +55,7 @@ interface MessageThread {
 
 export const RecruiterDashboard = () => {
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker'>('search-devs');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker' | 'profile'>('search-devs');
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
@@ -726,6 +727,17 @@ export const RecruiterDashboard = () => {
                 <Users className="w-5 h-5 mr-2" />
                 Hiring Pipeline
               </button>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                  activeTab === 'profile'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Users className="w-5 h-5 mr-2" />
+                Profile
+              </button>
             </nav>
           </div>
         </div>
@@ -753,6 +765,7 @@ export const RecruiterDashboard = () => {
           />
         )}
         {activeTab === 'tracker' && <HiringPipeline />}
+        {activeTab === 'profile' && <RecruiterProfileForm />}
       </div>
     </div>
   );

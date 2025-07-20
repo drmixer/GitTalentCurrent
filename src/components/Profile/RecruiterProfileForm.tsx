@@ -1,0 +1,125 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
+import { User } from '../../types';
+
+export const RecruiterProfileForm = () => {
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [profilePic, setProfilePic] = useState<File | null>(null);
+  const [companyLogo, setCompanyLogo] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (userProfile) {
+      setCompanyName(userProfile.company_name || '');
+    }
+  }, [userProfile]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccess('');
+    setError('');
+
+    try {
+      if (!user) throw new Error('You must be logged in to update your profile.');
+
+      let profilePicUrl = userProfile?.profile_pic_url;
+      if (profilePic) {
+        const { data, error } = await supabase.storage
+          .from('profile-pics')
+          .upload(`${user.id}/${profilePic.name}`, profilePic, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+        if (error) throw error;
+        profilePicUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/profile-pics/${data.path}`;
+      }
+
+      let companyLogoUrl = userProfile?.company_logo_url;
+      if (companyLogo) {
+        const { data, error } = await supabase.storage
+          .from('company-logos')
+          .upload(`${user.id}/${companyLogo.name}`, companyLogo, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+        if (error) throw error;
+        companyLogoUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
+      }
+
+      const { data: updatedUser, error: updateUserError } = await supabase
+        .from('users')
+        .update({
+          company_name: companyName,
+          profile_pic_url: profilePicUrl,
+          company_logo_url: companyLogoUrl,
+        })
+        .eq('id', user.id);
+
+      if (updateUserError) throw updateUserError;
+
+      setSuccess('Profile updated successfully!');
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-black text-gray-900">Edit Profile</h2>
+      <form onSubmit={handleUpdateProfile} className="space-y-6">
+        <div>
+          <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+            Company Name
+          </label>
+          <input
+            type="text"
+            id="companyName"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="profilePic" className="block text-sm font-medium text-gray-700">
+            Profile Picture
+          </label>
+          <input
+            type="file"
+            id="profilePic"
+            onChange={(e) => setProfilePic(e.target.files ? e.target.files[0] : null)}
+            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+        </div>
+        <div>
+          <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
+            Company Logo
+          </label>
+          <input
+            type="file"
+            id="companyLogo"
+            onChange={(e) => setCompanyLogo(e.target.files ? e.target.files[0] : null)}
+            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+        </div>
+        <div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            {loading ? 'Updating...' : 'Update Profile'}
+          </button>
+        </div>
+        {success && <p className="text-green-600">{success}</p>}
+        {error && <p className="text-red-600">{error}</p>}
+      </form>
+    </div>
+  );
+};
