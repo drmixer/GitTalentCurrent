@@ -51,10 +51,10 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
         .select(`
           *,
           recruiter:users!job_roles_recruiter_id_fkey(
-            id,
-            name, 
-            email,
-            recruiter:recruiters!user_id(company_name)
+            *,
+            recruiters(
+              company_name
+            )
           )
         `)
         .eq('is_active', true)
@@ -250,7 +250,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                         }}
                         className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
                       >
-                        {job.recruiter?.recruiter?.company_name || 'Company Confidential'}
+                        {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </button>
                     </div>
