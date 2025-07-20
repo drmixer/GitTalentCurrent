@@ -48,7 +48,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     .from('users')
                     .select(`
                       *,
-                      recruiter:recruiters!user_id(
+                      recruiters(
                         company_name
                       )
                     `)
@@ -127,13 +127,13 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         <img className="h-32 w-32 bg-gray-300 rounded-full border-4 border-white" src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id} alt={`${recruiter.name}'s profile`} />
                     </div>
                     <div className="absolute top-36 right-8">
-                        <img className="h-16" src={recruiter.company_logo_url || (recruiter.recruiter?.[0]?.company_name ? `https://logo.clearbit.com/${recruiter.recruiter[0].company_name}.com` : '')} alt={`${recruiter.recruiter?.[0]?.company_name || ''} logo`} />
+                        <img className="h-16" src={recruiter.company_logo_url || (recruiter.recruiters?.[0]?.company_name ? `https://logo.clearbit.com/${recruiter.recruiters[0].company_name}.com` : '')} alt={`${recruiter.recruiters?.[0]?.company_name || ''} logo`} />
                     </div>
                 </div>
 
                 <div className="pt-20 pb-8 px-8">
                     <h1 className="text-3xl font-bold">{recruiter.name}</h1>
-                    <p className="text-gray-600">{recruiter.recruiter?.[0]?.company_name || ''}</p>
+                    <p className="text-gray-600">{recruiter.recruiters?.[0]?.company_name || ''}</p>
                 </div>
 
                 <div className="px-8 pb-8">
