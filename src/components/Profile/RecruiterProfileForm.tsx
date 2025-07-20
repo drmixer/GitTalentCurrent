@@ -9,6 +9,9 @@ export const RecruiterProfileForm = () => {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [website, setWebsite] = useState('');
+  const [companySize, setCompanySize] = useState('');
+  const [industry, setIndustry] = useState('');
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [companyLogo, setCompanyLogo] = useState<File | null>(null);
   const [profilePicUrl, setProfilePicUrl] = useState('');
@@ -19,11 +22,14 @@ export const RecruiterProfileForm = () => {
       if (userProfile) {
         const { data: recruiterData, error: recruiterError } = await supabase
           .from('recruiters')
-          .select('company_name')
+          .select('company_name, website, company_size, industry')
           .eq('user_id', userProfile.id)
           .single();
         if (recruiterData) {
           setCompanyName(recruiterData.company_name || '');
+          setWebsite(recruiterData.website || '');
+          setCompanySize(recruiterData.company_size || '');
+          setIndustry(recruiterData.industry || '');
         }
         setProfilePicUrl(userProfile.profile_pic_url || '');
         setCompanyLogoUrl(userProfile.company_logo_url || '');
@@ -61,7 +67,12 @@ export const RecruiterProfileForm = () => {
 
       const { error: updateRecruiterError } = await supabase
         .from('recruiters')
-        .update({ company_name: companyName })
+        .update({
+          company_name: companyName,
+          website: website,
+          company_size: companySize,
+          industry: industry,
+        })
         .eq('user_id', user.id);
 
       if (updateRecruiterError) throw updateRecruiterError;
@@ -98,6 +109,42 @@ export const RecruiterProfileForm = () => {
             id="companyName"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="website" className="block text-sm font-medium text-gray-700">
+            Website
+          </label>
+          <input
+            type="text"
+            id="website"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="companySize" className="block text-sm font-medium text-gray-700">
+            Company Size
+          </label>
+          <input
+            type="text"
+            id="companySize"
+            value={companySize}
+            onChange={(e) => setCompanySize(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="industry" className="block text-sm font-medium text-gray-700">
+            Industry
+          </label>
+          <input
+            type="text"
+            id="industry"
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
