@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { JobRole, User } from '../../types';
+import { JobRole, User, Recruiter as RecruiterType } from '../../types';
 
 interface RecruiterProfileProps {
   recruiterId: string;
 }
 
 const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
-    const [recruiter, setRecruiter] = useState<User | null>(null);
+    const [recruiter, setRecruiter] = useState<(User & { recruiter: RecruiterType }) | null>(null);
     const [jobs, setJobs] = useState<JobRole[]>([]);
     const [stats, setStats] = useState({
         totalJobs: 0,
@@ -40,7 +40,10 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
                 const { data: recruiterData, error: recruiterError } = await supabase
                     .from('users')
-                    .select('*')
+                    .select(`
+                      *,
+                      recruiter:recruiters!user_id(*)
+                    `)
                     .eq('id', recruiterId)
                     .single();
 
@@ -50,20 +53,6 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 }
                 console.log("Recruiter data fetched:", recruiterData);
                 setRecruiter(recruiterData);
-
-                if (recruiterData && recruiterData.company_id) {
-                    const { data: companyData, error: companyError } = await supabase
-                        .from('companies')
-                        .select('logo_url')
-                        .eq('id', recruiterData.company_id)
-                        .single();
-
-                    if (companyError) {
-                        console.error(`Error fetching company data for ID ${recruiterData.company_id}:`, companyError);
-                    } else {
-                        setRecruiter(prev => prev ? ({ ...prev, company: { logo_url: companyData.logo_url } }) : null);
-                    }
-                }
 
                 const { data: jobsData, error: jobsError } = await supabase
                     .from('job_roles')
@@ -123,13 +112,13 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         <img className="h-32 w-32 bg-gray-300 rounded-full border-4 border-white" src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id} alt={`${recruiter.name}'s profile`} />
                     </div>
                     <div className="absolute top-36 right-8">
-                        <img className="h-16" src={recruiter.company?.logo_url || 'https://logo.clearbit.com/' + recruiter.company_name + '.com'} alt={`${recruiter.company_name} logo`} />
+                        <img className="h-16" src={recruiter.company_logo_url || 'https://logo.clearbit.com/' + recruiter.recruiter.company_name + '.com'} alt={`${recruiter.recruiter.company_name} logo`} />
                     </div>
                 </div>
 
                 <div className="pt-20 pb-8 px-8">
                     <h1 className="text-3xl font-bold">{recruiter.name}</h1>
-                    <p className="text-gray-600">{recruiter.company_name}</p>
+                    <p className="text-gray-600">{recruiter.recruiter.company_name}</p>
                 </div>
 
                 <div className="px-8 pb-8">
