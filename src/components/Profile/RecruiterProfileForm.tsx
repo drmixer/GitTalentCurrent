@@ -17,10 +17,10 @@ export const RecruiterProfileForm: React.FC = () => {
 
   useEffect(() => {
     if (userProfile?.profile_pic_url) {
-      setProfilePicPreview(userProfile.profile_pic_url);
+      setProfilePicPreview(encodeURI(userProfile.profile_pic_url));
     }
     if (userProfile?.company_logo_url) {
-      setCompanyLogoPreview(userProfile.company_logo_url);
+      setCompanyLogoPreview(encodeURI(userProfile.company_logo_url));
     }
   }, [userProfile]);
 
@@ -54,33 +54,56 @@ export const RecruiterProfileForm: React.FC = () => {
     let companyLogoUrl = userProfile?.company_logo_url;
 
     try {
+      console.log('user.id:', user.id);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+      } else {
+        console.log('auth.uid():', session?.user?.id);
+      }
+
       if (profilePicFile) {
-        const { data, error } = await supabase.storage
+        const filePath = `${user.id}/${profilePicFile.name}`;
+        const { error: uploadError } = await supabase.storage
           .from('profile-pics')
-          .upload(`${user.id}/${profilePicFile.name}`, profilePicFile, {
+          .upload(filePath, profilePicFile, {
             cacheControl: '3600',
             upsert: true,
           });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
+        const { data: publicUrlData } = supabase.storage
+          .from('profile-pics')
+          .getPublicUrl(filePath);
+
         profilePicUrl = publicUrlData.publicUrl;
+        setProfilePicPreview(profilePicUrl);
       }
 
       if (companyLogoFile) {
-        const { data, error } = await supabase.storage
+        const filePath = `${user.id}/${companyLogoFile.name}`;
+        const { error: uploadError } = await supabase.storage
           .from('company-logos')
-          .upload(`${user.id}/${companyLogoFile.name}`, companyLogoFile, {
+          .upload(filePath, companyLogoFile, {
             cacheControl: '3600',
             upsert: true,
           });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
+        const { data: publicUrlData } = supabase.storage
+          .from('company-logos')
+          .getPublicUrl(filePath);
+
         companyLogoUrl = publicUrlData.publicUrl;
+        setCompanyLogoPreview(companyLogoUrl);
       }
+
+      console.log('Updating user profile with:', {
+        profile_pic_url: profilePicUrl,
+        company_logo_url: companyLogoUrl,
+      });
 
       const { error: updateError } = await supabase
         .from('users')
@@ -92,16 +115,11 @@ export const RecruiterProfileForm: React.FC = () => {
 
       if (updateError) throw updateError;
 
+      console.log('Profile updated successfully in db.');
+
       setSuccess('Profile updated successfully!');
       if(refreshProfile) {
         await refreshProfile();
-      }
-      // Manually update the preview state after successful upload and profile refresh
-      if (profilePicUrl) {
-        setProfilePicPreview(profilePicUrl);
-      }
-      if (companyLogoUrl) {
-        setCompanyLogoPreview(companyLogoUrl);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
