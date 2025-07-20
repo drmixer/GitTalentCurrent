@@ -79,6 +79,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     console.error(`Error fetching jobs for recruiter ID ${recruiterId}:`, jobsError);
                     throw jobsError;
                 }
+                console.log("Jobs data fetched:", jobsData);
                 setJobs(jobsData || []);
 
                 const { count: hiresCount, error: hiresError } = await supabase
