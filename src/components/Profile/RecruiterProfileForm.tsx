@@ -59,7 +59,7 @@ export const RecruiterProfileForm = () => {
           });
         if (error) throw error;
         const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
-        newProfilePicUrl = publicUrlData.publicUrl + `?t=${new Date().getTime()}`;
+        newProfilePicUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
         setProfilePicUrl(newProfilePicUrl);
       }
 
@@ -73,7 +73,7 @@ export const RecruiterProfileForm = () => {
           });
         if (error) throw error;
         const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
-        newCompanyLogoUrl = publicUrlData.publicUrl + `?t=${new Date().getTime()}`;
+        newCompanyLogoUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
         setCompanyLogoUrl(newCompanyLogoUrl);
       }
 
