@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { JobRole, User, Recruiter as RecruiterType } from '../../types';
 
@@ -147,10 +148,10 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     <h2 className="text-xl font-semibold mb-4">Open Positions</h2>
                     <div className="space-y-4">
                         {jobs.filter(j => j.is_active).map(job => (
-                            <div key={job.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                            <Link to={`/apply/job/${job.id}`} key={job.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow block">
                                 <h3 className="text-lg font-semibold text-blue-600">{job.title}</h3>
                                 <p className="text-gray-700">{job.description?.substring(0, 100)}...</p>
-                            </div>
+                            </Link>
                         ))}
                     </div>
                 </div>
