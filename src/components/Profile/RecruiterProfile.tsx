@@ -180,7 +180,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         </div>
                         <div className="p-6 overflow-y-auto">
                             <JobDetailView
-                                jobId={selectedJob.id}
+                                job={selectedJob}
                                 onBack={() => setSelectedJob(null)}
                                 onMessageDeveloper={() => {}}
                                 showBackButton={false}

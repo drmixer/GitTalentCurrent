@@ -10,56 +10,22 @@ interface Candidate extends AppliedJob {
 }
 
 interface JobDetailViewProps {
-  jobId: string;
+  job: JobRole;
   onBack: () => void;
   onMessageDeveloper: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
   showBackButton?: boolean;
 }
 
-export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onMessageDeveloper, showBackButton = true }) => {
+export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMessageDeveloper, showBackButton = true }) => {
   const { userProfile } = useAuth();
-  const [job, setJob] = useState<JobRole | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
 
   useEffect(() => {
-    fetchJobDetails();
     fetchCandidates();
-  }, [jobId]);
-
-  const fetchJobDetails = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const { data, error } = await supabase
-        .from('job_roles')
-        .select(`
-          *,
-          recruiter:users!job_roles_recruiter_id_fkey (
-            *,
-            recruiters!user_id (
-              *
-            )
-          )
-        `)
-        .eq('id', jobId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching job details:", error);
-        throw error;
-      }
-      console.log("Job details fetched:", data);
-      setJob(data as JobRole);
-    } catch (err: any) {
-      console.error("Caught error in fetchJobDetails:", err);
-      setError('Failed to fetch job details. ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [job.id]);
 
   const fetchCandidates = async () => {
     try {
@@ -72,7 +38,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
             user:users(*)
           )
         `)
-        .eq('job_id', jobId);
+        .eq('job_id', job.id);
 
       if (error) throw error;
       setCandidates(data as Candidate[] || []);
@@ -97,9 +63,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
     }
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-12"><Loader className="animate-spin h-8 w-8 text-blue-600" /></div>;
-  }
 
   if (error) {
     return (
