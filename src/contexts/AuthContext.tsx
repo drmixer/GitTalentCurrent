@@ -28,6 +28,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [authUserToProcess, setAuthUserToProcess] = useState<SupabaseUser | null>(null);
   const [authProcessingEventType, setAuthProcessingEventType] = useState<string | null>(null);
+  const [onRefreshComplete, setOnRefreshComplete] = useState<(() => void) | null>(null);
 
   async function ensureUserProfileExists() {
     const {
@@ -383,6 +384,10 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
           setAuthUserToProcess(null);
           setAuthProcessingEventType(null);
           isProcessingAuthEventRef.current = false;
+          if (authProcessingEventType === 'MANUAL_REFRESH' && onRefreshComplete) {
+            onRefreshComplete();
+            setOnRefreshComplete(null); // Reset the callback
+          }
         }
       };
       processIt();
@@ -577,15 +582,18 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  const refreshProfile = useCallback(async () => {
+  const refreshProfile = useCallback(async (onComplete?: () => void) => {
     if (!user) {
-      // console.warn('refreshProfile: No user to refresh.'); // Keep this commented or remove if not essential
+      onComplete?.();
       return;
     }
     setLoading(true);
+    if (onComplete) {
+      setOnRefreshComplete(() => onComplete);
+    }
     setAuthUserToProcess(user);
     setAuthProcessingEventType('MANUAL_REFRESH');
-  }, [user, fetchUserProfile]); // Added fetchUserProfile as it's part of the logic path now
+  }, [user]);
 
   const setResolvedDeveloperProfile = useCallback((developerData: Developer) => {
     console.log('[AuthContext] setResolvedDeveloperProfile called with:', developerData);
