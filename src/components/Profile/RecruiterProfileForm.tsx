@@ -16,12 +16,11 @@ export const RecruiterProfileForm: React.FC = () => {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('RecruiterProfileForm useEffect userProfile:', userProfile);
     if (userProfile?.profile_pic_url) {
-      setProfilePicPreview(userProfile.profile_pic_url);
+      setProfilePicPreview(encodeURI(userProfile.profile_pic_url));
     }
     if (userProfile?.company_logo_url) {
-      setCompanyLogoPreview(userProfile.company_logo_url);
+      setCompanyLogoPreview(encodeURI(userProfile.company_logo_url));
     }
   }, [userProfile]);
 
@@ -110,11 +109,9 @@ export const RecruiterProfileForm: React.FC = () => {
       if (rpcError) throw rpcError;
 
       setSuccess('Profile updated successfully!');
-      console.log('Profile updated successfully, calling refreshProfile');
       if(refreshProfile) {
         await refreshProfile();
       }
-      console.log('refreshProfile called');
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
     } finally {
