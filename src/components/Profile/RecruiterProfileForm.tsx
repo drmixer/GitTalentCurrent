@@ -16,6 +16,7 @@ export const RecruiterProfileForm: React.FC = () => {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('RecruiterProfileForm useEffect userProfile:', userProfile);
     if (userProfile?.profile_pic_url) {
       setProfilePicPreview(userProfile.profile_pic_url);
     }
@@ -78,6 +79,7 @@ export const RecruiterProfileForm: React.FC = () => {
           .getPublicUrl(filePath);
 
         profilePicUrl = publicUrlData.publicUrl;
+        setProfilePicPreview(profilePicUrl);
       }
 
       if (companyLogoFile) {
@@ -96,6 +98,7 @@ export const RecruiterProfileForm: React.FC = () => {
           .getPublicUrl(filePath);
 
         companyLogoUrl = publicUrlData.publicUrl;
+        setCompanyLogoPreview(companyLogoUrl);
       }
 
       const { error: rpcError } = await supabase.rpc('update_user_profile', {
@@ -107,9 +110,11 @@ export const RecruiterProfileForm: React.FC = () => {
       if (rpcError) throw rpcError;
 
       setSuccess('Profile updated successfully!');
+      console.log('Profile updated successfully, calling refreshProfile');
       if(refreshProfile) {
         await refreshProfile();
       }
+      console.log('refreshProfile called');
     } catch (err: any) {
       setError(err.message || 'An error occurred while updating your profile.');
     } finally {
