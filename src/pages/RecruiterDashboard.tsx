@@ -88,14 +88,14 @@ export const RecruiterDashboard = () => {
 
   useEffect(() => {
     // If the recruiter's profile is not approved, refresh it to check for status changes.
-    if (userProfile && !isApproved) {
+    if (userProfile && !isApproved && !isRefreshing) {
       console.log('Unapproved recruiter profile detected, refreshing to check for updates...');
       setIsRefreshing(true);
       refreshProfile(() => {
         setIsRefreshing(false);
       });
     }
-  }, [userProfile, isApproved, refreshProfile]);
+  }, [userProfile, isApproved, refreshProfile, isRefreshing]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
