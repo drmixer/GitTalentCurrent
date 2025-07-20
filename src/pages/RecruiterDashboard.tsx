@@ -95,7 +95,7 @@ export const RecruiterDashboard = () => {
         setIsRefreshing(false);
       });
     }
-  }, [userProfile?.id]); // Rerunning this only when the user ID changes, which is effectively once on load.
+  }, [userProfile, isApproved, refreshProfile]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
