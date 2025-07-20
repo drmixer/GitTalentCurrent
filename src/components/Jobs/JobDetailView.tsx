@@ -41,6 +41,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .eq('job_id', job.id);
 
       if (error) throw error;
+      console.log('Fetched candidates:', data);
       setCandidates(data as Candidate[] || []);
     } catch (err: any) {
       setError('Failed to fetch candidates. ' + err.message);

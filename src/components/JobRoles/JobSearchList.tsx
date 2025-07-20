@@ -62,6 +62,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
 
       if (error) throw error;
       
+      console.log('Fetched jobs:', data);
       setJobs(data || []);
     } catch (error: unknown) {
       console.error('Error fetching jobs:', error);
