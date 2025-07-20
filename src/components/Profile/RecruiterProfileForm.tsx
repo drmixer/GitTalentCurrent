@@ -59,7 +59,7 @@ export const RecruiterProfileForm = () => {
           });
         if (error) throw error;
         const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
-        newProfilePicUrl = publicUrlData.publicUrl;
+        newProfilePicUrl = publicUrlData.publicUrl + `?t=${new Date().getTime()}`;
         setProfilePicUrl(newProfilePicUrl);
       }
 
@@ -73,7 +73,7 @@ export const RecruiterProfileForm = () => {
           });
         if (error) throw error;
         const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
-        newCompanyLogoUrl = publicUrlData.publicUrl;
+        newCompanyLogoUrl = publicUrlData.publicUrl + `?t=${new Date().getTime()}`;
         setCompanyLogoUrl(newCompanyLogoUrl);
       }
 
@@ -125,7 +125,13 @@ export const RecruiterProfileForm = () => {
           <input
             type="file"
             id="profilePic"
-            onChange={(e) => setProfilePic(e.target.files ? e.target.files[0] : null)}
+            onChange={(e) => {
+              const file = e.target.files ? e.target.files[0] : null;
+              setProfilePic(file);
+              if (file) {
+                setProfilePicUrl(URL.createObjectURL(file));
+              }
+            }}
             className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
           {profilePicUrl && <img src={profilePicUrl} alt="Profile" className="mt-2 h-24 w-24 rounded-full object-cover" />}
@@ -137,7 +143,13 @@ export const RecruiterProfileForm = () => {
           <input
             type="file"
             id="companyLogo"
-            onChange={(e) => setCompanyLogo(e.target.files ? e.target.files[0] : null)}
+            onChange={(e) => {
+              const file = e.target.files ? e.target.files[0] : null;
+              setCompanyLogo(file);
+              if (file) {
+                setCompanyLogoUrl(URL.createObjectURL(file));
+              }
+            }}
             className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
           {companyLogoUrl && <img src={companyLogoUrl} alt="Company Logo" className="mt-2 h-24 w-auto" />}
