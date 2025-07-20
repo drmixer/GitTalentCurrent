@@ -11,17 +11,29 @@ export const RecruiterProfileForm = () => {
   const [companyName, setCompanyName] = useState('');
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [companyLogo, setCompanyLogo] = useState<File | null>(null);
+  const [profilePicUrl, setProfilePicUrl] = useState('');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
 
   useEffect(() => {
     const fetchRecruiterProfile = async () => {
       if (user) {
-        const { data, error } = await supabase
+        const { data: recruiterData, error: recruiterError } = await supabase
           .from('recruiters')
           .select('company_name')
           .eq('user_id', user.id)
           .single();
-        if (data) {
-          setCompanyName(data.company_name || '');
+        if (recruiterData) {
+          setCompanyName(recruiterData.company_name || '');
+        }
+
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('profile_pic_url, company_logo_url')
+          .eq('id', user.id)
+          .single();
+        if (userData) {
+          setProfilePicUrl(userData.profile_pic_url || '');
+          setCompanyLogoUrl(userData.company_logo_url || '');
         }
       }
     };
@@ -37,7 +49,7 @@ export const RecruiterProfileForm = () => {
     try {
       if (!user) throw new Error('You must be logged in to update your profile.');
 
-      let profilePicUrl = userProfile?.profile_pic_url;
+      let newProfilePicUrl = profilePicUrl;
       if (profilePic) {
         const { data, error } = await supabase.storage
           .from('profile-pics')
@@ -46,10 +58,12 @@ export const RecruiterProfileForm = () => {
             upsert: true,
           });
         if (error) throw error;
-        profilePicUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/profile-pics/${data.path}`;
+        const { data: publicUrlData } = supabase.storage.from('profile-pics').getPublicUrl(data.path);
+        newProfilePicUrl = publicUrlData.publicUrl;
+        setProfilePicUrl(newProfilePicUrl);
       }
 
-      let companyLogoUrl = userProfile?.company_logo_url;
+      let newCompanyLogoUrl = companyLogoUrl;
       if (companyLogo) {
         const { data, error } = await supabase.storage
           .from('company-logos')
@@ -58,7 +72,9 @@ export const RecruiterProfileForm = () => {
             upsert: true,
           });
         if (error) throw error;
-        companyLogoUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
+        const { data: publicUrlData } = supabase.storage.from('company-logos').getPublicUrl(data.path);
+        newCompanyLogoUrl = publicUrlData.publicUrl;
+        setCompanyLogoUrl(newCompanyLogoUrl);
       }
 
       const { data: updatedRecruiter, error: updateRecruiterError } = await supabase
@@ -71,8 +87,8 @@ export const RecruiterProfileForm = () => {
       const { data: updatedUser, error: updateUserError } = await supabase
         .from('users')
         .update({
-          profile_pic_url: profilePicUrl,
-          company_logo_url: companyLogoUrl,
+          profile_pic_url: newProfilePicUrl,
+          company_logo_url: newCompanyLogoUrl,
         })
         .eq('id', user.id);
 
@@ -112,6 +128,7 @@ export const RecruiterProfileForm = () => {
             onChange={(e) => setProfilePic(e.target.files ? e.target.files[0] : null)}
             className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
+          {profilePicUrl && <img src={profilePicUrl} alt="Profile" className="mt-2 h-24 w-24 rounded-full object-cover" />}
         </div>
         <div>
           <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
@@ -123,6 +140,7 @@ export const RecruiterProfileForm = () => {
             onChange={(e) => setCompanyLogo(e.target.files ? e.target.files[0] : null)}
             className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
+          {companyLogoUrl && <img src={companyLogoUrl} alt="Company Logo" className="mt-2 h-24 w-auto" />}
         </div>
         <div>
           <button
