@@ -13,9 +13,10 @@ interface JobDetailViewProps {
   jobId: string;
   onBack: () => void;
   onMessageDeveloper: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
+  showBackButton?: boolean;
 }
 
-export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onMessageDeveloper }) => {
+export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onMessageDeveloper, showBackButton = true }) => {
   const { userProfile } = useAuth();
   const [job, setJob] = useState<JobRole | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -113,10 +114,12 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ jobId, onBack, onM
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4">
-        <ArrowLeft className="w-5 h-5 mr-2" />
-        Back to Job Listings
-      </button>
+      {showBackButton && (
+        <button onClick={onBack} className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4">
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Job Listings
+        </button>
+      )}
 
       {job && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
