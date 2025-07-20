@@ -606,6 +606,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
     createAssignment, createHire, updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
+    refreshUserProfile: refreshProfile,
     setResolvedDeveloperProfile, // This is the one called by GitHubAppSetup
     needsOnboarding: !developerProfile && userProfile?.role === 'developer',
   };
