@@ -88,14 +88,31 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-2xl font-bold mb-4">{job.title}</h2>
           <p className="text-gray-600 mb-4">{job.description}</p>
+
+          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+              <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-400" /> {job.location}</div>
+              <div className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-gray-400" /> {job.job_type}</div>
+              <div className="flex items-center"><DollarSign className="w-4 h-4 mr-2 text-gray-400" /> ${job.salary_min}k - ${job.salary_max}k</div>
+              <div className="flex items-center"><Clock className="w-4 h-4 mr-2 text-gray-400" /> Posted {new Date(job.created_at).toLocaleDateString()}</div>
+          </div>
+
+          <div className="mb-4">
+              <h3 className="font-bold mb-2">Tech Stack</h3>
+              <div className="flex flex-wrap gap-2">
+                  {job.tech_stack.map((tech, index) => (
+                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">{tech}</span>
+                  ))}
+              </div>
+          </div>
+
           {job.recruiter && (
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 pt-4 border-t border-gray-200">
               <img src={job.recruiter?.profile_pic_url || ''} alt={job.recruiter?.name} className="w-12 h-12 rounded-full" />
               <div>
                 <a href={`/recruiters/${job.recruiter.id}`} className="font-bold hover:underline">{job.recruiter.name}</a>
                 <p className="text-sm text-gray-600">
                   <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-                    {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
+                    {job.recruiter?.company_name || job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
                   </a>
                 </p>
               </div>
