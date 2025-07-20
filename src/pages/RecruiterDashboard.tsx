@@ -79,6 +79,7 @@ export const RecruiterDashboard = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Check if the user is approved
   const isApproved = userProfile?.is_approved === true;
@@ -89,7 +90,10 @@ export const RecruiterDashboard = () => {
     // If the recruiter's profile is not approved, refresh it to check for status changes.
     if (userProfile && !isApproved) {
       console.log('Unapproved recruiter profile detected, refreshing to check for updates...');
-      refreshProfile();
+      setIsRefreshing(true);
+      refreshProfile(() => {
+        setIsRefreshing(false);
+      });
     }
   }, [userProfile?.id]); // Rerunning this only when the user ID changes, which is effectively once on load.
 
@@ -594,9 +598,15 @@ export const RecruiterDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
           <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Clock className="h-10 w-10 text-yellow-600" />
+            {isRefreshing ? (
+              <Loader className="animate-spin h-10 w-10 text-yellow-600" />
+            ) : (
+              <Clock className="h-10 w-10 text-yellow-600" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Account Pending Approval</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            {isRefreshing ? 'Checking Account Status...' : 'Account Pending Approval'}
+          </h1>
           <p className="text-gray-600 mb-6">
             Your recruiter account is currently pending approval by our admin team. 
             You'll receive an email notification once your account is approved.
@@ -606,11 +616,15 @@ export const RecruiterDashboard = () => {
             please contact support@gittalent.dev
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              setIsRefreshing(true);
+              refreshProfile(() => setIsRefreshing(false));
+            }}
+            disabled={isRefreshing}
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className="w-4 h-4 mr-2 inline" />
-            Check Status
+            <RefreshCw className={`w-4 h-4 mr-2 inline ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Checking...' : 'Check Status'}
           </button>
         </div>
       </div>
