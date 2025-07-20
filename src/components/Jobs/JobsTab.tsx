@@ -23,7 +23,7 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
       <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
-        {job.recruiter?.recruiters && job.recruiter.recruiters[0] ? job.recruiter.recruiters[0].company_name : 'Company Confidential'}
+        {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
       </a>
     </p>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
@@ -72,7 +72,7 @@ export const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSa
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
           <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
-            {job.recruiter?.recruiters && job.recruiter.recruiters[0] ? job.recruiter.recruiters[0].company_name : 'Company Confidential'}
+            {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
           </a>
         </p>
         <p className="text-md text-gray-600">
