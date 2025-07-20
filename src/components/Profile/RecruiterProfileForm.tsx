@@ -13,10 +13,20 @@ export const RecruiterProfileForm = () => {
   const [companyLogo, setCompanyLogo] = useState<File | null>(null);
 
   useEffect(() => {
-    if (userProfile) {
-      setCompanyName(userProfile.company_name || '');
-    }
-  }, [userProfile]);
+    const fetchRecruiterProfile = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from('recruiters')
+          .select('company_name')
+          .eq('user_id', user.id)
+          .single();
+        if (data) {
+          setCompanyName(data.company_name || '');
+        }
+      }
+    };
+    fetchRecruiterProfile();
+  }, [user]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,10 +61,16 @@ export const RecruiterProfileForm = () => {
         companyLogoUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/company-logos/${data.path}`;
       }
 
+      const { data: updatedRecruiter, error: updateRecruiterError } = await supabase
+        .from('recruiters')
+        .update({ company_name: companyName })
+        .eq('user_id', user.id);
+
+      if (updateRecruiterError) throw updateRecruiterError;
+
       const { data: updatedUser, error: updateUserError } = await supabase
         .from('users')
         .update({
-          company_name: companyName,
           profile_pic_url: profilePicUrl,
           company_logo_url: companyLogoUrl,
         })
