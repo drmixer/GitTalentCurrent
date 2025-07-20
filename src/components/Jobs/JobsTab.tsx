@@ -8,7 +8,7 @@ import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, 
 // Minimal JobCard component for now
 const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
   ({ job, onSelect, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
-  <div className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-200">
+  <div onClick={onSelect} className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-200 cursor-pointer">
     <div className="flex justify-between items-start mb-3">
       <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{job.title}</h3>
       <button
@@ -22,7 +22,7 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
     </div>
     <p className="text-sm text-gray-500 mb-1 flex items-center">
       <Briefcase size={14} className="mr-2 text-gray-400" />
-      <a href={`/jobs?company=${job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name}`} className="hover:underline">
+      <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
         {job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name || 'Company Confidential'}
       </a>
     </p>
@@ -46,16 +46,10 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
         <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">+{job.tech_stack.length - 4} more</span>
       )}
     </div>
-    <div className="flex items-center space-x-3">
-      <button
-        onClick={onSelect}
-        className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors font-semibold text-sm flex items-center justify-center"
-      >
-        <Eye size={16} className="mr-2"/> View Details
-      </button>
+    <div className="flex items-center space-x-3 mt-4">
       <button
         onClick={(e) => { e.stopPropagation(); onApply(); }}
-        className={`flex-1 px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600')}`}
+        className={`w-full px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600')}`}
         disabled={hasApplied || isProcessingApply}
       >
         {isProcessingApply ? <Loader size={16} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={16} className="mr-2"/> : <Send size={16} className="mr-2"/>)}
@@ -77,7 +71,7 @@ const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () 
       <div className="p-6 space-y-4 overflow-y-auto">
         <p className="text-md text-gray-600">
           <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          <a href={`/jobs?company=${job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name}`} className="hover:underline">
+          <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
             {job.recruiter?.recruiters && job.recruiter.recruiters[0]?.company_name || 'Company Confidential'}
           </a>
         </p>
