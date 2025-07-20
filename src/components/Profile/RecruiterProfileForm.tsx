@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { User } from '../../types';
 
 export const RecruiterProfileForm = () => {
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading, refreshUserProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -95,6 +95,7 @@ export const RecruiterProfileForm = () => {
       if (updateUserError) throw updateUserError;
 
       setSuccess('Profile updated successfully!');
+      await refreshUserProfile();
     } catch (error: any) {
       setError(error.message);
     } finally {
