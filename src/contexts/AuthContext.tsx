@@ -566,7 +566,8 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       if (userId === user.id) { setUserProfile(data); }
       return { data, error: null };
     } catch (error: any) {
-      return { data: null, error };
+      console.error("Error updating user approval status:", error);
+      throw error;
     }
   };
 
