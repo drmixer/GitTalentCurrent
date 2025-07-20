@@ -250,7 +250,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                         }}
                         className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
                       >
-                        {job.recruiter?.recruiters[0]?.company_name || 'Company Confidential'}
+                        {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </button>
                     </div>
