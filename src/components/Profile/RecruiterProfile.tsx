@@ -48,7 +48,9 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     .from('users')
                     .select(`
                       *,
-                      recruiter:recruiters!user_id(*)
+                      recruiter:recruiters!user_id(
+                        company_name
+                      )
                     `)
                     .eq('id', recruiterId)
                     .single();
@@ -77,7 +79,6 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     console.error(`Error fetching jobs for recruiter ID ${recruiterId}:`, jobsError);
                     throw jobsError;
                 }
-                console.log("Jobs data fetched:", jobsData);
                 setJobs(jobsData || []);
 
                 const { count: hiresCount, error: hiresError } = await supabase

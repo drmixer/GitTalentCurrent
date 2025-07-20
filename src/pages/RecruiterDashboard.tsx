@@ -131,7 +131,7 @@ export const RecruiterDashboard = () => {
           recruiter:users!job_roles_recruiter_id_fkey (
             *,
             recruiters (
-              *
+              company_name
             )
           )
         `)

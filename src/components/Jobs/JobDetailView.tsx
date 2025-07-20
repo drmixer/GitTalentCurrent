@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { JobRole, Developer, AppliedJob } from '../../types';
-import { Briefcase, User, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Briefcase, User, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle, ArrowLeft, MapPin, DollarSign } from 'lucide-react';
 import { DeveloperProfileModal } from '../DeveloperProfileModal';
 
 interface Candidate extends AppliedJob {
