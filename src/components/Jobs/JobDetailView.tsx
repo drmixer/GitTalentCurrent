@@ -41,7 +41,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .eq('job_id', job.id);
 
       if (error) throw error;
-      console.log('Fetched candidates:', data);
       setCandidates(data as Candidate[] || []);
     } catch (err: any) {
       setError('Failed to fetch candidates. ' + err.message);
@@ -113,7 +112,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                 <a href={`/recruiters/${job.recruiter.id}`} className="font-bold hover:underline">{job.recruiter.name}</a>
                 <p className="text-sm text-gray-600">
                   <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-                    {job.recruiter?.company_name || 'Company Confidential'}
+                    {job.recruiter?.recruiter?.company_name || 'Company Confidential'}
                   </a>
                 </p>
               </div>

@@ -54,7 +54,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
             id,
             name, 
             email,
-            recruiters(company_name)
+            recruiter:recruiters!user_id(company_name)
           )
         `)
         .eq('is_active', true)
@@ -62,7 +62,6 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
 
       if (error) throw error;
       
-      console.log('Fetched jobs:', data);
       setJobs(data || []);
     } catch (error: unknown) {
       console.error('Error fetching jobs:', error);
@@ -251,7 +250,7 @@ export const JobSearchList: React.FC<JobSearchListProps> = ({
                         }}
                         className="text-blue-600 hover:text-blue-800 transition-colors flex items-center"
                       >
-                        {job.recruiter?.company_name || 'Company Confidential'}
+                        {job.recruiter?.recruiter?.company_name || 'Company Confidential'}
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </button>
                     </div>
