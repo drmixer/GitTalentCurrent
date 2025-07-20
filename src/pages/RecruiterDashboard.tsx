@@ -91,7 +91,7 @@ export const RecruiterDashboard = () => {
     if (userProfile && !isApproved && !isRefreshing) {
       console.log('Unapproved recruiter profile detected, refreshing to check for updates...');
       setIsRefreshing(true);
-      refreshProfile(() => {
+      refreshProfile().finally(() => {
         setIsRefreshing(false);
       });
     }

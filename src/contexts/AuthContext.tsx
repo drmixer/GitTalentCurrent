@@ -587,13 +587,21 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       onComplete?.();
       return;
     }
+
     setLoading(true);
+
+    // Invalidate the cache for the 'users' table for the specific user
+    await supabase.from('users').select('*').eq('id', user.id).then(({ data, error }) => {
+      if (error) console.error("Cache invalidation might not be fully effective:", error);
+    });
+
     if (onComplete) {
       setOnRefreshComplete(() => onComplete);
     }
+
     setAuthUserToProcess(user);
     setAuthProcessingEventType('MANUAL_REFRESH');
-  }, [user]);
+  }, [user, supabase]);
 
   const setResolvedDeveloperProfile = useCallback((developerData: Developer) => {
     console.log('[AuthContext] setResolvedDeveloperProfile called with:', developerData);
