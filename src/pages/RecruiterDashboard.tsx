@@ -54,7 +54,7 @@ interface MessageThread {
 }
 
 export const RecruiterDashboard = () => {
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker' | 'profile'>('search-devs');
   const [stats, setStats] = useState({
     totalJobs: 0,
@@ -84,6 +84,14 @@ export const RecruiterDashboard = () => {
   const isApproved = userProfile?.is_approved === true;
 
   console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
+
+  useEffect(() => {
+    // If the recruiter's profile is not approved, refresh it to check for status changes.
+    if (userProfile && !isApproved) {
+      console.log('Unapproved recruiter profile detected, refreshing to check for updates...');
+      refreshProfile();
+    }
+  }, [userProfile?.id]); // Rerunning this only when the user ID changes, which is effectively once on load.
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
