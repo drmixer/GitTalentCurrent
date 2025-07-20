@@ -60,7 +60,7 @@ const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void
 );
 
 // Minimal JobDetailsModal component for now
-const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
+export const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
   ({ job, onClose, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { JobRole, User, Recruiter as RecruiterType } from '../../types';
+import { JobDetailsModal } from '../Jobs/JobsTab';
+import { JobDetailView } from '../Jobs/JobDetailView';
+import { Star, Loader, CheckCircle, Send, XCircle } from 'lucide-react';
 
 interface RecruiterProfileProps {
   recruiterId: string;
@@ -17,6 +20,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         totalHires: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         console.log("RecruiterProfile component rendered/updated");
@@ -113,13 +118,13 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                         <img className="h-32 w-32 bg-gray-300 rounded-full border-4 border-white" src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id} alt={`${recruiter.name}'s profile`} />
                     </div>
                     <div className="absolute top-36 right-8">
-                        <img className="h-16" src={recruiter.company_logo_url || (recruiter.recruiter ? 'https://logo.clearbit.com/' + recruiter.recruiter.company_name + '.com' : '')} alt={`${recruiter.recruiter ? recruiter.recruiter.company_name : ''} logo`} />
+                        <img className="h-16" src={recruiter.company_logo_url || (recruiter.recruiter[0] ? 'https://logo.clearbit.com/' + recruiter.recruiter[0].company_name + '.com' : '')} alt={`${recruiter.recruiter[0] ? recruiter.recruiter[0].company_name : ''} logo`} />
                     </div>
                 </div>
 
                 <div className="pt-20 pb-8 px-8">
                     <h1 className="text-3xl font-bold">{recruiter.name}</h1>
-                    <p className="text-gray-600">{recruiter.recruiter ? recruiter.recruiter.company_name : ''}</p>
+                    <p className="text-gray-600">{recruiter.recruiter[0] ? recruiter.recruiter[0].company_name : ''}</p>
                 </div>
 
                 <div className="px-8 pb-8">
@@ -148,14 +153,34 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                     <h2 className="text-xl font-semibold mb-4">Open Positions</h2>
                     <div className="space-y-4">
                         {jobs.filter(j => j.is_active).map(job => (
-                            <Link to={`/apply/job/${job.id}`} key={job.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow block">
+                            <div key={job.id} onClick={() => setSelectedJob(job)} className="p-4 border rounded-lg hover:shadow-md transition-shadow block cursor-pointer">
                                 <h3 className="text-lg font-semibold text-blue-600">{job.title}</h3>
                                 <p className="text-gray-700">{job.description?.substring(0, 100)}...</p>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 </div>
             </div>
+            {selectedJob && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                            <h2 className="text-xl font-bold text-gray-800">{selectedJob.title}</h2>
+                            <button onClick={() => setSelectedJob(null)} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                                <XCircle size={24} className="text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            <JobDetailView
+                                jobId={selectedJob.id}
+                                onBack={() => setSelectedJob(null)}
+                                onMessageDeveloper={() => {}}
+                                showBackButton={false}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
