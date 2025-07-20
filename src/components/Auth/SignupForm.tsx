@@ -62,6 +62,12 @@ export const SignupForm = () => {
         throw new Error('Company name is required for recruiters');
       }
       
+      // Store role and company name in local storage to ensure it's available in the AuthContext
+      localStorage.setItem('gittalent_signup_role', formData.role);
+      if (formData.role === 'recruiter') {
+        localStorage.setItem('gittalent_signup_company_name', formData.company_name.trim());
+      }
+
       const userData = {
         name: formData.name.trim(),
         role: formData.role,
