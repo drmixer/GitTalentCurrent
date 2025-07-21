@@ -82,7 +82,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
       } else {
         const { error } = await supabase
           .from('job_roles')
-          .insert([{ ...jobData, recruiter_id: userProfile?.id }]);
+          .insert({ ...jobData, recruiter_id: userProfile?.id });
 
         if (error) throw error;
         setSuccess('Job created successfully!');
