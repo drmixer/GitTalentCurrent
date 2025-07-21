@@ -65,7 +65,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
           developer:developers (
             *,
             user:users(*),
-            developer_profile:developers!inner (  // Assuming inner join for developer_profile
+            developer_profile:developers!inner (
                 skills,
                 portfolio_url,
                 github_url,
