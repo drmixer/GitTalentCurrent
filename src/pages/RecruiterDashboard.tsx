@@ -551,6 +551,7 @@ export const RecruiterDashboard = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredHires.map((hire) => (
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
+                    {/* THIS WAS THE PROBLEM AREA */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
@@ -559,7 +560,9 @@ export const RecruiterDashboard = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.name || 'Unknown'}
                         </div>
-                      </td>
+                      </div>
+                    </td>
+                    {/* END OF PROBLEM AREA */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
