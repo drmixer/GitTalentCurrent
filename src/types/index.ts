@@ -1,3 +1,7 @@
+// src/types/index.ts
+
+import { User as SupabaseUser } from '@supabase/supabase-js'; // Assuming you import SupabaseUser somewhere
+
 export interface User {
   id: string;
   role: 'admin' | 'recruiter' | 'developer';
@@ -5,13 +9,15 @@ export interface User {
   email: string;
   is_approved: boolean;
   created_at: string;
+  avatar_url: string | null;      // Added for profile pictures (used as company logo fallback)
+  profile_pic_url: string | null;  // Added as another potential profile pic URL
 }
 
 export interface SkillCategory {
   [category: string]: {
     skills: string[];
     proficiency: 'beginner' | 'intermediate' | 'expert';
-    company_name: string;
+    company_name: string; // This seems odd for a SkillCategory, might need review but keeping as is
   };
 }
 
@@ -61,7 +67,7 @@ export interface AuthContextType {
   developerProfile?: Developer | null;
   authError: string | null;
   loading: boolean;
-  needsOnboarding?: boolean; 
+  needsOnboarding?: boolean;
   signIn: (email: string, password: string) => Promise<{ user: SupabaseUser | null, error: any | null }>;
   signInWithGitHub: (stateParams?: Record<string, any>) => Promise<{ error: any | null }>;
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ data?: any, error: any | null }>;
@@ -69,49 +75,48 @@ export interface AuthContextType {
   refreshProfile?: () => Promise<void>;
   setResolvedDeveloperProfile?: (developerData: Developer) => void;
   lastProfileUpdateTime?: number | null; // Added for explicit refresh signal
-  createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
-  updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
+  createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
+  updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
   createJobRole?: (jobData: Partial<JobRole>) => Promise<any>;
   updateJobRole?: (jobId: string, jobData: Partial<JobRole>) => Promise<any>;
-  createAssignment?: (assignmentData: Partial<Assignment>) => Promise<boolean>; 
-  importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>; 
-  createHire?: (hireData: Partial<Hire>) => Promise<boolean>; 
-  updateUserApprovalStatus?: (userId: string, isApproved: boolean) => Promise<boolean>; 
+  createAssignment?: (assignmentData: Partial<Assignment>) => Promise<boolean>;
+  importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
+  createHire?: (hireData: Partial<Hire>) => Promise<boolean>;
+  updateUserApprovalStatus?: (userId: string, isApproved: boolean) => Promise<boolean>;
 }
 
 export interface Developer {
   user_id: string;
-  github_handle: string;
-  bio: string;
-  availability: boolean;
-  top_languages: string[];
-  skills: string[];
-  linked_projects: string[];
-  location: string;
-  experience_years: number;
-  desired_salary: number;
-  skills_categories: SkillCategory;
-  profile_strength: number;
-  public_profile_slug: string;
-  notification_preferences: NotificationPreferences;
-  resume_url?: string;
-  profile_pic_url?: string;
-  github_installation_id?: string;
+  github_handle: string | null;        // Changed to nullable
+  bio: string | null;                   // Changed to nullable
+  availability: boolean | null;         // Changed to nullable
+  top_languages: string[] | null;       // Changed to nullable
+  linked_projects: string[] | null;     // Changed to nullable
+  location: string | null;              // Changed to nullable
+  experience_years: number | null;      // Changed to nullable
+  desired_salary: number | null;        // Changed to nullable
+  skills_categories: SkillCategory | null; // Changed to nullable
+  profile_strength: number | null;      // Changed to nullable
+  public_profile_slug: string | null;   // Changed to nullable
+  notification_preferences: NotificationPreferences | null; // Changed to nullable
+  resume_url?: string | null;
+  profile_pic_url?: string | null;
+  github_installation_id?: string | null;
   created_at: string;
   updated_at: string;
-  user?: User;
+  user: User; // Made mandatory as it's always joined in fetches
 
-  // New fields for the snapshot card
-  title?: string;                   // Developer's job title
-  skills?: string[];                // Core skills
-  public_repos_count?: number;      // GitHub public repositories count
-  annual_contributions?: number;    // GitHub contributions in the last year
+  // New fields for the snapshot card / existing fields for consistency
+  title?: string | null;                // Developer's job title, from preferred_title
+  skills?: string[] | null;             // Core skills (from DB)
+  public_repos_count?: number | null;   // GitHub public repositories count
+  annual_contributions?: number | null; // GitHub contributions in the last year
 
   // Fields for Overview tab snapshot cards
-  endorsements_count?: number;
-  saved_jobs_count?: number;
-  applied_jobs_count?: number;
-  public_profile_enabled?: boolean; // For public/private toggle
+  endorsements_count?: number | null;
+  saved_jobs_count?: number | null;
+  applied_jobs_count?: number | null;
+  public_profile_enabled?: boolean | null; // For public/private toggle
 }
 
 export interface PortfolioItem {
@@ -152,17 +157,18 @@ export interface AppliedJob {
   applied_at: string;
   status: 'applied' | 'viewed' | 'interviewing' | 'offer' | 'rejected' | 'archived';
   job_role?: JobRole; // Optional: for displaying job info
+  developer?: Developer; // Added: Represents the joined developer object
 }
 
 export interface Recruiter {
   user_id: string;
   company_name: string;
-  website: string;
-  company_size: string;
-  industry: string;
+  website: string | null;       // Changed to nullable based on your schema
+  company_size: string | null;  // Changed to nullable based on your schema
+  industry: string | null;      // Changed to nullable based on your schema
   created_at: string;
   updated_at: string;
-  user?: User;
+  user: User; // Made mandatory as it's always joined in fetches
 }
 
 export interface JobRole {
@@ -171,15 +177,18 @@ export interface JobRole {
   title: string;
   description: string;
   location: string;
-  job_type: 'Full-time' | 'Part-time' | 'Contract' | 'Freelance';
-  tech_stack: string[];
-  salary: string;
-  experience_required: string;
-  is_active: boolean;
-  is_featured?: boolean;
+  job_type: string;                  // Changed from enum to string as per your DB schema
+  tech_stack: string[] | null;       // Changed to string[] | null as per your DB schema
+  salary: string | null;             // Changed to string | null as per your DB schema
+  experience_required: string | null; // Changed to string | null as per your DB schema
+  is_active: boolean | null;         // Changed to boolean | null as per your DB schema
+  is_featured: boolean | null;       // Changed to boolean | null as per your DB schema
   created_at: string;
   updated_at: string;
-  recruiter?: Recruiter;
+  recruiter?: Recruiter;             // Optional, as it's a joined field.
+
+  responsibilities?: string[] | null; // Added (if intended/future)
+  benefits?: string[] | null;         // Added (if intended/future)
 }
 
 export interface CSVJobImport {
@@ -187,7 +196,7 @@ export interface CSVJobImport {
   description: string;
   location: string;
   job_type: string;
-  tech_stack: string;
+  tech_stack: string; // Note: if imported as string, might need parsing to string[]
   salary: string;
   experience_required?: string;
   is_active?: boolean | string;
