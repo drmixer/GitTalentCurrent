@@ -561,13 +561,16 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
   const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<{ data: any | null; error: any | null }> => {
     try {
       if (!user) { throw new Error('User must be authenticated to update approval status'); }
-      const { data, error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId).select().single();
+      const { data, error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId).select();
       if (error) { throw error; }
-      if (userId === user.id) { setUserProfile(data); }
+      if (userId === user.id) {
+        const { data: singleUser, error: singleError } = await supabase.from('users').select().eq('id', userId).single();
+        if(singleError) throw singleError;
+        setUserProfile(singleUser);
+      }
       return { data, error: null };
     } catch (error: any) {
-      console.error("Error updating user approval status:", error);
-      throw error;
+      return { data: null, error };
     }
   };
 
