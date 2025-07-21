@@ -176,16 +176,27 @@ export const RecruiterDashboard = () => {
 
       // Data Transformation for nested relationships in RecruiterDashboard
       const transformedJobRoles = (data || []).map(jobRole => {
-        const transformedRecruiter = {
-          id: jobRole.recruiter.id,
-          name: jobRole.recruiter.name,
-          email: jobRole.recruiter.email,
-          // **FIX:** More robust access to company_name
-          // Check if recruiter_profile exists AND is an array before attempting to access index 0
-          company_name: Array.isArray(jobRole.recruiter.recruiter_profile) && jobRole.recruiter.recruiter_profile.length > 0
-            ? jobRole.recruiter.recruiter_profile[0].company_name
-            : null
+        // **IMPORTANT FIX:** Ensure jobRole.recruiter exists before accessing its properties.
+        // If recruiter is null/undefined, provide default values.
+        const recruiter = jobRole.recruiter;
+
+        let transformedRecruiter = {
+          id: '',
+          name: 'Unknown Recruiter',
+          email: 'unknown@example.com',
+          company_name: null as string | null
         };
+
+        if (recruiter) {
+          transformedRecruiter.id = recruiter.id || '';
+          transformedRecruiter.name = recruiter.name || 'Unknown Recruiter';
+          transformedRecruiter.email = recruiter.email || 'unknown@example.com';
+
+          // Safely access company_name only if recruiter_profile exists and is an array with elements
+          if (Array.isArray(recruiter.recruiter_profile) && recruiter.recruiter_profile.length > 0) {
+            transformedRecruiter.company_name = recruiter.recruiter_profile[0].company_name;
+          }
+        }
 
         return {
           ...jobRole,
@@ -284,7 +295,7 @@ export const RecruiterDashboard = () => {
   };
 
   const handleViewApplicants = (jobId: string) => {
-    console.log(`Setting selectedJobId to: ${jobId} for viewing applicants.`); // Added for debugging
+    console.log(`Setting selectedJobId to: ${jobId} for viewing applicants.`);
     setSelectedJobId(jobId);
     setActiveTab('job-details'); // This tab will display job details AND applicants
   };
