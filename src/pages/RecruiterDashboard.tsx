@@ -150,7 +150,8 @@ export const RecruiterDashboard = () => {
         .order('created_at', { ascending: false });
 
       if (companyFilter) {
-        query = query.ilike('recruiter.company_name', `%${companyFilter}%`);
+        // FIX: Correctly access nested company_name from the 'recruiters' table
+        query = query.ilike('recruiter.recruiters.company_name', `%${companyFilter}%`);
       } else {
         query = query.eq('recruiter_id', userProfile.id);
       }
@@ -772,9 +773,9 @@ export const RecruiterDashboard = () => {
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
-        {activeTab === 'job-details' && selectedJobId && selectedJobRole && ( // Added selectedJobRole check
+        {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
           <JobDetailView
-            job={selectedJobRole} // <--- Changed from jobId to job
+            job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
           />
