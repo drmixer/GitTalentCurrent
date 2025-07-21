@@ -564,9 +564,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       const { data, error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId).select();
       if (error) { throw error; }
       if (userId === user.id) {
-        const { data: singleUser, error: singleError } = await supabase.from('users').select().eq('id', userId).single();
-        if(singleError) throw singleError;
-        setUserProfile(singleUser);
+        const { data: userData, error: userError } = await supabase.from('users').select().eq('id', userId);
+        if(userError) throw userError;
+        setUserProfile(userData[0]);
       }
       return { data, error: null };
     } catch (error: any) {
