@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
-import { 
-  Users, 
-  Briefcase, 
+import {
+  Users,
+  Briefcase,
   MessageSquare,
-  TrendingUp, 
+  TrendingUp,
   Plus,
   Search,
   Bell,
@@ -65,18 +65,18 @@ export const RecruiterDashboard = () => {
     totalHires: 0,
     totalRevenue: 0
   });
-  
+
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  
+
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -117,7 +117,7 @@ export const RecruiterDashboard = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       await Promise.all([
         fetchJobRoles(),
         fetchStats(),
@@ -167,31 +167,31 @@ export const RecruiterDashboard = () => {
   const fetchStats = async () => {
     try {
       if (!userProfile?.id) return;
-      
+
       // Fetch job stats
       const { data: jobs, error: jobsError } = await supabase
         .from('job_roles')
         .select('id, is_active, is_featured')
         .eq('recruiter_id', userProfile.id);
-      
+
       if (jobsError) throw jobsError;
-      
+
       // Fetch message stats
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
         .select('id, is_read')
         .eq('receiver_id', userProfile.id);
-      
+
       if (messagesError) throw messagesError;
-      
+
       // Fetch hire stats
       const { data: hires, error: hiresError } = await supabase
         .from('hires')
         .select('id, salary')
         .eq('marked_by', userProfile.id);
-      
+
       if (hiresError) throw hiresError;
-      
+
       setStats({
         totalJobs: jobs?.length || 0,
         activeJobs: jobs?.filter(j => j.is_active).length || 0,
@@ -209,7 +209,7 @@ export const RecruiterDashboard = () => {
   const fetchHires = async () => {
     try {
       if (!userProfile?.id) return;
-      
+
       const { data, error } = await supabase
         .from('hires')
         .select(`
@@ -222,7 +222,7 @@ export const RecruiterDashboard = () => {
         `)
         .eq('assignment.recruiter_id', userProfile.id)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setHires(data || []);
     } catch (error: any) {
@@ -233,13 +233,13 @@ export const RecruiterDashboard = () => {
   const fetchUnreadNotificationsCount = async () => {
     try {
       if (!userProfile?.id) return;
-      
+
       const { count, error } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userProfile.id)
         .eq('is_read', false);
-      
+
       if (error) throw error;
       setUnreadNotifications(count || 0);
     } catch (error: any) {
@@ -276,7 +276,7 @@ export const RecruiterDashboard = () => {
     // Refresh hires data
     await fetchHires();
     await fetchStats();
-    
+
     setSuccess('Developer hired successfully!');
     setTimeout(() => {
       setSuccess('');
@@ -289,7 +289,7 @@ export const RecruiterDashboard = () => {
   }
 
   // Filter hires based on search term
-  const filteredHires = hires.filter(hire => 
+  const filteredHires = hires.filter(hire =>
     hire.assignment?.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     hire.assignment?.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -308,7 +308,7 @@ export const RecruiterDashboard = () => {
           <div className="text-sm font-medium text-gray-600 mb-2">Total Job Listings</div>
           <div className="text-xs text-emerald-600 font-medium">{stats.activeJobs} active jobs</div>
         </div>
-        
+
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -319,7 +319,7 @@ export const RecruiterDashboard = () => {
           <div className="text-sm font-medium text-gray-600 mb-2">Featured Jobs</div>
           <div className="text-xs text-emerald-600 font-medium">Higher visibility to developers</div>
         </div>
-        
+
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -330,7 +330,7 @@ export const RecruiterDashboard = () => {
           <div className="text-sm font-medium text-gray-600 mb-2">Unread Messages</div>
           <div className="text-xs text-emerald-600 font-medium">{stats.totalMessages} total messages</div>
         </div>
-        
+
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -355,7 +355,7 @@ export const RecruiterDashboard = () => {
             <span className="font-semibold text-gray-900">Manage Jobs</span>
             <span className="text-sm text-gray-600 mt-1">View, edit, and create job listings</span>
           </button>
-          
+
           <button
             onClick={() => setActiveTab('tracker')}
             className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
@@ -364,7 +364,7 @@ export const RecruiterDashboard = () => {
             <span className="font-semibold text-gray-900">Hiring Pipeline</span>
             <span className="text-sm text-gray-600 mt-1">Track candidates across all jobs</span>
           </button>
-          
+
           <button
             onClick={() => setActiveTab('search-devs')}
             className="flex flex-col items-center justify-center p-6 bg-emerald-50 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
@@ -379,7 +379,7 @@ export const RecruiterDashboard = () => {
       {/* Recent Activity */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
-        
+
         {/* Recent Hires */}
         <div>
           <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Hires</h3>
@@ -392,7 +392,7 @@ export const RecruiterDashboard = () => {
                       {hire.assignment?.developer?.name || 'Unknown Developer'}
                     </h4>
                     <div className="text-sm text-gray-600 mt-1">
-                      Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} • 
+                      Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
                       ${hire.salary.toLocaleString()} annual salary
                     </div>
                   </div>
@@ -405,7 +405,7 @@ export const RecruiterDashboard = () => {
           ) : (
             <p className="text-gray-500 text-center py-4">No hires recorded yet.</p>
           )}
-          
+
           {hires.length > 0 && (
             <div className="mt-4 text-center">
               <button
@@ -424,7 +424,7 @@ export const RecruiterDashboard = () => {
   const renderSearchDevelopers = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
-      
+
       <DeveloperDirectory onSendMessage={handleMessageDeveloper} />
     </div>
   );
@@ -440,7 +440,7 @@ export const RecruiterDashboard = () => {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Messages
           </button>
-          
+
           <MessageThread
             otherUserId={selectedThread.otherUserId}
             otherUserName={selectedThread.otherUserName}
@@ -468,7 +468,7 @@ export const RecruiterDashboard = () => {
             />
           </div>
         </div>
-        
+
         <MessageList
           onThreadSelect={setSelectedThread}
           searchTerm={searchTerm}
@@ -480,7 +480,7 @@ export const RecruiterDashboard = () => {
   const renderHires = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Successful Hires</h2>
-      
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -492,7 +492,8 @@ export const RecruiterDashboard = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      
+
+
       {/* Hires List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -608,11 +609,11 @@ export const RecruiterDashboard = () => {
             {isRefreshing ? 'Checking Account Status...' : 'Account Pending Approval'}
           </h1>
           <p className="text-gray-600 mb-6">
-            Your recruiter account is currently pending approval by our admin team. 
+            Your recruiter account is currently pending approval by our admin team.
             You'll receive an email notification once your account is approved.
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            This usually takes 1-2 business days. If you have any questions, 
+            This usually takes 1-2 business days. If you have any questions,
             please contact support@gittalent.dev
           </p>
           <button
@@ -630,6 +631,10 @@ export const RecruiterDashboard = () => {
       </div>
     );
   }
+
+  // Find the selected job role based on selectedJobId
+  // This is the key change to address the TypeError in JobDetailView
+  const selectedJobRole = jobRoles.find(job => job.id === selectedJobId);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -649,7 +654,7 @@ export const RecruiterDashboard = () => {
             <p className="text-green-800 font-medium">{success}</p>
           </div>
         )}
-        
+
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
             <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
@@ -767,9 +772,9 @@ export const RecruiterDashboard = () => {
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
-        {activeTab === 'job-details' && selectedJobId && (
+        {activeTab === 'job-details' && selectedJobId && selectedJobRole && ( // Added selectedJobRole check
           <JobDetailView
-            jobId={selectedJobId}
+            job={selectedJobRole} // <--- Changed from jobId to job
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
           />
