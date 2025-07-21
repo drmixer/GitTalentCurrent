@@ -180,15 +180,19 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
       const row = parsedData[i];
       
       try {
+        if (!row.title || !row.description || !row.location || !row.job_type) {
+          throw new Error('Missing required fields');
+        }
+
         // Convert CSV data to JobRole format
         const jobData: Partial<JobRole> = {
           title: row.title,
           description: row.description,
           location: row.location,
           job_type: row.job_type as 'Full-time' | 'Part-time' | 'Contract' | 'Freelance',
-          tech_stack: row.tech_stack.split(',').map(tech => tech.trim()),
-          salary_min: Number(row.salary_min),
-          salary_max: Number(row.salary_max),
+          tech_stack: row.tech_stack ? row.tech_stack.split(',').map(tech => tech.trim()) : [],
+          salary_min: Number(row.salary_min) || 0,
+          salary_max: Number(row.salary_max) || 0,
           experience_required: row.experience_required || '',
           is_active: typeof row.is_active === 'string' 
             ? row.is_active.toLowerCase() === 'true'
