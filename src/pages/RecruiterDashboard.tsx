@@ -27,7 +27,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails'; // Keep this import
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
@@ -40,7 +40,6 @@ import JobsDashboard from '../components/Jobs/JobsDashboard';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 
-// --- NEW/UPDATED INTERFACE FOR CORRECT TYPE SAFETY ---
 // This interface defines the expected structure of a JobRole object
 // *after* the data transformation, where company_name is directly on recruiter.
 interface FetchedJobRole extends JobRole {
@@ -51,7 +50,6 @@ interface FetchedJobRole extends JobRole {
     company_name: string | null; // This will hold the flattened company name
   };
 }
-// --- END NEW/UPDATED INTERFACE ---
 
 interface MessageThread {
   otherUserId: string;
@@ -79,9 +77,9 @@ export const RecruiterDashboard = () => {
     totalRevenue: 0
   });
 
-  // --- UPDATED: Use the new interface for jobRoles state ---
+  // Use the new interface for jobRoles state
   const [jobRoles, setJobRoles] = useState<FetchedJobRole[]>([]);
-  // --- END UPDATED ---
+
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -159,15 +157,14 @@ export const RecruiterDashboard = () => {
             id,
             name,
             email,
-            recruiter_profile:recruiters ( // This alias helps with transformation
+            recruiter_profile:recruiters (
               company_name
             )
           )
-        `)
+        `) // **IMPORTANT: Removed the comment from here**
         .order('created_at', { ascending: false });
 
       if (companyFilter) {
-        // Updated filter path to match the select query's structure
         query = query.ilike('recruiter.recruiter_profile.company_name', `%${companyFilter}%`);
       } else {
         query = query.eq('recruiter_id', userProfile.id);
@@ -177,11 +174,8 @@ export const RecruiterDashboard = () => {
 
       if (error) throw error;
 
-      // --- NEW: Data Transformation for nested relationships in RecruiterDashboard ---
-      // Supabase's PostgREST API returns nested foreign key joins as arrays.
-      // We need to flatten the 'company_name' from the 'recruiter_profile' array.
+      // Data Transformation for nested relationships in RecruiterDashboard
       const transformedJobRoles = (data || []).map(jobRole => {
-        // Create a new recruiter object with company_name flattened
         const transformedRecruiter = {
           id: jobRole.recruiter.id,
           name: jobRole.recruiter.name,
@@ -190,17 +184,14 @@ export const RecruiterDashboard = () => {
           company_name: jobRole.recruiter.recruiter_profile?.[0]?.company_name || null
         };
 
-        // Return a new jobRole object where the 'recruiter' property now has the flattened structure
-        // We also explicitly remove the old 'recruiter_profile' array from the recruiter object
         const { recruiter_profile, ...restRecruiterData } = jobRole.recruiter;
         return {
           ...jobRole,
-          recruiter: transformedRecruiter // Assign the flattened recruiter object
-        } as FetchedJobRole; // Assert the type for safety
+          recruiter: transformedRecruiter
+        } as FetchedJobRole;
       });
 
-      setJobRoles(transformedJobRoles); // Set the transformed and correctly typed data
-      // --- END NEW ---
+      setJobRoles(transformedJobRoles);
 
     } catch (error: any) {
       console.error('Error fetching job roles:', error);
@@ -676,7 +667,6 @@ export const RecruiterDashboard = () => {
   }
 
   // Find the selected job role based on selectedJobId
-  // This is the key change to address the TypeError in JobDetailView
   // This selectedJobRole will now have the `company_name` directly on `recruiter` thanks to the transformation
   const selectedJobRole = jobRoles.find(job => job.id === selectedJobId);
 
@@ -818,7 +808,7 @@ export const RecruiterDashboard = () => {
         {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
         {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
           <JobDetailView
-            job={selectedJobRole} // This prop is now correctly typed and structured
+            job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
           />
