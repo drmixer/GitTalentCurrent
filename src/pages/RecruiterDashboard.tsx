@@ -161,7 +161,7 @@ export const RecruiterDashboard = () => {
               company_name
             )
           )
-        `) // **IMPORTANT: Removed the comment from here**
+        `)
         .order('created_at', { ascending: false });
 
       if (companyFilter) {
@@ -180,11 +180,16 @@ export const RecruiterDashboard = () => {
           id: jobRole.recruiter.id,
           name: jobRole.recruiter.name,
           email: jobRole.recruiter.email,
-          // Access the company_name from the first (and only) item in the 'recruiter_profile' array
-          company_name: jobRole.recruiter.recruiter_profile?.[0]?.company_name || null
+          // **FIXED:** Safely access company_name using optional chaining and nullish coalescing
+          company_name: jobRole.recruiter.recruiter_profile?.[0]?.company_name ?? null
         };
 
-        const { recruiter_profile, ...restRecruiterData } = jobRole.recruiter;
+        // Note: recruiter_profile might be an empty array [] or null/undefined
+        // The previous transformation was:
+        // const { recruiter_profile, ...restRecruiterData } = jobRole.recruiter;
+        // This line is not strictly needed if recruiter_profile is not used after extraction
+        // but it doesn't hurt. We just need to ensure the `company_name` access is safe.
+
         return {
           ...jobRole,
           recruiter: transformedRecruiter
