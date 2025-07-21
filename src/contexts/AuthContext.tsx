@@ -563,21 +563,25 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       if (!user) {
         throw new Error('User must be authenticated to update approval status');
       }
-      const { error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId);
 
-      if (error) {
-        console.error("Error updating user approval status:", error);
-        return false;
+      if (isApproved) {
+        const { data, error } = await supabase.functions.invoke('approve-recruiter', {
+          body: { userId },
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        return data.success;
+      } else {
+        // Rejection logic remains the same (deletion)
+        const { error } = await supabase.from('users').delete().eq('id', userId);
+        if (error) {
+          console.error("Error deleting user:", error);
+          return false;
+        }
+        return true;
       }
-
-      if (userId === user.id) {
-        // Refresh the current user's profile if they are the one being changed.
-        const { data: userData, error: userError } = await supabase.from('users').select().eq('id', userId).single();
-        if (userError) throw userError;
-        setUserProfile(userData);
-      }
-
-      return true;
     } catch (error: any) {
       console.error("Caught error in updateUserApprovalStatus:", error);
       return false;
