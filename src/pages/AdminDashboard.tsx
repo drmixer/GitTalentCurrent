@@ -358,9 +358,9 @@ export const AdminDashboard = () => {
       setProcessingIds(prev => [...prev, userId]);
       setError('');
       
-      const result = await updateUserApprovalStatus?.(userId, true);
+      const success = await updateUserApprovalStatus?.(userId, true);
       
-      if (result && !result.error) {
+      if (success) {
         setSuccessMessage('Recruiter approved successfully');
         // Update local state
         const approvedRecruiter = pendingRecruiters.find(r => r.user_id === userId);
@@ -373,42 +373,39 @@ export const AdminDashboard = () => {
           setSuccessMessage('');
         }, 3000);
       } else {
-        // This else block might not be necessary anymore if updateUserApprovalStatus throws.
-        // However, keeping it provides a fallback for non-throwing error returns.
-        throw new Error(result?.error?.message || 'Failed to approve recruiter');
+        throw new Error('Failed to approve recruiter');
       }
     } catch (error: any) {
       console.error('Error approving recruiter:', error);
-      setError(error.message || 'An unexpected error occurred during approval.');
+      setError(error.message || 'Failed to approve recruiter');
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== userId));
     }
   };
 
   const handleReject = async (userId: string) => {
+    // In a real application, you might want to handle rejection differently
+    // For now, we'll just keep them as pending but you could delete them or mark them as rejected
     try {
       setProcessingIds(prev => [...prev, userId]);
       setError('');
       
-      // For rejection, we'll just remove them from the pending list.
-      // A more robust system might move them to a 'rejected' state.
-      // We are not calling the updateUserApprovalStatus for rejection to reflect this logic.
+      const success = await updateUserApprovalStatus?.(userId, false);
       
-      // Note: The original logic called `updateUserApprovalStatus(userId, false)`.
-      // If the desired behavior is to mark them as explicitly not approved,
-      // that call should be restored here, wrapped in similar try/catch logic as handleApprove.
-      // For now, we are simply removing them from the pending list UI-side.
+      if (success) {
+        setSuccessMessage('Recruiter rejected successfully');
+        // Update local state
+        setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
 
-      setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
-      setSuccessMessage('Recruiter has been rejected and removed from the pending list.');
-
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
-
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+      } else {
+        throw new Error('Failed to reject recruiter');
+      }
     } catch (error: any) {
       console.error('Error rejecting recruiter:', error);
-      setError(error.message || 'An unexpected error occurred during rejection.');
+      setError(error.message || 'Failed to reject recruiter');
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== userId));
     }
