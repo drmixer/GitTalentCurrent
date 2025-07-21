@@ -5,7 +5,7 @@ import { JobRole, AppliedJob } from '../../types'; // Removed 'Developer' as its
 import {
   Briefcase, User, ChevronRight, Clock, Eye, MessageSquare,
   Loader, AlertCircle, ArrowLeft, MapPin, DollarSign,
-  Building, Edit, Trash2, CheckCircle // Added icons for Job Details section
+  Building // Added icons for Job Details section
 } from 'lucide-react';
 import { DeveloperProfileModal } from '../DeveloperProfileModal'; // Assuming this component exists and works
 
@@ -15,9 +15,9 @@ interface DeveloperWithProfile {
   user_id: string; // Foreign key to the 'users' table
   github_handle: string | null;
   bio: string | null;
-  availability: boolean | null; // Note: your schema shows boolean, previous had string 'availability'
-  top_languages: string[] | null; // Corrected to match ARRAY type
-  linked_projects: string[] | null; // Corrected to match ARRAY type
+  availability: boolean | null;
+  top_languages: string[] | null;
+  linked_projects: string[] | null;
   location: string | null;
   experience_years: number | null;
   desired_salary: number | null;
@@ -33,7 +33,7 @@ interface DeveloperWithProfile {
   public_profile_enabled: boolean | null;
   profile_view_count: number | null;
   search_appearance_count: number | null;
-  skills: string[] | null; // Corrected to match ARRAY type
+  skills: string[] | null;
   preferred_title: string | null;
   looking_for_job: boolean | null;
   // Nested user object from the join
@@ -68,8 +68,7 @@ interface JobDetailViewProps {
 }
 
 export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMessageDeveloper, showBackButton = true }) => {
-  // userProfile is not directly used in this component's rendering, but kept if needed for other logic
-  const { userProfile } = useAuth();
+  const { userProfile } = useAuth(); // Not directly used in rendering, but kept for context if other logic needs it
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -90,35 +89,28 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
           developer:developers (
             *,
             user:users(*)
-            -- All profile fields from the 'developers' table are included by '*' above.
-            -- No need for a separate join to 'developers' for profile details.
           )
-        `)
+        `) // ALL COMMENTS REMOVED FROM HERE
         .eq('job_id', job.id);
 
       if (fetchError) {
         throw fetchError;
       }
 
-      // Ensure data is an array and transform it safely
       const transformedCandidates: Candidate[] = (data || []).map(appliedJob => {
         const developer = appliedJob.developer;
-        // Defensive check: ensure developer and its user property exist
         if (!developer || !developer.user) {
           console.warn('Skipping candidate due to missing developer or user data:', appliedJob);
-          return null; // Filter out nulls later
+          return null;
         }
-
-        // The 'developer' object from the query already contains all its direct columns (profile fields)
-        // and the nested 'user' object.
         return {
           ...appliedJob,
           developer: {
             ...developer,
-            user: developer.user // Explicitly ensure user is correctly typed and nested
+            user: developer.user
           }
         } as Candidate;
-      }).filter(Boolean) as Candidate[]; // Filter out any nulls if an entry was malformed
+      }).filter(Boolean) as Candidate[];
 
       setCandidates(transformedCandidates);
     } catch (err: any) {
@@ -130,7 +122,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
   };
 
   const updateCandidateStatus = async (applicationId: string, status: string) => {
-    setLoading(true); // Indicate loading for status update
+    setLoading(true);
     setError('');
     try {
       const { data, error: updateError } = await supabase
@@ -143,7 +135,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         throw updateError;
       }
 
-      // Optimistically update the local state
       setCandidates(prev => prev.map(c => c.id === applicationId ? { ...c, status } : c));
     } catch (err: any) {
       console.error("Error updating candidate status:", err);
@@ -153,13 +144,11 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     }
   };
 
-  // Defensive checks for job recruiter details
   const companyName = job.recruiter?.company_name || 'Company Confidential';
-  // Use avatar_url from user for recruiter profile pic if available, otherwise fallback
   const recruiterProfilePicUrl = job.recruiter?.profile_pic_url || '';
 
   return (
-    <div className="space-y-8"> {/* Added main container for consistent spacing */}
+    <div className="space-y-8">
       {showBackButton && (
         <button onClick={onBack} className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-4">
           <ArrowLeft className="w-5 h-5 mr-2" />
@@ -176,7 +165,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         </div>
       )}
 
-      {/* Job Details Section */}
       {job && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{job.title}</h2>
@@ -189,7 +177,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
             <div className="flex items-center"><Clock className="w-4 h-4 mr-2 text-gray-500" /> Posted {new Date(job.created_at).toLocaleDateString()}</div>
           </div>
 
-          {/* Conditional rendering for array fields based on your schema */}
           {job.required_skills && job.required_skills.length > 0 && (
             <div className="mb-4">
               <h3 className="font-bold text-gray-800 mb-2">Required Skills</h3>
@@ -235,7 +222,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         </div>
       )}
 
-      {/* Applicants Section */}
       <h3 className="text-xl font-bold text-gray-900 mb-4">Applicants ({candidates.length})</h3>
       {loading ? (
         <div className="flex items-center justify-center py-8 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -260,7 +246,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                 <div>
                   <h4 className="font-bold text-gray-900">{candidate.developer.user.name || candidate.developer.github_handle || 'Unknown Developer'}</h4>
                   <p className="text-sm text-gray-600">{candidate.developer.github_handle || 'No GitHub Handle'}</p>
-                  {/* Displaying some profile details directly */}
                   {candidate.developer.experience_years !== null && candidate.developer.experience_years !== undefined && (
                     <p className="text-xs text-gray-500">Exp: {candidate.developer.experience_years} years</p>
                   )}
