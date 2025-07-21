@@ -180,15 +180,9 @@ export const RecruiterDashboard = () => {
           id: jobRole.recruiter.id,
           name: jobRole.recruiter.name,
           email: jobRole.recruiter.email,
-          // **FIXED:** Safely access company_name using optional chaining and nullish coalescing
+          // Safely access company_name using optional chaining and nullish coalescing
           company_name: jobRole.recruiter.recruiter_profile?.[0]?.company_name ?? null
         };
-
-        // Note: recruiter_profile might be an empty array [] or null/undefined
-        // The previous transformation was:
-        // const { recruiter_profile, ...restRecruiterData } = jobRole.recruiter;
-        // This line is not strictly needed if recruiter_profile is not used after extraction
-        // but it doesn't hurt. We just need to ensure the `company_name` access is safe.
 
         return {
           ...jobRole,
@@ -287,8 +281,9 @@ export const RecruiterDashboard = () => {
   };
 
   const handleViewApplicants = (jobId: string) => {
+    console.log(`Setting selectedJobId to: ${jobId} for viewing applicants.`); // Added for debugging
     setSelectedJobId(jobId);
-    setActiveTab('job-details');
+    setActiveTab('job-details'); // This tab will display job details AND applicants
   };
 
   const handleMessageDeveloper = (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
@@ -564,8 +559,7 @@ export const RecruiterDashboard = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.name || 'Unknown'}
                         </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
