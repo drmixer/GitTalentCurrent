@@ -515,7 +515,6 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
   };
 
   const createJobRole = async (jobData: Partial<JobRole>): Promise<any> => {
-    console.log('createJobRole called with:', jobData);
     if (!user) throw new Error("User must be authenticated to create job roles");
     const { data, error } = await supabase
       .from('job_roles')
