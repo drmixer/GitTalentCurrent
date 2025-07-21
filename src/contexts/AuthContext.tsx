@@ -558,19 +558,29 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<{ data: any | null; error: any | null }> => {
+  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
     try {
-      if (!user) { throw new Error('User must be authenticated to update approval status'); }
-      const { data, error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId).select();
-      if (error) { throw error; }
-      if (userId === user.id) {
-        const { data: userData, error: userError } = await supabase.from('users').select().eq('id', userId);
-        if(userError) throw userError;
-        setUserProfile(userData[0]);
+      if (!user) {
+        throw new Error('User must be authenticated to update approval status');
       }
-      return { data, error: null };
+      const { error } = await supabase.from('users').update({ is_approved: isApproved }).eq('id', userId);
+
+      if (error) {
+        console.error("Error updating user approval status:", error);
+        return false;
+      }
+
+      if (userId === user.id) {
+        // Refresh the current user's profile if they are the one being changed.
+        const { data: userData, error: userError } = await supabase.from('users').select().eq('id', userId).single();
+        if (userError) throw userError;
+        setUserProfile(userData);
+      }
+
+      return true;
     } catch (error: any) {
-      return { data: null, error };
+      console.error("Caught error in updateUserApprovalStatus:", error);
+      return false;
     }
   };
 
