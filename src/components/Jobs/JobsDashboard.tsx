@@ -15,7 +15,9 @@ import {
   Calendar,
   Loader,
   Briefcase,
-  MessageSquare
+  MessageSquare,
+  CheckCircle, // Added for success messages
+  AlertCircle // Added for error messages
 } from 'lucide-react';
 import { JobRoleForm } from '../JobRoles/JobRoleForm';
 import { JobImportModal } from '../JobRoles/JobImportModal';
@@ -23,14 +25,14 @@ import { JobImportModal } from '../JobRoles/JobImportModal';
 interface JobsDashboardProps {
   jobRoles: JobRole[];
   onViewApplicants: (jobId: string) => void;
-  onJobUpdate: () => void;
+  onJobUpdate: () => void; // This function is called to refresh the job list in the parent
 }
 
 const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicants, onJobUpdate }) => {
   const { userProfile } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false); // Used for dashboard-level operations like delete, toggle status
+  const [error, setError] = useState(''); // Used for dashboard-level errors
+  const [success, setSuccess] = useState(''); // Used for dashboard-level success messages
   const [searchTerm, setSearchTerm] = useState('');
   const [editingJob, setEditingJob] = useState<JobRole | null>(null);
   const [showJobForm, setShowJobForm] = useState(false);
@@ -63,42 +65,23 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
       setJobInterestCounts(counts);
     } catch (error: any) {
       console.error('Error fetching job interest counts:', error);
+      setError('Failed to fetch interest counts.');
+      setTimeout(() => setError(''), 3000);
     }
   };
 
-  const handleJobSubmit = async (jobData: Partial<JobRole>) => {
-    try {
-      setLoading(true);
-      setError('');
+  /**
+   * REFACTOR: This function now handles the completion of the JobRoleForm
+   * It no longer performs its own database insert/update operations.
+   * JobRoleForm (via useAuth) is responsible for that.
+   */
+  const handleJobFormCompletion = () => {
+    setSuccess('Job operation completed successfully!');
+    onJobUpdate(); // Refresh the list of job roles in the parent component
+    setShowJobForm(false); // Close the form modal
+    setEditingJob(null); // Clear the editing state
 
-      if (editingJob) {
-        const { error } = await supabase
-          .from('job_roles')
-          .update(jobData)
-          .eq('id', editingJob.id);
-
-        if (error) throw error;
-        setSuccess('Job updated successfully!');
-      } else {
-        const { error } = await supabase
-          .from('job_roles')
-          .insert({ ...jobData, recruiter_id: userProfile?.id });
-
-        if (error) throw error;
-        setSuccess('Job created successfully!');
-      }
-
-      onJobUpdate();
-      setShowJobForm(false);
-      setEditingJob(null);
-
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error: any) {
-      console.error('Error saving job:', error);
-      setError(error.message || 'Failed to save job');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => setSuccess(''), 3000); // Clear success message after 3 seconds
   };
 
   const handleDeleteJob = async (jobId: string) => {
@@ -115,6 +98,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
     } catch (error: any) {
       console.error('Error deleting job:', error);
       setError(error.message || 'Failed to delete job');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -132,6 +116,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
     } catch (error: any) {
       console.error('Error updating job status:', error);
       setError(error.message || 'Failed to update job status');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -149,6 +134,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
     } catch (error: any) {
       console.error('Error featuring job:', error);
       setError(error.message || 'Failed to feature job');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -182,6 +168,24 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
         </div>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+            <p className="text-sm font-medium text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+            <p className="text-sm font-medium text-green-800">{success}</p>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
@@ -214,7 +218,7 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
                   <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center"><MapPin className="w-4 h-4 mr-1" />{job.location}</div>
                     <div className="flex items-center"><Clock className="w-4 h-4 mr-1" />{job.job_type}</div>
-                    <div className="flex items-center"><DollarSign className="w-4 h-4 mr-1" />${job.salary_min}k - ${job.salary_max}k</div>
+                    <div className="flex items-center"><DollarSign className="w-4 h-4 mr-1" />${job.salary}</div> {/* Changed to job.salary as per JobRoleForm */}
                     <div className="flex items-center"><Calendar className="w-4 h-4 mr-1" />Posted {new Date(job.created_at).toLocaleDateString()}</div>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -253,7 +257,8 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
       {showJobForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <JobRoleForm jobRole={editingJob} onSuccess={handleJobSubmit} onCancel={() => { setShowJobForm(false); setEditingJob(null); }} />
+            {/* IMPORTANT CHANGE: onSuccess now points to handleJobFormCompletion */}
+            <JobRoleForm jobRole={editingJob} onSuccess={handleJobFormCompletion} onCancel={() => { setShowJobForm(false); setEditingJob(null); }} />
           </div>
         </div>
       )}
