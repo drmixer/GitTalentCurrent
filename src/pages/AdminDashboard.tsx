@@ -355,58 +355,56 @@ export const AdminDashboard = () => {
 
   const handleApprove = async (userId: string) => {
     console.log("handleApprove called with userId:", userId);
+    setProcessingIds(prev => [...prev, userId]);
+    setError('');
     try {
-      setProcessingIds(prev => [...prev, userId]);
-      setError('');
-      
-      const success = await updateUserApprovalStatus?.(userId, true);
+      const success = await updateUserApprovalStatus(userId, true);
       
       if (success) {
         setSuccessMessage('Recruiter approved successfully');
-        // Update local state
+        // Update local state immediately for better UX
         const approvedRecruiter = pendingRecruiters.find(r => r.user_id === userId);
         if (approvedRecruiter) {
           setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
           setApprovedRecruiters(prev => [approvedRecruiter, ...prev]);
         }
         
-        setTimeout(() => {
-          setSuccessMessage('');
-        }, 3000);
+        // Optional: refresh from DB to ensure consistency
+        // fetchRecruiters();
+
+        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
-        throw new Error('Failed to approve recruiter');
+        // The error is logged in the context, but we can set a UI error here
+        setError('Failed to approve recruiter. Please check the logs.');
       }
     } catch (error: any) {
       console.error('Error approving recruiter:', error);
-      setError(error.message || 'Failed to approve recruiter');
+      setError(error.message || 'An unexpected error occurred.');
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== userId));
     }
   };
 
   const handleReject = async (userId: string) => {
-    // In a real application, you might want to handle rejection differently
-    // For now, we'll just keep them as pending but you could delete them or mark them as rejected
+    setProcessingIds(prev => [...prev, userId]);
+    setError('');
     try {
-      setProcessingIds(prev => [...prev, userId]);
-      setError('');
-      
-      const success = await updateUserApprovalStatus?.(userId, false);
-      
-      if (success) {
-        setSuccessMessage('Recruiter rejected successfully');
-        // Update local state
-        setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
+      // For now, we are just deleting the user record upon rejection.
+      // A "soft delete" or a "rejected" status might be better in a real app.
+      const { error: deleteError } = await supabase.from('users').delete().eq('id', userId);
 
-        setTimeout(() => {
-          setSuccessMessage('');
-        }, 3000);
-      } else {
-        throw new Error('Failed to reject recruiter');
+      if (deleteError) {
+        throw deleteError;
       }
+
+      setSuccessMessage('Recruiter rejected and removed successfully');
+      setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
+
+      setTimeout(() => setSuccessMessage(''), 3000);
+
     } catch (error: any) {
       console.error('Error rejecting recruiter:', error);
-      setError(error.message || 'Failed to reject recruiter');
+      setError(error.message || 'Failed to reject recruiter. Please check logs.');
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== userId));
     }
