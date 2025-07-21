@@ -354,6 +354,7 @@ export const AdminDashboard = () => {
   };
 
   const handleApprove = async (userId: string) => {
+    console.log("handleApprove called with userId:", userId);
     try {
       setProcessingIds(prev => [...prev, userId]);
       setError('');
