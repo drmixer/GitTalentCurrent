@@ -514,18 +514,18 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  const createJobRole = async (jobData: Partial<JobRole>): Promise<{ data: any | null; error: any | null }> => {
-    try {
-      if (!user) { throw new Error('User must be authenticated to create job roles'); }
-      const { data, error } = await supabase.from('job_roles').insert([jobData]).select().single();
-      if (error) { throw error; }
-      return { data, error: null };
-    } catch (error: any) {
-      return { data: null, error };
-    }
+  const createJobRole = async (jobData: Partial<JobRole>): Promise<any> => {
+    if (!user) throw new Error("User must be authenticated to create job roles");
+    const { data, error } = await supabase
+      .from('job_roles')
+      .insert({ ...jobData, recruiter_id: user.id })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   };
 
-  const updateJobRole = async (jobRoleId: number, updates: Partial<JobRole>): Promise<{ data: any | null; error: any | null }> => {
+  const updateJobRole = async (jobRoleId: string, updates: Partial<JobRole>): Promise<any> => {
     try {
       if (!user) { throw new Error('User must be authenticated to update job roles'); }
       const { data, error } = await supabase.from('job_roles').update(updates).eq('id', jobRoleId).select().single();
