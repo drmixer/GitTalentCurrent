@@ -180,8 +180,11 @@ export const RecruiterDashboard = () => {
           id: jobRole.recruiter.id,
           name: jobRole.recruiter.name,
           email: jobRole.recruiter.email,
-          // Safely access company_name using optional chaining and nullish coalescing
-          company_name: jobRole.recruiter.recruiter_profile?.[0]?.company_name ?? null
+          // **FIX:** More robust access to company_name
+          // Check if recruiter_profile exists AND is an array before attempting to access index 0
+          company_name: Array.isArray(jobRole.recruiter.recruiter_profile) && jobRole.recruiter.recruiter_profile.length > 0
+            ? jobRole.recruiter.recruiter_profile[0].company_name
+            : null
         };
 
         return {
@@ -551,7 +554,6 @@ export const RecruiterDashboard = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredHires.map((hire) => (
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
-                    {/* THIS WAS THE PROBLEM AREA */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
@@ -562,7 +564,6 @@ export const RecruiterDashboard = () => {
                         </div>
                       </div>
                     </td>
-                    {/* END OF PROBLEM AREA */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
