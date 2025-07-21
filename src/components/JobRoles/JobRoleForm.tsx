@@ -38,8 +38,7 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
     location: '',
     job_type: 'Full-time' as 'Full-time' | 'Part-time' | 'Contract' | 'Freelance',
     tech_stack: [] as string[],
-    salary_min: 0,
-    salary_max: 0,
+    salary: '',
     experience_required: '',
     is_active: true,
     is_featured: false
@@ -55,8 +54,7 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
         location: jobRole.location,
         job_type: jobRole.job_type,
         tech_stack: jobRole.tech_stack || [],
-        salary_min: jobRole.salary_min,
-        salary_max: jobRole.salary_max,
+        salary: jobRole.salary,
         experience_required: jobRole.experience_required,
         is_active: jobRole.is_active,
         is_featured: jobRole.is_featured || false
@@ -105,12 +103,6 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
       }
       if (!formData.location.trim()) {
         throw new Error('Location is required');
-      }
-      if (formData.salary_min < 0 || formData.salary_max < 0) {
-        throw new Error('Salary values must be positive');
-      }
-      if (formData.salary_min > formData.salary_max) {
-        throw new Error('Minimum salary cannot be greater than maximum salary');
       }
 
       const jobData = {
@@ -221,7 +213,7 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
         </div>
 
         {/* Job Type and Salary */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="job_type" className="block text-sm font-bold text-gray-700 mb-2">
               Job Type *
@@ -245,39 +237,25 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
           </div>
 
           <div>
-            <label htmlFor="salary_min" className="block text-sm font-bold text-gray-700 mb-2">
-              Min Salary (USD)
+            <label htmlFor="salary" className="block text-sm font-bold text-gray-700 mb-2">
+              Salary (USD)
             </label>
             <div className="relative">
               <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
-                id="salary_min"
-                name="salary_min"
-                type="number"
-                min="0"
+                id="salary"
+                name="salary"
+                type="text"
+                pattern="[0-9]*"
                 className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                placeholder="80000"
-                value={formData.salary_min}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="salary_max" className="block text-sm font-bold text-gray-700 mb-2">
-              Max Salary (USD)
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="salary_max"
-                name="salary_max"
-                type="number"
-                min="0"
-                className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                placeholder="120000"
-                value={formData.salary_max}
-                onChange={handleChange}
+                placeholder="e.g. 100000"
+                value={formData.salary}
+                onChange={(e) => {
+                  const { value } = e.target;
+                  if (/^[0-9]*$/.test(value)) {
+                    handleChange(e);
+                  }
+                }}
               />
             </div>
           </div>
@@ -448,10 +426,13 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
 
         {/* Submit Buttons */}
         <div className="flex items-center justify-end space-x-4 pt-6">
-          {onCancel && (
+          {(onCancel || onClose) && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                onCancel?.();
+                onClose?.();
+              }}
               className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
             >
               Cancel
@@ -474,18 +455,6 @@ export const JobRoleForm: React.FC<JobRoleFormProps> = ({
               </div>
             )}
           </button>
-          {(onCancel || onClose) && (
-            <button
-              type="button"
-              onClick={() => {
-                onCancel?.();
-                onClose?.();
-              }}
-              className="px-6 py-3 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-            >
-              Cancel
-            </button>
-          )}
         </div>
       </form>
     </div>

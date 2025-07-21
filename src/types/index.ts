@@ -71,8 +71,8 @@ export interface AuthContextType {
   lastProfileUpdateTime?: number | null; // Added for explicit refresh signal
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>; 
-  createJobRole?: (jobData: Partial<JobRole>) => Promise<boolean>; 
-  updateJobRole?: (jobId: string, jobData: Partial<JobRole>) => Promise<boolean>; 
+  createJobRole?: (jobData: Partial<JobRole>) => Promise<any>;
+  updateJobRole?: (jobId: string, jobData: Partial<JobRole>) => Promise<any>;
   createAssignment?: (assignmentData: Partial<Assignment>) => Promise<boolean>; 
   importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>; 
   createHire?: (hireData: Partial<Hire>) => Promise<boolean>; 
@@ -173,8 +173,7 @@ export interface JobRole {
   location: string;
   job_type: 'Full-time' | 'Part-time' | 'Contract' | 'Freelance';
   tech_stack: string[];
-  salary_min: number;
-  salary_max: number;
+  salary: string;
   experience_required: string;
   is_active: boolean;
   is_featured?: boolean;
@@ -189,8 +188,7 @@ export interface CSVJobImport {
   location: string;
   job_type: string;
   tech_stack: string;
-  salary_min: number | string;
-  salary_max: number | string;
+  salary: string;
   experience_required?: string;
   is_active?: boolean | string;
 }
