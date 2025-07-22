@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { JobRole, Developer, AppliedJob } from '../../types';
-import { Briefcase, User, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle } from 'lucide-react';
+import { JobRole, Developer, AppliedJob, User } from '../../types'; // Ensure User is imported
+import { Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle } from 'lucide-react';
 
 interface Candidate extends AppliedJob {
-  developer: Developer & { user: any };
+  developer: Developer & { user: User }; // Ensure this matches your Developer type if 'user' is always present
 }
 
 export const CandidateTracker: React.FC = () => {
@@ -51,8 +51,38 @@ export const CandidateTracker: React.FC = () => {
         .select(`
           *,
           developer:developers (
-            *,
-            user:users(*)
+            id,
+            user_id,
+            github_handle,
+            bio,
+            availability,
+            top_languages,
+            linked_projects,
+            location,
+            experience_years,
+            desired_salary,
+            created_at,
+            updated_at,
+            skills_categories,
+            profile_strength,
+            public_profile_slug,
+            notification_preferences,
+            resume_url,
+            profile_pic_url,
+            github_installation_id,
+            public_profile_enabled,
+            profile_view_count,
+            search_appearance_count,
+            skills,
+            preferred_title,
+            looking_for_job,
+            user:users (
+              id,
+              name,
+              email,
+              avatar_url,
+              profile_pic_url
+            )
           )
         `)
         .eq('job_id', jobId);
@@ -134,9 +164,9 @@ export const CandidateTracker: React.FC = () => {
                   <div key={candidate.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <img src={candidate.developer.profile_pic_url || ''} alt={candidate.developer.user.name} className="w-12 h-12 rounded-full" />
+                        <img src={candidate.developer.profile_pic_url || candidate.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.developer.user?.name || candidate.developer.github_handle || 'U')}&background=random`} alt={candidate.developer.user?.name || 'Developer'} className="w-12 h-12 rounded-full object-cover" />
                         <div>
-                          <h4 className="font-bold">{candidate.developer.user.name}</h4>
+                          <h4 className="font-bold">{candidate.developer.user?.name || 'Unknown'}</h4>
                           <p className="text-sm text-gray-600">{candidate.developer.github_handle}</p>
                         </div>
                       </div>
