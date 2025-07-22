@@ -10,7 +10,8 @@ interface RecruiterProfileProps {
 }
 
 const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
-  const [recruiter, setRecruiter] = useState<(User & { recruiters?: RecruiterType[] }) | null>(null);
+  // Corrected type: recruiters should be RecruiterType (an object) or null/undefined, not an array.
+  const [recruiter, setRecruiter] = useState<(User & { recruiters?: RecruiterType | null }) | null>(null);
   const [jobs, setJobs] = useState<EnrichedJobRole[]>([]); // Use EnrichedJobRole[]
   const [stats, setStats] = useState({
     totalJobs: 0,
@@ -54,7 +55,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
             avatar_url,
             profile_pic_url,
             company_logo_url,
-            recruiters:recruiters!user_id(
+            recruiters:recruiters!recruiters_user_id_fkey(  // Changed user_id to recruiters_user_id_fkey for consistency
               company_name,
               website,
               company_size,
@@ -66,7 +67,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
         // --- START DEBUG LOGS FOR RECRUITER PROFILE ---
         console.log(`[RecruiterProfile] Fetched Raw Recruiter Data for Profile:`, recruiterData);
-        console.log(`[RecruiterProfile] Profile's 'recruiters' array:`, recruiterData?.recruiters);
+        // This log will now show the object directly if it's an object or null if not found
+        console.log(`[RecruiterProfile] Profile's 'recruiters' object:`, recruiterData?.recruiters);
         // --- END DEBUG LOGS ---
 
         if (recruiterError) {
@@ -99,13 +101,16 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         }
 
         const transformedJobs: EnrichedJobRole[] = (jobsData || []).map(job => {
-          const companyName = job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential';
+          // Changed access here for job details modal's nested recruiter company name
+          // Access directly, as job.recruiter.recruiters is an object
+          const companyName = (job.recruiter?.recruiters as RecruiterType)?.company_name || 'Company Confidential';
           return {
             ...job,
             company_name: companyName,
             recruiter: job.recruiter ? {
                 ...job.recruiter,
-                recruiters: job.recruiter.recruiters || [], // Ensure nested array is preserved
+                // Ensure nested object is preserved, or undefined if null
+                recruiters: (job.recruiter.recruiters as RecruiterType) || undefined,
             } : undefined,
           };
         });
@@ -167,7 +172,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
           <div className="h-48 bg-gray-100 flex items-center justify-center text-gray-400 text-6xl font-bold">
              {/* Main banner image - uses company_logo_url from the recruiter object directly */}
              {recruiter.company_logo_url && (
-                <img src={recruiter.company_logo_url} alt={`${recruiter.recruiters?.[0]?.company_name || 'Company'} Cover`} className="w-full h-full object-cover"/>
+                {/* Access directly, not via [0] */}
+                <img src={recruiter.company_logo_url} alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} Cover`} className="w-full h-full object-cover"/>
              )}
              {/* Fallback if no company logo or profile pic for banner */}
              {!recruiter.company_logo_url && !recruiter.profile_pic_url && (
@@ -188,11 +194,12 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               <img
                 className="h-16 w-auto object-contain rounded-lg shadow-sm bg-white p-1"
                 src={recruiter.company_logo_url}
-                alt={`${recruiter.recruiters?.[0]?.company_name || 'Company'} logo`}
+                {/* Access directly, not via [0] */}
+                alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} logo`}
               />
-            ) : recruiter.recruiters?.[0]?.company_name ? (
+            ) : (recruiter.recruiters as RecruiterType)?.company_name ? ( // Access directly, not via [0]
               <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm">
-                {recruiter.recruiters[0].company_name[0].toUpperCase()}
+                {(recruiter.recruiters as RecruiterType).company_name[0].toUpperCase()} {/* Access directly, not via [0] */}
               </div>
             ) : null}
           </div>
@@ -201,7 +208,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         <div className="pt-20 pb-8 px-8">
           <h1 className="text-3xl font-bold text-gray-800">{recruiter.name}</h1>
           {/* Display company name from recruiter's recruiters table, fallback */}
-          <p className="text-gray-600 text-lg">{recruiter.recruiters?.[0]?.company_name || 'Company Name Not Available'}</p>
+          {/* Access directly, not via [0] */}
+          <p className="text-gray-600 text-lg">{(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}</p>
         </div>
 
         <div className="px-8 pb-8">
