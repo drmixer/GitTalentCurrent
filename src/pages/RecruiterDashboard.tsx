@@ -179,7 +179,7 @@ const RecruiterDashboard: React.FC = () => {
       // Fetch Notifications
       const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
-        .select('*, user(name, avatar_url, profile_pic_url)')
+        .select('*, user:users(name, avatar_url, profile_pic_url)')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
 
