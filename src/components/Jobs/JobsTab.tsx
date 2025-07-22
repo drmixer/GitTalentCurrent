@@ -186,7 +186,7 @@ export const JobsTab: React.FC = () => {
   const { developerProfile } = useAuth();
   const [jobs, setJobs] = useState<EnrichedJobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
-  const [appliedJobIds, setAppliedJobIds] = new Set());
+  const [appliedJobIds, setAppliedJobIds] = useState(new Set<string>()); // CORRECTED LINE: Wrapped with useState and added semicolon
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
