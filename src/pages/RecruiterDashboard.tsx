@@ -140,6 +140,8 @@ const RecruiterDashboard: React.FC = () => {
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
 
   // --- Consolidated Data Fetching Function ---
+  // This function fetches ALL initial dashboard data.
+  // Realtime subscriptions will handle incremental updates more efficiently.
   const fetchDashboardData = useCallback(async () => {
     // Only proceed if userProfile (and thus user.id) is loaded
     if (!userProfile?.id) {
@@ -227,55 +229,106 @@ const RecruiterDashboard: React.FC = () => {
     }
   }, [userProfile?.id]); // Dependency array: ONLY re-run this function if userProfile.id changes
 
-  // --- useEffect to call fetchDashboardData on initial load and userProfile change ---
+  // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
   useEffect(() => {
-    // This effect runs when the component mounts or when fetchDashboardData (due to userProfile.id change) updates.
-    fetchDashboardData();
+    if (user?.id) {
+      fetchDashboardData(); // This initial call is good to get all data once
 
-    // Setup Realtime subscriptions
-    // IMPORTANT: Subscriptions should NOT trigger fetchDashboardData() which causes full re-fetch.
-    // Instead, they should update specific state relevant to the change.
-    // For now, keeping them to trigger fetchDashboardData for simplicity, but optimize later if needed.
-    const jobRolesSubscription = supabase
-      .channel('public:job_roles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${user?.id}` }, payload => {
-        // console.log("Job Role change detected:", payload); // For debugging
-        fetchDashboardData(); // Re-fetch all data (can be optimized)
-      })
-      .subscribe();
+      // Setup Realtime subscriptions for specific, incremental updates
+      const currentUserId = user.id;
 
-    const hiresSubscription = supabase
-      .channel('public:hires')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${user?.id}` }, payload => {
-        // console.log("Hire change detected:", payload); // For debugging
-        fetchDashboardData(); // Re-fetch all data (can be optimized)
-      })
-      .subscribe();
+      // Job Roles Subscription
+      const jobRolesSubscription = supabase
+        .channel('job_roles_updates') // Use a distinct channel name
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
+          // Re-fetch only job roles data and update related stats
+          const { data: newJobRolesData, error: newJobRolesError } = await supabase
+            .from('job_roles')
+            .select(`*, users!inner(recruiters!inner(company_name))`)
+            .eq('recruiter_id', currentUserId);
+          if (newJobRolesError) {
+            console.error("Error updating job roles via subscription:", newJobRolesError);
+            setDashboardError("Failed to update job roles via live data.");
+          } else {
+            setJobRoles(newJobRolesData || []);
+            setStats(prev => ({
+              ...prev,
+              totalJobs: newJobRolesData?.length || 0,
+              activeJobs: (newJobRolesData?.filter(job => job.is_active)?.length || 0)
+            }));
+          }
+        })
+        .subscribe();
 
-    const messagesSubscription = supabase
-      .channel('public:messages')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user?.id}` }, payload => {
-        // console.log("Message change detected:", payload); // For debugging
-        fetchDashboardData(); // Re-fetch all data (can be optimized for just message count/list)
-      })
-      .subscribe();
+      // Hires Subscription
+      const hiresSubscription = supabase
+        .channel('hires_updates') // Use a distinct channel name
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
+          // Re-fetch only hires data and update related stats
+          const { data: newHiresData, error: newHiresError } = await supabase
+            .from('hires')
+            .select(`*, assignment:assignments (*, developer:developers (user:users (*)), job_role:job_roles (*))`)
+            .eq('marked_by', currentUserId)
+            .order('created_at', { ascending: false });
+          if (newHiresError) {
+            console.error("Error updating hires via subscription:", newHiresError);
+            setDashboardError("Failed to update hires via live data.");
+          } else {
+            setHires(newHiresData || []);
+            setStats(prev => ({ ...prev, recentHires: newHiresData?.length || 0 }));
+          }
+        })
+        .subscribe();
 
-    const notificationsSubscription = supabase
-      .channel('public:notifications')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, payload => {
-        // console.log("Notification change detected:", payload); // For debugging
-        fetchDashboardData(); // Re-fetch all data (can be optimized for just notifications)
-      })
-      .subscribe();
+      // Messages Subscription - OPTIMIZED for just unread count
+      const messagesSubscription = supabase
+        .channel('messages_updates') // Use a distinct channel name
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, async payload => {
+          // Only update the unread count for messages.
+          // The MessageList component should ideally handle its own real-time updates for the list itself.
+          const { count: newUnreadMessagesCount, error: newMessagesCountError } = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('receiver_id', currentUserId)
+            .eq('is_read', false);
 
-    return () => {
-      // Clean up subscriptions on unmount
-      jobRolesSubscription.unsubscribe();
-      hiresSubscription.unsubscribe();
-      messagesSubscription.unsubscribe();
-      notificationsSubscription.unsubscribe();
-    };
-  }, [fetchDashboardData, user?.id]); // Added user?.id as a dependency for subscriptions
+          if (newMessagesCountError) {
+            console.error("Error updating unread messages count via subscription:", newMessagesCountError);
+          } else {
+            setStats(prev => ({ ...prev, unreadMessages: newUnreadMessagesCount || 0 }));
+          }
+        })
+        .subscribe();
+
+      // Notifications Subscription
+      const notificationsSubscription = supabase
+        .channel('notifications_updates') // Use a distinct channel name
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, async payload => {
+          // Re-fetch only notifications data
+          const { data: newNotificationsData, error: newNotificationsError } = await supabase
+            .from('notifications')
+            .select('*, user:users(name, avatar_url, profile_pic_url)')
+            .eq('user_id', currentUserId)
+            .order('created_at', { ascending: false });
+          if (newNotificationsError) {
+            console.error("Error updating notifications via subscription:", newNotificationsError);
+            setDashboardError("Failed to update notifications via live data.");
+          } else {
+            setNotifications(newNotificationsData || []);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        // Unsubscribe from all channels on component unmount
+        jobRolesSubscription.unsubscribe();
+        hiresSubscription.unsubscribe();
+        messagesSubscription.unsubscribe();
+        notificationsSubscription.unsubscribe();
+      };
+    }
+  }, [user?.id]); // Note: fetchDashboardData is REMOVED from dependencies here to prevent infinite loop
+                 // The individual subscription callbacks now perform their own specific fetches.
 
   // --- Handlers ---
   const handleViewApplicants = useCallback((jobId: string) => {
@@ -463,7 +516,7 @@ const RecruiterDashboard: React.FC = () => {
             otherUserRole={selectedThread.otherUserRole}
             otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
             jobContext={selectedThread.jobContext}
-            onNewMessage={fetchDashboardData} // Keep this to potentially update unread counts or thread list
+            // onNewMessage={fetchDashboardData} // Removed this call as messages subscription updates count directly
             onClose={handleCloseMessageThread} // Added onClose prop for MessageThread to signal closing
           />
         </div>
@@ -491,7 +544,7 @@ const RecruiterDashboard: React.FC = () => {
         />
       </div>
     );
-  }, [selectedThread, searchTerm, fetchDashboardData, handleCloseMessageThread]); // Dependencies for renderMessages
+  }, [selectedThread, searchTerm, handleCloseMessageThread]); // Dependencies for renderMessages
 
   const renderHires = useCallback(() => (
     <div className="space-y-6">
