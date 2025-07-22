@@ -1,21 +1,30 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext.tsx';
-import { Header } from './components/Layout/Header';
-import { LandingPage } from './pages/LandingPage';
+
+// Assuming AuthProvider is a named export from AuthContext.tsx
+import { AuthProvider } from './contexts/AuthContext.tsx'; 
+
+// Assuming Header is a named export
+import { Header } from './components/Layout/Header'; 
+
+// Page components typically use default exports
+import LandingPage from './pages/LandingPage'; 
+import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import RecruiterDashboard from './pages/RecruiterDashboard'; // FIXED: Changed to default import
+import DeveloperDashboard from './pages/DeveloperDashboard';
+import PublicDeveloperProfile from './pages/PublicDeveloperProfile';
+import GitHubAppSetup from './pages/GitHubAppSetup';
+import AuthCallback from './pages/AuthCallback';
+import ApplyForJob from './pages/ApplyForJob';
+import RecruiterProfilePage from './pages/RecruiterProfilePage'; // Already correct
+import CompanyProfilePage from './pages/CompanyProfilePage';     // Already correct
+
+// Form components often use named exports
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
-import { Dashboard } from './pages/Dashboard';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { RecruiterDashboard } from './pages/RecruiterDashboard';
-import RecruiterProfilePage from './pages/RecruiterProfilePage';
-import CompanyProfilePage from './pages/CompanyProfilePage';
-import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
-import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
-import { GitHubAppSetup } from './pages/GitHubAppSetup';
-import { AuthCallback } from './pages/AuthCallback';
-import { ApplyForJob } from './pages/ApplyForJob';
+
 
 function App() {
   return (
