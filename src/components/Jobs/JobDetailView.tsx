@@ -1,78 +1,39 @@
+// src/components/Jobs/JobDetailView.tsx
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useAuth'; // Assuming useAuth provides userProfile
-import { JobRole, AppliedJob } from '../../types'; // Removed 'Developer' as its full structure is defined below
+import { useAuth } from '../../hooks/useAuth';
+import { JobRole, AppliedJob, Developer, User } from '../../types'; // Import Developer and User from central types
 import {
-  Briefcase, User, ChevronRight, Clock, Eye, MessageSquare,
+  Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare, // Renamed User to UserIcon to avoid conflict
   Loader, AlertCircle, ArrowLeft, MapPin, DollarSign,
-  Building // Added icons for Job Details section
+  Building
 } from 'lucide-react';
-import { DeveloperProfileModal } from '../DeveloperProfileModal'; // Assuming this component exists and works
+import { DeveloperProfileModal } from '../DeveloperProfileModal';
 
-// Define the full Developer type as it's fetched, incorporating profile fields directly
-interface DeveloperWithProfile {
-  id: string; // This would typically be the user_id from the 'users' table or a separate ID for the developer entry
-  user_id: string; // Foreign key to the 'users' table
-  github_handle: string | null;
-  bio: string | null;
-  availability: boolean | null;
-  top_languages: string[] | null;
-  linked_projects: string[] | null;
-  location: string | null;
-  experience_years: number | null;
-  desired_salary: number | null;
-  created_at: string;
-  updated_at: string;
-  skills_categories: { [key: string]: any } | null; // jsonb
-  profile_strength: number | null;
-  public_profile_slug: string | null;
-  notification_preferences: { [key: string]: boolean } | null; // jsonb
-  resume_url: string | null;
-  profile_pic_url: string | null;
-  github_installation_id: string | null;
-  public_profile_enabled: boolean | null;
-  profile_view_count: number | null;
-  search_appearance_count: number | null;
-  skills: string[] | null;
-  preferred_title: string | null;
-  looking_for_job: boolean | null;
-  // Nested user object from the join
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    avatar_url: string | null; // Ensure this is the correct field for the user's profile pic in 'users'
-    // Add other user fields as needed from 'users' table
-  };
-}
+// Removed local interfaces DeveloperWithProfile, Candidate, JobDetailViewProps
+// Instead, we will directly use or extend types from '../../types'.
 
-// Extending the Candidate interface for more specific typing
-interface Candidate extends AppliedJob {
-  developer: DeveloperWithProfile; // Use the newly defined DeveloperWithProfile
-}
+// Extending AppliedJob to include the full Developer and User structure
+// This implicitly defines 'Candidate' as AppliedJob with a nested 'developer' of type 'Developer'
+type CandidateType = AppliedJob & {
+  developer: Developer; // Developer type from src/types already includes the nested 'user: User'
+};
 
-// Update JobRole structure for JobDetailViewProps to match RecruiterDashboard's FetchedJobRole
+// JobDetailViewProps will directly use the JobRole type, which has been enhanced in src/types
 interface JobDetailViewProps {
-  job: JobRole & {
-    recruiter: { // Ensure this matches the type passed from RecruiterDashboard
-      id: string;
-      name: string;
-      email: string;
-      profile_pic_url?: string | null; // Added based on typical user profiles
-      company_name: string | null; // Crucial: flattened from recruiter_profile
-    };
-  };
+  job: JobRole; // JobRole from src/types now correctly includes recruiter and its user
   onBack: () => void;
   onMessageDeveloper: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
   showBackButton?: boolean;
 }
 
 export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMessageDeveloper, showBackButton = true }) => {
-  const { userProfile } = useAuth(); // Not directly used in rendering, but kept for context if other logic needs it
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const { userProfile } = useAuth();
+  const [candidates, setCandidates] = useState<CandidateType[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedDeveloper, setSelectedDeveloper] = useState<DeveloperWithProfile | null>(null); // Use DeveloperWithProfile type
+  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null); // Use Developer type from src/types
 
   useEffect(() => {
     fetchCandidates();
@@ -87,32 +48,54 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .select(`
           *,
           developer:developers (
-            *,
-            user:users(*)
+            id,
+            user_id,
+            github_handle,
+            bio,
+            availability,
+            top_languages,
+            linked_projects,
+            location,
+            experience_years,
+            desired_salary,
+            created_at,
+            updated_at,
+            skills_categories,
+            profile_strength,
+            public_profile_slug,
+            notification_preferences,
+            resume_url,
+            profile_pic_url,
+            github_installation_id,
+            public_profile_enabled,
+            profile_view_count,
+            search_appearance_count,
+            skills,
+            preferred_title,
+            looking_for_job,
+            user:users (
+              id,
+              name,
+              email,
+              avatar_url,
+              profile_pic_url // Ensure this field is selected if it exists in your 'users' table
+            )
           )
-        `) // ALL COMMENTS REMOVED FROM HERE
+        `)
         .eq('job_id', job.id);
 
       if (fetchError) {
         throw fetchError;
       }
 
-      const transformedCandidates: Candidate[] = (data || []).map(appliedJob => {
-        const developer = appliedJob.developer;
-        if (!developer || !developer.user) {
-          console.warn('Skipping candidate due to missing developer or user data:', appliedJob);
-          return null;
-        }
-        return {
-          ...appliedJob,
-          developer: {
-            ...developer,
-            user: developer.user
-          }
-        } as Candidate;
-      }).filter(Boolean) as Candidate[];
+      // No complex transformation needed here. The fetched data should directly map to CandidateType
+      // given the `Developer` type now includes the `user` object.
+      // We still filter out any null results if developer or user data is unexpectedly missing.
+      const validCandidates: CandidateType[] = (data || []).filter(appliedJob =>
+        appliedJob.developer && appliedJob.developer.user
+      ) as CandidateType[];
 
-      setCandidates(transformedCandidates);
+      setCandidates(validCandidates);
     } catch (err: any) {
       console.error("Error fetching candidates:", err);
       setError('Failed to fetch candidates. ' + err.message);
@@ -144,8 +127,11 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     }
   };
 
+  // Access recruiter company name and profile pic through the nested recruiter.user.avatar_url
   const companyName = job.recruiter?.company_name || 'Company Confidential';
-  const recruiterProfilePicUrl = job.recruiter?.profile_pic_url || '';
+  // Prefer avatar_url from user, fall back to profile_pic_url from recruiter or a default
+  const recruiterProfilePicUrl = job.recruiter?.user?.avatar_url || job.recruiter?.user?.profile_pic_url || '';
+
 
   return (
     <div className="space-y-8">
@@ -210,9 +196,13 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
 
           {job.recruiter && (
             <div className="flex items-center space-x-4 pt-4 border-t border-gray-200 mt-4">
-              <img src={recruiterProfilePicUrl} alt={job.recruiter.name || 'Recruiter'} className="w-12 h-12 rounded-full object-cover" />
+              <img
+                src={recruiterProfilePicUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(job.recruiter.user?.name || job.recruiter.company_name || 'U')}&background=random`}
+                alt={job.recruiter.user?.name || job.recruiter.company_name || 'Recruiter'}
+                className="w-12 h-12 rounded-full object-cover"
+              />
               <div>
-                <span className="font-bold text-gray-900">{job.recruiter.name}</span>
+                <span className="font-bold text-gray-900">{job.recruiter.user?.name || job.recruiter.company_name || 'Unknown Recruiter'}</span>
                 <p className="text-sm text-gray-600">
                   <Building className="inline-block w-3 h-3 mr-1 align-middle text-gray-500" /> {companyName}
                 </p>
@@ -230,7 +220,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         </div>
       ) : candidates.length === 0 ? (
         <div className="text-center py-8 bg-white rounded-xl shadow-sm border border-gray-200">
-          <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" /> {/* Use UserIcon here */}
           <p className="text-gray-600">No applicants for this job yet.</p>
         </div>
       ) : (
@@ -239,19 +229,19 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
             <div key={candidate.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
               <div className="flex items-center space-x-4 mb-4 sm:mb-0">
                 <img
-                  src={candidate.developer.user.avatar_url || candidate.developer.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.developer.user.name || candidate.developer.github_handle || 'U')}&background=random`}
-                  alt={candidate.developer.user.name || candidate.developer.github_handle || 'Developer'}
+                  src={candidate.developer.user?.avatar_url || candidate.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.developer.user?.name || candidate.developer.github_handle || 'U')}&background=random`}
+                  alt={candidate.developer.user?.name || candidate.developer.github_handle || 'Developer'}
                   className="w-12 h-12 rounded-full object-cover"
                 />
                 <div>
-                  <h4 className="font-bold text-gray-900">{candidate.developer.user.name || candidate.developer.github_handle || 'Unknown Developer'}</h4>
+                  <h4 className="font-bold text-gray-900">{candidate.developer.user?.name || candidate.developer.github_handle || 'Unknown Developer'}</h4>
                   <p className="text-sm text-gray-600">{candidate.developer.github_handle || 'No GitHub Handle'}</p>
                   {candidate.developer.experience_years !== null && candidate.developer.experience_years !== undefined && (
                     <p className="text-xs text-gray-500">Exp: {candidate.developer.experience_years} years</p>
                   )}
-                   {candidate.developer.skills && candidate.developer.skills.length > 0 && (
+                    {candidate.developer.skills && candidate.developer.skills.length > 0 && (
                     <p className="text-xs text-gray-500">Skills: {candidate.developer.skills.slice(0, 3).join(', ')}{candidate.developer.skills.length > 3 ? '...' : ''}</p>
-                  )}
+                    )}
                 </div>
               </div>
               <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap">
@@ -263,7 +253,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                   <Eye size={16} className="mr-1" /> View Profile
                 </button>
                 <button
-                  onClick={() => onMessageDeveloper(candidate.developer.user_id, candidate.developer.user.name || candidate.developer.github_handle || 'Developer', job?.id, job?.title)}
+                  onClick={() => onMessageDeveloper(candidate.developer.user_id, candidate.developer.user?.name || candidate.developer.github_handle || 'Developer', job?.id, job?.title)}
                   className="inline-flex items-center px-3 py-1 text-sm bg-blue-100 rounded-full text-blue-700 hover:bg-blue-200 transition-colors"
                   title="Message Developer"
                 >
