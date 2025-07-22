@@ -45,13 +45,29 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         const { data: recruiterData, error: recruiterError } = await supabase
           .from('users')
           .select(`
-            *,
-            recruiters!user_id(
-              company_name
+            id,
+            role,
+            name,
+            email,
+            is_approved,
+            created_at,
+            avatar_url,
+            profile_pic_url,
+            company_logo_url, // Explicitly select company_logo_url from users table
+            recruiters:recruiters!user_id( // Alias 'recruiters' for the joined table
+              company_name,
+              website,
+              company_size,
+              industry
             )
           `)
           .eq('id', recruiterId)
           .single();
+
+        // --- START DEBUG LOGS FOR RECRUITER PROFILE ---
+        console.log(`[RecruiterProfile] Fetched Raw Recruiter Data for Profile:`, recruiterData);
+        console.log(`[RecruiterProfile] Profile's 'recruiters' array:`, recruiterData?.recruiters);
+        // --- END DEBUG LOGS ---
 
         if (recruiterError) {
           console.error(`Error fetching recruiter data for ID ${recruiterId}:`, recruiterError);
@@ -68,9 +84,9 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               name,
               email,
               profile_pic_url,
-              company_logo_url,
+              company_logo_url, // Explicitly select company_logo_url for job's recruiter data
               recruiters:recruiters!recruiters_user_id_fkey (
-                company_name
+                company_name // Explicitly select company_name for job's recruiter data
               )
             )
           `)
@@ -87,6 +103,10 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
           return {
             ...job,
             company_name: companyName,
+            recruiter: job.recruiter ? {
+                ...job.recruiter,
+                recruiters: job.recruiter.recruiters || [], // Ensure nested array is preserved
+            } : undefined,
           };
         });
         setJobs(transformedJobs);
@@ -145,14 +165,17 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
       <div className="bg-white shadow-lg rounded-lg overflow-hidden border border-gray-200/80">
         <div className="relative">
           <div className="h-48 bg-gray-100 flex items-center justify-center text-gray-400 text-6xl font-bold">
+             {/* Main banner image - uses company_logo_url from the recruiter object directly */}
              {recruiter.company_logo_url && (
                 <img src={recruiter.company_logo_url} alt={`${recruiter.recruiters?.[0]?.company_name || 'Company'} Cover`} className="w-full h-full object-cover"/>
              )}
+             {/* Fallback if no company logo or profile pic for banner */}
              {!recruiter.company_logo_url && !recruiter.profile_pic_url && (
                 <span className="text-gray-300">Company Banner</span>
              )}
           </div>
           <div className="absolute top-24 left-8">
+            {/* Profile picture, fallback to pravatar if not set */}
             <img
               className="h-32 w-32 bg-gray-200 rounded-full border-4 border-white object-cover shadow-md"
               src={recruiter.profile_pic_url || 'https://i.pravatar.cc/150?u=' + recruiter.id}
@@ -160,6 +183,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
             />
           </div>
           <div className="absolute top-36 right-8">
+            {/* Smaller company logo in corner, fallback to initial if no logo */}
             {recruiter.company_logo_url ? (
               <img
                 className="h-16 w-auto object-contain rounded-lg shadow-sm bg-white p-1"
@@ -176,6 +200,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
 
         <div className="pt-20 pb-8 px-8">
           <h1 className="text-3xl font-bold text-gray-800">{recruiter.name}</h1>
+          {/* Display company name from recruiter's recruiters table, fallback */}
           <p className="text-gray-600 text-lg">{recruiter.recruiters?.[0]?.company_name || 'Company Name Not Available'}</p>
         </div>
 
@@ -209,7 +234,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 <div key={job.id} onClick={() => setSelectedJob(job)} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow block cursor-pointer bg-white">
                   <h3 className="text-lg font-semibold text-blue-700">{job.title}</h3>
                   <p className="text-gray-700">{job.description?.substring(0, 150)}...</p>
-                  {/* CORRECTED SALARY DISPLAY LOGIC for salary: string | null */}
+                  {/* Salary Display */}
                   <p className="text-sm text-gray-500 mt-2 flex items-center">
                     <Star size={14} className="mr-1 text-gray-400" />
                     {job.salary || 'N/A'}
