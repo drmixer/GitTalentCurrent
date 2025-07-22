@@ -1,432 +1,410 @@
-// src/components/RecruiterDashboard.tsx
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import {
-  Users,
-  Briefcase,
-  MessageSquare,
-  TrendingUp,
-  Plus,
-  Search,
-  Bell,
-  Eye,
-  Edit,
-  Trash2,
-  Star,
-  Building,
-  MapPin,
-  DollarSign,
-  Clock,
-  Calendar,
-  Loader,
-  AlertCircle,
-  CheckCircle,
-  ArrowLeft,
-  RefreshCw,
-  XCircle
-} from 'lucide-react';
-import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { NotificationList } from '../components/Notifications/NotificationList';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
-import { JobImportModal } from '../components/JobRoles/JobImportModal';
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
-// Corrected imports for types from src/types/index.ts
-import { JobRole, Hire, Message, Recruiter, User } from '../types';
+import JobDetailView from '../components/JobDetailView';
+import JobsDashboard from '../components/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
+import MessageList from '../components/MessageList';
+import MessageThread from '../components/MessageThread';
+import NotificationList from '../components/NotificationList';
 import HiringPipeline from '../components/HiringPipeline';
-import JobsDashboard from '../components/Jobs/JobsDashboard';
-import { JobDetailView } from '../components/Jobs/JobDetailView';
-import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
+import RecruiterProfileForm from '../components/RecruiterProfileForm';
+import {
+  Briefcase,
+  Search,
+  MessageSquare,
+  Bell,
+  TrendingUp,
+  DollarSign,
+  Users,
+  ArrowLeft,
+  Loader,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  RefreshCw
+} from 'lucide-react';
 
-// Removed FetchedJobRole interface here, as JobRole from types/index.ts will be used directly.
-// The MessageThread interface from your code is moved here as it seems to be an internal component type
-// If this is used elsewhere, consider moving it to types/index.ts as well.
-interface LocalMessageThread {
+// Define the types based on your schema outputs
+interface UserProfile {
+  id: string;
+  role: string;
+  name: string;
+  email: string;
+  is_approved: boolean;
+  avatar_url?: string;
+  profile_pic_url?: string;
+  company_logo_url?: string;
+  recruiters?: { company_name?: string } | null; // Nested recruiter data
+}
+
+interface JobRole {
+  id: string;
+  recruiter_id: string;
+  title: string;
+  description: string;
+  location: string;
+  job_type: string;
+  tech_stack: string[];
+  experience_required?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  is_featured: boolean;
+  salary?: string;
+  recruiter?: { company_name?: string } | null; // Ensure nested recruiter data is available
+}
+
+interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  job_role_id?: string;
+  assignment_id?: string;
+  subject?: string;
+  body: string;
+  sent_at: string;
+  read_at?: string;
+  is_read: boolean;
+  // Add sender and receiver user profiles for display
+  sender?: { name?: string; avatar_url?: string; profile_pic_url?: string; role?: string };
+  receiver?: { name?: string; avatar_url?: string; profile_pic_url?: string; role?: string };
+}
+
+interface Hire {
+  id: string;
+  assignment_id: string;
+  salary: number;
+  hire_date?: string;
+  start_date?: string;
+  notes?: string;
+  marked_by: string;
+  created_at: string;
+  assignment?: { // Nested assignment data
+    id: string;
+    developer_id: string;
+    job_role_id: string;
+    recruiter_id: string;
+    status: string;
+    developer?: { // Nested developer data
+      user?: { // Nested user data for the developer
+        id: string;
+        name?: string;
+        avatar_url?: string;
+        profile_pic_url?: string;
+        github_handle?: string; // Add github_handle if it exists on developer directly or user
+      };
+      // other developer fields if needed
+    };
+    job_role?: { // Nested job_role data
+      id: string;
+      title?: string;
+      // other job_role fields if needed
+    };
+  };
+}
+
+interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  entity_id?: string;
+  entity_type?: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  user?: { // User related to the notification (e.g., sender for a message notification)
+    name?: string;
+    avatar_url?: string;
+    profile_pic_url?: string;
+  }
+}
+
+interface DashboardStats {
+  totalJobs: number;
+  activeJobs: number;
+  applications: number; // Placeholder, might need to derive from assignments
+  recentHires: number;
+  unreadMessages: number;
+}
+
+interface MessageThreadInfo {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
   otherUserProfilePicUrl?: string;
-  lastMessage: Message;
-  unreadCount: number;
-  jobContext?: {
-    id: string;
-    title: string;
-  };
+  jobContext?: JobRole | null;
 }
 
-export const RecruiterDashboard = () => {
-  const { user, userProfile, loading: authLoading, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-jobs' | 'job-details' | 'search-devs' | 'messages' | 'notifications' | 'hires' | 'tracker' | 'profile'>('search-devs');
-  const [stats, setStats] = useState({
+const RecruiterDashboard: React.FC = () => {
+  const { user, userProfile, fetchUserProfile, authLoading, refreshProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Data states
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+  const [hires, setHires] = useState<Hire[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
     totalJobs: 0,
     activeJobs: 0,
-    featuredJobs: 0,
-    totalMessages: 0,
+    applications: 0,
+    recentHires: 0,
     unreadMessages: 0,
-    totalHires: 0,
-    totalRevenue: 0
   });
-
-  // Use the JobRole type directly, as it now includes the full recruiter and user structure from types/index.ts
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-
-  const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-
-  // Use the local MessageThread interface
-  const [selectedThread, setSelectedThread] = useState<LocalMessageThread | null>(null);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-
+  const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [companyFilter, setCompanyFilter] = useState(''); // This might need review if filtered by logged-in recruiter.
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
 
-  // Check if the user is approved
   const isApproved = userProfile?.is_approved === true;
+  const unreadNotifications = notifications.filter(n => !n.is_read).length;
 
-  console.log('RecruiterDashboard render - authLoading:', authLoading, 'userProfile:', userProfile);
+  const fetchDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
 
-  useEffect(() => {
-    // If the recruiter's profile is not approved, refresh it to check for status changes.
-    if (userProfile && !isApproved && !isRefreshing) {
-      console.log('Unapproved recruiter profile detected, refreshing to check for updates...');
-      setIsRefreshing(true);
-      refreshProfile().finally(() => {
-        setIsRefreshing(false);
-      });
-    }
-  }, [userProfile, isApproved, refreshProfile, isRefreshing]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const company = params.get('company');
-    if (company) {
-      setCompanyFilter(company);
-      setActiveTab('my-jobs');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (userProfile?.role === 'recruiter') {
-      console.log('RecruiterDashboard - Fetching dashboard data');
-      fetchDashboardData();
-    }
-  }, [userProfile]);
-
-  const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      setError('');
+      const currentUserId = user.id;
 
-      await Promise.all([
-        fetchJobRoles(),
-        fetchStats(),
-        fetchHires(),
-        fetchUnreadNotificationsCount()
-      ]);
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-      setError(error.message || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchJobRoles = async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      let query = supabase
+      // Fetch Job Roles
+      const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
-          id,
-          recruiter_id,
-          title,
-          description,
-          location,
-          job_type,
-          tech_stack,
-          salary,
-          experience_required,
-          is_active,
-          is_featured,
-          created_at,
-          updated_at,
-          responsibilities,
-          benefits,
-          recruiter:recruiters (
-            user_id,
-            company_name,
-            website,
-            company_size,
-            industry,
-            user:users ( // Directly join 'users' table through the 'user_id' in 'recruiters'
-              id,
-              name,
-              email,
-              avatar_url,
-              profile_pic_url
-            )
-          )
+          *,
+          recruiter!inner(company_name)
         `)
-        .order('created_at', { ascending: false });
+        .eq('recruiter_id', currentUserId); // Filter by recruiter_id to get only current recruiter's jobs
 
-      if (companyFilter) {
-        // This filter assumes recruiter.company_name is directly accessible after join
-        // If 'company_name' is not directly on 'recruiter' but within 'recruiter_profile', this needs adjustment
-        query = query.ilike('recruiter.company_name', `%${companyFilter}%`);
-      } else {
-        query = query.eq('recruiter_id', userProfile.id);
-      }
+      if (jobRolesError) throw jobRolesError;
+      setJobRoles(jobRolesData || []);
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // The data structure returned by Supabase, when correctly typed with JobRole,
-      // should already match the shape needed due to the changes in src/types/index.ts.
-      // Therefore, the manual transformation below is no longer needed.
-      setJobRoles(data || []);
-
-    } catch (error: any) {
-      console.error('Error fetching job roles:', error);
-      setError('Failed to fetch job roles: ' + error.message); // Set error for UI
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      // Fetch job stats
-      const { data: jobs, error: jobsError } = await supabase
-        .from('job_roles')
-        .select('id, is_active, is_featured')
-        .eq('recruiter_id', userProfile.id);
-
-      if (jobsError) throw jobsError;
-
-      // Fetch message stats
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('id, is_read')
-        .eq('receiver_id', userProfile.id);
-
-      if (messagesError) throw messagesError;
-
-      // Fetch hire stats
-      const { data: hires, error: hiresError } = await supabase
-        .from('hires')
-        .select('id, salary')
-        .eq('marked_by', userProfile.id);
-
-      if (hiresError) throw hiresError;
-
-      setStats({
-        totalJobs: jobs?.length || 0,
-        activeJobs: jobs?.filter(j => j.is_active).length || 0,
-        featuredJobs: jobs?.filter(j => j.is_featured).length || 0,
-        totalMessages: messages?.length || 0,
-        unreadMessages: messages?.filter(m => !m.is_read).length || 0,
-        totalHires: hires?.length || 0,
-        totalRevenue: hires?.reduce((sum, hire) => sum + Math.round(hire.salary * 0.15), 0) || 0
-      });
-    } catch (error: any) {
-      console.error('Error fetching stats:', error);
-      setError('Failed to fetch dashboard stats: ' + error.message); // Set error for UI
-    }
-  };
-
-  const fetchHires = async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      const { data, error } = await supabase
+      // Fetch Hires
+      // Modified to select deeply nested relations
+      const { data: hiresData, error: hiresError } = await supabase
         .from('hires')
         .select(`
           *,
-          assignment:assignments(
+          assignment (
             *,
-            developer:developers( // Ensure this selects necessary developer fields
-              user_id,
-              github_handle,
-              bio,
-              user:users( // Join user data for the developer
-                id,
-                name,
-                email,
-                avatar_url,
-                profile_pic_url
-              )
+            developer (
+              user (*)
             ),
-            job_role:job_roles(*)
+            job_role (*)
           )
         `)
-        .eq('assignment.recruiter_id', userProfile.id)
+        .eq('marked_by', currentUserId) // Filter hires by the recruiter who marked them
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setHires(data || []);
-    } catch (error: any) {
-      console.error('Error fetching hires:', error);
-      setError('Failed to fetch hires data: ' + error.message); // Set error for UI
-    }
-  };
+      if (hiresError) throw hiresError;
+      setHires(hiresData || []);
 
-  const fetchUnreadNotificationsCount = async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      const { count, error } = await supabase
+      // Fetch Notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userProfile.id)
+        .select('*, user(name, avatar_url, profile_pic_url)') // Fetch user details for notifications
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: false });
+
+      if (notificationsError) throw notificationsError;
+      setNotifications(notificationsData || []);
+
+      // Fetch Messages for unread count
+      const { count: unreadMessagesCount, error: messagesCountError } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', currentUserId)
         .eq('is_read', false);
 
-      if (error) throw error;
-      setUnreadNotifications(count || 0);
-    } catch (error: any) {
-      console.error('Error fetching unread notifications count:', error);
+      if (messagesCountError) throw messagesCountError;
+
+      // Calculate Dashboard Stats
+      const totalJobs = jobRolesData?.length || 0;
+      const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
+      const recentHires = hiresData?.length || 0; // Or filter by date for 'recent'
+      // Applications count would need a more complex query on assignments table, skipped for now
+      // Assuming 'applications' might be a separate view or derived from 'assignments' table if its status indicates an application
+      setStats({
+        totalJobs,
+        activeJobs,
+        applications: 0, // Placeholder
+        recentHires,
+        unreadMessages: unreadMessagesCount || 0,
+      });
+
+    } catch (err: any) {
+      console.error("Error fetching dashboard data:", err);
+      setError(`Failed to load data: ${err.message || err.error_description || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchDashboardData();
+
+      // Setup Realtime subscriptions
+      const jobRolesSubscription = supabase
+        .channel('public:job_roles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${user.id}` }, payload => {
+          fetchDashboardData(); // Re-fetch on job role changes
+        })
+        .subscribe();
+
+      const hiresSubscription = supabase
+        .channel('public:hires')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${user.id}` }, payload => {
+          fetchDashboardData(); // Re-fetch on hire changes
+        })
+        .subscribe();
+
+      const messagesSubscription = supabase
+        .channel('public:messages')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, payload => {
+          fetchDashboardData(); // Re-fetch on new messages
+        })
+        .subscribe();
+
+      const notificationsSubscription = supabase
+        .channel('public:notifications')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, payload => {
+          fetchDashboardData(); // Re-fetch on new notifications
+        })
+        .subscribe();
+
+
+      return () => {
+        jobRolesSubscription.unsubscribe();
+        hiresSubscription.unsubscribe();
+        messagesSubscription.unsubscribe();
+        notificationsSubscription.unsubscribe();
+      };
+    }
+  }, [user?.id, fetchDashboardData]);
+
 
   const handleViewApplicants = (jobId: string) => {
-    console.log(`Setting selectedJobId to: ${jobId} for viewing applicants.`);
     setSelectedJobId(jobId);
-    setActiveTab('job-details'); // This tab will display job details AND applicants
+    setActiveTab('job-details');
   };
 
-  const handleMessageDeveloper = (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
+  const handleJobUpdate = (message: string) => {
+    setSuccess(message);
+    fetchDashboardData(); // Refresh data after update
+    setTimeout(() => setSuccess(null), 5000); // Clear message after 5 seconds
+  };
+
+  const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, jobRole?: JobRole) => {
+    if (!userProfile) {
+      setError("User profile not loaded. Cannot send message.");
+      return;
+    }
+
+    // Check if a thread already exists
+    const { data: existingThreads, error: threadError } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id')
+      .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${developerId}),and(sender_id.eq.${developerId},receiver_id.eq.${userProfile.id})`)
+      .limit(1);
+
+    if (threadError) {
+      console.error("Error checking existing thread:", threadError);
+      setError("Failed to check existing message thread.");
+      return;
+    }
+
+    let threadJobContext: JobRole | null = null;
+    if (jobRole) {
+      // Ensure jobRole has recruiter details if needed for display in MessageThread
+      threadJobContext = jobRole;
+      if (!threadJobContext.recruiter?.company_name && userProfile.recruiters?.company_name) {
+          threadJobContext = {
+              ...threadJobContext,
+              recruiter: { company_name: userProfile.recruiters.company_name }
+          };
+      }
+    }
+
+
     setSelectedThread({
       otherUserId: developerId,
       otherUserName: developerName,
-      otherUserRole: 'developer',
-      unreadCount: 0,
-      lastMessage: {} as Message, // Provide a minimal Message object or null if allowed
-      jobContext: jobRoleId && jobRoleTitle ? {
-        id: jobRoleId,
-        title: jobRoleTitle
-      } : undefined
+      otherUserRole: 'developer', // Assuming the recipient is a developer
+      otherUserProfilePicUrl: '', // Will be fetched by MessageThread or passed if available
+      jobContext: threadJobContext,
     });
     setActiveTab('messages');
-  };
+  }, [userProfile]);
+
 
   const handleViewNotificationJobRole = (jobRoleId: string) => {
-    setSelectedJobId(jobRoleId);
-    setActiveTab('my-jobs');
+    const job = jobRoles.find(jr => jr.id === jobRoleId);
+    if (job) {
+      setSelectedJobId(jobRoleId);
+      setActiveTab('job-details');
+    } else {
+      setError("Job role not found for this notification.");
+    }
   };
 
-  const handleHireSuccess = async () => {
-    // Refresh hires data
-    await fetchHires();
-    await fetchStats();
 
-    setSuccess('Developer hired successfully!');
-    setTimeout(() => {
-      setSuccess('');
-    }, 3000);
-  };
-
-  const handleJobUpdate = () => {
-    fetchJobRoles();
-    fetchStats();
-  }
-
-  // Filter hires based on search term
-  const filteredHires = hires.filter(hire =>
-    hire.assignment?.developer?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || // Access developer's name via nested user
-    hire.assignment?.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredHires = hires.filter(hire => {
+    const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
+    const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
+    const search = searchTerm.toLowerCase();
+    return developerName.includes(search) || jobTitle.includes(search);
+  });
 
   const renderOverview = () => (
-    <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Briefcase className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalJobs}</div>
-          <div className="text-sm font-medium text-gray-600 mb-2">Total Job Listings</div>
-          <div className="text-xs text-emerald-600 font-medium">{stats.activeJobs} active jobs</div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Job Listings Stat Card */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
+        <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+          <Briefcase className="w-6 h-6 text-blue-600" />
         </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Star className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-gray-900 mb-1">{stats.featuredJobs}</div>
-          <div className="text-sm font-medium text-gray-600 mb-2">Featured Jobs</div>
-          <div className="text-xs text-emerald-600 font-medium">Higher visibility to developers</div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-              <MessageSquare className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-gray-900 mb-1">{stats.unreadMessages}</div>
-          <div className="text-sm font-medium text-gray-600 mb-2">Unread Messages</div>
-          <div className="text-xs text-emerald-600 font-medium">{stats.totalMessages} total messages</div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-gray-900 mb-1">{stats.totalHires}</div>
-          <div className="text-sm font-medium text-gray-600 mb-2">Successful Hires</div>
-          <div className="text-xs text-emerald-600 font-medium">${stats.totalRevenue.toLocaleString()} in fees</div>
-        </div>
+        <p className="text-sm font-medium text-gray-500">Total Job Listings</p>
+        <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalJobs}</h3>
+        <button
+          onClick={() => setActiveTab('my-jobs')}
+          className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
+        >
+          Manage Listings &rarr;
+        </button>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <button
-            onClick={() => setActiveTab('my-jobs')}
-            className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
-          >
-            <Briefcase className="w-8 h-8 text-blue-600 mb-3" />
-            <span className="font-semibold text-gray-900">Manage Jobs</span>
-            <span className="text-sm text-gray-600 mt-1">View, edit, and create job listings</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('tracker')}
-            className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
-          >
-            <Users className="w-8 h-8 text-purple-600 mb-3" />
-            <span className="font-semibold text-gray-900">Hiring Pipeline</span>
-            <span className="text-sm text-gray-600 mt-1">Track candidates across all jobs</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('search-devs')}
-            className="flex flex-col items-center justify-center p-6 bg-emerald-50 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
-          >
-            <Search className="w-8 h-8 text-emerald-600 mb-3" />
-            <span className="font-semibold text-gray-900">Search Developers</span>
-            <span className="text-sm text-gray-600 mt-1">Find talent for your roles</span>
-          </button>
+      {/* Active Jobs Stat Card */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
+        <div className="flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-full mb-4">
+          <TrendingUp className="w-6 h-6 text-emerald-600" />
         </div>
+        <p className="text-sm font-medium text-gray-500">Active Job Listings</p>
+        <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.activeJobs}</h3>
+        <button
+          onClick={() => setActiveTab('my-jobs')}
+          className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
+        >
+          View Active Jobs &rarr;
+        </button>
+      </div>
+
+      {/* Unread Messages Stat Card */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
+        <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
+          <MessageSquare className="w-6 h-6 text-purple-600" />
+        </div>
+        <p className="text-sm font-medium text-gray-500">Unread Messages</p>
+        <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.unreadMessages}</h3>
+        <button
+          onClick={() => setActiveTab('messages')}
+          className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
+        >
+          View Messages &rarr;
+        </button>
       </div>
 
       {/* Recent Activity */}
@@ -573,8 +551,8 @@ export const RecruiterDashboard = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                            src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.github_handle || 'U')}&background=random`}
-                            alt={hire.assignment?.developer?.user?.name || hire.assignment?.developer?.github_handle || 'Developer'}
+                            src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
+                            alt={hire.assignment?.developer?.user?.name || 'Developer'}
                             className="w-8 h-8 rounded-full object-cover mr-3"
                         />
                         <div className="text-sm font-semibold text-gray-900">
@@ -599,7 +577,7 @@ export const RecruiterDashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
-                        {new Date(hire.hire_date).toLocaleDateString()}
+                        {new Date(hire.hire_date || '').toLocaleDateString()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -641,11 +619,11 @@ export const RecruiterDashboard = () => {
 
   // Redirect if not authenticated or not a recruiter
   if (!userProfile) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />; // Redirect to general dashboard if profile missing
   }
 
   if (userProfile.role !== 'recruiter') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />; // Redirect if not recruiter
   }
 
   // If recruiter is not approved, show pending approval message
@@ -817,7 +795,7 @@ export const RecruiterDashboard = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <Users className="w-5 h-5 mr-2" />
+                <Users className="w-5 h-5 mr-2" /> {/* Reusing Users icon, consider a more specific icon like User or Settings */}
                 Profile
               </button>
             </nav>
@@ -841,8 +819,8 @@ export const RecruiterDashboard = () => {
           <NotificationList
             onViewJobRole={handleViewNotificationJobRole}
             onViewMessage={(messageId) => {
-              // Handle viewing message
-              setActiveTab('messages');
+              // Handle viewing message: Find the message, set selectedThread if needed
+              setActiveTab('messages'); // Simply navigate to messages tab for now
             }}
           />
         )}
@@ -852,3 +830,5 @@ export const RecruiterDashboard = () => {
     </div>
   );
 };
+
+export default RecruiterDashboard;
