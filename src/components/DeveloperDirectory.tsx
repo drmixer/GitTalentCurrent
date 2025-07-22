@@ -4,8 +4,10 @@ import { DeveloperCard } from './DeveloperCard';
 import { Developer } from '@/types';
 import { DeveloperSnapshotModal } from './DeveloperSnapshotModal';
 import { DeveloperProfileModal } from './DeveloperProfileModal';
+
 interface DeveloperDirectoryProps {
-  onSendMessage: (developerId: string, developerName: string) => void;
+  // Updated onSendMessage signature to include developerProfilePicUrl
+  onSendMessage: (developerId: string, developerName: string, developerProfilePicUrl?: string) => void;
 }
 
 const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }) => {
@@ -21,9 +23,10 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
   useEffect(() => {
     const fetchDevelopers = async () => {
       try {
+        // Ensure the select query for developers includes user profile data
         const { data, error } = await supabase
           .from('developers')
-          .select('*, user:users(*)');
+          .select('*, user:users(*)'); // Keeping this explicit alias for 'user' is good practice
 
         if (error) {
           throw error;
@@ -68,7 +71,8 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
 
   const filteredDevelopers = developers.filter(developer => {
     const searchTermLower = searchTerm.toLowerCase();
-  const nameMatch = developer.name?.toLowerCase().includes(searchTermLower) || developer.github_username?.toLowerCase().includes(searchTermLower);
+    // Adjusted nameMatch to use developer.user.name as per fetch query
+    const nameMatch = developer.user?.name?.toLowerCase().includes(searchTermLower) || developer.github_username?.toLowerCase().includes(searchTermLower);
     const skillsMatch = developer.skills?.some(skill => skill.toLowerCase().includes(searchTermLower));
     const availabilityMatch = availabilityFilter === null || developer.availability === availabilityFilter;
 
@@ -116,7 +120,14 @@ const DeveloperDirectory: React.FC<DeveloperDirectoryProps> = ({ onSendMessage }
                 key={dev.user_id}
                 developer={dev}
                 onViewProfile={() => handleViewSnapshot(dev)}
-                onSendMessage={() => onSendMessage(dev.user_id, dev.name)}
+                // Corrected onSendMessage call to pass profile picture URL
+                onSendMessage={() =>
+                  onSendMessage(
+                    dev.user_id, // This is the user's ID associated with the developer
+                    dev.user?.name || dev.github_username || 'Unknown Developer', // Use user.name, fallback to github_username or 'Unknown'
+                    dev.user?.profile_pic_url || dev.user?.avatar_url // Pass the actual profile pic URL
+                  )
+                }
               />
             ) : null
           ))}
