@@ -7,9 +7,9 @@ import JobsDashboard from '../components/Jobs/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import MessageList from '../components/Messages/MessageList';
 import MessageThread from '../components/Messages/MessageThread';
-import NotificationList from '../components/Notifications/NotificationList'; // <-- CORRECTED PATH HERE
+import NotificationList from '../components/Notifications/NotificationList';
 import HiringPipeline from '../components/HiringPipeline';
-import RecruiterProfileForm from '../components/Profile/RecruiterProfileForm'; // <-- CORRECTED PATH HERE
+import RecruiterProfileForm from '../components/Profile/RecruiterProfileForm';
 import {
   Briefcase,
   Search,
@@ -558,7 +558,8 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </td>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
@@ -588,7 +589,7 @@ const RecruiterDashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div> {/* <-- THIS CLOSING DIV WAS MISSING AND CAUSED THE ISSUE */}
         </div>
       ) : (
         <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
