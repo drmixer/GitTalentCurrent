@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { JobRole, EnrichedJobRole } from '../../types'; // Ensure EnrichedJobRole is imported
+import { JobRole, EnrichedJobRole, Recruiter as RecruiterType } from '../../types'; // Ensure EnrichedJobRole is imported
 import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
 
 // Minimal JobCard component
@@ -186,7 +186,7 @@ export const JobsTab: React.FC = () => {
   const { developerProfile } = useAuth();
   const [jobs, setJobs] = useState<EnrichedJobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
-  const [appliedJobIds, setAppliedJobIds] = useState(new Set<string>()); // CORRECTED LINE: Wrapped with useState and added semicolon
+  const [appliedJobIds, setAppliedJobIds] = useState(new Set<string>());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -224,24 +224,30 @@ export const JobsTab: React.FC = () => {
         throw jobsError;
       }
 
+      // Keep this log for debugging the raw data structure from Supabase
+      console.log("[JobsTab] Raw data from Supabase query:", JSON.stringify(data, null, 2));
+
       const transformedJobs: EnrichedJobRole[] = (data || []).map(job => {
         // --- START DEBUG LOGS FOR JOBS TAB ---
         console.log(`[JobsTab] Processing Job ID: ${job.id}`);
         console.log(`[JobsTab] Raw Recruiter Object for Job ${job.id}:`, job.recruiter);
-        console.log(`[JobsTab] Nested 'recruiters' array from join for Job ${job.id}:`, job.recruiter?.recruiters);
+        console.log(`[JobsTab] Nested 'recruiters' object from join for Job ${job.id}:`, job.recruiter?.recruiters); // Changed 'array' to 'object' for clarity
         // --- END DEBUG LOGS ---
 
-        const companyNameFromRecruitersTable = job.recruiter?.recruiters?.[0]?.company_name;
-        // console.log(`[JobsTab] Derived Company Name for Job ${job.id}:`, companyNameFromRecruitersTable); // Keep this if you want
+        // --- THE FIX IS HERE (Access directly, not via [0]) ---
+        // Assert job.recruiter.recruiters as RecruiterType, as it's an object if present
+        const companyNameFromRecruitersTable = (job.recruiter?.recruiters as RecruiterType)?.company_name;
+        // --- END FIX ---
         
         const companyName = companyNameFromRecruitersTable || 'Company Confidential';
         return {
           ...job,
           company_name: companyName,
           // Ensure the recruiter object on EnrichedJobRole is complete with nested data
+          // Cast recruiters to RecruiterType or undefined to correctly type it as an object
           recruiter: job.recruiter ? {
             ...job.recruiter,
-            recruiters: job.recruiter.recruiters || [],
+            recruiters: (job.recruiter.recruiters as RecruiterType) || undefined,
           } : undefined,
         };
       });
