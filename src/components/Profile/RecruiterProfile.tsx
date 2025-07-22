@@ -53,8 +53,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
             created_at,
             avatar_url,
             profile_pic_url,
-            company_logo_url, // Explicitly select company_logo_url from users table
-            recruiters:recruiters!user_id( // Alias 'recruiters' for the joined table
+            company_logo_url,
+            recruiters:recruiters!user_id(
               company_name,
               website,
               company_size,
@@ -84,9 +84,9 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               name,
               email,
               profile_pic_url,
-              company_logo_url, // Explicitly select company_logo_url for job's recruiter data
+              company_logo_url,
               recruiters:recruiters!recruiters_user_id_fkey (
-                company_name // Explicitly select company_name for job's recruiter data
+                company_name
               )
             )
           `)
