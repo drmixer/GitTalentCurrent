@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import JobDetailView from '../components/JobDetailView';
+import JobDetailView from '../components/Jobs/JobDetailView'; // <-- CORRECTED PATH HERE
 import JobsDashboard from '../components/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import MessageList from '../components/MessageList';
