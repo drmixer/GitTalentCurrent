@@ -12,7 +12,7 @@ import {
 import { DeveloperProfileModal } from '../DeveloperProfileModal';
 
 type CandidateType = AppliedJob & {
-  developer: Developer; // Developer type from src/types already includes the nested 'user: User'
+  developer: Developer;
 };
 
 interface JobDetailViewProps {
@@ -31,7 +31,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
 
   useEffect(() => {
     fetchCandidates();
-  }, [job.id]); // Re-fetch when job.id changes
+  }, [job.id]);
 
   const fetchCandidates = async () => {
     setLoading(true);
@@ -42,7 +42,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .select(`
           *,
           developer:developers (
-            id,
             user_id,
             github_handle,
             bio,
@@ -75,7 +74,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
               profile_pic_url
             )
           )
-        `) // No comments here anymore!
+        `)
         .eq('job_id', job.id);
 
       if (fetchError) {
