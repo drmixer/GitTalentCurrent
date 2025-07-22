@@ -5,8 +5,8 @@ import { Navigate } from 'react-router-dom';
 import JobDetailView from '../components/Jobs/JobDetailView';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
-import MessageList from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread'; // <-- CORRECTED IMPORT HERE
+import { MessageList } from '../components/Messages/MessageList'; // <-- CORRECTED IMPORT HERE
+import { MessageThread } from '../components/Messages/MessageThread';
 import NotificationList from '../components/Notifications/NotificationList';
 import HiringPipeline from '../components/HiringPipeline';
 import RecruiterProfileForm from '../components/Profile/RecruiterProfileForm';
@@ -589,7 +589,7 @@ const RecruiterDashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div> {/* <-- THIS CLOSING DIV WAS MISSING AND CAUSED THE ISSUE */}
+          </div>
         </div>
       ) : (
         <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
