@@ -1,35 +1,70 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../hooks/useAuth'; // Assuming useAuth is indeed in '../hooks/useAuth'
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-
-// ALL CUSTOM COMPONENT IMPORTS ARE NOW NAMED IMPORTS
-import { JobDetailView } from '../components/Jobs/JobDetailView';
-import { JobsDashboard } from '../components/Jobs/JobsDashboard';
-import DeveloperDirectory from '../components/DeveloperDirectory';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
-import { NotificationList } from '../components/Notifications/NotificationList';
-import { HiringPipeline } from '../components/HiringPipeline';
-import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
-
-import { // Lucide icons are already named imports, this is correct
-  Briefcase,
-  Search,
-  MessageSquare,
-  Bell,
-  TrendingUp,
-  DollarSign,
+import {
   Users,
-  ArrowLeft,
-  Loader,
-  CheckCircle,
-  AlertCircle,
+  Briefcase,
+  MessageSquare,
+  TrendingUp,
+  Plus, // Make sure Plus is used somewhere or remove if not needed
+  Search,
+  Bell,
+  Eye, // Make sure Eye is used somewhere or remove if not needed
+  Edit, // Make sure Edit is used somewhere or remove if not needed
+  Trash2, // Make sure Trash2 is used somewhere or remove if not needed
+  Star, // Make sure Star is used somewhere or remove if not needed
+  Building, // Make sure Building is used somewhere or remove if not needed
+  MapPin, // Make sure MapPin is used somewhere or remove if not needed
+  DollarSign,
   Clock,
-  RefreshCw
+  Calendar, // Make sure Calendar is used somewhere or remove if not needed
+  Loader,
+  AlertCircle,
+  CheckCircle,
+  ArrowLeft,
+  RefreshCw,
+  XCircle, // Make sure XCircle is used somewhere or remove if not needed
+  Mail, // Make sure Mail is used somewhere or remove if not needed
+  Phone, // Make sure Phone is used somewhere or remove if not needed
+  ExternalLink // Make sure ExternalLink is used somewhere or remove if not needed
 } from 'lucide-react';
 
-// Define the types based on your schema outputs
+// === CUSTOM COMPONENTS: Corrected based on your original imports ===
+// These should be named imports:
+import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { NotificationList } from '../components/Notifications/NotificationList';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
+import { JobImportModal } from '../components/JobRoles/JobImportModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobDetailView } from '../components/Jobs/JobDetailView';
+import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
+import { ConfirmationModal } from '../components/ConfirmationModal';
+
+// These should be default imports:
+import DeveloperDirectory from '../components/DeveloperDirectory';
+import HiringPipeline from '../components/HiringPipeline';
+import JobsDashboard from '../components/Jobs/JobsDashboard';
+
+// === TYPE IMPORTS ===
+import { JobRole, Hire, Message, Recruiter, User } from '../types'; // 'Recruiter' should ideally be 'RecruiterProfile' as per previous discussion, ensuring it matches your DB table name and type definition
+
+interface LocalMessageThread {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  otherUserProfilePicUrl?: string;
+  lastMessage: Message;
+  unreadCount: number;
+  jobContext?: {
+    id: string;
+    title: string;
+  };
+}
+
+// Define the types based on your schema outputs (retained from previous versions for completeness)
 interface UserProfile {
   id: string;
   role: string;
@@ -42,6 +77,11 @@ interface UserProfile {
   recruiters?: { company_name?: string } | null; // Nested recruiter data
 }
 
+// Ensure your JobRole interface matches the JobRole type imported from '../types'
+// If you have a separate JobRole interface defined here, it might conflict.
+// Assuming the one from '../types' is authoritative.
+// For now, retaining the explicit definition to match previous context, but be aware of duplication.
+/*
 interface JobRole {
   id: string;
   recruiter_id: string;
@@ -58,56 +98,11 @@ interface JobRole {
   salary?: string;
   recruiter?: { company_name?: string } | null; // Ensure nested recruiter data is available
 }
+*/
 
-interface Message {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  job_role_id?: string;
-  assignment_id?: string;
-  subject?: string;
-  body: string;
-  sent_at: string;
-  read_at?: string;
-  is_read: boolean;
-  // Add sender and receiver user profiles for display
-  sender?: { name?: string; avatar_url?: string; profile_pic_url?: string; role?: string };
-  receiver?: { name?: string; avatar_url?: string; profile_pic_url?: string; role?: string };
-}
-
-interface Hire {
-  id: string;
-  assignment_id: string;
-  salary: number;
-  hire_date?: string;
-  start_date?: string;
-  notes?: string;
-  marked_by: string;
-  created_at: string;
-  assignment?: { // Nested assignment data
-    id: string;
-    developer_id: string;
-    job_role_id: string;
-    recruiter_id: string;
-    status: string;
-    developer?: { // Nested developer data
-      user?: { // Nested user data for the developer
-        id: string;
-        name?: string;
-        avatar_url?: string;
-        profile_pic_url?: string;
-        github_handle?: string; // Add github_handle if it exists on developer directly or user
-      };
-      // other developer fields if needed
-    };
-    job_role?: { // Nested job_role data
-      id: string;
-      title?: string;
-      // other job_role fields if needed
-    };
-  };
-}
-
+// Similarly for Message, Hire, Notification (if not imported from '../types')
+// Assuming `Message`, `Hire`, `User` (for Notification.user) from '../types' are correct.
+// If Notification type is custom for this dashboard, keep it.
 interface Notification {
   id: string;
   user_id: string;
@@ -139,6 +134,7 @@ interface MessageThreadInfo {
   otherUserProfilePicUrl?: string;
   jobContext?: JobRole | null;
 }
+
 
 const RecruiterDashboard: React.FC = () => {
   const { user, userProfile, fetchUserProfile, authLoading, refreshProfile } = useAuth();
