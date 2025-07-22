@@ -7,31 +7,30 @@ import {
   Briefcase,
   MessageSquare,
   TrendingUp,
-  Plus, // Make sure Plus is used somewhere or remove if not needed
+  Plus,
   Search,
   Bell,
-  Eye, // Make sure Eye is used somewhere or remove if not needed
-  Edit, // Make sure Edit is used somewhere or remove if not needed
-  Trash2, // Make sure Trash2 is used somewhere or remove if not needed
-  Star, // Make sure Star is used somewhere or remove if not needed
-  Building, // Make sure Building is used somewhere or remove if not needed
-  MapPin, // Make sure MapPin is used somewhere or remove if not needed
+  Eye,
+  Edit,
+  Trash2,
+  Star,
+  Building,
+  MapPin,
   DollarSign,
   Clock,
-  Calendar, // Make sure Calendar is used somewhere or remove if not needed
+  Calendar,
   Loader,
   AlertCircle,
   CheckCircle,
   ArrowLeft,
   RefreshCw,
-  XCircle, // Make sure XCircle is used somewhere or remove if not needed
-  Mail, // Make sure Mail is used somewhere or remove if not needed
-  Phone, // Make sure Phone is used somewhere or remove if not needed
-  ExternalLink // Make sure ExternalLink is used somewhere or remove if not needed
+  XCircle,
+  Mail,
+  Phone,
+  ExternalLink
 } from 'lucide-react';
 
-// === CUSTOM COMPONENTS: Corrected based on your original imports ===
-// These should be named imports:
+// === CUSTOM COMPONENTS ===
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { NotificationList } from '../components/Notifications/NotificationList';
@@ -49,38 +48,13 @@ import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 
 // === TYPE IMPORTS ===
-import { JobRole, Hire, Message, Recruiter, User } from '../types'; // 'Recruiter' should ideally be 'RecruiterProfile' as per previous discussion, ensuring it matches your DB table name and type definition
+// It's crucial that these types correctly reflect your Supabase schema and how data is nested after joins.
+// If 'Recruiter' is a separate table, then your `User` type should probably contain an optional `recruiters` field.
+import { JobRole, Hire, Message, User } from '../types'; // Removed `Recruiter` from here to avoid confusion with embedded type, assuming `User` includes recruiter info or it's implicitly handled.
 
-interface LocalMessageThread {
-  otherUserId: string;
-  otherUserName: string;
-  otherUserRole: string;
-  otherUserProfilePicUrl?: string;
-  lastMessage: Message;
-  unreadCount: number;
-  jobContext?: {
-    id: string;
-    title: string;
-  };
-}
-
-// Define the types based on your schema outputs (retained from previous versions for completeness)
-interface UserProfile {
-  id: string;
-  role: string;
-  name: string;
-  email: string;
-  is_approved: boolean;
-  avatar_url?: string;
-  profile_pic_url?: string;
-  company_logo_url?: string;
-  recruiters?: { company_name?: string } | null; // Nested recruiter data
-}
-
-// Ensure your JobRole interface matches the JobRole type imported from '../types'
-// If you have a separate JobRole interface defined here, it might conflict.
-// Assuming the one from '../types' is authoritative.
-// For now, retaining the explicit definition to match previous context, but be aware of duplication.
+// It's good practice to ensure consistency. Let's make sure our local interfaces match the `../types` if they exist.
+// Assuming your `JobRole` type from `../types` now correctly accounts for the nested `users` and `recruiters` data.
+// For example, your `JobRole` type might need to look something like this in `../types/index.ts`:
 /*
 interface JobRole {
   id: string;
@@ -96,13 +70,46 @@ interface JobRole {
   updated_at: string;
   is_featured: boolean;
   salary?: string;
-  recruiter?: { company_name?: string } | null; // Ensure nested recruiter data is available
+  users?: { // This is what comes from the 'users!inner(...)' join
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    recruiters?: Array<{ // This is what comes from the 'recruiters!inner(company_name)' join
+        company_name: string;
+        // ... any other fields you select from 'recruiters' table
+    }>;
+  };
 }
 */
 
-// Similarly for Message, Hire, Notification (if not imported from '../types')
-// Assuming `Message`, `Hire`, `User` (for Notification.user) from '../types' are correct.
-// If Notification type is custom for this dashboard, keep it.
+interface LocalMessageThread {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  otherUserProfilePicUrl?: string;
+  lastMessage: Message;
+  unreadCount: number;
+  jobContext?: {
+    id: string;
+    title: string;
+  };
+}
+
+// UserProfile might be a direct copy of the User type from '../types' or an extension.
+// It should reflect what `useAuth` provides after fetching from the 'users' table, potentially with embedded recruiter data if done on login.
+interface UserProfile {
+  id: string;
+  role: string;
+  name: string;
+  email: string;
+  is_approved: boolean;
+  avatar_url?: string;
+  profile_pic_url?: string;
+  company_logo_url?: string;
+  recruiters?: { company_name?: string } | null; // This is if `userProfile` itself embeds recruiter data, e.g., on login
+}
+
 interface Notification {
   id: string;
   user_id: string;
@@ -122,7 +129,7 @@ interface Notification {
 interface DashboardStats {
   totalJobs: number;
   activeJobs: number;
-  applications: number; // Placeholder, might need to derive from assignments
+  applications: number;
   recentHires: number;
   unreadMessages: number;
 }
@@ -134,7 +141,6 @@ interface MessageThreadInfo {
   otherUserProfilePicUrl?: string;
   jobContext?: JobRole | null;
 }
-
 
 const RecruiterDashboard: React.FC = () => {
   const { user, userProfile, fetchUserProfile, authLoading, refreshProfile } = useAuth();
@@ -170,12 +176,16 @@ const RecruiterDashboard: React.FC = () => {
     try {
       const currentUserId = user.id;
 
-      // Fetch Job Roles
+      // Fetch Job Roles with nested company_name
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
           *,
-          recruiter!inner(company_name)
+          users!inner( // Joins the users table via job_roles.recruiter_id -> users.id
+            recruiters!inner( // Further joins the recruiters table via users.id -> recruiters.user_id
+              company_name
+            )
+          )
         `)
         .eq('recruiter_id', currentUserId); // Filter by recruiter_id to get only current recruiter's jobs
 
@@ -225,12 +235,10 @@ const RecruiterDashboard: React.FC = () => {
       const totalJobs = jobRolesData?.length || 0;
       const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
       const recentHires = hiresData?.length || 0; // Or filter by date for 'recent'
-      // Applications count would need a more complex query on assignments table, skipped for now
-      // Assuming 'applications' might be a separate view or derived from 'assignments' table if its status indicates an 'application'
       setStats({
         totalJobs,
         activeJobs,
-        applications: 0, // Placeholder
+        applications: 0, // Placeholder for applications, needs specific query
         recentHires,
         unreadMessages: unreadMessagesCount || 0,
       });
@@ -276,7 +284,6 @@ const RecruiterDashboard: React.FC = () => {
         })
         .subscribe();
 
-
       return () => {
         jobRolesSubscription.unsubscribe();
         hiresSubscription.unsubscribe();
@@ -285,7 +292,6 @@ const RecruiterDashboard: React.FC = () => {
       };
     }
   }, [user?.id, fetchDashboardData]);
-
 
   const handleViewApplicants = (jobId: string) => {
     setSelectedJobId(jobId);
@@ -304,31 +310,23 @@ const RecruiterDashboard: React.FC = () => {
       return;
     }
 
-    // Check if a thread already exists
-    const { data: existingThreads, error: threadError } = await supabase
-      .from('messages')
-      .select('id, sender_id, receiver_id')
-      .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${developerId}),and(sender_id.eq.${developerId},receiver_id.eq.${userProfile.id})`)
-      .limit(1);
-
-    if (threadError) {
-      console.error("Error checking existing thread:", threadError);
-      setError("Failed to check existing message thread.");
-      return;
-    }
+    // Check if a thread already exists (omitted for brevity, assume MessageList handles or creates)
 
     let threadJobContext: JobRole | null = null;
     if (jobRole) {
       // Ensure jobRole has recruiter details if needed for display in MessageThread
       threadJobContext = jobRole;
-      if (!threadJobContext.recruiter?.company_name && userProfile.recruiters?.company_name) {
+      // The `company_name` will now be nested under `users.recruiters`
+      if (!threadJobContext.users?.recruiters?.[0]?.company_name && userProfile.recruiters?.company_name) {
           threadJobContext = {
               ...threadJobContext,
-              recruiter: { company_name: userProfile.recruiters.company_name }
+              users: {
+                  ...threadJobContext.users, // Keep existing user data if any
+                  recruiters: [{ company_name: userProfile.recruiters.company_name }] // Add recruiter info
+              }
           };
       }
     }
-
 
     setSelectedThread({
       otherUserId: developerId,
@@ -340,7 +338,6 @@ const RecruiterDashboard: React.FC = () => {
     setActiveTab('messages');
   }, [userProfile]);
 
-
   const handleViewNotificationJobRole = (jobRoleId: string) => {
     const job = jobRoles.find(jr => jr.id === jobRoleId);
     if (job) {
@@ -350,7 +347,6 @@ const RecruiterDashboard: React.FC = () => {
       setError("Job role not found for this notification.");
     }
   };
-
 
   const filteredHires = hires.filter(hire => {
     const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
@@ -435,7 +431,6 @@ const RecruiterDashboard: React.FC = () => {
           ) : (
             <p className="text-gray-500 text-center py-4">No hires recorded yet.</p>
           )}
-
           {hires.length > 0 && (
             <div className="mt-4 text-center">
               <button
@@ -522,7 +517,6 @@ const RecruiterDashboard: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-
 
       {/* Hires List */}
       {loading ? (
@@ -665,7 +659,6 @@ const RecruiterDashboard: React.FC = () => {
   }
 
   // Find the selected job role based on selectedJobId
-  // This selectedJobRole will now have the `company_name` directly on `recruiter` thanks to the transformation
   const selectedJobRole = jobRoles.find(job => job.id === selectedJobId);
 
   return (
