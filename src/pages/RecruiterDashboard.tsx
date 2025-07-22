@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+// src/components/RecruiterDashboard.tsx
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
@@ -33,25 +35,18 @@ import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
 import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
-import { JobRole, Hire, Message } from '../types';
+// Corrected imports for types from src/types/index.ts
+import { JobRole, Hire, Message, Recruiter, User } from '../types';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 
-// This interface defines the expected structure of a JobRole object
-// *after* the data transformation, where company_name is directly on recruiter.
-interface FetchedJobRole extends JobRole {
-  recruiter: {
-    id: string;
-    name: string;
-    email: string;
-    company_name: string | null; // This will hold the flattened company name
-  };
-}
-
-interface MessageThread {
+// Removed FetchedJobRole interface here, as JobRole from types/index.ts will be used directly.
+// The MessageThread interface from your code is moved here as it seems to be an internal component type
+// If this is used elsewhere, consider moving it to types/index.ts as well.
+interface LocalMessageThread {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
@@ -77,8 +72,8 @@ export const RecruiterDashboard = () => {
     totalRevenue: 0
   });
 
-  // Use the new interface for jobRoles state
-  const [jobRoles, setJobRoles] = useState<FetchedJobRole[]>([]);
+  // Use the JobRole type directly, as it now includes the full recruiter and user structure from types/index.ts
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
 
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,11 +82,12 @@ export const RecruiterDashboard = () => {
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  // Use the local MessageThread interface
+  const [selectedThread, setSelectedThread] = useState<LocalMessageThread | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState(''); // This might need review if filtered by logged-in recruiter.
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Check if the user is approved
@@ -152,20 +148,42 @@ export const RecruiterDashboard = () => {
       let query = supabase
         .from('job_roles')
         .select(`
-          *,
-          recruiter:users!job_roles_recruiter_id_fkey (
-            id,
-            name,
-            email,
-            recruiter_profile:recruiters (
-              company_name
+          id,
+          recruiter_id,
+          title,
+          description,
+          location,
+          job_type,
+          tech_stack,
+          salary,
+          experience_required,
+          is_active,
+          is_featured,
+          created_at,
+          updated_at,
+          responsibilities,
+          benefits,
+          recruiter:recruiters (
+            user_id,
+            company_name,
+            website,
+            company_size,
+            industry,
+            user:users ( // Directly join 'users' table through the 'user_id' in 'recruiters'
+              id,
+              name,
+              email,
+              avatar_url,
+              profile_pic_url
             )
           )
         `)
         .order('created_at', { ascending: false });
 
       if (companyFilter) {
-        query = query.ilike('recruiter.recruiter_profile.company_name', `%${companyFilter}%`);
+        // This filter assumes recruiter.company_name is directly accessible after join
+        // If 'company_name' is not directly on 'recruiter' but within 'recruiter_profile', this needs adjustment
+        query = query.ilike('recruiter.company_name', `%${companyFilter}%`);
       } else {
         query = query.eq('recruiter_id', userProfile.id);
       }
@@ -174,40 +192,14 @@ export const RecruiterDashboard = () => {
 
       if (error) throw error;
 
-      // Data Transformation for nested relationships in RecruiterDashboard
-      const transformedJobRoles = (data || []).map(jobRole => {
-        // **IMPORTANT FIX:** Ensure jobRole.recruiter exists before accessing its properties.
-        // If recruiter is null/undefined, provide default values.
-        const recruiter = jobRole.recruiter;
-
-        let transformedRecruiter = {
-          id: '',
-          name: 'Unknown Recruiter',
-          email: 'unknown@example.com',
-          company_name: null as string | null
-        };
-
-        if (recruiter) {
-          transformedRecruiter.id = recruiter.id || '';
-          transformedRecruiter.name = recruiter.name || 'Unknown Recruiter';
-          transformedRecruiter.email = recruiter.email || 'unknown@example.com';
-
-          // Safely access company_name only if recruiter_profile exists and is an array with elements
-          if (Array.isArray(recruiter.recruiter_profile) && recruiter.recruiter_profile.length > 0) {
-            transformedRecruiter.company_name = recruiter.recruiter_profile[0].company_name;
-          }
-        }
-
-        return {
-          ...jobRole,
-          recruiter: transformedRecruiter
-        } as FetchedJobRole;
-      });
-
-      setJobRoles(transformedJobRoles);
+      // The data structure returned by Supabase, when correctly typed with JobRole,
+      // should already match the shape needed due to the changes in src/types/index.ts.
+      // Therefore, the manual transformation below is no longer needed.
+      setJobRoles(data || []);
 
     } catch (error: any) {
       console.error('Error fetching job roles:', error);
+      setError('Failed to fetch job roles: ' + error.message); // Set error for UI
     }
   };
 
@@ -250,6 +242,7 @@ export const RecruiterDashboard = () => {
       });
     } catch (error: any) {
       console.error('Error fetching stats:', error);
+      setError('Failed to fetch dashboard stats: ' + error.message); // Set error for UI
     }
   };
 
@@ -263,7 +256,18 @@ export const RecruiterDashboard = () => {
           *,
           assignment:assignments(
             *,
-            developer:users!assignments_developer_id_fkey(*),
+            developer:developers( // Ensure this selects necessary developer fields
+              user_id,
+              github_handle,
+              bio,
+              user:users( // Join user data for the developer
+                id,
+                name,
+                email,
+                avatar_url,
+                profile_pic_url
+              )
+            ),
             job_role:job_roles(*)
           )
         `)
@@ -274,6 +278,7 @@ export const RecruiterDashboard = () => {
       setHires(data || []);
     } catch (error: any) {
       console.error('Error fetching hires:', error);
+      setError('Failed to fetch hires data: ' + error.message); // Set error for UI
     }
   };
 
@@ -306,7 +311,7 @@ export const RecruiterDashboard = () => {
       otherUserName: developerName,
       otherUserRole: 'developer',
       unreadCount: 0,
-      lastMessage: {} as Message,
+      lastMessage: {} as Message, // Provide a minimal Message object or null if allowed
       jobContext: jobRoleId && jobRoleTitle ? {
         id: jobRoleId,
         title: jobRoleTitle
@@ -338,7 +343,7 @@ export const RecruiterDashboard = () => {
 
   // Filter hires based on search term
   const filteredHires = hires.filter(hire =>
-    hire.assignment?.developer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    hire.assignment?.developer?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || // Access developer's name via nested user
     hire.assignment?.job_role?.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -437,7 +442,7 @@ export const RecruiterDashboard = () => {
                 <div key={hire.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div>
                     <h4 className="font-semibold text-gray-900">
-                      {hire.assignment?.developer?.name || 'Unknown Developer'}
+                      {hire.assignment?.developer?.user?.name || 'Unknown Developer'}
                     </h4>
                     <div className="text-sm text-gray-600 mt-1">
                       Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
@@ -567,11 +572,13 @@ export const RecruiterDashboard = () => {
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xs mr-3">
-                          {hire.assignment?.developer?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
-                        </div>
+                        <img
+                            src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.github_handle || 'U')}&background=random`}
+                            alt={hire.assignment?.developer?.user?.name || hire.assignment?.developer?.github_handle || 'Developer'}
+                            className="w-8 h-8 rounded-full object-cover mr-3"
+                        />
                         <div className="text-sm font-semibold text-gray-900">
-                          {hire.assignment?.developer?.name || 'Unknown'}
+                          {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
                       </div>
                     </td>
@@ -667,7 +674,7 @@ export const RecruiterDashboard = () => {
           <button
             onClick={() => {
               setIsRefreshing(true);
-              refreshProfile(() => setIsRefreshing(false));
+              refreshProfile().finally(() => setIsRefreshing(false)); // Use finally for consistent state reset
             }}
             disabled={isRefreshing}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
