@@ -2,21 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { JobRole } from '../../types';
+import { JobRole, EnrichedJobRole } from '../../types'; // Ensure EnrichedJobRole is imported
 import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
-
-// === HELPER TYPE FOR ENRICHED JOB ROLE ===
-interface EnrichedJobRole extends JobRole {
-  recruiter: {
-    id: string;
-    name: string;
-    email: string;
-    recruiters: { // This matches the alias in the select query
-      company_name: string;
-    }[];
-  };
-  company_name?: string;
-}
 
 // Minimal JobCard component
 const JobCard: React.FC<{
@@ -62,12 +49,13 @@ const JobCard: React.FC<{
           )}
       </p>
       <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
-      {job.salary_min && job.salary_max && (
-        <p className="text-sm text-gray-500 mb-3 flex items-center">
-          <DollarSign size={14} className="mr-2 text-gray-400" />
-          ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
-        </p>
-      )}
+
+      {/* CORRECTED SALARY DISPLAY LOGIC for salary: string | null */}
+      <p className="text-sm text-gray-500 mb-3 flex items-center">
+        <DollarSign size={14} className="mr-2 text-gray-400" />
+        {job.salary || 'N/A'}
+      </p>
+
       <div className="flex flex-wrap gap-2 mb-4">
         {job.tech_stack?.slice(0, 4).map(tech => (
           <span key={tech} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">{tech}</span>
@@ -108,29 +96,48 @@ export const JobDetailsModal: React.FC<{
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto">
-          <p className="text-md text-gray-600">
-            <Briefcase size={16} className="inline mr-2 text-gray-500" />
-            {job.recruiter?.id ? (
-              <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-                {job.company_name || 'Company Confidential'}
-              </a>
+          {/* Company and Recruiter Info */}
+          <div className="flex items-center mb-4">
+            {job.recruiter?.company_logo_url ? (
+              <img src={job.recruiter.company_logo_url} alt={`${job.company_name} logo`} className="w-10 h-10 rounded-full mr-3 object-cover" />
+            ) : job.recruiter?.profile_pic_url ? (
+              <img src={job.recruiter.profile_pic_url} alt={`${job.recruiter.name} profile`} className="w-10 h-10 rounded-full mr-3 object-cover" />
             ) : (
-              <span>{job.company_name || 'Company Confidential'}</span>
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold text-lg mr-3">
+                {job.company_name ? job.company_name[0].toUpperCase() : (job.recruiter?.name ? job.recruiter.name[0].toUpperCase() : 'U')}
+              </div>
             )}
-          </p>
-          <p className="text-md text-gray-600">
-            {job.recruiter?.id ? (
-              <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-                  {job.recruiter?.name || 'Recruiter'}
-              </a>
-            ) : (
-              <span>{job.recruiter?.name || 'Recruiter'}</span>
-            )}
-          </p>
+            <div>
+              <p className="text-md text-gray-600 font-semibold">
+                <Briefcase size={16} className="inline mr-2 text-gray-500" />
+                {job.recruiter?.id ? (
+                  <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+                    {job.company_name || 'Company Confidential'}
+                  </a>
+                ) : (
+                  <span>{job.company_name || 'Company Confidential'}</span>
+                )}
+              </p>
+              <p className="text-sm text-gray-500">
+                {job.recruiter?.id ? (
+                  <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+                      {job.recruiter?.name || 'Recruiter'}
+                  </a>
+                ) : (
+                  <span>{job.recruiter?.name || 'Recruiter'}</span>
+                )}
+              </p>
+            </div>
+          </div>
+
           <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
-          {job.salary_min && job.salary_max && (
-            <p className="text-md text-gray-600"><DollarSign size={16} className="inline mr-2 text-gray-500" /> ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}</p>
-          )}
+
+          {/* CORRECTED SALARY DISPLAY LOGIC for salary: string | null */}
+          <p className="text-md text-gray-600">
+            <DollarSign size={16} className="inline mr-2 text-gray-500" />
+            {job.salary || 'N/A'}
+          </p>
+
           <div className="pt-2">
             <h4 className="font-semibold text-gray-700 mb-1">Job Description:</h4>
             <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.description || "No description provided."}</p>
@@ -194,6 +201,8 @@ export const JobsTab: React.FC = () => {
             id,
             name,
             email,
+            profile_pic_url,
+            company_logo_url,
             recruiters:recruiters!recruiters_user_id_fkey (
               company_name
             )
