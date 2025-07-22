@@ -165,9 +165,9 @@ const RecruiterDashboard: React.FC = () => {
           assignment:assignments (
             *,
             developer:developers (
-              user (*)
+              user:users (*)
             ),
-            job_role (*)
+            job_role:job_roles (*)
           )
         `)
         .eq('marked_by', currentUserId)
