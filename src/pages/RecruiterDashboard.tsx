@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase'; // <-- CORRECTED SUPABASE PATH HERE
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import JobDetailView from '../components/Jobs/JobDetailView'; // <-- CORRECTED JOB DETAIL VIEW PATH HERE
-import JobsDashboard from '../components/JobsDashboard';
+import JobDetailView from '../components/Jobs/JobDetailView';
+import JobsDashboard from '../components/Jobs/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
-import MessageList from '../components/MessageList';
-import MessageThread from '../components/MessageThread';
-import NotificationList from '../components/NotificationList';
+import MessageList from '../components/Messages/MessageList';
+import MessageThread from '../components/Messages/MessageThread';
+import NotificationList from '../components/Notifications/NotificationList'; // <-- CORRECTED PATH HERE
 import HiringPipeline from '../components/HiringPipeline';
-import RecruiterProfileForm from '../components/RecruiterProfileForm';
+import RecruiterProfileForm from '../components/Profile/RecruiterProfileForm'; // <-- CORRECTED PATH HERE
 import {
   Briefcase,
   Search,
@@ -558,8 +558,7 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
