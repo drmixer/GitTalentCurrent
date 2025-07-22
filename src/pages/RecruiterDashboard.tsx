@@ -162,7 +162,7 @@ const RecruiterDashboard: React.FC = () => {
         .from('hires')
         .select(`
           *,
-          assignment (
+          assignment:assignments (
             *,
             developer (
               user (*)
