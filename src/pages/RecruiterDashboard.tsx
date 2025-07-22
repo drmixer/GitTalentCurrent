@@ -268,7 +268,7 @@ const RecruiterDashboard: React.FC = () => {
     setTimeout(() => setSuccess(null), 5000);
   };
 
-  const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, jobRole?: JobRole) => {
+  const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, developerProfilePicUrl?: string, jobRole?: JobRole) => {
     if (!userProfile) {
       setError("User profile not loaded. Cannot send message.");
       return;
@@ -292,7 +292,7 @@ const RecruiterDashboard: React.FC = () => {
       otherUserId: developerId,
       otherUserName: developerName,
       otherUserRole: 'developer',
-      otherUserProfilePicUrl: '',
+      otherUserProfilePicUrl: developerProfilePicUrl,
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
