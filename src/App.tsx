@@ -1,30 +1,27 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Assuming AuthProvider is a named export from AuthContext.tsx
-import { AuthProvider } from './contexts/AuthContext.tsx'; 
+// AuthContext: Named export
+import { AuthProvider } from './contexts/AuthContext.tsx';
 
-// Assuming Header is a named export
-import { Header } from './components/Layout/Header'; 
-
-// Page components typically use default exports
-import LandingPage from './pages/LandingPage'; 
-import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import RecruiterDashboard from './pages/RecruiterDashboard'; // FIXED: Changed to default import
-import DeveloperDashboard from './pages/DeveloperDashboard';
-import PublicDeveloperProfile from './pages/PublicDeveloperProfile';
-import GitHubAppSetup from './pages/GitHubAppSetup';
-import AuthCallback from './pages/AuthCallback';
-import ApplyForJob from './pages/ApplyForJob';
-import RecruiterProfilePage from './pages/RecruiterProfilePage'; // Already correct
-import CompanyProfilePage from './pages/CompanyProfilePage';     // Already correct
-
-// Form components often use named exports
+// Components: All confirmed as Named Exports
+import { Header } from './components/Layout/Header';
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
 
+// Pages: Mixed exports - Pay close attention!
+import { LandingPage } from './pages/LandingPage';           // Confirmed: Named Export
+import { Dashboard } from './pages/Dashboard';               // Confirmed: Named Export
+import { AdminDashboard } from './pages/AdminDashboard';     // Confirmed: Named Export
+import RecruiterDashboard from './pages/RecruiterDashboard'; // Confirmed: Default Export
+import RecruiterProfilePage from './pages/RecruiterProfilePage'; // Confirmed: Default Export
+import CompanyProfilePage from './pages/CompanyProfilePage';     // Confirmed: Default Export
+import { DeveloperDashboard } from './pages/DeveloperDashboard'; // Confirmed: Named Export
+import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile'; // Confirmed: Named Export
+import { GitHubAppSetup } from './pages/GitHubAppSetup';     // Confirmed: Named Export
+import { AuthCallback } from './pages/AuthCallback';         // Confirmed: Named Export
+import { ApplyForJob } from './pages/ApplyForJob';           // Confirmed: Named Export
 
 function App() {
   return (
