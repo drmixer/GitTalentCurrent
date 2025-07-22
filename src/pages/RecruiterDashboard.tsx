@@ -48,40 +48,7 @@ import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 
 // === TYPE IMPORTS ===
-// It's crucial that these types correctly reflect your Supabase schema and how data is nested after joins.
-// If 'Recruiter' is a separate table, then your `User` type should probably contain an optional `recruiters` field.
-import { JobRole, Hire, Message, User } from '../types'; // Removed `Recruiter` from here to avoid confusion with embedded type, assuming `User` includes recruiter info or it's implicitly handled.
-
-// It's good practice to ensure consistency. Let's make sure our local interfaces match the `../types` if they exist.
-// Assuming your `JobRole` type from `../types` now correctly accounts for the nested `users` and `recruiters` data.
-// For example, your `JobRole` type might need to look something like this in `../types/index.ts`:
-/*
-interface JobRole {
-  id: string;
-  recruiter_id: string;
-  title: string;
-  description: string;
-  location: string;
-  job_type: string;
-  tech_stack: string[];
-  experience_required?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  is_featured: boolean;
-  salary?: string;
-  users?: { // This is what comes from the 'users!inner(...)' join
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    recruiters?: Array<{ // This is what comes from the 'recruiters!inner(company_name)' join
-        company_name: string;
-        // ... any other fields you select from 'recruiters' table
-    }>;
-  };
-}
-*/
+import { JobRole, Hire, Message, User } from '../types';
 
 interface LocalMessageThread {
   otherUserId: string;
@@ -96,8 +63,6 @@ interface LocalMessageThread {
   };
 }
 
-// UserProfile might be a direct copy of the User type from '../types' or an extension.
-// It should reflect what `useAuth` provides after fetching from the 'users' table, potentially with embedded recruiter data if done on login.
 interface UserProfile {
   id: string;
   role: string;
@@ -107,7 +72,7 @@ interface UserProfile {
   avatar_url?: string;
   profile_pic_url?: string;
   company_logo_url?: string;
-  recruiters?: { company_name?: string } | null; // This is if `userProfile` itself embeds recruiter data, e.g., on login
+  recruiters?: { company_name?: string } | null;
 }
 
 interface Notification {
@@ -119,7 +84,7 @@ interface Notification {
   message: string;
   is_read: boolean;
   created_at: string;
-  user?: { // User related to the notification (e.g., sender for a message notification)
+  user?: {
     name?: string;
     avatar_url?: string;
     profile_pic_url?: string;
@@ -163,7 +128,7 @@ const RecruiterDashboard: React.FC = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isApproved = userProfile?.is_approved === true;
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
@@ -176,24 +141,23 @@ const RecruiterDashboard: React.FC = () => {
     try {
       const currentUserId = user.id;
 
-      // Fetch Job Roles with nested company_name
+      // Fetch Job Roles with nested company_name - CORRECTED: Removed comments from select string
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
           *,
-          users!inner( // Joins the users table via job_roles.recruiter_id -> users.id
-            recruiters!inner( // Further joins the recruiters table via users.id -> recruiters.user_id
+          users!inner(
+            recruiters!inner(
               company_name
             )
           )
         `)
-        .eq('recruiter_id', currentUserId); // Filter by recruiter_id to get only current recruiter's jobs
+        .eq('recruiter_id', currentUserId);
 
       if (jobRolesError) throw jobRolesError;
       setJobRoles(jobRolesData || []);
 
       // Fetch Hires
-      // Modified to select deeply nested relations
       const { data: hiresData, error: hiresError } = await supabase
         .from('hires')
         .select(`
@@ -206,7 +170,7 @@ const RecruiterDashboard: React.FC = () => {
             job_role (*)
           )
         `)
-        .eq('marked_by', currentUserId) // Filter hires by the recruiter who marked them
+        .eq('marked_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (hiresError) throw hiresError;
@@ -215,7 +179,7 @@ const RecruiterDashboard: React.FC = () => {
       // Fetch Notifications
       const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
-        .select('*, user(name, avatar_url, profile_pic_url)') // Fetch user details for notifications
+        .select('*, user(name, avatar_url, profile_pic_url)')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
 
@@ -234,11 +198,11 @@ const RecruiterDashboard: React.FC = () => {
       // Calculate Dashboard Stats
       const totalJobs = jobRolesData?.length || 0;
       const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
-      const recentHires = hiresData?.length || 0; // Or filter by date for 'recent'
+      const recentHires = hiresData?.length || 0;
       setStats({
         totalJobs,
         activeJobs,
-        applications: 0, // Placeholder for applications, needs specific query
+        applications: 0,
         recentHires,
         unreadMessages: unreadMessagesCount || 0,
       });
@@ -259,28 +223,28 @@ const RecruiterDashboard: React.FC = () => {
       const jobRolesSubscription = supabase
         .channel('public:job_roles')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${user.id}` }, payload => {
-          fetchDashboardData(); // Re-fetch on job role changes
+          fetchDashboardData();
         })
         .subscribe();
 
       const hiresSubscription = supabase
         .channel('public:hires')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${user.id}` }, payload => {
-          fetchDashboardData(); // Re-fetch on hire changes
+          fetchDashboardData();
         })
         .subscribe();
 
       const messagesSubscription = supabase
         .channel('public:messages')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, payload => {
-          fetchDashboardData(); // Re-fetch on new messages
+          fetchDashboardData();
         })
         .subscribe();
 
       const notificationsSubscription = supabase
         .channel('public:notifications')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, payload => {
-          fetchDashboardData(); // Re-fetch on new notifications
+          fetchDashboardData();
         })
         .subscribe();
 
@@ -300,8 +264,8 @@ const RecruiterDashboard: React.FC = () => {
 
   const handleJobUpdate = (message: string) => {
     setSuccess(message);
-    fetchDashboardData(); // Refresh data after update
-    setTimeout(() => setSuccess(null), 5000); // Clear message after 5 seconds
+    fetchDashboardData();
+    setTimeout(() => setSuccess(null), 5000);
   };
 
   const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, jobRole?: JobRole) => {
@@ -310,19 +274,15 @@ const RecruiterDashboard: React.FC = () => {
       return;
     }
 
-    // Check if a thread already exists (omitted for brevity, assume MessageList handles or creates)
-
     let threadJobContext: JobRole | null = null;
     if (jobRole) {
-      // Ensure jobRole has recruiter details if needed for display in MessageThread
       threadJobContext = jobRole;
-      // The `company_name` will now be nested under `users.recruiters`
       if (!threadJobContext.users?.recruiters?.[0]?.company_name && userProfile.recruiters?.company_name) {
           threadJobContext = {
               ...threadJobContext,
               users: {
-                  ...threadJobContext.users, // Keep existing user data if any
-                  recruiters: [{ company_name: userProfile.recruiters.company_name }] // Add recruiter info
+                  ...threadJobContext.users,
+                  recruiters: [{ company_name: userProfile.recruiters.company_name }]
               }
           };
       }
@@ -331,8 +291,8 @@ const RecruiterDashboard: React.FC = () => {
     setSelectedThread({
       otherUserId: developerId,
       otherUserName: developerName,
-      otherUserRole: 'developer', // Assuming the recipient is a developer
-      otherUserProfilePicUrl: '', // Will be fetched by MessageThread or passed if available
+      otherUserRole: 'developer',
+      otherUserProfilePicUrl: '',
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
@@ -408,7 +368,7 @@ const RecruiterDashboard: React.FC = () => {
 
         {/* Recent Hires */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Hires</h3>
+          <h3 className="lg font-bold text-gray-900 mb-4">Recent Hires</h3>
           {hires.length > 0 ? (
             <div className="space-y-4">
               {hires.slice(0, 3).map(hire => (
@@ -612,11 +572,11 @@ const RecruiterDashboard: React.FC = () => {
 
   // Redirect if not authenticated or not a recruiter
   if (!userProfile) {
-    return <Navigate to="/dashboard" replace />; // Redirect to general dashboard if profile missing
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (userProfile.role !== 'recruiter') {
-    return <Navigate to="/dashboard" replace />; // Redirect if not recruiter
+    return <Navigate to="/dashboard" replace />;
   }
 
   // If recruiter is not approved, show pending approval message
@@ -645,7 +605,7 @@ const RecruiterDashboard: React.FC = () => {
           <button
             onClick={() => {
               setIsRefreshing(true);
-              refreshProfile().finally(() => setIsRefreshing(false)); // Use finally for consistent state reset
+              refreshProfile().finally(() => setIsRefreshing(false));
             }}
             disabled={isRefreshing}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -811,8 +771,7 @@ const RecruiterDashboard: React.FC = () => {
           <NotificationList
             onViewJobRole={handleViewNotificationJobRole}
             onViewMessage={(messageId) => {
-              // Handle viewing message: Find the message, set selectedThread if needed
-              setActiveTab('messages'); // Simply navigate to messages tab for now
+              setActiveTab('messages');
             }}
           />
         )}
