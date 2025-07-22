@@ -2,15 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import JobDetailView from '../components/Jobs/JobDetailView';
-import JobsDashboard from '../components/Jobs/JobsDashboard';
-import DeveloperDirectory from '../components/DeveloperDirectory';
-import { MessageList } from '../components/Messages/MessageList'; // <-- CORRECTED IMPORT HERE
+
+// ALL CUSTOM COMPONENT IMPORTS ARE NOW NAMED IMPORTS
+import { JobDetailView } from '../components/Jobs/JobDetailView';
+import { JobsDashboard } from '../components/Jobs/JobsDashboard';
+import { DeveloperDirectory } from '../components/DeveloperDirectory';
+import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
-import NotificationList from '../components/Notifications/NotificationList';
-import HiringPipeline from '../components/HiringPipeline';
-import RecruiterProfileForm from '../components/Profile/RecruiterProfileForm';
-import {
+import { NotificationList } from '../components/Notifications/NotificationList';
+import { HiringPipeline } from '../components/HiringPipeline';
+import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
+
+import { // Lucide icons are already named imports, this is correct
   Briefcase,
   Search,
   MessageSquare,
