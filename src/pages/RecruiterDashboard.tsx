@@ -162,16 +162,16 @@ const RecruiterDashboard: React.FC = () => {
         .from('hires')
         .select(`
           *,
-          assignment:assignments (
+          assignment:assignments ( // This was already corrected
             *,
-            developer (
+            developer:developers ( // <--- THIS IS THE NEW CORRECTED LINE
               user (*)
             ),
             job_role (*)
           )
         `)
         .eq('marked_by', currentUserId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false });;
 
       if (hiresError) throw hiresError;
       setHires(hiresData || []);
