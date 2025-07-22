@@ -172,8 +172,11 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
           <div className="h-48 bg-gray-100 flex items-center justify-center text-gray-400 text-6xl font-bold">
              {/* Main banner image - uses company_logo_url from the recruiter object directly */}
              {recruiter.company_logo_url && (
-                {/* Access directly, not via [0] */}
-                <img src={recruiter.company_logo_url} alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} Cover`} className="w-full h-full object-cover"/>
+                <img
+                  src={recruiter.company_logo_url}
+                  alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} Cover`} // Access directly, not via [0]
+                  className="w-full h-full object-cover"
+                />
              )}
              {/* Fallback if no company logo or profile pic for banner */}
              {!recruiter.company_logo_url && !recruiter.profile_pic_url && (
@@ -194,8 +197,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               <img
                 className="h-16 w-auto object-contain rounded-lg shadow-sm bg-white p-1"
                 src={recruiter.company_logo_url}
-                {/* Access directly, not via [0] */}
-                alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} logo`}
+                alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} logo`} // Access directly, not via [0]
               />
             ) : (recruiter.recruiters as RecruiterType)?.company_name ? ( // Access directly, not via [0]
               <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm">
@@ -208,8 +210,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         <div className="pt-20 pb-8 px-8">
           <h1 className="text-3xl font-bold text-gray-800">{recruiter.name}</h1>
           {/* Display company name from recruiter's recruiters table, fallback */}
-          {/* Access directly, not via [0] */}
-          <p className="text-gray-600 text-lg">{(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}</p>
+          <p className="text-gray-600 text-lg">{(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}</p> {/* Access directly, not via [0] */}
         </div>
 
         <div className="px-8 pb-8">
