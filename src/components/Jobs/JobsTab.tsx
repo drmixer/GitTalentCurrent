@@ -14,7 +14,8 @@ interface EnrichedJobRole extends JobRole {
     id: string;
     name: string;
     email: string;
-    recruiters: { // This matches the alias in the select query
+    // Corrected to `recruiters` based on the query structure, and now explicitly matches the joined data
+    recruiters: {
       company_name: string;
       // Add other recruiter fields if you select them
     }[]; // Supabase returns this as an array even if it's a one-to-one
@@ -179,14 +180,12 @@ export const JobDetailsModal: React.FC<{
 export const JobsTab: React.FC = () => {
   const navigate = useNavigate();
   const { developerProfile } = useAuth();
-  // Use EnrichedJobRole type for jobs state
   const [jobs, setJobs] = useState<EnrichedJobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  // Use EnrichedJobRole type for selectedJob state
   const [selectedJob, setSelectedJob] = useState<EnrichedJobRole | null>(null);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
   const [currentJobView, setCurrentJobView] = useState<'all' | 'saved' | 'applied'>('all');
@@ -203,31 +202,35 @@ export const JobsTab: React.FC = () => {
             id,
             name,
             email,
-            recruiters:recruiters!users_id_fkey (
+            // CORRECTED: Use the actual foreign key constraint name and structure
+            // It's 'recruiters_user_id_fkey' linking 'recruiters.user_id' to 'users.id'
+            // We use the 'recruiters' table name followed by '!<foreign_key_constraint_name>'
+            // and then specify the columns from the 'recruiters' table.
+            recruiters:recruiters!recruiters_user_id_fkey (
               company_name
             )
           )
         `)
         .eq('is_active', true)
-        // TODO: Add more sophisticated filtering/matching based on developer profile
         .order('created_at', { ascending: false });
 
       if (jobsError) {
         console.error("Supabase error fetching jobs from view:", JSON.stringify(jobsError));
         throw jobsError;
       }
-      console.log('Fetched raw jobs data:', data); // Log raw data for debugging
+      console.log('Fetched raw jobs data:', data);
 
-      // Transform data to flatten company_name for easier access
       const transformedJobs: EnrichedJobRole[] = (data || []).map(job => {
+        // Accessing the 'recruiters' property from the `users` join,
+        // which now matches the alias `recruiters` in the select.
         const companyName = job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential';
         return {
           ...job,
-          company_name: companyName, // Add a top-level company_name property
+          company_name: companyName,
         };
       });
 
-      console.log('Transformed jobs data with company name:', transformedJobs); // Log transformed data
+      console.log('Transformed jobs data with company name:', transformedJobs);
       setJobs(transformedJobs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch jobs.');
@@ -255,7 +258,6 @@ export const JobsTab: React.FC = () => {
       setAppliedJobIds(new Set(applied?.map(a => a.job_id) || []));
     } catch (e: unknown) {
       console.error("Error fetching user job interactions:", e);
-      // Non-critical, so don't set main error state
     }
   }, [developerProfile?.user_id]);
 
@@ -293,15 +295,12 @@ export const JobsTab: React.FC = () => {
       alert(`Failed to ${alreadySaved ? 'unsave' : 'save'} job. ${e instanceof Error ? e.message : ''}`);
     } finally {
       setProcessingJobId(null);
-      // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
-      // for updated saved_jobs_count on OverviewTab, or use a global state.
     }
   };
 
   const handleApplyJob = (jobId: string) => {
     if (!developerProfile?.user_id || appliedJobIds.has(jobId)) return;
 
-    // Navigate to the dedicated application page
     navigate(`/apply/job/${jobId}`);
   };
 
@@ -320,7 +319,6 @@ export const JobsTab: React.FC = () => {
     return jobsToShow.filter(job => {
       const searchTermLower = searchTerm.toLowerCase();
       const titleMatch = job.title.toLowerCase().includes(searchTermLower);
-      // Use the flattened company_name for search
       const companyMatch = job.company_name?.toLowerCase().includes(searchTermLower);
       const techMatch = job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTermLower));
       return titleMatch || companyMatch || techMatch;
@@ -338,8 +336,7 @@ export const JobsTab: React.FC = () => {
         <p className="text-gray-600">Search and apply for jobs that match your skills.</p>
       </div>
 
-      {/* Search and Filters */}
-      <div className="sticky top-[65px] z-10 bg-gray-50 py-4 px-1 -mx-1"> {/* Adjust top based on header height */}
+      <div className="sticky top-[65px] z-10 bg-gray-50 py-4 px-1 -mx-1">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
@@ -350,7 +347,6 @@ export const JobsTab: React.FC = () => {
             className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
           />
         </div>
-        {/* Filter Buttons */}
         <div className="mt-4 flex space-x-2 pb-2 border-b border-gray-200">
           {(['all', 'saved', 'applied'] as const).map((view) => (
             <button
@@ -373,7 +369,6 @@ export const JobsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Job Listings */}
       {!loading && displayedJobs.length === 0 && (
         <div className="text-center py-10">
           <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
@@ -402,14 +397,13 @@ export const JobsTab: React.FC = () => {
             isSaved={savedJobIds.has(job.id)}
             hasApplied={appliedJobIds.has(job.id)}
             isProcessingSave={processingJobId === job.id}
-            isProcessingApply={processingJobId === job.id} // Assuming same processing flag for now
+            isProcessingApply={processingJobId === job.id}
           />
         ))}
       </div>
 
       {loading && jobs.length > 0 && <div className="text-center py-6"><Loader size={24} className="animate-spin text-blue-600"/></div>}
 
-      {/* Job Details Modal */}
       {selectedJob && (
         <JobDetailsModal
           job={selectedJob}
@@ -419,7 +413,7 @@ export const JobsTab: React.FC = () => {
           isSaved={savedJobIds.has(selectedJob.id)}
           hasApplied={appliedJobIds.has(selectedJob.id)}
           isProcessingSave={processingJobId === selectedJob.id}
-          isProcessingApply={processingJobId === selectedJob.id} // Assuming same processing flag for now
+          isProcessingApply={processingJobId === selectedJob.id}
         />
       )}
     </div>
