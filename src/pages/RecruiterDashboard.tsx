@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabase'; // <-- CORRECTED SUPABASE PATH HERE
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import JobDetailView from '../components/Jobs/JobDetailView'; // <-- CORRECTED PATH HERE
+import JobDetailView from '../components/Jobs/JobDetailView';
 import JobsDashboard from '../components/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import MessageList from '../components/MessageList';
@@ -227,7 +227,7 @@ const RecruiterDashboard: React.FC = () => {
       const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
       const recentHires = hiresData?.length || 0; // Or filter by date for 'recent'
       // Applications count would need a more complex query on assignments table, skipped for now
-      // Assuming 'applications' might be a separate view or derived from 'assignments' table if its status indicates an application
+      // Assuming 'applications' might be a separate view or derived from 'assignments' table if its status indicates an 'application'
       setStats({
         totalJobs,
         activeJobs,
@@ -558,8 +558,7 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
