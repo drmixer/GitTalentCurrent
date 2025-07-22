@@ -6,7 +6,7 @@ import { Navigate } from 'react-router-dom';
 // ALL CUSTOM COMPONENT IMPORTS ARE NOW NAMED IMPORTS
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { JobsDashboard } from '../components/Jobs/JobsDashboard';
-import { DeveloperDirectory } from '../components/DeveloperDirectory';
+import DeveloperDirectory from '../components/DeveloperDirectory';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { NotificationList } from '../components/Notifications/NotificationList';
