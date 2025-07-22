@@ -6,27 +6,21 @@ import { JobRole } from '../../types';
 import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
 
 // === HELPER TYPE FOR ENRICHED JOB ROLE ===
-// This helps TS understand the structure of the data AFTER the join and transformation
-// Note: This assumes `JobRole` type itself doesn't already contain a `recruiter` or `company_name` field.
-// If it does, you might need to adjust your base JobRole type or merge types.
 interface EnrichedJobRole extends JobRole {
-  recruiter: { // This matches the alias in the select query
+  recruiter: {
     id: string;
     name: string;
     email: string;
-    // Corrected to `recruiters` based on the query structure, and now explicitly matches the joined data
-    recruiters: {
+    recruiters: { // This matches the alias in the select query
       company_name: string;
-      // Add other recruiter fields if you select them
-    }[]; // Supabase returns this as an array even if it's a one-to-one
+    }[];
   };
-  // Add a flattened company_name for easier access after transformation
   company_name?: string;
 }
 
 // Minimal JobCard component
 const JobCard: React.FC<{
-  job: EnrichedJobRole; // Use the enriched type here
+  job: EnrichedJobRole;
   onSelect: () => void;
   onSave: () => void;
   onApply: () => void;
@@ -50,7 +44,6 @@ const JobCard: React.FC<{
       </div>
       <p className="text-sm text-gray-500 mb-1 flex items-center">
         <Briefcase size={14} className="mr-2 text-gray-400" />
-        {/* Use the flattened company_name property */}
         {job.recruiter?.id ? (
           <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
             {job.company_name || 'Company Confidential'}
@@ -98,7 +91,7 @@ const JobCard: React.FC<{
 
 // Minimal JobDetailsModal component
 export const JobDetailsModal: React.FC<{
-  job: EnrichedJobRole; // Use the enriched type here
+  job: EnrichedJobRole;
   onClose: () => void;
   onSave: () => void;
   onApply: () => void;
@@ -117,7 +110,6 @@ export const JobDetailsModal: React.FC<{
         <div className="p-6 space-y-4 overflow-y-auto">
           <p className="text-md text-gray-600">
             <Briefcase size={16} className="inline mr-2 text-gray-500" />
-            {/* Use the flattened company_name property */}
             {job.recruiter?.id ? (
               <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
                 {job.company_name || 'Company Confidential'}
@@ -202,10 +194,6 @@ export const JobsTab: React.FC = () => {
             id,
             name,
             email,
-            // CORRECTED: Use the actual foreign key constraint name and structure
-            // It's 'recruiters_user_id_fkey' linking 'recruiters.user_id' to 'users.id'
-            // We use the 'recruiters' table name followed by '!<foreign_key_constraint_name>'
-            // and then specify the columns from the 'recruiters' table.
             recruiters:recruiters!recruiters_user_id_fkey (
               company_name
             )
@@ -221,8 +209,6 @@ export const JobsTab: React.FC = () => {
       console.log('Fetched raw jobs data:', data);
 
       const transformedJobs: EnrichedJobRole[] = (data || []).map(job => {
-        // Accessing the 'recruiters' property from the `users` join,
-        // which now matches the alias `recruiters` in the select.
         const companyName = job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential';
         return {
           ...job,
@@ -238,7 +224,7 @@ export const JobsTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // Empty dependency array, fetchJobs only depends on stable Supabase client
+  }, []);
 
   const fetchUserJobInteractions = useCallback(async () => {
     if (!developerProfile?.user_id) return;
