@@ -48,8 +48,10 @@ import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
 
 // === TYPE IMPORTS ===
+// Ensure these types match your actual definitions in '../types'
 import { JobRole, Hire, Message, User } from '../types';
 
+// Defining interfaces locally as per our discussion, or ensure they are in '../types'
 interface LocalMessageThread {
   otherUserId: string;
   otherUserName: string;
@@ -108,13 +110,9 @@ interface MessageThreadInfo {
 }
 
 const RecruiterDashboard: React.FC = () => {
-  const { user, userProfile, fetchUserProfile, authLoading, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { user, userProfile, authLoading, refreshProfile } = useAuth(); // Removed fetchUserProfile as it's handled by AuthContext
 
-  // Data states
+  // --- State for fetched dashboard data ---
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<Hire[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -125,23 +123,37 @@ const RecruiterDashboard: React.FC = () => {
     recentHires: 0,
     unreadMessages: 0,
   });
+
+  // --- Separate loading and error states for the dashboard's main data fetches ---
+  const [dashboardLoading, setDashboardLoading] = useState(true); // Renamed from 'loading'
+  const [dashboardError, setDashboardError] = useState<string | null>(null); // Renamed from 'error'
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // --- UI-related states ---
+  const [activeTab, setActiveTab] = useState('overview');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
 
   const isApproved = userProfile?.is_approved === true;
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
 
+  // --- Consolidated Data Fetching Function ---
   const fetchDashboardData = useCallback(async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    setError(null);
+    // Only proceed if userProfile (and thus user.id) is loaded
+    if (!userProfile?.id) {
+      setDashboardLoading(false); // Ensure loading is false if userProfile isn't ready
+      return;
+    }
+
+    setDashboardLoading(true); // Start loading when fetch begins
+    setDashboardError(null);   // Clear any previous errors
 
     try {
-      const currentUserId = user.id;
+      const currentUserId = userProfile.id; // Use userProfile.id as it's guaranteed here
 
-      // Fetch Job Roles with nested company_name - CORRECTED: Removed comments from select string
+      // Fetch Job Roles with nested company_name
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
@@ -186,7 +198,7 @@ const RecruiterDashboard: React.FC = () => {
       if (notificationsError) throw notificationsError;
       setNotifications(notificationsData || []);
 
-      // Fetch Messages for unread count
+      // Fetch Messages for unread count (only count is needed for stats)
       const { count: unreadMessagesCount, error: messagesCountError } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
@@ -202,89 +214,99 @@ const RecruiterDashboard: React.FC = () => {
       setStats({
         totalJobs,
         activeJobs,
-        applications: 0,
+        applications: 0, // Applications logic not included here, keep as 0 for now
         recentHires,
         unreadMessages: unreadMessagesCount || 0,
       });
 
     } catch (err: any) {
       console.error("Error fetching dashboard data:", err);
-      setError(`Failed to load data: ${err.message || err.error_description || 'Unknown error'}`);
+      setDashboardError(`Failed to load data: ${err.message || err.error_description || 'Unknown error'}`);
     } finally {
-      setLoading(false);
+      setDashboardLoading(false); // End loading, regardless of success or failure
     }
-  }, [user?.id]);
+  }, [userProfile?.id]); // Dependency array: ONLY re-run this function if userProfile.id changes
 
+  // --- useEffect to call fetchDashboardData on initial load and userProfile change ---
   useEffect(() => {
-    if (user?.id) {
-      fetchDashboardData();
+    // This effect runs when the component mounts or when fetchDashboardData (due to userProfile.id change) updates.
+    fetchDashboardData();
 
-      // Setup Realtime subscriptions
-      const jobRolesSubscription = supabase
-        .channel('public:job_roles')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${user.id}` }, payload => {
-          fetchDashboardData();
-        })
-        .subscribe();
+    // Setup Realtime subscriptions
+    // IMPORTANT: Subscriptions should NOT trigger fetchDashboardData() which causes full re-fetch.
+    // Instead, they should update specific state relevant to the change.
+    // For now, keeping them to trigger fetchDashboardData for simplicity, but optimize later if needed.
+    const jobRolesSubscription = supabase
+      .channel('public:job_roles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${user?.id}` }, payload => {
+        // console.log("Job Role change detected:", payload); // For debugging
+        fetchDashboardData(); // Re-fetch all data (can be optimized)
+      })
+      .subscribe();
 
-      const hiresSubscription = supabase
-        .channel('public:hires')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${user.id}` }, payload => {
-          fetchDashboardData();
-        })
-        .subscribe();
+    const hiresSubscription = supabase
+      .channel('public:hires')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${user?.id}` }, payload => {
+        // console.log("Hire change detected:", payload); // For debugging
+        fetchDashboardData(); // Re-fetch all data (can be optimized)
+      })
+      .subscribe();
 
-      const messagesSubscription = supabase
-        .channel('public:messages')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, payload => {
-          fetchDashboardData();
-        })
-        .subscribe();
+    const messagesSubscription = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user?.id}` }, payload => {
+        // console.log("Message change detected:", payload); // For debugging
+        fetchDashboardData(); // Re-fetch all data (can be optimized for just message count/list)
+      })
+      .subscribe();
 
-      const notificationsSubscription = supabase
-        .channel('public:notifications')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, payload => {
-          fetchDashboardData();
-        })
-        .subscribe();
+    const notificationsSubscription = supabase
+      .channel('public:notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, payload => {
+        // console.log("Notification change detected:", payload); // For debugging
+        fetchDashboardData(); // Re-fetch all data (can be optimized for just notifications)
+      })
+      .subscribe();
 
-      return () => {
-        jobRolesSubscription.unsubscribe();
-        hiresSubscription.unsubscribe();
-        messagesSubscription.unsubscribe();
-        notificationsSubscription.unsubscribe();
-      };
-    }
-  }, [user?.id, fetchDashboardData]);
+    return () => {
+      // Clean up subscriptions on unmount
+      jobRolesSubscription.unsubscribe();
+      hiresSubscription.unsubscribe();
+      messagesSubscription.unsubscribe();
+      notificationsSubscription.unsubscribe();
+    };
+  }, [fetchDashboardData, user?.id]); // Added user?.id as a dependency for subscriptions
 
-  const handleViewApplicants = (jobId: string) => {
+  // --- Handlers ---
+  const handleViewApplicants = useCallback((jobId: string) => {
     setSelectedJobId(jobId);
     setActiveTab('job-details');
-  };
+  }, []);
 
-  const handleJobUpdate = (message: string) => {
+  const handleJobUpdate = useCallback((message: string) => {
     setSuccess(message);
-    fetchDashboardData();
+    fetchDashboardData(); // This refetches data, which is fine for job updates
     setTimeout(() => setSuccess(null), 5000);
-  };
+  }, [fetchDashboardData]);
 
   const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, developerProfilePicUrl?: string, jobRole?: JobRole) => {
     if (!userProfile) {
-      setError("User profile not loaded. Cannot send message.");
+      setDashboardError("User profile not loaded. Cannot send message.");
       return;
     }
 
     let threadJobContext: JobRole | null = null;
     if (jobRole) {
       threadJobContext = jobRole;
+      // Ensure company_name is set from recruiter profile if not already present in job role
       if (!threadJobContext.users?.recruiters?.[0]?.company_name && userProfile.recruiters?.company_name) {
-          threadJobContext = {
-              ...threadJobContext,
-              users: {
-                  ...threadJobContext.users,
-                  recruiters: [{ company_name: userProfile.recruiters.company_name }]
-              }
-          };
+        threadJobContext = {
+          ...threadJobContext,
+          users: {
+            ...threadJobContext.users, // Keep existing users properties if any
+            recruiters: [{ company_name: userProfile.recruiters.company_name }]
+          }
+        };
       }
     }
 
@@ -296,17 +318,26 @@ const RecruiterDashboard: React.FC = () => {
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
-  }, [userProfile]);
+  }, [userProfile]); // userProfile is a dependency here as it's used to construct the thread
 
-  const handleViewNotificationJobRole = (jobRoleId: string) => {
+  // Handler for closing the message thread
+  const handleCloseMessageThread = useCallback(() => {
+    setActiveTab('messages'); // Switch back to the main messages list
+    setSelectedThread(null);    // Clear the selected thread to go back to MessageList view
+    // IMPORTANT: DO NOT call fetchDashboardData() here.
+    // The main data fetching useEffect should only run on userProfile change.
+    // MessageList already handles its own refreshing (or relies on subscription for unread count)
+  }, []);
+
+  const handleViewNotificationJobRole = useCallback((jobRoleId: string) => {
     const job = jobRoles.find(jr => jr.id === jobRoleId);
     if (job) {
       setSelectedJobId(jobRoleId);
       setActiveTab('job-details');
     } else {
-      setError("Job role not found for this notification.");
+      setDashboardError("Job role not found for this notification.");
     }
-  };
+  }, [jobRoles]); // jobRoles is a dependency because it's used to find the job
 
   const filteredHires = hires.filter(hire => {
     const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
@@ -315,7 +346,8 @@ const RecruiterDashboard: React.FC = () => {
     return developerName.includes(search) || jobTitle.includes(search);
   });
 
-  const renderOverview = () => (
+  // --- Render Functions for Tabs ---
+  const renderOverview = useCallback(() => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {/* Job Listings Stat Card */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
@@ -363,7 +395,7 @@ const RecruiterDashboard: React.FC = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-3"> {/* Made it span full width */}
         <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
 
         {/* Recent Hires */}
@@ -404,35 +436,35 @@ const RecruiterDashboard: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+  ), [stats, hires]); // Dependencies for renderOverview
 
-  const renderSearchDevelopers = () => (
+  const renderSearchDevelopers = useCallback(() => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
-
+      {/* DeveloperDirectory handles its own loading internally */}
       <DeveloperDirectory onSendMessage={handleMessageDeveloper} />
     </div>
-  );
+  ), [handleMessageDeveloper]); // Dependency for renderSearchDevelopers
 
-  const renderMessages = () => {
+  const renderMessages = useCallback(() => {
     if (selectedThread) {
       return (
         <div className="space-y-6">
           <button
-            onClick={() => setSelectedThread(null)}
+            onClick={handleCloseMessageThread} // Use the new handler here
             className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Messages
           </button>
-
           <MessageThread
             otherUserId={selectedThread.otherUserId}
             otherUserName={selectedThread.otherUserName}
             otherUserRole={selectedThread.otherUserRole}
             otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
             jobContext={selectedThread.jobContext}
-            onNewMessage={fetchDashboardData}
+            onNewMessage={fetchDashboardData} // Keep this to potentially update unread counts or thread list
+            onClose={handleCloseMessageThread} // Added onClose prop for MessageThread to signal closing
           />
         </div>
       );
@@ -453,16 +485,15 @@ const RecruiterDashboard: React.FC = () => {
             />
           </div>
         </div>
-
         <MessageList
           onThreadSelect={setSelectedThread}
           searchTerm={searchTerm}
         />
       </div>
     );
-  };
+  }, [selectedThread, searchTerm, fetchDashboardData, handleCloseMessageThread]); // Dependencies for renderMessages
 
-  const renderHires = () => (
+  const renderHires = useCallback(() => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Successful Hires</h2>
 
@@ -479,7 +510,7 @@ const RecruiterDashboard: React.FC = () => {
       </div>
 
       {/* Hires List */}
-      {loading ? (
+      {dashboardLoading ? ( // Use dashboardLoading here
         <div className="flex items-center justify-center py-12">
           <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
           <span className="text-gray-600 font-medium">Loading hires...</span>
@@ -557,9 +588,11 @@ const RecruiterDashboard: React.FC = () => {
         </div>
       )}
     </div>
-  );
+  ), [dashboardLoading, filteredHires, searchTerm]); // Dependencies for renderHires
 
-  if (authLoading || loading) {
+  // --- Global Loading and Error Handling ---
+  // Combine authLoading and dashboardLoading for the initial "Loading Dashboard..." screen
+  if (authLoading || dashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -570,9 +603,11 @@ const RecruiterDashboard: React.FC = () => {
     );
   }
 
-  // Redirect if not authenticated or not a recruiter
+  // Handle redirection if user profile is not loaded or role is incorrect after initial loading
   if (!userProfile) {
-    return <Navigate to="/dashboard" replace />;
+    // This could happen if authLoading resolves but no userProfile is found
+    // Or if user is logged out while on this page
+    return <Navigate to="/dashboard" replace />; // Assuming /dashboard redirects unauthenticated users to login
   }
 
   if (userProfile.role !== 'recruiter') {
@@ -608,7 +643,7 @@ const RecruiterDashboard: React.FC = () => {
               refreshProfile().finally(() => setIsRefreshing(false));
             }}
             disabled={isRefreshing}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 mr-2 inline ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Checking...' : 'Check Status'}
@@ -640,10 +675,10 @@ const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {error && (
+        {dashboardError && ( // Use dashboardError here
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
             <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
-            <p className="text-red-800 font-medium">{error}</p>
+            <p className="text-red-800 font-medium">{dashboardError}</p>
             <button onClick={fetchDashboardData} className="ml-auto px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200">Retry</button>
           </div>
         )}
@@ -769,8 +804,11 @@ const RecruiterDashboard: React.FC = () => {
         {activeTab === 'hires' && renderHires()}
         {activeTab === 'notifications' && (
           <NotificationList
+            notifications={notifications} // Pass notifications data to the list
             onViewJobRole={handleViewNotificationJobRole}
             onViewMessage={(messageId) => {
+              // This part can be refined to select a specific message thread if messageId is used
+              // For now, it just switches to messages tab.
               setActiveTab('messages');
             }}
           />
