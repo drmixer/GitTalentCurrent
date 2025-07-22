@@ -3,26 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { JobRole, AppliedJob, Developer, User } from '../../types'; // Import Developer and User from central types
+import { JobRole, AppliedJob, Developer, User } from '../../types';
 import {
-  Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare, // Renamed User to UserIcon to avoid conflict
+  Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare,
   Loader, AlertCircle, ArrowLeft, MapPin, DollarSign,
   Building
 } from 'lucide-react';
 import { DeveloperProfileModal } from '../DeveloperProfileModal';
 
-// Removed local interfaces DeveloperWithProfile, Candidate, JobDetailViewProps
-// Instead, we will directly use or extend types from '../../types'.
-
-// Extending AppliedJob to include the full Developer and User structure
-// This implicitly defines 'Candidate' as AppliedJob with a nested 'developer' of type 'Developer'
 type CandidateType = AppliedJob & {
   developer: Developer; // Developer type from src/types already includes the nested 'user: User'
 };
 
-// JobDetailViewProps will directly use the JobRole type, which has been enhanced in src/types
 interface JobDetailViewProps {
-  job: JobRole; // JobRole from src/types now correctly includes recruiter and its user
+  job: JobRole;
   onBack: () => void;
   onMessageDeveloper: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
   showBackButton?: boolean;
@@ -33,7 +27,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
   const [candidates, setCandidates] = useState<CandidateType[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null); // Use Developer type from src/types
+  const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
 
   useEffect(() => {
     fetchCandidates();
@@ -78,19 +72,16 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
               name,
               email,
               avatar_url,
-              profile_pic_url // Ensure this field is selected if it exists in your 'users' table
+              profile_pic_url
             )
           )
-        `)
+        `) // No comments here anymore!
         .eq('job_id', job.id);
 
       if (fetchError) {
         throw fetchError;
       }
 
-      // No complex transformation needed here. The fetched data should directly map to CandidateType
-      // given the `Developer` type now includes the `user` object.
-      // We still filter out any null results if developer or user data is unexpectedly missing.
       const validCandidates: CandidateType[] = (data || []).filter(appliedJob =>
         appliedJob.developer && appliedJob.developer.user
       ) as CandidateType[];
@@ -127,11 +118,8 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     }
   };
 
-  // Access recruiter company name and profile pic through the nested recruiter.user.avatar_url
   const companyName = job.recruiter?.company_name || 'Company Confidential';
-  // Prefer avatar_url from user, fall back to profile_pic_url from recruiter or a default
   const recruiterProfilePicUrl = job.recruiter?.user?.avatar_url || job.recruiter?.user?.profile_pic_url || '';
-
 
   return (
     <div className="space-y-8">
@@ -220,7 +208,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         </div>
       ) : candidates.length === 0 ? (
         <div className="text-center py-8 bg-white rounded-xl shadow-sm border border-gray-200">
-          <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" /> {/* Use UserIcon here */}
+          <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600">No applicants for this job yet.</p>
         </div>
       ) : (
