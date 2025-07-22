@@ -5,142 +5,190 @@ import { useAuth } from '../../hooks/useAuth';
 import { JobRole } from '../../types';
 import { Search, Briefcase, MapPin, DollarSign, Send, Eye, Loader, AlertCircle, Star, XCircle, CheckCircle } from 'lucide-react';
 
-// Minimal JobCard component for now
-const JobCard: React.FC<{ job: JobRole; onSelect: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
-  ({ job, onSelect, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
-  <div onClick={onSelect} className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-200 cursor-pointer">
-    <div className="flex justify-between items-start mb-3">
-      <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{job.title}</h3>
-      <button
-        onClick={(e) => { e.stopPropagation(); onSave(); }}
-        className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-400')}`}
-        title={isSaved ? "Unsave Job" : "Save Job"}
-        disabled={isProcessingSave}
-      >
-        {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
-      </button>
-    </div>
-    <p className="text-sm text-gray-500 mb-1 flex items-center">
-      <Briefcase size={14} className="mr-2 text-gray-400" />
-      {job.recruiter ? (
-        <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-          {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
-        </a>
-      ) : (
-        <span>{job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}</span>
-      )}
-    </p>
-    <p className="text-sm text-gray-500 mb-1 flex items-center">
-        <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
-            {job.recruiter?.name || 'Recruiter'}
-        </a>
-    </p>
-    <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
-    {job.salary_min && job.salary_max && (
-      <p className="text-sm text-gray-500 mb-3 flex items-center">
-        <DollarSign size={14} className="mr-2 text-gray-400" />
-        ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
-      </p>
-    )}
-    <div className="flex flex-wrap gap-2 mb-4">
-      {job.tech_stack?.slice(0, 4).map(tech => (
-        <span key={tech} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">{tech}</span>
-      ))}
-      {job.tech_stack && job.tech_stack.length > 4 && (
-        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">+{job.tech_stack.length - 4} more</span>
-      )}
-    </div>
-    <div className="flex items-center space-x-3 mt-4">
-      <button
-        onClick={(e) => { e.stopPropagation(); onApply(); }}
-        className={`w-full px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600')}`}
-        disabled={hasApplied || isProcessingApply}
-      >
-        {isProcessingApply ? <Loader size={16} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={16} className="mr-2"/> : <Send size={16} className="mr-2"/>)}
-        {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply')}
-      </button>
-    </div>
-  </div>
-);
+// === HELPER TYPE FOR ENRICHED JOB ROLE ===
+// This helps TS understand the structure of the data AFTER the join and transformation
+// Note: This assumes `JobRole` type itself doesn't already contain a `recruiter` or `company_name` field.
+// If it does, you might need to adjust your base JobRole type or merge types.
+interface EnrichedJobRole extends JobRole {
+  recruiter: { // This matches the alias in the select query
+    id: string;
+    name: string;
+    email: string;
+    recruiters: { // This matches the alias in the select query
+      company_name: string;
+      // Add other recruiter fields if you select them
+    }[]; // Supabase returns this as an array even if it's a one-to-one
+  };
+  // Add a flattened company_name for easier access after transformation
+  company_name?: string;
+}
 
-// Minimal JobDetailsModal component for now
-export const JobDetailsModal: React.FC<{ job: JobRole; onClose: () => void; onSave: () => void; onApply: () => void; isSaved: boolean; hasApplied: boolean; isProcessingSave: boolean; isProcessingApply: boolean; }> =
-  ({ job, onClose, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-      <div className="flex justify-between items-center p-6 border-b border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-800">{job.title}</h2>
-        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
-      </div>
-      <div className="p-6 space-y-4 overflow-y-auto">
-        <p className="text-md text-gray-600">
-          <Briefcase size={16} className="inline mr-2 text-gray-500" />
-          {job.recruiter ? (
-            <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
-              {job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}
-            </a>
-          ) : (
-            <span>{job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential'}</span>
-          )}
-        </p>
-        <p className="text-md text-gray-600">
-            <a href={`/recruiters/${job.recruiter?.id}`} className="hover:underline">
-                {job.recruiter?.name || 'Recruiter'}
-            </a>
-        </p>
-        <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
-        {job.salary_min && job.salary_max && (
-          <p className="text-md text-gray-600"><DollarSign size={16} className="inline mr-2 text-gray-500" /> ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}</p>
-        )}
-        <div className="pt-2">
-          <h4 className="font-semibold text-gray-700 mb-1">Job Description:</h4>
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.description || "No description provided."}</p>
-        </div>
-        {job.tech_stack && job.tech_stack.length > 0 && (
-          <div className="pt-2">
-            <h4 className="font-semibold text-gray-700 mb-2">Tech Stack:</h4>
-            <div className="flex flex-wrap gap-2">
-              {job.tech_stack.map(tech => (
-                <span key={tech} className="px-3 py-1 text-sm bg-gray-100 text-gray-800 rounded-full font-medium">{tech}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="p-6 border-t border-gray-200 flex items-center space-x-3">
+// Minimal JobCard component
+const JobCard: React.FC<{
+  job: EnrichedJobRole; // Use the enriched type here
+  onSelect: () => void;
+  onSave: () => void;
+  onApply: () => void;
+  isSaved: boolean;
+  hasApplied: boolean;
+  isProcessingSave: boolean;
+  isProcessingApply: boolean;
+}> =
+  ({ job, onSelect, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
+    <div onClick={onSelect} className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{job.title}</h3>
         <button
-          onClick={onSave}
-          className={`p-3 rounded-lg hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-500')}`}
+          onClick={(e) => { e.stopPropagation(); onSave(); }}
+          className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-400')}`}
           title={isSaved ? "Unsave Job" : "Save Job"}
           disabled={isProcessingSave}
         >
-          {isProcessingSave ? <Loader size={22} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={22} />}
+          {isProcessingSave ? <Loader size={20} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={20} />}
         </button>
+      </div>
+      <p className="text-sm text-gray-500 mb-1 flex items-center">
+        <Briefcase size={14} className="mr-2 text-gray-400" />
+        {/* Use the flattened company_name property */}
+        {job.recruiter?.id ? (
+          <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+            {job.company_name || 'Company Confidential'}
+          </a>
+        ) : (
+          <span>{job.company_name || 'Company Confidential'}</span>
+        )}
+      </p>
+      <p className="text-sm text-gray-500 mb-1 flex items-center">
+          {job.recruiter?.id ? (
+            <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+              {job.recruiter?.name || 'Recruiter'}
+            </a>
+          ) : (
+            <span>{job.recruiter?.name || 'Recruiter'}</span>
+          )}
+      </p>
+      <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
+      {job.salary_min && job.salary_max && (
+        <p className="text-sm text-gray-500 mb-3 flex items-center">
+          <DollarSign size={14} className="mr-2 text-gray-400" />
+          ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {job.tech_stack?.slice(0, 4).map(tech => (
+          <span key={tech} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">{tech}</span>
+        ))}
+        {job.tech_stack && job.tech_stack.length > 4 && (
+          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full font-medium">+{job.tech_stack.length - 4} more</span>
+        )}
+      </div>
+      <div className="flex items-center space-x-3 mt-4">
         <button
-          onClick={onApply}
-          className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold text-base flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')}`}
+          onClick={(e) => { e.stopPropagation(); onApply(); }}
+          className={`w-full px-4 py-2 rounded-lg transition-colors font-semibold text-sm flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600')}`}
           disabled={hasApplied || isProcessingApply}
         >
-          {isProcessingApply ? <Loader size={20} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={20} className="mr-2"/> : <Send size={20} className="mr-2"/>)}
-          {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply Now')}
+          {isProcessingApply ? <Loader size={16} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={16} className="mr-2"/> : <Send size={16} className="mr-2"/>)}
+          {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply')}
         </button>
       </div>
     </div>
-  </div>
-);
+  );
+
+// Minimal JobDetailsModal component
+export const JobDetailsModal: React.FC<{
+  job: EnrichedJobRole; // Use the enriched type here
+  onClose: () => void;
+  onSave: () => void;
+  onApply: () => void;
+  isSaved: boolean;
+  hasApplied: boolean;
+  isProcessingSave: boolean;
+  isProcessingApply: boolean;
+}> =
+  ({ job, onClose, onSave, onApply, isSaved, hasApplied, isProcessingSave, isProcessingApply }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-800">{job.title}</h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><XCircle size={24} className="text-gray-500"/></button>
+        </div>
+        <div className="p-6 space-y-4 overflow-y-auto">
+          <p className="text-md text-gray-600">
+            <Briefcase size={16} className="inline mr-2 text-gray-500" />
+            {/* Use the flattened company_name property */}
+            {job.recruiter?.id ? (
+              <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+                {job.company_name || 'Company Confidential'}
+              </a>
+            ) : (
+              <span>{job.company_name || 'Company Confidential'}</span>
+            )}
+          </p>
+          <p className="text-md text-gray-600">
+            {job.recruiter?.id ? (
+              <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
+                  {job.recruiter?.name || 'Recruiter'}
+              </a>
+            ) : (
+              <span>{job.recruiter?.name || 'Recruiter'}</span>
+            )}
+          </p>
+          <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
+          {job.salary_min && job.salary_max && (
+            <p className="text-md text-gray-600"><DollarSign size={16} className="inline mr-2 text-gray-500" /> ${job.salary_min.toLocaleString()} - ${job.salary_max.toLocaleString()}</p>
+          )}
+          <div className="pt-2">
+            <h4 className="font-semibold text-gray-700 mb-1">Job Description:</h4>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.description || "No description provided."}</p>
+          </div>
+          {job.tech_stack && job.tech_stack.length > 0 && (
+            <div className="pt-2">
+              <h4 className="font-semibold text-gray-700 mb-2">Tech Stack:</h4>
+              <div className="flex flex-wrap gap-2">
+                {job.tech_stack.map(tech => (
+                  <span key={tech} className="px-3 py-1 text-sm bg-gray-100 text-gray-800 rounded-full font-medium">{tech}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="p-6 border-t border-gray-200 flex items-center space-x-3">
+          <button
+            onClick={onSave}
+            className={`p-3 rounded-lg hover:bg-gray-100 transition-colors ${isProcessingSave ? 'text-gray-300 cursor-not-allowed' : (isSaved ? 'text-yellow-500' : 'text-gray-500')}`}
+            title={isSaved ? "Unsave Job" : "Save Job"}
+            disabled={isProcessingSave}
+          >
+            {isProcessingSave ? <Loader size={22} className="animate-spin" /> : <Star className={isSaved ? "fill-current" : ""} size={22} />}
+          </button>
+          <button
+            onClick={onApply}
+            className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold text-base flex items-center justify-center ${hasApplied ? 'bg-green-100 text-green-700 cursor-not-allowed' : (isProcessingApply ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')}`}
+            disabled={hasApplied || isProcessingApply}
+          >
+            {isProcessingApply ? <Loader size={20} className="animate-spin mr-2" /> : (hasApplied ? <CheckCircle size={20} className="mr-2"/> : <Send size={20} className="mr-2"/>)}
+            {isProcessingApply ? 'Applying...' : (hasApplied ? 'Applied' : 'Apply Now')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
 
 export const JobsTab: React.FC = () => {
   const navigate = useNavigate();
   const { developerProfile } = useAuth();
-  const [jobs, setJobs] = useState<JobRole[]>([]);
+  // Use EnrichedJobRole type for jobs state
+  const [jobs, setJobs] = useState<EnrichedJobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedJob, setSelectedJob] = useState<JobRole | null>(null);
-  const [processingJobId, setProcessingJobId] = useState<string | null>(null); // For save/apply loading state
+  // Use EnrichedJobRole type for selectedJob state
+  const [selectedJob, setSelectedJob] = useState<EnrichedJobRole | null>(null);
+  const [processingJobId, setProcessingJobId] = useState<string | null>(null);
   const [currentJobView, setCurrentJobView] = useState<'all' | 'saved' | 'applied'>('all');
 
   const fetchJobs = useCallback(async () => {
@@ -152,9 +200,11 @@ export const JobsTab: React.FC = () => {
         .select(`
           *,
           recruiter:users!job_roles_recruiter_id_fkey (
-            *,
-            recruiters!user_id (
-              *
+            id,
+            name,
+            email,
+            recruiters:recruiters!users_id_fkey (
+              company_name
             )
           )
         `)
@@ -166,15 +216,26 @@ export const JobsTab: React.FC = () => {
         console.error("Supabase error fetching jobs from view:", JSON.stringify(jobsError));
         throw jobsError;
       }
-      console.log('Fetched jobs data:', data);
-      setJobs(data || []);
+      console.log('Fetched raw jobs data:', data); // Log raw data for debugging
+
+      // Transform data to flatten company_name for easier access
+      const transformedJobs: EnrichedJobRole[] = (data || []).map(job => {
+        const companyName = job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential';
+        return {
+          ...job,
+          company_name: companyName, // Add a top-level company_name property
+        };
+      });
+
+      console.log('Transformed jobs data with company name:', transformedJobs); // Log transformed data
+      setJobs(transformedJobs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch jobs.');
       console.error("Error fetching jobs:", e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Empty dependency array, fetchJobs only depends on stable Supabase client
 
   const fetchUserJobInteractions = useCallback(async () => {
     if (!developerProfile?.user_id) return;
@@ -230,10 +291,10 @@ export const JobsTab: React.FC = () => {
     } catch (e: unknown) {
       console.error("Error saving/unsaving job:", e);
       alert(`Failed to ${alreadySaved ? 'unsave' : 'save'} job. ${e instanceof Error ? e.message : ''}`);
-  } finally {
-    setProcessingJobId(null);
-    // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
-    // for updated saved_jobs_count on OverviewTab, or use a global state.
+    } finally {
+      setProcessingJobId(null);
+      // TODO: Consider a mechanism to notify DeveloperDashboard to refresh developer profile
+      // for updated saved_jobs_count on OverviewTab, or use a global state.
     }
   };
 
@@ -259,15 +320,12 @@ export const JobsTab: React.FC = () => {
     return jobsToShow.filter(job => {
       const searchTermLower = searchTerm.toLowerCase();
       const titleMatch = job.title.toLowerCase().includes(searchTermLower);
-      const companyMatch = job.recruiter?.recruiters[0]?.company_name?.toLowerCase().includes(searchTermLower);
+      // Use the flattened company_name for search
+      const companyMatch = job.company_name?.toLowerCase().includes(searchTermLower);
       const techMatch = job.tech_stack?.some(tech => tech.toLowerCase().includes(searchTermLower));
       return titleMatch || companyMatch || techMatch;
     });
   }, [jobs, savedJobIds, appliedJobIds, currentJobView, searchTerm]);
-
-  // Use 'displayedJobs' instead of 'filteredJobs' for rendering the list and checking length
-  // const filteredJobs = ... (This line can be removed or commented out)
-
 
   if (loading && jobs.length === 0) {
     return <div className="flex justify-center items-center p-10"><Loader size={32} className="animate-spin text-blue-600" /></div>;
@@ -350,7 +408,6 @@ export const JobsTab: React.FC = () => {
       </div>
 
       {loading && jobs.length > 0 && <div className="text-center py-6"><Loader size={24} className="animate-spin text-blue-600"/></div>}
-
 
       {/* Job Details Modal */}
       {selectedJob && (
