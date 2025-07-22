@@ -31,6 +31,7 @@ const JobCard: React.FC<{
       </div>
       <p className="text-sm text-gray-500 mb-1 flex items-center">
         <Briefcase size={14} className="mr-2 text-gray-400" />
+        {/* Display company_name from EnrichedJobRole */}
         {job.recruiter?.id ? (
           <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
             {job.company_name || 'Company Confidential'}
@@ -40,6 +41,7 @@ const JobCard: React.FC<{
         )}
       </p>
       <p className="text-sm text-gray-500 mb-1 flex items-center">
+          {/* Display recruiter name from joined recruiter object */}
           {job.recruiter?.id ? (
             <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
               {job.recruiter?.name || 'Recruiter'}
@@ -50,7 +52,7 @@ const JobCard: React.FC<{
       </p>
       <p className="text-sm text-gray-500 mb-1 flex items-center"><MapPin size={14} className="mr-2 text-gray-400" /> {job.location}</p>
 
-      {/* CORRECTED SALARY DISPLAY LOGIC for salary: string | null */}
+      {/* Salary Display */}
       <p className="text-sm text-gray-500 mb-3 flex items-center">
         <DollarSign size={14} className="mr-2 text-gray-400" />
         {job.salary || 'N/A'}
@@ -104,12 +106,14 @@ export const JobDetailsModal: React.FC<{
               <img src={job.recruiter.profile_pic_url} alt={`${job.recruiter.name} profile`} className="w-10 h-10 rounded-full mr-3 object-cover" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold text-lg mr-3">
+                {/* Fallback to first letter of company name or 'U' if not available */}
                 {job.company_name ? job.company_name[0].toUpperCase() : (job.recruiter?.name ? job.recruiter.name[0].toUpperCase() : 'U')}
               </div>
             )}
             <div>
               <p className="text-md text-gray-600 font-semibold">
                 <Briefcase size={16} className="inline mr-2 text-gray-500" />
+                {/* Display company_name from EnrichedJobRole */}
                 {job.recruiter?.id ? (
                   <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
                     {job.company_name || 'Company Confidential'}
@@ -119,6 +123,7 @@ export const JobDetailsModal: React.FC<{
                 )}
               </p>
               <p className="text-sm text-gray-500">
+                {/* Display recruiter name from joined recruiter object */}
                 {job.recruiter?.id ? (
                   <a href={`/recruiters/${job.recruiter.id}`} className="hover:underline">
                       {job.recruiter?.name || 'Recruiter'}
@@ -132,7 +137,7 @@ export const JobDetailsModal: React.FC<{
 
           <p className="text-md text-gray-600"><MapPin size={16} className="inline mr-2 text-gray-500" /> {job.location}</p>
 
-          {/* CORRECTED SALARY DISPLAY LOGIC for salary: string | null */}
+          {/* Salary Display */}
           <p className="text-md text-gray-600">
             <DollarSign size={16} className="inline mr-2 text-gray-500" />
             {job.salary || 'N/A'}
@@ -181,7 +186,7 @@ export const JobsTab: React.FC = () => {
   const { developerProfile } = useAuth();
   const [jobs, setJobs] = useState<EnrichedJobRole[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
-  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
+  const [appliedJobIds, setAppliedJobIds] = new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -204,7 +209,10 @@ export const JobsTab: React.FC = () => {
             profile_pic_url,
             company_logo_url,
             recruiters:recruiters!recruiters_user_id_fkey (
-              company_name
+              company_name,
+              website,
+              company_size,
+              industry
             )
           )
         `)
@@ -215,17 +223,29 @@ export const JobsTab: React.FC = () => {
         console.error("Supabase error fetching jobs from view:", JSON.stringify(jobsError));
         throw jobsError;
       }
-      console.log('Fetched raw jobs data:', data);
 
       const transformedJobs: EnrichedJobRole[] = (data || []).map(job => {
-        const companyName = job.recruiter?.recruiters?.[0]?.company_name || 'Company Confidential';
+        // --- START DEBUG LOGS FOR JOBS TAB ---
+        console.log(`[JobsTab] Processing Job ID: ${job.id}`);
+        console.log(`[JobsTab] Raw Recruiter Object for Job ${job.id}:`, job.recruiter);
+        console.log(`[JobsTab] Nested 'recruiters' array from join for Job ${job.id}:`, job.recruiter?.recruiters);
+        // --- END DEBUG LOGS ---
+
+        const companyNameFromRecruitersTable = job.recruiter?.recruiters?.[0]?.company_name;
+        // console.log(`[JobsTab] Derived Company Name for Job ${job.id}:`, companyNameFromRecruitersTable); // Keep this if you want
+        
+        const companyName = companyNameFromRecruitersTable || 'Company Confidential';
         return {
           ...job,
           company_name: companyName,
+          // Ensure the recruiter object on EnrichedJobRole is complete with nested data
+          recruiter: job.recruiter ? {
+            ...job.recruiter,
+            recruiters: job.recruiter.recruiters || [],
+          } : undefined,
         };
       });
 
-      console.log('Transformed jobs data with company name:', transformedJobs);
       setJobs(transformedJobs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch jobs.');
