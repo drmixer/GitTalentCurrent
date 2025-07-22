@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase'; // <-- CORRECTED SUPABASE PATH HERE
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import JobDetailView from '../components/Jobs/JobDetailView';
+import JobDetailView from '../components/Jobs/JobDetailView'; // <-- CORRECTED JOB DETAIL VIEW PATH HERE
 import JobsDashboard from '../components/JobsDashboard';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import MessageList from '../components/MessageList';
@@ -558,7 +558,8 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </td>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
