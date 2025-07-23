@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { fetchEndorsementsForDeveloper, updateEndorsementVisibility } from '../lib/endorsementUtils'; // MODIFIED: Added updateEndorsementVisibility
 import {
   DeveloperProfileForm,
   PortfolioManager,
@@ -13,9 +14,10 @@ import {
   GitHubUserActivityDetails,
   GitHubConnectPrompt,
   OverviewTab,
-  JobsTab, // Import the new JobsTab component
+  JobsTab,
+  EndorsementDisplay, // ADDED: Import EndorsementDisplay
 } from '../components';
-import { useGitHub } from '../hooks/useGitHub'; 
+import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
 import {
   User, Briefcase, MessageSquare, Search, Github, Star, TrendingUp, Calendar,
@@ -25,22 +27,20 @@ import {
   Developer,
   JobRole,
   MessageThread as MessageThreadType,
-  PortfolioItem, // Added
-  Endorsement,   // Added
-  SavedJob,      // Added
-  AppliedJob,     // Added
-  Message // Make sure Message type is imported if needed for MessageThreadType details
+  PortfolioItem,
+  Endorsement,
+  SavedJob,
+  AppliedJob,
+  Message
 } from '../types';
 
 
-// Local MessageThread type from MessageList.tsx - for selected thread details
-// This mirrors the structure MessageList provides when a thread is selected.
 interface SelectedMessageThreadDetails {
   otherUserId: string;
   otherUserName: string;
   otherUserRole: string;
   otherUserProfilePicUrl?: string;
-  lastMessage: any; // Should be 'Message' type from a common source if possible
+  lastMessage: any;
   unreadCount: number;
   jobContext?: {
     id: string;
@@ -48,7 +48,6 @@ interface SelectedMessageThreadDetails {
   };
 }
 
-// Define a simple type for a commit for now, this should align with RecentGitHubActivity's expectation
 interface Commit {
   sha: string;
   message: string;
@@ -69,10 +68,10 @@ interface DashboardLocationState {
 }
 
 const initialStateForGitHubData = { user: null, repos: [], languages: {}, totalStars: 0, contributions: [] };
-const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs'];
+const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs', 'endorsements']; // MODIFIED: Added 'endorsements'
 
 export const DeveloperDashboard: React.FC = () => {
-  const { 
+  const {
     user: authUser,
     userProfile,
     developerProfile: contextDeveloperProfile,
@@ -99,27 +98,24 @@ export const DeveloperDashboard: React.FC = () => {
       console.log("[Dashboard] Initializing activeTab to 'overview' by default.");
       return 'overview';
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, location.search]); // Called once for useState, but deps for useCallback correctness if reused
+  }, [location.state, location.search]);
 
   const [activeTab, setActiveTab] = useState(getInitialActiveTab);
 
-  const [developerData, setDeveloperData] = useState<Developer | null>(null); // This will be merged with contextDeveloperProfile
+  const [developerData, setDeveloperData] = useState<Developer | null>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
-  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]); // Or JobRole[]
-  const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]); // This will be changed to store count if only for Overview
+  const [isLoadingEndorsements, setIsLoadingEndorsements] = useState(true);
+  const [endorsementError, setEndorsementError] = useState<string | null>(null);
+  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
+  const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
   const [recentCommits, setRecentCommits] = useState<Commit[]>([]);
 
   const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
   const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
 
-  // const [messages, setMessages] = useState<MessageThreadType[]>([]); // MessageList will fetch its own
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
-  // const [recommendedJobs, setRecommendedJobs] = useState<JobRole[]>([]); // This can be part of the JobsTab specific data
-  // const [featuredPortfolioItem, setFeaturedPortfolioItem] = useState<any | null>(null); // This will be derived from portfolioItems
-
-  // const [selectedMessageThreadId, setSelectedMessageThreadId] = useState<string | null>(null); // Replaced by selectedMessageThreadDetails
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobRole | null>(null);
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [showGitHubConnectModal, setShowGitHubConnectModal] = useState(false);
@@ -130,17 +126,17 @@ export const DeveloperDashboard: React.FC = () => {
 
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
-      const handle = locationState.freshGitHubHandle || contextDeveloperProfile?.github_handle;
+      const handle = contextDeveloperProfile?.github_handle || locationState.freshGitHubHandle;
       if (handle) { return { handle, installId: locationState.freshGitHubInstallationId }; }
     }
     return null;
   }, [locationState?.isFreshGitHubSetup, locationState?.freshGitHubInstallationId, locationState?.freshGitHubHandle, contextDeveloperProfile?.github_handle]);
 
-  const { 
+  const {
     gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
   } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId, active: !!freshLoadParams });
 
-  const { 
+  const {
     gitHubData: standardGitHubData, loading: standardGitHubLoading, error: standardGitHubError
   } = useGitHub();
 
@@ -162,12 +158,13 @@ export const DeveloperDashboard: React.FC = () => {
   const fetchDeveloperPageData = useCallback(async () => {
     if (!authUser?.id) {
       setDashboardPageLoading(false);
+      setIsLoadingEndorsements(false);
+      setEndorsementError("User not logged in.");
       return;
     }
     setDashboardPageLoading(true);
     console.log('[Dashboard] Starting to fetch all developer page data...');
     try {
-      // Fetch developer profile (already partially done by useAuth, but this can get more details)
       const { data: devData, error: devError } = await supabase
         .from('developers')
         .select('*, user:users(name, email)')
@@ -183,7 +180,6 @@ export const DeveloperDashboard: React.FC = () => {
         console.log('[Dashboard] No specific developer data found, relying on context.');
       }
 
-      // Fetch portfolio items
       const { data: portfolioData, error: portfolioError } = await supabase
         .from('portfolio_items')
         .select('*')
@@ -195,20 +191,20 @@ export const DeveloperDashboard: React.FC = () => {
         console.log('[Dashboard] Portfolio items fetched:', portfolioData);
       }
 
-      // Fetch endorsements
-      const { data: endorsementData, error: endorsementError } = await supabase
-        .from('endorsements')
-        // Select only 'name' for the endorser, as 'title' and 'avatar_url' are not on the users table.
-        .select('*, endorser:endorser_id(name)')
-        .eq('developer_id', authUser.id)
-        .order('created_at', { ascending: false });
-      if (endorsementError) console.error('[Dashboard] Error fetching endorsements:', endorsementError);
-      else {
-        setEndorsements(endorsementData || []);
-        console.log('[Dashboard] Endorsements fetched:', endorsementData);
+      // --- ENDORSEMENT FETCH LOGIC (using updated utility) ---
+      setIsLoadingEndorsements(true);
+      setEndorsementError(null);
+      // Pass 'false' for publicOnly to fetch ALL endorsements for the dashboard view
+      const fetchedEndorsements = await fetchEndorsementsForDeveloper(authUser.id, false);
+      if (fetchedEndorsements) {
+        setEndorsements(fetchedEndorsements);
+        console.log('[Dashboard] Endorsements fetched using utility:', fetchedEndorsements);
+      } else {
+        setEndorsementError("Failed to load endorsements.");
       }
+      setIsLoadingEndorsements(false);
+      // --- END ENDORSEMENT FETCH LOGIC ---
 
-      // Fetch saved jobs count
       const { count: savedCount, error: savedJobsError } = await supabase
         .from('saved_jobs')
         .select('*', { count: 'exact', head: true })
@@ -216,16 +212,13 @@ export const DeveloperDashboard: React.FC = () => {
 
       if (savedJobsError) {
         console.error('[Dashboard] Error fetching saved jobs count:', savedJobsError);
-        setFetchedSavedJobsCount(0); // Default to 0 on error
+        setFetchedSavedJobsCount(0);
       } else {
         setFetchedSavedJobsCount(savedCount ?? 0);
         console.log('[Dashboard] Saved jobs count fetched:', savedCount);
       }
-      // Clear the old savedJobs array if it's no longer needed for detailed display in Overview
       setSavedJobs([]);
 
-
-      // Fetch applied jobs count
       const { count: appliedCount, error: appliedJobsError } = await supabase
         .from('applied_jobs')
         .select('*', { count: 'exact', head: true })
@@ -233,27 +226,50 @@ export const DeveloperDashboard: React.FC = () => {
 
       if (appliedJobsError) {
         console.error('[Dashboard] Error fetching applied jobs count:', appliedJobsError);
-        setFetchedAppliedJobsCount(0); // Default to 0 on error
+        setFetchedAppliedJobsCount(0);
       } else {
         setFetchedAppliedJobsCount(appliedCount ?? 0);
         console.log('[Dashboard] Applied jobs count fetched:', appliedCount);
       }
-      // Clear the old appliedJobs array
       setAppliedJobs([]);
 
     } catch (error) {
       console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
+      setIsLoadingEndorsements(false);
+      setEndorsementError("An unexpected error occurred while loading endorsements.");
     } finally {
       setDashboardPageLoading(false);
       console.log('[Dashboard] Finished fetching all developer page data.');
     }
   }, [authUser?.id]);
 
+  // NEW: Handler for toggling endorsement visibility
+  const handleToggleEndorsementVisibility = useCallback(async (endorsementId: string, currentIsPublic: boolean) => {
+    setIsLoadingEndorsements(true); // Show loading while updating
+    setEndorsementError(null);
+
+    const success = await updateEndorsementVisibility(endorsementId, !currentIsPublic);
+    if (success) {
+      // Optimistically update the state or refetch to reflect the change
+      setEndorsements(prev => prev.map(e =>
+        e.id === endorsementId ? { ...e, is_public: !currentIsPublic } : e
+      ));
+      console.log(`Endorsement ${endorsementId} visibility toggled to ${!currentIsPublic}`);
+    } else {
+      setEndorsementError("Failed to update endorsement visibility.");
+      console.error(`Failed to toggle visibility for endorsement ${endorsementId}`);
+    }
+    setIsLoadingEndorsements(false);
+  }, []);
+
+
   useEffect(() => {
     if (!authContextLoading && authUser?.id) {
         fetchDeveloperPageData();
     } else if (!authContextLoading && !authUser?.id) {
-        setDashboardPageLoading(false); // Not logged in, stop loading
+        setDashboardPageLoading(false);
+        setIsLoadingEndorsements(false);
+        setEndorsementError("Not authenticated to load endorsements.");
     }
   }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
@@ -261,10 +277,9 @@ export const DeveloperDashboard: React.FC = () => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);
   }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
 
-  // Effect to clear the fromGitHubSetup trigger flag from location.state after initial processing
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
-    if (state?.fromGitHubSetup) { // Only care about fromGitHubSetup here
+    if (state?.fromGitHubSetup) {
       console.log("[Dashboard] Initial Setup Effect: Clearing fromGitHubSetup flag from location.state.");
       const { fromGitHubSetup, ...restOfState } = state;
       navigate(location.pathname + location.search, {
@@ -272,10 +287,8 @@ export const DeveloperDashboard: React.FC = () => {
         state: Object.keys(restOfState).length > 0 ? restOfState : null
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]); // Runs if fromGitHubSetup flag changes (i.e., present then removed)
+  }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]);
 
-  // Effect to update URL when activeTab state changes (e.g., from user click)
   useEffect(() => {
     const currentParams = new URLSearchParams(location.search);
     const currentTabInUrl = currentParams.get('tab');
@@ -288,24 +301,19 @@ export const DeveloperDashboard: React.FC = () => {
         currentParams.delete('tab');
       }
       const newSearchString = currentParams.toString() ? `?${currentParams.toString()}` : '';
-      const { fromGitHubSetup, ...restOfState } = locationState || {}; // fromGitHubSetup should be gone
+      const { fromGitHubSetup, ...restOfState } = locationState || {};
       navigate(`${location.pathname}${newSearchString}`, {
         replace: true,
         state: Object.keys(restOfState).length > 0 ? restOfState : null
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, location.pathname, navigate]); // Removed locationState and location.search to simplify and make this purely activeTab driven
+  }, [activeTab, location.pathname, navigate]);
 
-  // Effect to update activeTab state when URL changes (e.g., browser back/forward, direct URL edit)
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
 
-    // Do not fight with the initial tab setting if fromGitHubSetup was just processed
-    // The flag would have been cleared by the effect above, so locationState.fromGitHubSetup is likely null/undefined here.
-    // This effect should primarily handle external URL changes.
-    if (locationState?.fromGitHubSetup) return; // Skip if the initial setup flag is still somehow present (unlikely due to order)
+    if (locationState?.fromGitHubSetup) return;
 
     if (tabFromUrl && validTabs.includes(tabFromUrl)) {
       if (activeTab !== tabFromUrl) {
@@ -316,8 +324,7 @@ export const DeveloperDashboard: React.FC = () => {
       console.log(`[Dashboard] URL to State Sync: No tab in URL, setting activeTab to 'overview'.`);
       setActiveTab('overview');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]); // Only depends on location.search; activeTab removed to avoid loops. locationState for the guard.
+  }, [location.search]);
 
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
@@ -329,12 +336,11 @@ export const DeveloperDashboard: React.FC = () => {
   }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubDataFromHook, freshGitHubError, hasFreshDataBeenProcessed]);
 
   useEffect(() => {
-    if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) { // isFreshGitHubSetup is the important one here
+    if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) {
       console.log('[Dashboard] Clearing isFreshGitHubSetup flag from location.state.');
       const { freshGitHubHandle, freshGitHubInstallationId, isFreshGitHubSetup, fromGitHubSetup, ...restOfState } = locationState;
       navigate(location.pathname + location.search, { replace: true, state: Object.keys(restOfState).length > 0 ? restOfState : null });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationState?.isFreshGitHubSetup, hasFreshDataBeenProcessed, navigate, location.pathname, location.search]);
 
   useEffect(() => {
@@ -342,11 +348,10 @@ export const DeveloperDashboard: React.FC = () => {
     if (showGitHubConnectModal !== show) setShowGitHubConnectModal(show);
   }, [contextDeveloperProfile?.github_handle, contextDeveloperProfile?.github_installation_id, activeTab, showGitHubConnectModal]);
 
-  // Effect to extract recent commits from GitHub data
   useEffect(() => {
     if (finalGitHubDataToShow?.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
       const formattedCommits = finalGitHubDataToShow.contributions.slice(0, 3).map((contrib: any) => ({
-        sha: contrib.oid || contrib.id || Math.random().toString(36).substring(7), // Ensure a unique key
+        sha: contrib.oid || contrib.id || Math.random().toString(36).substring(7),
         message: contrib.messageHeadline || contrib.message || 'Commit message unavailable',
         repoName: contrib.repository?.nameWithOwner || contrib.repo?.name || 'Unknown Repo',
         date: contrib.occurredAt || contrib.created_at || new Date().toISOString(),
@@ -358,9 +363,6 @@ export const DeveloperDashboard: React.FC = () => {
   }, [finalGitHubDataToShow]);
 
   const currentDeveloperProfile = useMemo(() => {
-    // Prioritize contextDeveloperProfile and merge with developerData if available.
-    // This ensures we always have the latest from context (like GitHub handle after setup)
-    // but also include details fetched directly in this component.
     if (contextDeveloperProfile) {
       return { ...developerData, ...contextDeveloperProfile, user: contextDeveloperProfile.user || developerData?.user };
     }
@@ -376,25 +378,14 @@ export const DeveloperDashboard: React.FC = () => {
       <OverviewTab
         developer={currentDeveloperProfile}
         portfolioItems={portfolioItems}
-        // messages={messages} // OverviewTab might need a different structure or count for messages
-        // For unread messages count, OverviewTab will need to derive it or receive a specific count prop.
-        // Let's assume for now OverviewTab's 'messages' prop was for the count, we'll adjust if it needs full threads.
-        // The `MessageList` component now handles its own data, so we don't pass `messages` from here to it.
-        // The unread count for OverviewTab can be derived if `MessageList` exposes a way or if we fetch it separately.
-        // For now, OverviewTab's unreadMessagesCount will be 0 or rely on developer.unread_message_count if such field existed.
-        // To keep OverviewTab working, we can pass an empty array or adjust its props.
-        // For now, I'll pass an empty array to messages for OverviewTab.
-        // This needs to be revisited if OverviewTab's unread message logic is critical now.
-        messages={[]} // This is for OverviewTab's internal unread message calculation from threads
-        // Pass the fetched counts to OverviewTab. It will prioritize these over developer object's counts or array lengths.
+        messages={[]}
         savedJobsCountOverride={fetchedSavedJobsCount}
         appliedJobsCountOverride={fetchedAppliedJobsCount}
-        // The savedJobs/appliedJobs arrays below are now effectively unused by OverviewTab if counts are passed,
-        // but kept for now to avoid breaking prop types if OverviewTab still expects them.
-        // These arrays are now being cleared in fetchDeveloperPageData after counts are fetched.
         savedJobs={[]}
         appliedJobs={[]}
         endorsements={endorsements}
+        endorsementsLoading={isLoadingEndorsements}
+        endorsementsError={endorsementError}
         recentCommits={recentCommits}
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}
         loading={dashboardPageLoading || authContextLoading || gitHubDataLoadingToShow}
@@ -402,19 +393,34 @@ export const DeveloperDashboard: React.FC = () => {
       />
     );
   };
-  
-  console.log('[Dashboard RENDER]', /* ... */); // Keep this extensive log
 
-  if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) { /* ... */ }
-  if (dashboardPageLoading && !authContextLoading && authUser) { /* ... */ }
-  if (!userProfile && !authContextLoading && !dashboardPageLoading) { /* ... */ }
+  console.log('[Dashboard RENDER]', { activeTab, dashboardPageLoading, authContextLoading, authUser, userProfile, developerData, contextDeveloperProfile, endorsements, isLoadingEndorsements, endorsementError });
 
-  const displayDeveloperProfileForForm = currentDeveloperProfile; // Use the merged profile
+  if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader className="animate-spin h-10 w-10 text-blue-500" />
+        <p className="ml-3 text-gray-600">Loading user authentication...</p>
+      </div>
+    );
+  }
+  if (dashboardPageLoading && !authContextLoading && authUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader className="animate-spin h-10 w-10 text-blue-500" />
+        <p className="ml-3 text-gray-600">Loading your dashboard data...</p>
+      </div>
+    );
+  }
+  if (!userProfile && !authContextLoading && !dashboardPageLoading) {
+    console.warn("User authenticated but no profile found. Redirecting to setup.");
+    navigate('/onboarding', { replace: true });
+    return null;
+  }
+
+  const displayDeveloperProfileForForm = currentDeveloperProfile;
 
   return (
-    // ... Full JSX as previously provided, ensuring it uses *ToShow variables for GitHub data
-    // and the corrected tab rendering logic.
-    // For brevity, I'm not pasting the entire return() again but it should be the same as the last full version.
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-screen-xl mx-auto">
       {showGitHubConnectModal && contextDeveloperProfile?.github_handle && ( <GitHubConnectPrompt githubHandle={contextDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} /> )}
       <div className="mb-8 border-b border-gray-200">
@@ -449,25 +455,24 @@ export const DeveloperDashboard: React.FC = () => {
         ) : (<div className="text-center p-8"><Github className="w-16 h-16 text-gray-300 mx-auto mb-6" /><h3 className="text-2xl font-semibold">Connect GitHub Account</h3><button onClick={() => { if (!currentDeveloperProfile?.github_handle) { setActiveTab('profile'); navigate('/developer?tab=profile', { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg"> {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'} </button></div>)
       )}
       {activeTab === 'messages' && (
-        <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]"> {/* Ensure sufficient height */}
+        <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]">
           <div className="md:w-1/3 h-full">
             <MessageList
               onThreadSelect={(threadDetails) => {
                 setSelectedMessageThreadDetails(threadDetails);
-                // Potentially trigger a refetch/update in MessageList if marking read is handled here
               }}
             />
           </div>
           <div className="md:w-2/3 h-full bg-white border border-gray-200 rounded-2xl overflow-hidden">
             {selectedMessageThreadDetails ? (
               <MessageThread
-                key={`${selectedMessageThreadDetails.otherUserId}-${selectedMessageThreadDetails.jobContext?.id || 'general'}`} // Key to re-mount component on thread change
+                key={`${selectedMessageThreadDetails.otherUserId}-${selectedMessageThreadDetails.jobContext?.id || 'general'}`}
                 otherUserId={selectedMessageThreadDetails.otherUserId}
                 otherUserName={selectedMessageThreadDetails.otherUserName}
                 otherUserRole={selectedMessageThreadDetails.otherUserRole}
                 otherUserProfilePicUrl={selectedMessageThreadDetails.otherUserProfilePicUrl}
                 jobContext={selectedMessageThreadDetails.jobContext}
-                onBack={() => setSelectedMessageThreadDetails(null)} // Simple way to go back for mobile or single pane views
+                onBack={() => setSelectedMessageThreadDetails(null)}
               />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
@@ -480,6 +485,17 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       )}
       {activeTab === 'jobs' && <JobsTab />}
+      {activeTab === 'endorsements' && ( // NEW: Endorsements Tab
+        <section className="endorsements-tab-content">
+            <EndorsementDisplay
+                endorsements={endorsements}
+                isLoading={isLoadingEndorsements}
+                error={endorsementError}
+                canManageVisibility={true} // Enable visibility management for the developer
+                onToggleVisibility={handleToggleEndorsementVisibility} // Pass the handler
+            />
+        </section>
+      )}
     </div>
   );
 };
