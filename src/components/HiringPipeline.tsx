@@ -98,12 +98,12 @@ const HiringPipeline: React.FC = () => {
                     id,
                     developer_id,
                     job_id,
-                    applied_at, // Use 'applied_at' as per your schema
+                    applied_at,
                     status,
                     cover_letter,
                     notes,
-                    developer:developers!applied_jobs_developer_id_fkey( // *** CORRECTED: Explicit FK from applied_jobs to developers ***
-                        user_id, // *** CORRECTED: This is the primary key of your 'developers' table ***
+                    developer:developers!applied_jobs_developer_id_fkey(
+                        user_id,
                         github_handle,
                         bio,
                         availability,
@@ -112,8 +112,8 @@ const HiringPipeline: React.FC = () => {
                         location,
                         experience_years,
                         desired_salary,
-                        created_at, // This refers to the 'developers' table's created_at
-                        updated_at, // This refers to the 'developers' table's updated_at
+                        created_at,
+                        updated_at,
                         skills_categories,
                         profile_strength,
                         public_profile_slug,
@@ -127,7 +127,7 @@ const HiringPipeline: React.FC = () => {
                         skills,
                         preferred_title,
                         looking_for_job,
-                        user:users!developers_user_id_fkey( // *** CORRECTED: Explicit FK from developers to users ***
+                        user:users!developers_user_id_fkey(
                             id,
                             name,
                             email,
@@ -135,7 +135,7 @@ const HiringPipeline: React.FC = () => {
                             profile_pic_url
                         )
                     ),
-                    job_role:job_roles!applied_jobs_job_id_fkey( // *** CORRECTED: Explicit FK from applied_jobs to job_roles ***
+                    job_role:job_roles!applied_jobs_job_id_fkey(
                         id,
                         recruiter_id,
                         title,
@@ -145,8 +145,8 @@ const HiringPipeline: React.FC = () => {
                         tech_stack,
                         experience_required,
                         is_active,
-                        created_at, // This refers to the 'job_roles' table's created_at
-                        updated_at, // This refers to the 'job_roles' table's updated_at
+                        created_at,
+                        updated_at,
                         is_featured,
                         salary
                     )
