@@ -1,26 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X, Bell } from 'lucide-react';
+import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react'; // Removed MessageSquare
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-import { NotificationBadge } from '../Notifications/NotificationBadge';
-// import { NotificationsDropdown } from '../Notifications/NotificationsDropdown'; // You'll create this soon
+import { NotificationBadge } from '../components/notifications/NotificationBadge'; // Adjusted path
+import { NotificationsDropdownContent } from '../components/notifications/NotificationsDropdownContent'; // NEW IMPORT, Adjusted path
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Unread count will now be fetched by NotificationBadge itself, or we re-introduce it here
-  // For now, let's keep the Header's logic lean and focused on UI toggle.
-  // const [unreadCount, setUnreadCount] = useState(0); // This can be removed or repurposed for dropdown content
-
-  // State to manage the visibility of the notifications dropdown
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
-  // Removed fetchUnreadCount from Header, as NotificationBadge will handle its own count.
-  // If you need the count in Header for other logic (e.g., to decide to show the bell at all),
-  // you might re-introduce it or pass it as a prop from NotificationBadge.
+  // Re-define getDashboardPath here to be passed down
+  const getDashboardPath = () => {
+    if (!userProfile) return '/login'; // Fallback if profile not loaded
+    switch (userProfile.role) {
+      case 'admin':
+        return '/admin';
+      case 'recruiter':
+        return '/recruiter';
+      case 'developer':
+        return '/developer';
+      default:
+        return '/dashboard'; // Generic dashboard
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -30,22 +36,7 @@ export const Header = () => {
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error signing out:', error);
-      // Force navigation to login page if there's an error with sign out
-      navigate('/login', { replace: true });
-    }
-  };
-
-  const getDashboardPath = () => {
-    if (!userProfile) return '/login';
-    switch (userProfile.role) {
-      case 'admin':
-        return '/admin';
-      case 'recruiter':
-        return '/recruiter';
-      case 'developer':
-        return '/developer';
-      default:
-        return '/dashboard';
+      navigate('/login', { replace: true }); // Force navigation
     }
   };
 
@@ -69,13 +60,33 @@ export const Header = () => {
     }
   };
 
-  // Format display name for developers
   const getDisplayName = () => {
     if (userProfile?.role === 'developer' && developerProfile?.github_handle) {
       return `${userProfile.name.split(' ')[0]} (${developerProfile.github_handle})`;
     }
     return userProfile?.name || '';
   };
+
+  // Close dropdown if clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Check if the click is outside the notification button and dropdown
+      const notificationButton = document.getElementById('notification-button');
+      const notificationDropdown = document.getElementById('notification-dropdown');
+
+      if (
+        notificationButton && !notificationButton.contains(event.target as Node) &&
+        notificationDropdown && !notificationDropdown.contains(event.target as Node)
+      ) {
+        setShowNotificationsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
@@ -179,9 +190,10 @@ export const Header = () => {
                     <span className="text-sm font-semibold">{getDisplayName()}</span>
                   </Link>
                   
-                  {/* NOTIFICATION BELL BUTTON */}
+                  {/* NOTIFICATION BELL BUTTON AND DROPDOWN */}
                   <div className="relative"> {/* Container for the bell and its dropdown */}
                     <button
+                      id="notification-button" // Added ID for click outside logic
                       onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                     >
@@ -189,27 +201,16 @@ export const Header = () => {
                       <NotificationBadge className="absolute -top-1 -right-1" /> {/* Position badge relative to this bell */}
                     </button>
 
-                    {/* Notifications Dropdown (Placeholder) */}
+                    {/* Notifications Dropdown (Render the new component here) */}
                     {showNotificationsDropdown && (
-                      <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
-                        {/* This is where you'll render your actual notification list.
-                            You'll likely create a new component, e.g., <NotificationsList />
-                            and pass it data (e.g., from a new useEffect or a shared context).
-                        */}
-                        <div className="px-4 py-2 text-gray-700 font-semibold border-b">Notifications</div>
-                        <div className="p-4 text-gray-500 text-sm">
-                            <p>No new notifications.</p> {/* Placeholder content */}
-                            {/* Example of a real notification item */}
-                            {/*
-                            <Link to="/developer?tab=messages" className="block px-4 py-2 hover:bg-gray-100">
-                                <p className="font-medium text-gray-800">New message from John Doe</p>
-                                <p className="text-xs text-gray-500">2 hours ago</p>
-                            </Link>
-                            */}
-                        </div>
-                        <div className="px-4 py-2 border-t text-center">
-                            <Link to={`${getDashboardPath()}?tab=messages`} className="text-blue-600 hover:underline text-sm" onClick={() => setShowNotificationsDropdown(false)}>View all messages</Link>
-                        </div>
+                      <div 
+                        id="notification-dropdown" // Added ID for click outside logic
+                        className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+                      >
+                        <NotificationsDropdownContent 
+                            onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
+                            getDashboardPath={getDashboardPath} // Pass the helper function
+                        />
                       </div>
                     )}
                   </div>
@@ -309,7 +310,7 @@ export const Header = () => {
                       <span>Dashboard</span>
                     </Link>
                     <Link
-                      to="/profile"
+                      to={`${getDashboardPath()}?tab=profile`}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
