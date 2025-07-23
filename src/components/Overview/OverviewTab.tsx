@@ -5,7 +5,7 @@ import { SnapshotCard } from './SnapshotCard';
 import { FeaturedProject } from './FeaturedProject';
 import { RecentGitHubActivity } from './RecentGitHubActivity';
 import { LatestEndorsements } from './LatestEndorsements';
-import { ProfileStrengthIndicator } from '../Profile/ProfileStrengthIndicator'; // Already exists
+import { ProfileStrengthIndicator } from '../Profile/ProfileStrengthIndicator';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -26,8 +26,8 @@ interface OverviewTabProps {
   // For now, keeping them, but they might be empty arrays from DeveloperDashboard
   savedJobs: JobRole[];
   appliedJobs: JobRole[];
-  savedJobsCountOverride?: number | null;    // New prop
-  appliedJobsCountOverride?: number | null;  // New prop
+  savedJobsCountOverride?: number | null;    // New prop
+  appliedJobsCountOverride?: number | null;  // New prop
   endorsements: Endorsement[];
   recentCommits?: Commit[];
   githubProfileUrl?: string;
@@ -41,8 +41,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   messages,
   savedJobs,
   appliedJobs,
-  savedJobsCountOverride, // Added to destructuring
-  appliedJobsCountOverride, // Added to destructuring
+  savedJobsCountOverride,
+  appliedJobsCountOverride,
   endorsements,
   recentCommits,
   githubProfileUrl,
@@ -190,7 +190,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <User size={16} className="mr-2"/> Complete Your Profile
             </button>
             {/* TODO: Implement endorsement invitation functionality */}
-            <button className="mt-3 w-full text-sm bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center">
+            <button
+              onClick={() => navigate('/developer/invite-endorsements')} // ADDED onClick HANDLER
+              className="mt-3 w-full text-sm bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
+            >
               <Users size={16} className="mr-2"/> Invite Endorsements
             </button>
           </div>
