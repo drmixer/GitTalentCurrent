@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // MODIFIED: Added useState, useEffect
+import React, { useState, useEffect } from 'react';
 import { Developer } from '../types';
 import { X, Github, Mail, MapPin, Loader } from 'lucide-react';
 import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
@@ -6,9 +6,9 @@ import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
 import { RealGitHubChart } from './GitHub/RealGitHubChart';
-import { EndorsementDisplay } from './EndorsementDisplay'; // NEW: Import EndorsementDisplay
-import { fetchEndorsementsForDeveloper } from '../lib/endorsementUtils'; // NEW: Import fetchEndorsementsForDeveloper
-import { Endorsement } from '../types'; // NEW: Import Endorsement type
+import EndorsementDisplay from './EndorsementDisplay'; // CORRECTED: Imported as default
+import { fetchEndorsementsForDeveloper } from '../lib/endorsementUtils';
+import { Endorsement } from '../types';
 
 interface DeveloperProfileModalProps {
   developer: Developer;
@@ -17,29 +17,23 @@ interface DeveloperProfileModalProps {
 
 export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
-  // Using a separate useGitHub hook call to avoid prop drilling issues or unnecessary re-fetches
-  // The useGitHub hook needs to be adapted to accept a developer object or a github_handle
-  // Assuming useGitHub can accept the developer object directly for its internal fetching logic
   const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer || initialDeveloper);
 
   const currentDeveloper = developer || initialDeveloper;
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
   const avatarUrl = currentDeveloper.user?.avatar_url || currentDeveloper.profile_pic_url;
 
-  // NEW: State for endorsements
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [isLoadingEndorsements, setIsLoadingEndorsements] = useState(true);
   const [endorsementError, setEndorsementError] = useState<string | null>(null);
 
-  // NEW: Fetch public endorsements on component mount or when developer changes
   useEffect(() => {
     const loadEndorsements = async () => {
       if (currentDeveloper?.user_id) {
         setIsLoadingEndorsements(true);
         setEndorsementError(null);
         try {
-          // Fetch only PUBLIC endorsements for the recruiter view
-          const fetchedEndorsements = await fetchEndorsementsForDeveloper(currentDeveloper.user_id, true);
+          const fetchedEndorsements = await fetchEndorsementsForDeveloper(currentDeveloper.user_id, true); // Fetch only PUBLIC endorsements
           if (fetchedEndorsements) {
             setEndorsements(fetchedEndorsements);
           } else {
@@ -55,7 +49,7 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
     };
 
     loadEndorsements();
-  }, [currentDeveloper?.user_id]); // Re-fetch if the developer ID changes
+  }, [currentDeveloper?.user_id]);
 
   if (loading && !developer) {
     return (
@@ -88,32 +82,30 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
         </div>
         <div className="p-6">
           <div className="flex items-start space-x-6">
-            <img src={avatarUrl || '/path/to/default/avatar.png'} alt={displayName} className="w-24 h-24 rounded-full shadow-lg object-cover" /> {/* Added default and object-cover */}
+            <img src={avatarUrl || '/path/to/default/avatar.png'} alt={displayName} className="w-24 h-24 rounded-full shadow-lg object-cover" />
             <div>
               <h3 className="text-2xl font-bold">{displayName}</h3>
-              <p className="text-gray-600 text-lg">{currentDeveloper.title}</p> {/* Changed from preferred_title if 'title' is the intended display */}
+              <p className="text-gray-600 text-lg">{currentDeveloper.title}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                 {currentDeveloper.github_handle && (
                   <a href={`https://github.com/${currentDeveloper.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600">
                     <Github size={16} className="mr-1" />{currentDeveloper.github_handle}
                   </a>
                 )}
-                {/* Note: Recruiters might not always need/want to see developer email here,
-                    but keeping it as per your original code. You might remove or gate this. */}
-                {currentDeveloper.user?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{currentDeveloper.user.email}</span>} {/* Changed to currentDeveloper.user.email */}
+                {currentDeveloper.user?.email && <span className="flex items-center"><Mail size={16} className="mr-1" />{currentDeveloper.user.email}</span>}
                 {currentDeveloper.location && <span className="flex items-center"><MapPin size={16} className="mr-1" />{currentDeveloper.location}</span>}
               </div>
             </div>
           </div>
 
-          {currentDeveloper.bio && ( // NEW: Display bio if exists
+          {currentDeveloper.bio && (
             <div className="mt-8">
               <h4 className="font-bold text-lg mb-3">Bio</h4>
               <p className="text-gray-700">{currentDeveloper.bio}</p>
             </div>
           )}
 
-          {currentDeveloper.skills?.length > 0 && ( // Check if skills exist
+          {currentDeveloper.skills?.length > 0 && (
             <div className="mt-8">
               <h4 className="font-bold text-lg mb-3">Tech Skills</h4>
               <div className="flex flex-wrap gap-2">
@@ -127,17 +119,17 @@ export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ de
           <div className="mt-8">
             <PortfolioManager
               developerId={currentDeveloper.user_id}
-              isEditable={false} // Recruiters cannot edit
+              isEditable={false}
             />
           </div>
 
           <div className="mt-8">
-            <h4 className="font-bold text-lg mb-3">Endorsements</h4> {/* NEW: Endorsements Section */}
+            <h4 className="font-bold text-lg mb-3">Endorsements</h4>
             <EndorsementDisplay
               endorsements={endorsements}
               isLoading={isLoadingEndorsements}
               error={endorsementError}
-              canManageVisibility={false} // Crucial: Recruiters cannot manage visibility
+              canManageVisibility={false}
             />
           </div>
 
