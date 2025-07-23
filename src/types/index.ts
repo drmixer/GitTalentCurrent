@@ -1,6 +1,6 @@
 // src/types/index.ts
 
-import { User as SupabaseUser } from '@supabase/supabase-js'; // Assuming you import SupabaseUser somewhere
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -133,7 +133,6 @@ export interface PortfolioItem {
   updated_at: string;
 }
 
-// UPDATED ENDORSEMENT INTERFACE
 export interface Endorsement {
   id: string;
   developer_id: string; // User ID of the developer being endorsed
@@ -141,6 +140,7 @@ export interface Endorsement {
   text: string;
   endorser_name: string | null; // Added for anonymous endorsements
   endorser_email: string | null; // Added for anonymous endorsements
+  is_public?: boolean; // NEW: Added for controlling public visibility
   created_at: string;
   // endorser?: User; // Commented out as current fetch doesn't join user data. Uncomment if you add join.
 }
