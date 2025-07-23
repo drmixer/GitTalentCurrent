@@ -1,22 +1,21 @@
 // src/pages/EndorsementPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // !! CORRECTED PATH HERE: ../lib/supabase !!
+import { supabase } from '../lib/supabase'; // Corrected path from previous step
 
 // Assuming you might have a component to display LatestEndorsements, you can import it here
 // import { LatestEndorsements } from '../components/Overview/LatestEndorsements';
 
 interface Endorsement {
   id: string;
-  message: string;
-  endorser_id: string; // Example: ID of the user who gave the endorsement
-  recipient_user_id: string; // Example: ID of the user who received the endorsement
+  developer_id: string; // Updated to match schema
+  endorser_id: string;
+  text: string; // Changed from 'message' to 'text' to match schema
   created_at: string;
-  // Add any other relevant fields from your 'endorsements' table here
+  updated_at: string | null; // Added updated_at from schema
 }
 
 const EndorsementPage: React.FC = () => {
-  // useParams will extract 'userId' from the URL '/u/:userId/endorse'
   const { userId } = useParams<{ userId: string }>();
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,31 +30,30 @@ const EndorsementPage: React.FC = () => {
       }
 
       setLoading(true);
-      setError(null); // Clear any previous errors
+      setError(null);
 
-      console.log(`Fetching endorsements for recipient_user_id: ${userId}`); // Debugging log
+      console.log(`Fetching endorsements for developer_id: ${userId}`); // Debugging log
 
       const { data, error } = await supabase
         .from('endorsements')
-        .select('*') // Select all columns from your 'endorsements' table
-        .eq('recipient_user_id', userId) // Filter by the user ID who received the endorsement
-        .order('created_at', { ascending: false }); // Order by newest endorsements first
+        .select('*')
+        .eq('developer_id', userId) // <--- CORRECTED COLUMN NAME HERE!
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching endorsements:', error.message);
         setError(error.message);
-        setEndorsements([]); // Ensure endorsements array is empty on error
+        setEndorsements([]);
       } else {
-        setEndorsements(data || []); // Set data, default to empty array if null
+        setEndorsements(data || []);
         setError(null);
       }
       setLoading(false);
     };
 
     fetchEndorsements();
-  }, [userId]); // Re-run this effect whenever the userId in the URL changes
+  }, [userId]);
 
-  // --- Render Logic ---
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-6rem)] flex items-center justify-center p-8">
@@ -74,7 +72,6 @@ const EndorsementPage: React.FC = () => {
   }
 
   if (!userId) {
-    // This case should ideally be caught by the useEffect's initial check, but as a fallback
     return (
       <div className="min-h-[calc(100vh-6rem)] flex items-center justify-center p-8">
         <p className="text-xl font-semibold text-gray-700">No developer ID provided.</p>
@@ -94,16 +91,10 @@ const EndorsementPage: React.FC = () => {
         </p>
       ) : (
         <div className="space-y-6">
-          {/*
-            You can either map over the endorsements directly here,
-            or pass them to your existing LatestEndorsements component if it expects an array prop.
-            Example using the imported LatestEndorsements component:
-            <LatestEndorsements endorsements={endorsements} />
-          */}
           {endorsements.map((endorsement) => (
             <div key={endorsement.id} className="bg-white shadow-md rounded-lg p-6 border border-gray-100 transition-all duration-200 hover:shadow-lg">
               <p className="text-gray-800 text-lg mb-2 leading-relaxed">
-                "{endorsement.message}"
+                "{endorsement.text}" {/* Updated from 'message' to 'text' */}
               </p>
               <p className="text-sm text-gray-500 text-right mt-4">
                 — Endorsed by {endorsement.endorser_id ? `User ${endorsement.endorser_id.substring(0, 8)}...` : 'Anonymous'} on {new Date(endorsement.created_at).toLocaleDateString()}
