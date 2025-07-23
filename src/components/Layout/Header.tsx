@@ -4,8 +4,8 @@ import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 // CORRECTED PATHS BELOW:
-import { NotificationBadge } from '../notifications/NotificationBadge';
-import { NotificationsDropdownContent } from '../notifications/NotificationsDropdownContent';
+import { NotificationBadge } from '../Notifications/NotificationBadge';
+import { NotificationsDropdownContent } from '../Notifications/NotificationsDropdownContent';
 
 
 export const Header = () => {
