@@ -95,10 +95,15 @@ const HiringPipeline: React.FC = () => {
             const { data: candidatesData, error: candidatesError } = await supabase
                 .from('applied_jobs')
                 .select(`
-                    *,
-                    developer:developers(
-                        id,
-                        user_id,
+                    id,
+                    developer_id,
+                    job_id,
+                    applied_at, // Use 'applied_at' as per your schema
+                    status,
+                    cover_letter,
+                    notes,
+                    developer:developers!applied_jobs_developer_id_fkey( // *** CORRECTED: Explicit FK from applied_jobs to developers ***
+                        user_id, // *** CORRECTED: This is the primary key of your 'developers' table ***
                         github_handle,
                         bio,
                         availability,
@@ -107,8 +112,8 @@ const HiringPipeline: React.FC = () => {
                         location,
                         experience_years,
                         desired_salary,
-                        created_at,
-                        updated_at,
+                        created_at, // This refers to the 'developers' table's created_at
+                        updated_at, // This refers to the 'developers' table's updated_at
                         skills_categories,
                         profile_strength,
                         public_profile_slug,
@@ -122,7 +127,7 @@ const HiringPipeline: React.FC = () => {
                         skills,
                         preferred_title,
                         looking_for_job,
-                        user:users(
+                        user:users!developers_user_id_fkey( // *** CORRECTED: Explicit FK from developers to users ***
                             id,
                             name,
                             email,
@@ -130,7 +135,7 @@ const HiringPipeline: React.FC = () => {
                             profile_pic_url
                         )
                     ),
-                    job_role:job_roles(
+                    job_role:job_roles!applied_jobs_job_id_fkey( // *** CORRECTED: Explicit FK from applied_jobs to job_roles ***
                         id,
                         recruiter_id,
                         title,
@@ -140,13 +145,13 @@ const HiringPipeline: React.FC = () => {
                         tech_stack,
                         experience_required,
                         is_active,
-                        created_at,
-                        updated_at,
+                        created_at, // This refers to the 'job_roles' table's created_at
+                        updated_at, // This refers to the 'job_roles' table's updated_at
                         is_featured,
                         salary
                     )
                 `)
-                .in('job_id', jobIds); // Use job_id (from applied_jobs) not job_role_id
+                .in('job_id', jobIds);
 
             if (candidatesError) throw candidatesError;
             setCandidates(candidatesData as SavedCandidate[] || []);
