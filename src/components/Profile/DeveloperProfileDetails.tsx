@@ -5,14 +5,14 @@ import { RealGitHubChart } from '../GitHub/RealGitHubChart';
 import { GitHubUserActivityDetails } from '../GitHub/GitHubUserActivityDetails';
 import { PortfolioManager } from '../Portfolio/PortfolioManager';
 import { ProfileStrengthIndicator } from './ProfileStrengthIndicator';
-import { 
-  User, 
-  Code, 
-  MapPin, 
-  Briefcase, 
-  DollarSign, 
-  Github, 
-  Mail, 
+import {
+  User,
+  Code,
+  MapPin,
+  Briefcase,
+  DollarSign,
+  Github,
+  Mail,
   Calendar,
   ExternalLink,
   Loader,
@@ -24,8 +24,7 @@ import {
   MessageSquare,
   Share2
 } from 'lucide-react';
-import { Developer, User as UserType } from '../../types';
-import { formatDisplayName } from '@/utils/displayName';
+import { Developer, User as UserType, PortfolioItem } from '../../types'; // Added PortfolioItem import here
 
 interface DeveloperProfileDetailsProps {
   developerId: string;
@@ -40,13 +39,15 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('profile');
 
+  // Moved outside useEffect to be accessible for featuredProject state management
+  const [featuredProject, setFeaturedProject] = useState<PortfolioItem | null>(null);
+
   useEffect(() => {
     if (developerId) {
       fetchDeveloperProfile();
     }
   }, [developerId]);
 
-  const [featuredProject, setFeaturedProject] = useState<PortfolioItem | null>(null);
 
   const fetchDeveloperProfile = async () => {
     try {
@@ -67,8 +68,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         setError(fetchError.message || 'Failed to load developer profile');
         setDeveloper(null);
       } else {
-        setDeveloper(data);
-
+        setDeveloper(data as Developer); // Cast data to Developer type
         // Fetch portfolio items and find the featured one
         const { data: portfolioItems, error: portfolioError } = await supabase
           .from('portfolio_items')
@@ -83,7 +83,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
         }
       }
 
-    } catch (err) {
+    } catch (err: any) { // Explicitly type err as any
       setError('Unexpected error loading developer profile');
       setDeveloper(null);
     } finally {
@@ -99,49 +99,49 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   // Generate profile strength suggestions based on missing data
   const generateProfileSuggestions = (): string[] => {
     const suggestions: string[] = [];
-    
+
     if (!developer) return suggestions;
-    
+
     if (!developer.github_handle) {
       suggestions.push('Add your GitHub handle to showcase your coding activity');
     }
-    
+
     if (!developer.github_installation_id) {
       suggestions.push('Connect your GitHub account to display real-time contribution data');
     }
-    
+
     if (!developer.bio || developer.bio.length < 50) {
       suggestions.push('Complete your bio with at least 50 characters');
     }
-    
+
     if (!developer.location) {
       suggestions.push('Add your location to receive location-specific opportunities');
     }
-    
+
     if (developer.experience_years === 0) {
       suggestions.push('Specify your years of experience');
     }
-    
+
     if (developer.desired_salary === 0) {
       suggestions.push('Set your desired salary to help match with appropriate roles');
     }
-    
+
     if (!developer.top_languages || developer.top_languages.length < 3) {
       suggestions.push('Add at least 3 programming languages to your profile');
     }
-    
+
     if (!developer.linked_projects || developer.linked_projects.length < 2) {
       suggestions.push('Link at least 2 projects to demonstrate your work');
     }
-    
+
     if (!developer.resume_url) {
       suggestions.push('Add a link to your resume for recruiters to review');
     }
-    
+
     return suggestions;
   };
 
-  if (loading) { 
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
@@ -150,7 +150,7 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
     );
   }
 
-  if (error || !developer) { 
+  if (error || !developer) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
@@ -164,7 +164,11 @@ export const DeveloperProfileDetails: React.FC<DeveloperProfileDetailsProps> = (
   }
 
   const displayName = formatDisplayName(developer?.user, developer);
-  const avatarUrl = developer?.user?.avatar_url || developer?.avatar_url;
+  // UPDATED: More comprehensive fallback for avatarUrl
+  const avatarUrl = developer?.user?.avatar_url
+    || developer?.user?.profile_pic_url
+    || developer?.profile_pic_url
+    || developer?.avatar_url;
 
   const tabs = [
     { id: 'profile', label: 'Profile' },
