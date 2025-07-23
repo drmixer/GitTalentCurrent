@@ -1,198 +1,328 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+// src/pages/PublicDeveloperProfile.tsx
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // MODIFIED: Added useMemo
+import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
-import { usePublicGitHub } from '@/hooks/usePublicGitHub';
 import {
-  DeveloperProfileDetails,
-  PortfolioManager,
-  RealGitHubChart
-} from '../components';
-import {
-  ArrowLeft,
   Loader,
-  AlertCircle,
-  User,
-  Code,
-  Briefcase
+  Github,
+  Mail,
+  MapPin,
+  ExternalLink,
+  Linkedin,
+  Globe,
+  Star,
+  Award,
 } from 'lucide-react';
-import { Developer } from '../types';
+import { Developer, PortfolioItem, Endorsement } from '../types';
+import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
+import { GitHubUserActivityDetails } from '../components/GitHub/GitHubUserActivityDetails';
+import { PortfolioManager } from '../components/Portfolio/PortfolioManager';
+import EndorsementDisplay from '../components/EndorsementDisplay';
+import { fetchEndorsementsForDeveloper } from '../lib/endorsementUtils';
+
+// Define valid tabs for the public profile
+const validTabs = ['profile', 'portfolio', 'github-activity', 'endorsements'];
 
 export const PublicDeveloperProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [profileError, setProfileError] = useState('');
+  const [developer, setDeveloper] = useState<Developer | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [gitHubData, setGitHubData] = useState<any>(null);
+  const [githubLoading, setGithubLoading] = useState(true);
+  const [githubError, setGithubError] = useState<string | null>(null);
 
-  const { developer, user, loading: profileLoading, error: devError } = useDeveloperProfile(userId || '');
-  const { gitHubData, loading: githubLoading, error: githubError } = usePublicGitHub(developer);
+  const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
+  const [isLoadingEndorsements, setIsLoadingEndorsements] = useState(true);
+  const [endorsementError, setEndorsementError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'portfolio' | 'github'>('profile');
+  // NEW: State for active tab, default to 'profile'
+  const [activeTab, setActiveTab] = useState<(typeof validTabs)[number]>('profile');
 
-  useEffect(() => {
-    const fetchUserIdBySlug = async () => {
-      if (!slug) {
-        setProfileError("No profile slug provided.");
-        setInitialLoading(false);
+  const fetchDeveloperAndData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setGitHubData(null);
+    setGithubLoading(true);
+    setGithubError(null);
+    setEndorsements([]);
+    setIsLoadingEndorsements(true);
+    setEndorsementError(null);
+
+    try {
+      const { data: devData, error: devError } = await supabase
+        .from('developers')
+        .select('*, user:users(name, email, avatar_url)')
+        .eq('public_profile_slug', slug)
+        .eq('public_profile_enabled', true)
+        .single();
+
+      if (devError) {
+        if (devError.code === 'PGRST116') {
+          setError('Developer profile not found or is private.');
+        } else {
+          setError(`Error fetching developer profile: ${devError.message}`);
+        }
+        setIsLoading(false);
+        setGithubLoading(false);
+        setIsLoadingEndorsements(false);
+        return;
+      }
+      if (!devData) {
+        setError('Developer profile not found or is private.');
+        setIsLoading(false);
+        setGithubLoading(false);
+        setIsLoadingEndorsements(false);
         return;
       }
 
-      setInitialLoading(true);
-      const { data, error } = await supabase
-        .from('developers')
-        .select('user_id')
-        .eq('public_profile_slug', slug)
-        .single();
+      setDeveloper(devData as Developer);
 
-      if (error || !data) {
-        console.error('Error fetching user_id by slug:', error);
-        setProfileError('Developer profile not found.');
-        setUserId(null);
+      const { data: portfolioData, error: portfolioError } = await supabase
+        .from('portfolio_items')
+        .select('*')
+        .eq('developer_id', devData.user_id)
+        .order('created_at', { ascending: false });
+
+      if (portfolioError) {
+        console.error('Error fetching portfolio items:', portfolioError);
       } else {
-        setUserId(data.user_id);
-        setProfileError('');
+        setPortfolioItems(portfolioData || []);
       }
-      setInitialLoading(false);
-    };
 
-    fetchUserIdBySlug();
+      if (devData.github_handle) {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_FUNCTIONS_URL}/get-github-data`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // Note: Public profiles usually don't send auth tokens to backend functions
+              // unless the function is specifically secured to allow public access.
+              // If your get-github-data function requires auth, it might fail here
+              // for public users unless it's designed to be publicly accessible or
+              // uses a different API key.
+              'Authorization': `Bearer ${supabase.auth.getSession() ? (await supabase.auth.getSession())?.access_token : ''}`
+            },
+            body: JSON.stringify({
+              githubHandle: devData.github_handle,
+              installationId: devData.github_installation_id,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch GitHub data: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+          const data = await response.json();
+          setGitHubData(data);
+        } catch (gitErr: any) {
+          setGithubError(gitErr.message || 'Failed to fetch GitHub data');
+          console.error("Error fetching GitHub data:", gitErr);
+        } finally {
+          setGithubLoading(false);
+        }
+      } else {
+        setGithubLoading(false);
+      }
+
+      const fetchedEndorsements = await fetchEndorsementsForDeveloper(devData.user_id, true);
+      if (fetchedEndorsements) {
+        setEndorsements(fetchedEndorsements);
+      } else {
+        setEndorsementError("Failed to load endorsements.");
+      }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.');
+      setGithubLoading(false);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingEndorsements(false);
+    }
   }, [slug]);
 
-  if (initialLoading || (profileLoading && !developer)) {
+  useEffect(() => {
+    fetchDeveloperAndData();
+  }, [fetchDeveloperAndData]);
+
+  // Derive display names and URLs once developer data is available
+  const displayName = useMemo(() => developer?.user?.name || developer?.name || 'Developer', [developer]);
+  const avatarUrl = useMemo(() => developer?.user?.avatar_url || developer?.profile_pic_url, [developer]);
+
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading developer profile...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader className="animate-spin h-10 w-10 text-blue-500" />
+        <p className="ml-3 text-gray-600">Loading profile...</p>
       </div>
     );
   }
 
-  if (profileError || devError || !developer) {
+  if (error || !developer) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-red-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Profile Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            {profileError || devError || "We couldn't find the developer profile you're looking for."}
-          </p>
-          <Link
-            to="/"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-8 text-center">
+        <Award className="h-20 w-20 text-gray-400 mb-6" />
+        <h1 className="text-3xl font-bold text-gray-800 mb-3">Profile Not Found or Private</h1>
+        <p className="text-lg text-gray-600 mb-6">{error || 'The developer profile you are looking for does not exist or is not set to public.'}</p>
+        <p className="text-sm text-gray-500">Please check the URL or contact the developer if you believe this is an error.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-8">
-          <Link
-            to="/"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Home
-          </Link>
-        </div>
-
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-8 text-white shadow-xl">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="flex items-center space-x-6 mb-6 md:mb-0">
-              {developer.profile_pic_url ? ( // Reverted to original logic
-                <img
-                  src={developer.profile_pic_url} // Reverted to original src
-                  alt={user?.name || developer.github_handle}
-                  className="w-24 h-24 rounded-2xl object-cover shadow-lg border-4 border-white"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg border-4 border-white">
-                  {(user?.name || developer.github_handle)?.split(' ').map(n => n[0]).join('')}
-                </div>
+    <div className="bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-lg p-6 md:p-8">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-6 sm:space-y-0 sm:space-x-8 pb-6 border-b border-gray-200 mb-6">
+          <img src={avatarUrl || '/path/to/default-avatar.png'} alt={displayName} className="w-32 h-32 rounded-full object-cover border-4 border-blue-200 shadow-md" />
+          <div className="text-center sm:text-left">
+            <h1 className="text-4xl font-extrabold text-gray-900">{displayName}</h1>
+            {developer.title && <p className="text-xl text-blue-600 font-semibold mt-1">{developer.title}</p>}
+            <div className="flex flex-wrap justify-center sm:justify-start items-center space-x-4 mt-3 text-gray-600 text-sm">
+              {developer.location && (
+                <span className="flex items-center">
+                  <MapPin size={18} className="mr-1 text-gray-500" /> {developer.location}
+                </span>
               )}
-              <div>
-                <h1 className="text-3xl font-black mb-2">
-                  {user?.name || developer.github_handle}
-                </h1>
-                <div className="flex items-center space-x-4 text-blue-100">
-                  <div className="flex items-center">
-                    <Code className="w-4 h-4 mr-1" />
-                    {developer.preferred_title || 'No title specified'}
-                  </div>
-                  {developer.location && (
-                    <div className="flex items-center">
-                      <User className="w-4 h-4 mr-1" />
-                      {developer.location}
-                    </div>
-                  )}
-                  {typeof developer.experience_years === 'number' && (
-                    <div className="flex items-center">
-                      <Briefcase className="w-4 h-4 mr-1" />
-                      {developer.experience_years} years experience
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${developer.availability ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${developer.availability ? 'bg-white' : 'bg-gray-500'}`}></div>
-                {developer.availability ? 'Available for hire' : 'Not available'}
-              </span>
+              {developer.email && (
+                <a href={`mailto:${developer.email}`} className="flex items-center hover:text-blue-700 transition-colors">
+                  <Mail size={18} className="mr-1 text-gray-500" /> {developer.email}
+                </a>
+              )}
+              {developer.github_handle && (
+                <a href={`https://github.com/${developer.github_handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-700 transition-colors">
+                  <Github size={18} className="mr-1 text-gray-500" /> {developer.github_handle}
+                </a>
+              )}
+              {developer.linkedin_url && (
+                <a href={developer.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-700 transition-colors">
+                  <Linkedin size={18} className="mr-1 text-gray-500" /> LinkedIn
+                </a>
+              )}
+              {developer.website_url && (
+                <a href={developer.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-700 transition-colors">
+                  <Globe size={18} className="mr-1 text-gray-500" /> Website
+                </a>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-t-2xl shadow-sm border border-gray-100 mb-0">
-          <div className="px-6 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'profile', label: 'Profile', icon: User },
-                { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
-                { id: 'github', label: 'GitHub Activity', icon: Code },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as 'profile' | 'portfolio' | 'github')}
-                    className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm ${activeTab === tab.id ? 'border-blue-500 text-blue-600 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-                  >
-                    <Icon className={`mr-2 h-5 w-5 ${activeTab === tab.id ? 'text-blue-500' : 'text-gray-400'}`} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+        {/* Tab Navigation */}
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
+            {validTabs.map((tabName) => (
+              <button
+                key={tabName}
+                onClick={() => setActiveTab(tabName)}
+                className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${
+                  activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="bg-white rounded-b-2xl shadow-sm border border-gray-100 border-t-0 p-6">
+        {/* Tab Content */}
+        <div className="tab-content">
           {activeTab === 'profile' && (
-            <DeveloperProfileDetails developerId={developer.user_id} />
+            <>
+              {developer.bio && (
+                <section className="mt-6">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">About Me</h2>
+                  <p className="text-gray-700 leading-relaxed">{developer.bio}</p>
+                </section>
+              )}
+
+              {developer.skills?.length > 0 && (
+                <section className="mt-8">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">Skills & Technologies</h2>
+                  <div className="flex flex-wrap gap-3">
+                    {developer.skills.map(skill => (
+                      <span key={skill} className="px-4 py-2 bg-blue-100 text-blue-800 font-medium rounded-full text-base">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {(!developer.bio && !developer.skills?.length) && (
+                <p className="text-gray-500 italic mt-6">This developer has not provided public profile details yet.</p>
+              )}
+            </>
           )}
+
           {activeTab === 'portfolio' && (
-            <PortfolioManager developerId={developer.user_id} isEditable={false} />
+            <section className="mt-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Portfolio</h2>
+              <PortfolioManager
+                developerId={developer.user_id}
+                isEditable={false}
+                itemsPerPage={5} // Adjust as needed
+              />
+              {portfolioItems.length === 0 && !isLoading && (
+                  <p className="text-gray-500 italic">No public portfolio items yet.</p>
+              )}
+            </section>
           )}
-          {activeTab === 'github' && developer.github_handle && (
-            <RealGitHubChart
-              githubHandle={developer.github_handle}
-              gitHubData={gitHubData}
-              loading={githubLoading}
-              error={githubError}
-              className="w-full"
-              displayMode="dashboardSnippet"
-              isGitHubAppInstalled={!!developer?.github_installation_id}
-            />
+
+          {activeTab === 'github-activity' && (
+            <section className="mt-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">GitHub Activity</h2>
+              <div className="flex flex-col lg:flex-row gap-6">
+                {githubLoading ? (
+                  <div className="flex items-center justify-center h-48 w-full">
+                    <Loader className="animate-spin h-8 w-8 text-blue-600" />
+                    <p className="ml-3 text-gray-600">Loading GitHub data...</p>
+                  </div>
+                ) : githubError ? (
+                  <div className="text-center text-red-600 w-full p-8 border rounded-lg bg-red-50">
+                    <Github className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                    <p>Error loading GitHub data: {githubError}</p>
+                    <p className="text-sm text-red-500 mt-2">The GitHub app may not be installed or configured for this user.</p>
+                  </div>
+                ) : developer.github_handle && gitHubData?.user ? (
+                  <>
+                    <div className="lg:w-2/5 flex-shrink-0">
+                      <div className="bg-white p-4 rounded-lg shadow-md border">
+                        <RealGitHubChart
+                          githubHandle={developer.github_handle}
+                          gitHubData={gitHubData}
+                          loading={false}
+                          error={null}
+                          isGitHubAppInstalled={!!developer.github_installation_id}
+                          className="w-full"
+                          displayMode="public" // Use 'public' if you have a specific public chart display
+                        />
+                      </div>
+                    </div>
+                    <div className="lg:w-3/5 flex-grow bg-white p-4 rounded-lg shadow-md border">
+                      <GitHubUserActivityDetails gitHubData={gitHubData} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center text-gray-500 w-full p-8 border rounded-lg bg-gray-50">
+                    <Github className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p>No public GitHub data available for this developer.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'endorsements' && (
+            <section className="mt-6">
+              <EndorsementDisplay
+                endorsements={endorsements}
+                isLoading={isLoadingEndorsements}
+                error={endorsementError}
+                canManageVisibility={false}
+              />
+            </section>
           )}
         </div>
       </div>
