@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { formatDistanceToNow } from 'date-fns';
+// REMOVED: import { formatDistanceToNow } from 'date-fns'; // No longer needed
 import { MessageSquare, Briefcase, User, GitBranch, Info, Bell, Loader } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -22,6 +22,37 @@ interface NotificationsDropdownContentProps {
   getDashboardPath: () => string; // Pass getDashboardPath from Header for consistency
 }
 
+// --- START: New/Modified Date Formatting Utility ---
+const formatRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (seconds < 60) {
+    return `${seconds} seconds ago`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  }
+
+  // Fallback for older notifications, similar to your NotificationList's formatTime
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+// --- END: New/Modified Date Formatting Utility ---
+
+
 export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath }) => {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
@@ -39,7 +70,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
 
       if (error) throw error;
 
-      // Optimistically update UI: remove the marked notification from the list
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (err) {
       console.error('Error marking notification as read:', err);
@@ -57,9 +87,9 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         .from('notifications')
         .select('*')
         .eq('user_id', userProfile.id)
-        .eq('is_read', false) // IMPORTANT: Only fetch unread for the dropdown
+        .eq('is_read', false)
         .order('created_at', { ascending: false })
-        .limit(5); // Show a maximum of 5 recent unread notifications in the dropdown
+        .limit(5);
 
       if (error) throw error;
       setNotifications(data || []);
@@ -76,17 +106,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       fetchNotifications();
       
       const subscription = supabase
-        .channel(`notifications-dropdown-${userProfile.id}`) // Unique channel name for dropdown
+        .channel(`notifications-dropdown-${userProfile.id}`)
         .on(
           'postgres_changes',
           {
-            event: '*', // Listen for any change (INSERT, UPDATE of is_read, DELETE)
+            event: '*',
             schema: 'public',
             table: 'notifications',
             filter: `user_id=eq.${userProfile.id}`
           },
           (payload) => {
-            fetchNotifications(); // Re-fetch all unread notifications to update the dropdown content
+            fetchNotifications();
           }
         )
         .subscribe();
@@ -101,16 +131,16 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     switch (type) {
       case 'message':
         return <MessageSquare className="w-4 h-4 text-purple-500" />;
-      case 'job_interest': // Assuming this type is for recruiter applications/interest
+      case 'job_interest':
         return <Briefcase className="w-4 h-4 text-blue-500" />;
-      case 'endorsement': // Assuming a type for endorsements
+      case 'endorsement':
         return <User className="w-4 h-4 text-green-500" />;
-      case 'github_sync': // For GitHub sync updates
+      case 'github_sync':
         return <GitBranch className="w-4 h-4 text-gray-700" />;
-      case 'system_alert': // General system alerts
+      case 'system_alert':
         return <Info className="w-4 h-4 text-red-500" />;
       default:
-        return <Bell className="w-4 h-4 text-gray-500" />; // Default icon
+        return <Bell className="w-4 h-4 text-gray-500" />;
     }
   };
 
@@ -119,15 +149,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       await markAsRead(notification.id);
     }
 
-    let path = getDashboardPath(); // Start with default dashboard path
+    let path = getDashboardPath();
 
-    // Determine navigation path based on notification type and entity_id/entity_type
     switch (notification.type) {
       case 'message':
         path = `${getDashboardPath()}?tab=messages&conversation_id=${notification.entity_id}`;
         break;
       case 'job_interest':
-        // Adjust based on current user's role
         if (userProfile?.role === 'recruiter') {
           path = `${getDashboardPath()}?tab=applications&job_id=${notification.entity_id}`;
         } else if (userProfile?.role === 'developer') {
@@ -135,20 +163,20 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         }
         break;
       case 'endorsement':
-        path = `${getDashboardPath()}?tab=profile`; // Go to profile for endorsements
+        path = `${getDashboardPath()}?tab=profile`;
         break;
       case 'github_sync':
         path = `${getDashboardPath()}?tab=github`;
         break;
       case 'system_alert':
-        path = `${getDashboardPath()}`; // Or a dedicated alerts page
+        path = `${getDashboardPath()}`;
         break;
       default:
-        path = `${getDashboardPath()}`; // Fallback to dashboard
+        path = `${getDashboardPath()}`;
     }
 
-    navigate(path); // Navigate to the determined path
-    onClose(); // Close the dropdown after navigation
+    navigate(path);
+    onClose();
   };
 
   if (loading) {
@@ -181,7 +209,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       ) : (
         <div className="max-h-80 overflow-y-auto">
           {notifications.map(notification => (
-            <div // Use a div for the click handler to encapsulate the whole item
+            <div
               key={notification.id}
               onClick={() => handleNotificationClick(notification)}
               className="flex items-start px-4 py-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
@@ -194,7 +222,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   {notification.message}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                  {/* Use the new formatRelativeTime function */}
+                  {formatRelativeTime(notification.created_at)}
                 </p>
               </div>
             </div>
@@ -203,9 +232,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       )}
 
       <div className="px-4 py-2 border-t text-center">
-        {/* The 'View all messages' link can be changed to 'View all notifications' if you have a general notifications page */}
         <Link 
-            to={`${getDashboardPath()}?tab=messages`} // Link to messages tab as per your current setup
+            to={`${getDashboardPath()}?tab=messages`}
             className="text-blue-600 hover:underline text-sm" 
             onClick={onClose}>
             View all messages
