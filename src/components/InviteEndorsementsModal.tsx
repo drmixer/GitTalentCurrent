@@ -1,16 +1,16 @@
-// src/components/InviteEndorsementsModal.tsx (New File)
 import React, { useState, useCallback, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // Assuming Supabase for backend operations
-import { Mail, CheckCircle, Copy, Loader, AlertCircle, X, Link as LinkIcon, Award, Send } from 'lucide-react'; // Ensure Send is imported
-import { Developer } from '../types'; // Assuming Developer type is available
+import { supabase } from '../lib/supabase';
+import { Mail, CheckCircle, Copy, Loader, AlertCircle, X, Link as LinkIcon, Award, Send } from 'lucide-react';
+import { Developer } from '../types';
 
 interface InviteEndorsementsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  developer: Developer | null; // Pass the developer profile to the modal
+  developer: Developer | null;
 }
 
 export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = ({ isOpen, onClose, developer }) => {
+  // ALL HOOKS MUST BE DECLARED FIRST, UNCONDITIONALLY
   const [email, setEmail] = useState('');
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -28,8 +28,6 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
     }
   }, [isOpen]);
 
-  if (!isOpen) return null; // Don't render anything if the modal is not open
-
   const handleSendInvite = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !developer?.id) {
@@ -39,17 +37,14 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
 
     setIsSending(true);
     setStatusMessage(null);
-    setInvitationLink(null); // Clear link if sending email
+    setInvitationLink(null);
 
     try {
-      // THIS REQUIRES A SUPABASE EDGE FUNCTION / RPC CALL
-      // Make sure your Edge Function is deployed and accessible
-      // e.g., 'send-endorsement-invite' will be a function name in Supabase Functions
       const { data, error } = await supabase.functions.invoke('send-endorsement-invite', {
         body: JSON.stringify({
           recipientEmail: email,
           developerId: developer.id,
-          developerName: developer.user?.name || 'A Developer', // Pass developer's name for email
+          developerName: developer.user?.name || 'A Developer',
         }),
       });
 
@@ -59,7 +54,7 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
 
       if (data?.success) {
         setStatusMessage('Invitation email sent successfully!');
-        setEmail(''); // Clear email input
+        setEmail('');
       } else {
         setStatusMessage(data?.message || 'Failed to send invitation. Please try again.');
       }
@@ -84,8 +79,6 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
     setCopySuccess(false);
 
     try {
-      // THIS ALSO REQUIRES A SUPABASE EDGE FUNCTION / RPC CALL
-      // e.g., 'generate-endorsement-link' will be a function name in Supabase Functions
       const { data, error } = await supabase.functions.invoke('generate-endorsement-link', {
         body: JSON.stringify({
           developerId: developer.id,
@@ -116,13 +109,16 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
     if (invitationLink) {
       navigator.clipboard.writeText(invitationLink).then(() => {
         setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000); // Clear message after 2 seconds
+        setTimeout(() => setCopySuccess(false), 2000);
       }).catch(err => {
         console.error('Failed to copy text:', err);
         setCopySuccess(false);
       });
     }
   }, [invitationLink]);
+
+  // NOW, place the conditional return AFTER all hooks are declared
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 flex items-center justify-center p-4">
