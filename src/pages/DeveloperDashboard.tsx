@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { fetchEndorsementsForDeveloper, updateEndorsementVisibility } from '../lib/endorsementUtils'; // MODIFIED: Added updateEndorsementVisibility
+import { fetchEndorsementsForDeveloper, updateEndorsementVisibility } from '../lib/endorsementUtils';
 import {
   DeveloperProfileForm,
   PortfolioManager,
@@ -15,8 +15,10 @@ import {
   GitHubConnectPrompt,
   OverviewTab,
   JobsTab,
-  EndorsementDisplay, // ADDED: Import EndorsementDisplay
+  // EndorsementDisplay, // REMOVED from named import
 } from '../components';
+import EndorsementDisplay from '../components/EndorsementDisplay'; // CORRECTED: Imported as default
+
 import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
 import {
@@ -68,7 +70,7 @@ interface DashboardLocationState {
 }
 
 const initialStateForGitHubData = { user: null, repos: [], languages: {}, totalStars: 0, contributions: [] };
-const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs', 'endorsements']; // MODIFIED: Added 'endorsements'
+const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs', 'endorsements'];
 
 export const DeveloperDashboard: React.FC = () => {
   const {
@@ -243,7 +245,7 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [authUser?.id]);
 
-  // NEW: Handler for toggling endorsement visibility
+  // Handler for toggling endorsement visibility
   const handleToggleEndorsementVisibility = useCallback(async (endorsementId: string, currentIsPublic: boolean) => {
     setIsLoadingEndorsements(true); // Show loading while updating
     setEndorsementError(null);
@@ -422,7 +424,7 @@ export const DeveloperDashboard: React.FC = () => {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-screen-xl mx-auto">
-      {showGitHubConnectModal && contextDeveloperProfile?.github_handle && ( <GitHubConnectPrompt githubHandle={contextDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} /> )}
+      {showGitHubConnectModal && currentDeveloperProfile?.github_handle && ( <GitHubConnectPrompt githubHandle={currentDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} /> )}
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
@@ -438,10 +440,10 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'profile' && (displayDeveloperProfileForForm ? <DeveloperProfileForm initialData={displayDeveloperProfileForForm} onSuccess={async () => { if(refreshProfile) await refreshProfile(); await fetchDeveloperPageData();}} isOnboarding={false} /> : <div className="text-center p-8">Loading...</div>)}
       {activeTab === 'portfolio' && <PortfolioManager developerId={authUser?.id || ''} />}
       {activeTab === 'github-activity' && (
-        contextDeveloperProfile?.github_handle && contextDeveloperProfile?.github_installation_id ? (
+        currentDeveloperProfile?.github_handle && currentDeveloperProfile?.github_installation_id ? (
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="lg:w-2/5 flex-shrink-0"><div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-                <RealGitHubChart githubHandle={contextDeveloperProfile.github_handle} gitHubData={finalGitHubDataToShow} loading={gitHubDataLoadingToShow} error={gitHubDataErrorToShow as Error | null} className="w-full" displayMode='dashboardSnippet' isGitHubAppInstalled={!!contextDeveloperProfile?.github_installation_id} />
+                <RealGitHubChart githubHandle={currentDeveloperProfile.github_handle} gitHubData={finalGitHubDataToShow} loading={gitHubDataLoadingToShow} error={gitHubDataErrorToShow as Error | null} className="w-full" displayMode='dashboardSnippet' isGitHubAppInstalled={!!currentDeveloperProfile?.github_installation_id} />
             </div></div>
             <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
               {gitHubDataLoadingToShow && (<div className="flex flex-col items-center justify-center h-64"><Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" /><p className="text-gray-600">{shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}</p></div>)}
@@ -449,7 +451,7 @@ export const DeveloperDashboard: React.FC = () => {
               {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && finalGitHubDataToShow?.user && (
                 <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
               )}
-              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (<div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg"><Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" /><h3 className="text-lg font-semibold text-yellow-700">No GitHub Data Available</h3><p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p><button onClick={async () => { setLatchedSuccessfullyFetchedFreshData(null); setHasFreshDataBeenProcessed(false); if(refreshProfile) await refreshProfile();}} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh</button></div>)}
+              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (<div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg"><Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" /><h3 className="text-lg font-semibold">No GitHub Data Available</h3><p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p><button onClick={async () => { setLatchedSuccessfullyFetchedFreshData(null); setHasFreshDataBeenProcessed(false); if(refreshProfile) await refreshProfile();}} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh</button></div>)}
             </div>
           </div>
         ) : (<div className="text-center p-8"><Github className="w-16 h-16 text-gray-300 mx-auto mb-6" /><h3 className="text-2xl font-semibold">Connect GitHub Account</h3><button onClick={() => { if (!currentDeveloperProfile?.github_handle) { setActiveTab('profile'); navigate('/developer?tab=profile', { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg"> {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'} </button></div>)
@@ -485,14 +487,14 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       )}
       {activeTab === 'jobs' && <JobsTab />}
-      {activeTab === 'endorsements' && ( // NEW: Endorsements Tab
+      {activeTab === 'endorsements' && (
         <section className="endorsements-tab-content">
             <EndorsementDisplay
                 endorsements={endorsements}
                 isLoading={isLoadingEndorsements}
                 error={endorsementError}
-                canManageVisibility={true} // Enable visibility management for the developer
-                onToggleVisibility={handleToggleEndorsementVisibility} // Pass the handler
+                canManageVisibility={true}
+                onToggleVisibility={handleToggleEndorsementVisibility}
             />
         </section>
       )}
