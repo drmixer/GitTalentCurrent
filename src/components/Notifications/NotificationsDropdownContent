@@ -1,0 +1,216 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
+import { formatDistanceToNow } from 'date-fns';
+import { MessageSquare, Briefcase, User, GitBranch, Info, Bell, Loader } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+
+// Reusing your existing Notification interface from NotificationList.tsx
+interface Notification {
+  id: string;
+  user_id: string;
+  type: string; // e.g., 'message', 'job_interest', 'endorsement', 'github_sync', 'system_alert'
+  entity_id: string; // e.g., message_id, job_role_id, developer_id
+  entity_type: string; // e.g., 'messages', 'job_roles', 'developers'
+  message: string; // The primary text of the notification
+  is_read: boolean;
+  created_at: string;
+}
+
+interface NotificationsDropdownContentProps {
+  onClose: () => void; // Callback to close the dropdown
+  getDashboardPath: () => string; // Pass getDashboardPath from Header for consistency
+}
+
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath }) => {
+  const { userProfile } = useAuth();
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .eq('user_id', userProfile?.id);
+
+      if (error) throw error;
+
+      // Optimistically update UI: remove the marked notification from the list
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  }, [userProfile]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      if (!userProfile?.id) return;
+
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userProfile.id)
+        .eq('is_read', false) // IMPORTANT: Only fetch unread for the dropdown
+        .order('created_at', { ascending: false })
+        .limit(5); // Show a maximum of 5 recent unread notifications in the dropdown
+
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err: any) {
+      console.error('Error fetching unread notifications for dropdown:', err.message);
+      setError('Failed to load notifications.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    if (userProfile) {
+      fetchNotifications();
+      
+      const subscription = supabase
+        .channel(`notifications-dropdown-${userProfile.id}`) // Unique channel name for dropdown
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen for any change (INSERT, UPDATE of is_read, DELETE)
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userProfile.id}`
+          },
+          (payload) => {
+            fetchNotifications(); // Re-fetch all unread notifications to update the dropdown content
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [userProfile, fetchNotifications]);
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'message':
+        return <MessageSquare className="w-4 h-4 text-purple-500" />;
+      case 'job_interest': // Assuming this type is for recruiter applications/interest
+        return <Briefcase className="w-4 h-4 text-blue-500" />;
+      case 'endorsement': // Assuming a type for endorsements
+        return <User className="w-4 h-4 text-green-500" />;
+      case 'github_sync': // For GitHub sync updates
+        return <GitBranch className="w-4 h-4 text-gray-700" />;
+      case 'system_alert': // General system alerts
+        return <Info className="w-4 h-4 text-red-500" />;
+      default:
+        return <Bell className="w-4 h-4 text-gray-500" />; // Default icon
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+
+    let path = getDashboardPath(); // Start with default dashboard path
+
+    // Determine navigation path based on notification type and entity_id/entity_type
+    switch (notification.type) {
+      case 'message':
+        path = `${getDashboardPath()}?tab=messages&conversation_id=${notification.entity_id}`;
+        break;
+      case 'job_interest':
+        // Adjust based on current user's role
+        if (userProfile?.role === 'recruiter') {
+          path = `${getDashboardPath()}?tab=applications&job_id=${notification.entity_id}`;
+        } else if (userProfile?.role === 'developer') {
+          path = `${getDashboardPath()}?tab=jobs&job_id=${notification.entity_id}`;
+        }
+        break;
+      case 'endorsement':
+        path = `${getDashboardPath()}?tab=profile`; // Go to profile for endorsements
+        break;
+      case 'github_sync':
+        path = `${getDashboardPath()}?tab=github`;
+        break;
+      case 'system_alert':
+        path = `${getDashboardPath()}`; // Or a dedicated alerts page
+        break;
+      default:
+        path = `${getDashboardPath()}`; // Fallback to dashboard
+    }
+
+    navigate(path); // Navigate to the determined path
+    onClose(); // Close the dropdown after navigation
+  };
+
+  if (loading) {
+    return (
+      <div className="p-4 text-center">
+        <Loader className="animate-spin h-5 w-5 text-blue-600 mx-auto" />
+        <p className="text-gray-500 text-sm mt-2">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-center text-red-500 text-sm">
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-2">
+      <div className="px-4 py-2 text-gray-700 font-semibold border-b">
+        Notifications ({notifications.length})
+      </div>
+
+      {notifications.length === 0 ? (
+        <div className="p-4 text-gray-500 text-sm text-center">
+          No new notifications.
+        </div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto">
+          {notifications.map(notification => (
+            <div // Use a div for the click handler to encapsulate the whole item
+              key={notification.id}
+              onClick={() => handleNotificationClick(notification)}
+              className="flex items-start px-4 py-3 hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+            >
+              <div className="flex-shrink-0 mr-3 mt-1">
+                {getNotificationIcon(notification.type)}
+              </div>
+              <div className="flex-grow">
+                <p className="font-medium text-gray-800 text-sm leading-tight">
+                  {notification.message}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-4 py-2 border-t text-center">
+        {/* The 'View all messages' link can be changed to 'View all notifications' if you have a general notifications page */}
+        <Link 
+            to={`${getDashboardPath()}?tab=messages`} // Link to messages tab as per your current setup
+            className="text-blue-600 hover:underline text-sm" 
+            onClick={onClose}>
+            View all messages
+        </Link>
+      </div>
+    </div>
+  );
+};
