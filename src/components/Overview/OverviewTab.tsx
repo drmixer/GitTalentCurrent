@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react'; // <--- ADDED useState
 import { Developer, PortfolioItem, MessageThreadType, JobRole, Endorsement, User as UserType } from '../../types';
 import { User, Briefcase, MessageSquare, GitCommit, Award, CheckSquare, TrendingUp, Link as LinkIcon, HardDrive, Users, FileText, Star, Package } from 'lucide-react';
 import { SnapshotCard } from './SnapshotCard';
@@ -7,6 +7,7 @@ import { RecentGitHubActivity } from './RecentGitHubActivity';
 import { LatestEndorsements } from './LatestEndorsements';
 import { ProfileStrengthIndicator } from '../Profile/ProfileStrengthIndicator';
 import { useNavigate } from 'react-router-dom';
+import { InviteEndorsementsModal } from './InviteEndorsementsModal'; // <--- ADDED MODAL IMPORT
 
 
 // Define a simple type for a commit for now. This should ideally come from your GitHub data types.
@@ -26,8 +27,8 @@ interface OverviewTabProps {
   // For now, keeping them, but they might be empty arrays from DeveloperDashboard
   savedJobs: JobRole[];
   appliedJobs: JobRole[];
-  savedJobsCountOverride?: number | null;    // New prop
-  appliedJobsCountOverride?: number | null;  // New prop
+  savedJobsCountOverride?: number | null;
+  appliedJobsCountOverride?: number | null;
   endorsements: Endorsement[];
   recentCommits?: Commit[];
   githubProfileUrl?: string;
@@ -50,6 +51,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   onNavigateToTab,
 }) => {
   const navigate = useNavigate();
+  // State to control modal visibility
+  const [showInviteEndorsementsModal, setShowInviteEndorsementsModal] = useState(false); // <--- ADDED STATE
 
   if (loading) {
     // A more sophisticated loading skeleton could be implemented here
@@ -191,7 +194,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </button>
             {/* TODO: Implement endorsement invitation functionality */}
             <button
-              onClick={() => navigate('/developer/invite-endorsements')} // ADDED onClick HANDLER
+              onClick={() => setShowInviteEndorsementsModal(true)} // <--- UPDATED onClick HANDLER
               className="mt-3 w-full text-sm bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
             >
               <Users size={16} className="mr-2"/> Invite Endorsements
@@ -199,6 +202,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* RENDER THE MODAL CONDITIONALLY */}
+      <InviteEndorsementsModal // <--- ADDED MODAL RENDERING
+        isOpen={showInviteEndorsementsModal}
+        onClose={() => setShowInviteEndorsementsModal(false)}
+        developer={developer} // Pass the developer object to the modal
+      />
     </div>
   );
 };
