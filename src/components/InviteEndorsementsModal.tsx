@@ -1,4 +1,3 @@
-// src/components/InviteEndorsementsModal.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, CheckCircle, Copy, Loader, AlertCircle, X, Link as LinkIcon, Award, Send } from 'lucide-react';
@@ -17,13 +16,6 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
   const [isSending, setIsSending] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // --- DEBUGGING LOGS FOR DEVELOPER PROP ---
-  console.log('InviteEndorsementsModal render:');
-  console.log('  isOpen prop received:', isOpen);
-  console.log('  developer prop received:', developer);
-  console.log('  developer.id prop received:', developer?.id);
-  // --- END DEBUGGING LOGS ---
-
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -37,12 +29,8 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
 
   const handleSendInvite = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    // --- DEBUGGING LOGS FOR handleSendInvite ---
-    console.log('handleSendInvite called. Current developer:', developer);
-    console.log('handleSendInvite called. Current developer ID:', developer?.id);
-    // --- END DEBUGGING LOGS ---
-
-    if (!email || !developer?.id) {
+    // CHANGED: developer?.id to developer?.user_id
+    if (!email || !developer?.user_id) {
       setStatusMessage('Please enter an email and ensure your developer profile is loaded.');
       return;
     }
@@ -55,7 +43,8 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
       const { data, error } = await supabase.functions.invoke('send-endorsement-invite', {
         body: JSON.stringify({
           recipientEmail: email,
-          developerId: developer.id,
+          // CHANGED: developer.id to developer.user_id
+          developerId: developer.user_id,
           developerName: developer.user?.name || 'A Developer',
         }),
       });
@@ -80,12 +69,8 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
   }, [email, developer]);
 
   const handleGenerateLink = useCallback(async () => {
-    // --- DEBUGGING LOGS FOR handleGenerateLink ---
-    console.log('handleGenerateLink called. Current developer:', developer);
-    console.log('handleGenerateLink called. Current developer ID:', developer?.id);
-    // --- END DEBUGGING LOGS ---
-
-    if (!developer?.id) {
+    // CHANGED: developer?.id to developer?.user_id
+    if (!developer?.user_id) {
       setStatusMessage('Please ensure your developer profile is loaded to generate a link.');
       return;
     }
@@ -98,7 +83,8 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
     try {
       const { data, error } = await supabase.functions.invoke('generate-endorsement-link', {
         body: JSON.stringify({
-          developerId: developer.id,
+          // CHANGED: developer.id to developer.user_id
+          developerId: developer.user_id,
         }),
       });
 
