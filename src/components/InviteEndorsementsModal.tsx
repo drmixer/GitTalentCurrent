@@ -1,3 +1,4 @@
+// src/components/InviteEndorsementsModal.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, CheckCircle, Copy, Loader, AlertCircle, X, Link as LinkIcon, Award, Send } from 'lucide-react';
@@ -10,12 +11,18 @@ interface InviteEndorsementsModalProps {
 }
 
 export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = ({ isOpen, onClose, developer }) => {
-  // ALL HOOKS MUST BE DECLARED FIRST, UNCONDITIONALLY
   const [email, setEmail] = useState('');
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // --- DEBUGGING LOGS FOR DEVELOPER PROP ---
+  console.log('InviteEndorsementsModal render:');
+  console.log('  isOpen prop received:', isOpen);
+  console.log('  developer prop received:', developer);
+  console.log('  developer.id prop received:', developer?.id);
+  // --- END DEBUGGING LOGS ---
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -30,6 +37,11 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
 
   const handleSendInvite = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    // --- DEBUGGING LOGS FOR handleSendInvite ---
+    console.log('handleSendInvite called. Current developer:', developer);
+    console.log('handleSendInvite called. Current developer ID:', developer?.id);
+    // --- END DEBUGGING LOGS ---
+
     if (!email || !developer?.id) {
       setStatusMessage('Please enter an email and ensure your developer profile is loaded.');
       return;
@@ -68,6 +80,11 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
   }, [email, developer]);
 
   const handleGenerateLink = useCallback(async () => {
+    // --- DEBUGGING LOGS FOR handleGenerateLink ---
+    console.log('handleGenerateLink called. Current developer:', developer);
+    console.log('handleGenerateLink called. Current developer ID:', developer?.id);
+    // --- END DEBUGGING LOGS ---
+
     if (!developer?.id) {
       setStatusMessage('Please ensure your developer profile is loaded to generate a link.');
       return;
@@ -117,7 +134,6 @@ export const InviteEndorsementsModal: React.FC<InviteEndorsementsModalProps> = (
     }
   }, [invitationLink]);
 
-  // NOW, place the conditional return AFTER all hooks are declared
   if (!isOpen) return null;
 
   return (
