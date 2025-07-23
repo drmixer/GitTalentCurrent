@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react'; // Removed MessageSquare
+import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-import { NotificationBadge } from '../components/notifications/NotificationBadge'; // Adjusted path
-import { NotificationsDropdownContent } from '../components/notifications/NotificationsDropdownContent'; // NEW IMPORT, Adjusted path
+// CORRECTED PATHS BELOW:
+import { NotificationBadge } from '../notifications/NotificationBadge';
+import { NotificationsDropdownContent } from '../notifications/NotificationsDropdownContent';
+
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
