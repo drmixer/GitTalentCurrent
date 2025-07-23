@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // <--- ADDED useState
+import React, { useState } from 'react';
 import { Developer, PortfolioItem, MessageThreadType, JobRole, Endorsement, User as UserType } from '../../types';
 import { User, Briefcase, MessageSquare, GitCommit, Award, CheckSquare, TrendingUp, Link as LinkIcon, HardDrive, Users, FileText, Star, Package } from 'lucide-react';
 import { SnapshotCard } from './SnapshotCard';
@@ -7,7 +7,7 @@ import { RecentGitHubActivity } from './RecentGitHubActivity';
 import { LatestEndorsements } from './LatestEndorsements';
 import { ProfileStrengthIndicator } from '../Profile/ProfileStrengthIndicator';
 import { useNavigate } from 'react-router-dom';
-import { InviteEndorsementsModal } from './InviteEndorsementsModal'; // <--- ADDED MODAL IMPORT
+import { InviteEndorsementsModal } from '../InviteEndorsementsModal'; // <--- CORRECTED IMPORT PATH
 
 
 // Define a simple type for a commit for now. This should ideally come from your GitHub data types.
@@ -52,10 +52,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const navigate = useNavigate();
   // State to control modal visibility
-  const [showInviteEndorsementsModal, setShowInviteEndorsementsModal] = useState(false); // <--- ADDED STATE
+  const [showInviteEndorsementsModal, setShowInviteEndorsementsModal] = useState(false);
 
   if (loading) {
-    // A more sophisticated loading skeleton could be implemented here
     return <div className="p-6 text-center text-gray-500">Loading overview data...</div>;
   }
 
@@ -87,7 +86,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     if (onNavigateToTab) {
       onNavigateToTab(tab);
     } else {
-      // Fallback if the callback is not provided, though it should be
       navigate(`/developer?tab=${tab}`);
     }
   };
@@ -204,7 +202,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* RENDER THE MODAL CONDITIONALLY */}
-      <InviteEndorsementsModal // <--- ADDED MODAL RENDERING
+      <InviteEndorsementsModal
         isOpen={showInviteEndorsementsModal}
         onClose={() => setShowInviteEndorsementsModal(false)}
         developer={developer} // Pass the developer object to the modal
