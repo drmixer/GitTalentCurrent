@@ -4,35 +4,23 @@ import { GitBranch, LogOut, User, MessageSquare, Briefcase, Menu, X, Bell } from
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { NotificationBadge } from '../Notifications/NotificationBadge';
+// import { NotificationsDropdown } from '../Notifications/NotificationsDropdown'; // You'll create this soon
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Unread count will now be fetched by NotificationBadge itself, or we re-introduce it here
+  // For now, let's keep the Header's logic lean and focused on UI toggle.
+  // const [unreadCount, setUnreadCount] = useState(0); // This can be removed or repurposed for dropdown content
 
-  useEffect(() => {
-    if (user && userProfile) {
-      fetchUnreadCount();
-    }
-  }, [user, userProfile]);
+  // State to manage the visibility of the notifications dropdown
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
-  const fetchUnreadCount = async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', userProfile.id)
-        .eq('is_read', false);
-
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-    }
-  };
+  // Removed fetchUnreadCount from Header, as NotificationBadge will handle its own count.
+  // If you need the count in Header for other logic (e.g., to decide to show the bell at all),
+  // you might re-introduce it or pass it as a prop from NotificationBadge.
 
   const handleSignOut = async () => {
     try {
@@ -101,7 +89,6 @@ export const Header = () => {
                 alt="GitTalent Logo"
                 className="h-full w-auto object-contain"
                 onError={(e) => {
-                  // Fallback to icon if image fails to load
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   const fallback = target.nextElementSibling as HTMLElement;
@@ -173,6 +160,7 @@ export const Header = () => {
               )}
             </nav>
           ) : (
+            // Authenticated User Navigation (Desktop)
             user && userProfile && (
               <nav className="hidden md:flex items-center space-x-6">
                 <Link
@@ -184,19 +172,48 @@ export const Header = () => {
                 </Link>
                 <div className="flex items-center space-x-4">
                   <Link
-                    to={`${getDashboardPath()}?tab=profile`} // Changed to navigate to profile tab
+                    to={`${getDashboardPath()}?tab=profile`}
                     className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm font-semibold">{getDisplayName()}</span>
                   </Link>
-                  <Link
-                    to={`${getDashboardPath()}?tab=messages`} // Changed to navigate to messages tab
-                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
-                  >
-                    <NotificationBadge />
-                    <Bell className="w-4 h-4" />
-                  </Link>
+                  
+                  {/* NOTIFICATION BELL BUTTON */}
+                  <div className="relative"> {/* Container for the bell and its dropdown */}
+                    <button
+                      onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
+                    >
+                      <Bell className="w-4 h-4" /> {/* The one and only bell icon */}
+                      <NotificationBadge className="absolute -top-1 -right-1" /> {/* Position badge relative to this bell */}
+                    </button>
+
+                    {/* Notifications Dropdown (Placeholder) */}
+                    {showNotificationsDropdown && (
+                      <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
+                        {/* This is where you'll render your actual notification list.
+                            You'll likely create a new component, e.g., <NotificationsList />
+                            and pass it data (e.g., from a new useEffect or a shared context).
+                        */}
+                        <div className="px-4 py-2 text-gray-700 font-semibold border-b">Notifications</div>
+                        <div className="p-4 text-gray-500 text-sm">
+                            <p>No new notifications.</p> {/* Placeholder content */}
+                            {/* Example of a real notification item */}
+                            {/*
+                            <Link to="/developer?tab=messages" className="block px-4 py-2 hover:bg-gray-100">
+                                <p className="font-medium text-gray-800">New message from John Doe</p>
+                                <p className="text-xs text-gray-500">2 hours ago</p>
+                            </Link>
+                            */}
+                        </div>
+                        <div className="px-4 py-2 border-t text-center">
+                            <Link to={`${getDashboardPath()}?tab=messages`} className="text-blue-600 hover:underline text-sm" onClick={() => setShowNotificationsDropdown(false)}>View all messages</Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={handleSignOut}
                     className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
@@ -229,7 +246,7 @@ export const Header = () => {
               {isPublicPage ? (
                 <>
                   {[
-                    { label:  'Features', id: 'features' },
+                    { label: 'Features', id: 'features' },
                     { label: 'Pricing', id: 'pricing' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
@@ -280,6 +297,7 @@ export const Header = () => {
                   )}
                 </>
               ) : (
+                // Authenticated User Mobile Menu
                 user && userProfile && (
                   <div className="space-y-4">
                     <Link
@@ -298,6 +316,8 @@ export const Header = () => {
                       <User className="w-4 h-4" />
                       <span>{getDisplayName()}</span>
                     </Link>
+                    {/* MOBILE BELL - Consider adding a similar bell/notification setup for mobile if desired */}
+                    {/* For now, leaving mobile bell out to keep changes focused, but you can replicate the desktop bell logic here */}
                     <button
                       onClick={handleSignOut}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
