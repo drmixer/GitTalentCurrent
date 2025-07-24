@@ -9,7 +9,8 @@ import { Endorsement } from '../types';
  * @param publicOnly If true, only fetches public endorsements. Defaults to false.
  * @returns An array of Endorsement objects, or null if an error occurs.
  */
-const fetchEndorsementsForDeveloper = async (developerId: string, publicOnly: boolean = false): Promise<Endorsement[] | null> => {
+// CORRECTED: fetchEndorsementsForDeveloper is a default export
+export default async function fetchEndorsementsForDeveloper(developerId: string, publicOnly: boolean = false): Promise<Endorsement[] | null> {
     try {
         let query = supabase
             .from('endorsements')
@@ -23,7 +24,7 @@ const fetchEndorsementsForDeveloper = async (developerId: string, publicOnly: bo
                 comment,
                 is_anonymous,
                 is_public,
-                endorser_user:endorser_id (
+                endorser_user:endorser_id(
                     name,
                     profile_pic_url,
                     developers(public_profile_slug)
@@ -58,8 +59,10 @@ const fetchEndorsementsForDeveloper = async (developerId: string, publicOnly: bo
                 name: item.endorser_user.name,
                 profile_pic_url: item.endorser_user.profile_pic_url,
                 // Accessing the nested developers array and its first element for public_profile_slug
-                public_profile_slug: item.endorser_user.developers[0]?.public_profile_slug || null,
+                developers: item.endorser_user.developers || [], // Ensure it's an array
             } : null,
+            // Ensure public_profile_slug is accessed correctly from the nested developers array
+            // This is now handled in the EndorsementDisplay component directly for safer access
         }));
 
         return transformedData;
@@ -67,6 +70,24 @@ const fetchEndorsementsForDeveloper = async (developerId: string, publicOnly: bo
         console.error("An unexpected error occurred while fetching endorsements:", err);
         return null;
     }
-};
+}
 
-export default fetchEndorsementsForDeveloper;
+/**
+ * Updates the visibility status (is_public) of a specific endorsement.
+ * @param endorsementId The ID of the endorsement to update.
+ * @param isPublic The new public status (true for public, false for hidden).
+ * @returns A promise that resolves to true if successful, false otherwise.
+ */
+// CORRECTED: Re-added 'export' keyword
+export async function updateEndorsementVisibility(endorsementId: string, isPublic: boolean): Promise<boolean> {
+  const { error } = await supabase
+    .from('endorsements')
+    .update({ is_public: isPublic })
+    .eq('id', endorsementId);
+
+  if (error) {
+    console.error(`Error updating endorsement (ID: ${endorsementId}) visibility to ${isPublic}:`, error);
+    return false;
+  }
+  return true;
+}
