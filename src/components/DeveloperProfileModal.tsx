@@ -7,7 +7,7 @@ import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
-import { RealGitHubChart } = './GitHub/RealGitHubChart';
+import { RealGitHubChart } from './GitHub/RealGitHubChart';
 import EndorsementDisplay from './EndorsementDisplay'; // CORRECTED: Imported as default
 // CORRECTED: Changed to default import
 import fetchEndorsementsForDeveloper from '../lib/endorsementUtils';
