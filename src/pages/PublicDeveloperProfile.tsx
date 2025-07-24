@@ -2,23 +2,22 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Developer, Endorsement } from '../types'; // Added Endorsement type
-import EndorsementDisplay from '../components/EndorsementDisplay'; // Component for endorsements
-// CORRECTED: fetchEndorsementsForDeveloper is now a default import
-import fetchEndorsementsForDeveloper from '../lib/endorsementUtils'; // Utility for fetching endorsements
-import { Loader, Github, MessageCircle, Briefcase, Award, MapPin, DollarSign, Calendar, Zap, RefreshCcw, AlertCircle, Star, GitFork } from 'lucide-react'; // Added more icons
-import { RealGitHubChart } from '../components/GitHub/RealGitHubChart'; // Import RealGitHubChart
-import { formatNumber, calculateProfileStrength } from '../lib/utils'; // Import utility functions
-import DOMPurify from 'dompurify'; // Import DOMPurify
+import { Developer, Endorsement } from '../types';
+import EndorsementDisplay from '../components/EndorsementDisplay';
+import fetchEndorsementsForDeveloper from '../lib/endorsementUtils';
+import { Loader, Github, MessageCircle, Briefcase, Award, MapPin, DollarSign, Calendar, Zap, RefreshCcw, AlertCircle, Star, GitFork } from 'lucide-react';
+import { RealGitHubChart } from '../components/GitHub/RealGitHubChart';
+import { formatNumber, calculateProfileStrength } from '../lib/utils';
+import DOMPurify from 'dompurify';
 
 export const PublicDeveloperProfile: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>(); // Get the public_profile_slug from the URL
+  const { slug } = useParams<{ slug: string }>();
   const [developer, setDeveloper] = useState<Developer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gitHubData, setGitHubData] = useState<any>(null); // State for GitHub data
-  const [gitHubLoading, setGitHubLoading] = useState(true); // Loading state for GitHub data
-  const [gitHubError, setGitHubError] = useState<string | null>(null); // Error state for GitHub data
+  const [gitHubData, setGitHubData] = useState<any>(null);
+  const [gitHubLoading, setGitHubLoading] = useState(true);
+  const [gitHubError, setGitHubError] = useState<string | null>(null);
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [endorsementLoading, setEndorsementLoading] = useState(true);
   const [endorsementError, setEndorsementError] = useState<string | null>(null);
@@ -37,7 +36,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         .single();
 
       if (devError) {
-        if (devError.code === 'PGRST116') { // No rows found
+        if (devError.code === 'PGRST116') {
           setError("Developer profile not found.");
         } else {
           console.error("Error fetching developer profile:", JSON.stringify(devError, null, 2));
@@ -45,9 +44,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         }
         setDeveloper(null);
       } else if (data) {
-        // --- START OF NEW ADDITION ---
         console.log("Fetched developer data:", JSON.stringify(data, null, 2));
-        // --- END OF NEW ADDITION ---
         setDeveloper(data as Developer);
         // Recalculate and update profile strength
         const strength = calculateProfileStrength(data as Developer);
@@ -134,7 +131,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const sanitizedBio = developer?.bio ? DOMPurify.sanitize(developer.bio) : '';
 
   const renderSection = (title: string, content: React.ReactNode, icon: React.ElementType, isLoaded: boolean = true) => {
-    if (!content && isLoaded) return null; // Don't render section if content is empty and loaded
+    if (!content && isLoaded) return null;
 
     return (
       <div className="bg-gray-50 p-4 rounded-lg shadow-inner border border-gray-200">
@@ -192,7 +189,7 @@ export const PublicDeveloperProfile: React.FC = () => {
             />
             <div>
               <h1 className="text-4xl font-extrabold text-gray-900">{developer.user?.name || 'Developer'}</h1>
-              <p className="text-xl text-gray-700 font-semibold mt-1">{developer.title || 'Developer'}</p>
+              <p className="text-xl text-gray-700 font-semibold mt-1">{developer.preferred_title || 'Developer'}</p> {/* Changed from developer.title */}
               <div className="flex items-center text-gray-600 text-sm mt-2">
                 <MapPin className="w-4 h-4 mr-1" /> {developer.location || 'Location Not Specified'}
                 <span className="mx-2">|</span>
@@ -211,17 +208,21 @@ export const PublicDeveloperProfile: React.FC = () => {
             )}
 
             {renderSection("Skills",
-              developer.skills_categories && Object.keys(developer.skills_categories).length > 0 ? (
+              developer.skills_categories && typeof developer.skills_categories === 'object' && Object.keys(developer.skills_categories).length > 0 ? (
                 <div className="space-y-3">
-                  {Object.entries(developer.skills_categories).map(([category, data]) => (
+                  {Object.entries(developer.skills_categories).map(([category, skillsArray]) => ( // CHANGED 'data' to 'skillsArray'
                     <div key={category}>
-                      <h4 className="font-semibold text-gray-700 mb-1">{category} ({data.proficiency})</h4>
+                      <h4 className="font-semibold text-gray-700 mb-1">{category}</h4> {/* REMOVED (data.proficiency) */}
                       <div className="flex flex-wrap gap-2">
-                        {data.skills.map(skill => (
-                          <span key={skill} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                            {skill}
-                          </span>
-                        ))}
+                        {Array.isArray(skillsArray) && skillsArray.length > 0 ? ( // Added Array.isArray check
+                          (skillsArray as string[]).map(skill => ( // Cast to string[] for type safety if needed
+                            <span key={skill} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-500 italic text-sm">No skills listed for this category.</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -248,7 +249,7 @@ export const PublicDeveloperProfile: React.FC = () => {
                 endorsements={endorsements}
                 isLoading={endorsementLoading}
                 error={endorsementError}
-                canManageVisibility={false} // Public profile, so cannot manage visibility here
+                canManageVisibility={false}
               />,
               Award,
               !endorsementLoading
@@ -273,7 +274,7 @@ export const PublicDeveloperProfile: React.FC = () => {
                       loading={gitHubLoading}
                       error={gitHubError as Error | null}
                       className="w-full h-auto"
-                      displayMode='modal' // Or 'publicProfile' if you have a specific style
+                      displayMode='modal'
                       isGitHubAppInstalled={!!developer.github_installation_id}
                     />
                     {!gitHubLoading && gitHubData && (
