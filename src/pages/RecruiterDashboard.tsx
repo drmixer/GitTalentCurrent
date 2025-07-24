@@ -427,9 +427,12 @@ const RecruiterDashboard: React.FC = () => {
 
   // This is called from MarkAsHiredModal on confirm
   const handleConfirmHire = useCallback(async (salary: number, startDate: string) => {
-    if (!userProfile?.id || !candidateToHire || !jobRoleForHire) {
-      console.error("Missing user, candidate, or job role data for hire. Aborting.");
-      setDashboardError("Missing required information to record hire.");
+    // Ensure all critical data is present
+    // ADDED CHECK: !candidateToHire.developer
+    if (!userProfile?.id || !candidateToHire || !jobRoleForHire || !candidateToHire.developer) {
+      console.error("Missing user, candidate, job role, or developer data for hire. Aborting.");
+      setDashboardError("Missing required information to record hire. Please try again.");
+      setDashboardLoading(false); // Stop loading indicator if this check fails
       return;
     }
 
@@ -450,7 +453,7 @@ const RecruiterDashboard: React.FC = () => {
       const { data: existingAssignment, error: assignmentError } = await supabase
         .from('assignments')
         .select('id')
-        .eq('developer_id', candidateToHire.developer.user_id) // developer.user_id is the PK for developers table
+        .eq('developer_id', candidateToHire.developer.user_id) // Accessing developer.user_id
         .eq('job_role_id', jobRoleForHire.id)
         .maybeSingle();
 
@@ -466,7 +469,7 @@ const RecruiterDashboard: React.FC = () => {
         const { data: newAssignment, error: createAssignmentError } = await supabase
           .from('assignments')
           .insert({
-            developer_id: candidateToHire.developer.user_id,
+            developer_id: candidateToHire.developer.user_id, // Accessing developer.user_id
             job_role_id: jobRoleForHire.id,
             assigned_by: userProfile.id, // Assuming the recruiter is the one creating this 'assignment' via hiring
             status: 'hired' // Set initial status based on hire
@@ -497,6 +500,7 @@ const RecruiterDashboard: React.FC = () => {
 
       if (insertError) throw insertError;
 
+      // Use optional chaining for safe access in the success message
       setSuccess(`Successfully hired ${candidateToHire.developer.user?.name || candidateToHire.developer.github_handle || 'the developer'} for ${jobRoleForHire.title}!`);
       handleCloseMarkAsHiredModal(); // Close modal on success
       fetchDashboardData(); // Re-fetch all dashboard data to ensure consistency (especially hires list)
