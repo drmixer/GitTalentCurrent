@@ -161,7 +161,7 @@ const RecruiterDashboard: React.FC = () => {
             developer:developers!fk_assignments_developer (
               user:users (*)
             ),
-            job_role:job_roles!fk_assignments_job_role_id (*) // <--- THIS LINE WAS CHANGED
+            job_role:job_roles!fk_assignments_job_role_id (*)
           )
         `)
         .eq('marked_by', currentUserId)
@@ -251,7 +251,7 @@ const RecruiterDashboard: React.FC = () => {
                 developer:developers!fk_assignments_developer (
                   user:users (*)
                 ),
-                job_role:job_roles!fk_assignments_job_role_id (*) // <--- THIS LINE WAS CHANGED
+                job_role:job_roles!fk_assignments_job_role_id (*)
               )
             `)
             .eq('marked_by', currentUserId)
@@ -428,7 +428,7 @@ const RecruiterDashboard: React.FC = () => {
                     id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                     user:users!inner (id, name, email, avatar_url, profile_pic_url)
                 ),
-                job_role:job_roles!fk_assignments_job_role_id!inner ( // <--- THIS LINE WAS CHANGED
+                job_role:job_roles!fk_assignments_job_role_id!inner (
                     id, recruiter_id, title, description, is_active,
                     recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
                 ),
@@ -465,7 +465,7 @@ const RecruiterDashboard: React.FC = () => {
                         id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                         user:users!inner (id, name, email, avatar_url, profile_pic_url)
                     ),
-                    job_role:job_roles!fk_assignments_job_role_id!inner ( // <--- THIS LINE WAS CHANGED
+                    job_role:job_roles!fk_assignments_job_role_id!inner (
                         id, recruiter_id, title, description, is_active,
                         recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
                     ),
