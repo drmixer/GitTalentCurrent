@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth'; // Assuming useAuth is indeed in '../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
 import {
@@ -7,49 +7,36 @@ import {
   Briefcase,
   MessageSquare,
   TrendingUp,
-  Plus,
   Search,
   Bell,
-  Eye,
-  Edit,
-  Trash2,
-  Star,
-  Building,
-  MapPin,
   DollarSign,
   Clock,
-  Calendar,
-  Loader,
-  AlertCircle,
-  CheckCircle,
   ArrowLeft,
   RefreshCw,
-  XCircle,
-  Mail,
-  Phone,
-  ExternalLink
+  AlertCircle,
+  CheckCircle,
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
-import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { JobRoleForm } from '../components/JobRoles/JobRoleForm'; // Not used in this render, but kept for context if a 'create job' flow exists elsewhere
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails'; // Not directly used in main render
 import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
-import { JobImportModal } from '../components/JobRoles/JobImportModal';
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobImportModal } from '../components/JobRoles/JobImportModal'; // Not used in this render
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // Not used in this render
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
-import { ConfirmationModal } from '../components/ConfirmationModal';
+import { ConfirmationModal } from '../components/ConfirmationModal'; // Not used in this render
 
 // These should be default imports:
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
+import DeveloperProfileModal from '../components/DeveloperProfileModal'; // <-- NEW: Import DeveloperProfileModal
 
 // === TYPE IMPORTS ===
-// Ensure these types match your actual definitions in '../types'
-import { JobRole, Hire, Message, User } from '../types';
+import { JobRole, Hire, Message, User, DeveloperProfile } from '../types'; // <-- NEW: Import DeveloperProfile
 
 // Defining interfaces locally as per our discussion, or ensure they are in '../types'
 interface LocalMessageThread {
@@ -110,7 +97,7 @@ interface MessageThreadInfo {
 }
 
 const RecruiterDashboard: React.FC = () => {
-  const { user, userProfile, authLoading, refreshProfile } = useAuth(); // Removed fetchUserProfile as it's handled by AuthContext
+  const { user, userProfile, authLoading, refreshProfile } = useAuth();
 
   // --- State for fetched dashboard data ---
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
@@ -125,8 +112,8 @@ const RecruiterDashboard: React.FC = () => {
   });
 
   // --- Separate loading and error states for the dashboard's main data fetches ---
-  const [dashboardLoading, setDashboardLoading] = useState(true); // Renamed from 'loading'
-  const [dashboardError, setDashboardError] = useState<string | null>(null); // Renamed from 'error'
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // --- UI-related states ---
@@ -136,24 +123,25 @@ const RecruiterDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
 
+  // --- Developer Profile Modal States --- <-- NEW
+  const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
+  const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<DeveloperProfile | null>(null);
+
   const isApproved = userProfile?.is_approved === true;
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
 
   // --- Consolidated Data Fetching Function ---
-  // This function fetches ALL initial dashboard data.
-  // Realtime subscriptions will handle incremental updates more efficiently.
   const fetchDashboardData = useCallback(async () => {
-    // Only proceed if userProfile (and thus user.id) is loaded
     if (!userProfile?.id) {
-      setDashboardLoading(false); // Ensure loading is false if userProfile isn't ready
+      setDashboardLoading(false);
       return;
     }
 
-    setDashboardLoading(true); // Start loading when fetch begins
-    setDashboardError(null);   // Clear any previous errors
+    setDashboardLoading(true);
+    setDashboardError(null);
 
     try {
-      const currentUserId = userProfile.id; // Use userProfile.id as it's guaranteed here
+      const currentUserId = userProfile.id;
 
       // Fetch Job Roles with nested company_name
       const { data: jobRolesData, error: jobRolesError } = await supabase
@@ -200,7 +188,7 @@ const RecruiterDashboard: React.FC = () => {
       if (notificationsError) throw notificationsError;
       setNotifications(notificationsData || []);
 
-      // Fetch Messages for unread count (only count is needed for stats)
+      // Fetch Messages for unread count
       const { count: unreadMessagesCount, error: messagesCountError } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
@@ -216,7 +204,7 @@ const RecruiterDashboard: React.FC = () => {
       setStats({
         totalJobs,
         activeJobs,
-        applications: 0, // Applications logic not included here, keep as 0 for now
+        applications: 0,
         recentHires,
         unreadMessages: unreadMessagesCount || 0,
       });
@@ -225,23 +213,21 @@ const RecruiterDashboard: React.FC = () => {
       console.error("Error fetching dashboard data:", err);
       setDashboardError(`Failed to load data: ${err.message || err.error_description || 'Unknown error'}`);
     } finally {
-      setDashboardLoading(false); // End loading, regardless of success or failure
+      setDashboardLoading(false);
     }
-  }, [userProfile?.id]); // Dependency array: ONLY re-run this function if userProfile.id changes
+  }, [userProfile?.id]);
 
   // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
   useEffect(() => {
     if (user?.id) {
-      fetchDashboardData(); // This initial call is good to get all data once
+      fetchDashboardData();
 
-      // Setup Realtime subscriptions for specific, incremental updates
       const currentUserId = user.id;
 
       // Job Roles Subscription
       const jobRolesSubscription = supabase
-        .channel('job_roles_updates') // Use a distinct channel name
+        .channel('job_roles_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
-          // Re-fetch only job roles data and update related stats
           const { data: newJobRolesData, error: newJobRolesError } = await supabase
             .from('job_roles')
             .select(`*, users!inner(recruiters!inner(company_name))`)
@@ -262,9 +248,8 @@ const RecruiterDashboard: React.FC = () => {
 
       // Hires Subscription
       const hiresSubscription = supabase
-        .channel('hires_updates') // Use a distinct channel name
+        .channel('hires_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
-          // Re-fetch only hires data and update related stats
           const { data: newHiresData, error: newHiresError } = await supabase
             .from('hires')
             .select(`*, assignment:assignments (*, developer:developers (user:users (*)), job_role:job_roles (*))`)
@@ -282,10 +267,8 @@ const RecruiterDashboard: React.FC = () => {
 
       // Messages Subscription - OPTIMIZED for just unread count
       const messagesSubscription = supabase
-        .channel('messages_updates') // Use a distinct channel name
+        .channel('messages_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, async payload => {
-          // Only update the unread count for messages.
-          // The MessageList component should ideally handle its own real-time updates for the list itself.
           const { count: newUnreadMessagesCount, error: newMessagesCountError } = await supabase
             .from('messages')
             .select('id', { count: 'exact', head: true })
@@ -302,9 +285,8 @@ const RecruiterDashboard: React.FC = () => {
 
       // Notifications Subscription
       const notificationsSubscription = supabase
-        .channel('notifications_updates') // Use a distinct channel name
+        .channel('notifications_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, async payload => {
-          // Re-fetch only notifications data
           const { data: newNotificationsData, error: newNotificationsError } = await supabase
             .from('notifications')
             .select('*, user:users(name, avatar_url, profile_pic_url)')
@@ -320,15 +302,13 @@ const RecruiterDashboard: React.FC = () => {
         .subscribe();
 
       return () => {
-        // Unsubscribe from all channels on component unmount
         jobRolesSubscription.unsubscribe();
         hiresSubscription.unsubscribe();
         messagesSubscription.unsubscribe();
         notificationsSubscription.unsubscribe();
       };
     }
-  }, [user?.id]); // Note: fetchDashboardData is REMOVED from dependencies here to prevent infinite loop
-                 // The individual subscription callbacks now perform their own specific fetches.
+  }, [user?.id, fetchDashboardData]); // Added fetchDashboardData to dependencies since it's used inside useEffect. React Hook useCallback will memoize it, preventing infinite loops.
 
   // --- Handlers ---
   const handleViewApplicants = useCallback((jobId: string) => {
@@ -338,7 +318,7 @@ const RecruiterDashboard: React.FC = () => {
 
   const handleJobUpdate = useCallback((message: string) => {
     setSuccess(message);
-    fetchDashboardData(); // This refetches data, which is fine for job updates
+    fetchDashboardData();
     setTimeout(() => setSuccess(null), 5000);
   }, [fetchDashboardData]);
 
@@ -351,12 +331,11 @@ const RecruiterDashboard: React.FC = () => {
     let threadJobContext: JobRole | null = null;
     if (jobRole) {
       threadJobContext = jobRole;
-      // Ensure company_name is set from recruiter profile if not already present in job role
       if (!threadJobContext.users?.recruiters?.[0]?.company_name && userProfile.recruiters?.company_name) {
         threadJobContext = {
           ...threadJobContext,
           users: {
-            ...threadJobContext.users, // Keep existing users properties if any
+            ...threadJobContext.users,
             recruiters: [{ company_name: userProfile.recruiters.company_name }]
           }
         };
@@ -371,15 +350,11 @@ const RecruiterDashboard: React.FC = () => {
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
-  }, [userProfile]); // userProfile is a dependency here as it's used to construct the thread
+  }, [userProfile]);
 
-  // Handler for closing the message thread
   const handleCloseMessageThread = useCallback(() => {
-    setActiveTab('messages'); // Switch back to the main messages list
-    setSelectedThread(null);    // Clear the selected thread to go back to MessageList view
-    // IMPORTANT: DO NOT call fetchDashboardData() here.
-    // The main data fetching useEffect should only run on userProfile change.
-    // MessageList already handles its own refreshing (or relies on subscription for unread count)
+    setActiveTab('messages');
+    setSelectedThread(null);
   }, []);
 
   const handleViewNotificationJobRole = useCallback((jobRoleId: string) => {
@@ -390,7 +365,7 @@ const RecruiterDashboard: React.FC = () => {
     } else {
       setDashboardError("Job role not found for this notification.");
     }
-  }, [jobRoles]); // jobRoles is a dependency because it's used to find the job
+  }, [jobRoles]);
 
   const filteredHires = hires.filter(hire => {
     const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
@@ -398,6 +373,17 @@ const RecruiterDashboard: React.FC = () => {
     const search = searchTerm.toLowerCase();
     return developerName.includes(search) || jobTitle.includes(search);
   });
+
+  // --- NEW: Handlers for DeveloperProfileModal ---
+  const handleViewDeveloperProfile = useCallback((developer: DeveloperProfile) => {
+    setSelectedDeveloperForModal(developer);
+    setIsDeveloperProfileModalOpen(true);
+  }, []);
+
+  const handleCloseDeveloperProfileModal = useCallback(() => {
+    setIsDeveloperProfileModalOpen(false);
+    setSelectedDeveloperForModal(null);
+  }, []);
 
   // --- Render Functions for Tabs ---
   const renderOverview = useCallback(() => (
@@ -448,7 +434,7 @@ const RecruiterDashboard: React.FC = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-3"> {/* Made it span full width */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-3">
         <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
 
         {/* Recent Hires */}
@@ -489,22 +475,21 @@ const RecruiterDashboard: React.FC = () => {
         </div>
       </div>
     </div>
-  ), [stats, hires]); // Dependencies for renderOverview
+  ), [stats, hires]);
 
   const renderSearchDevelopers = useCallback(() => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
-      {/* DeveloperDirectory handles its own loading internally */}
-      <DeveloperDirectory onSendMessage={handleMessageDeveloper} />
+      <DeveloperDirectory onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} /> {/* <-- NEW: Pass onViewDeveloperProfile */}
     </div>
-  ), [handleMessageDeveloper]); // Dependency for renderSearchDevelopers
+  ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
   const renderMessages = useCallback(() => {
     if (selectedThread) {
       return (
         <div className="space-y-6">
           <button
-            onClick={handleCloseMessageThread} // Use the new handler here
+            onClick={handleCloseMessageThread}
             className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -516,8 +501,7 @@ const RecruiterDashboard: React.FC = () => {
             otherUserRole={selectedThread.otherUserRole}
             otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
             jobContext={selectedThread.jobContext}
-            // onNewMessage={fetchDashboardData} // Removed this call as messages subscription updates count directly
-            onClose={handleCloseMessageThread} // Added onClose prop for MessageThread to signal closing
+            onClose={handleCloseMessageThread}
           />
         </div>
       );
@@ -544,7 +528,7 @@ const RecruiterDashboard: React.FC = () => {
         />
       </div>
     );
-  }, [selectedThread, searchTerm, handleCloseMessageThread]); // Dependencies for renderMessages
+  }, [selectedThread, searchTerm, handleCloseMessageThread]);
 
   const renderHires = useCallback(() => (
     <div className="space-y-6">
@@ -563,7 +547,7 @@ const RecruiterDashboard: React.FC = () => {
       </div>
 
       {/* Hires List */}
-      {dashboardLoading ? ( // Use dashboardLoading here
+      {dashboardLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
           <span className="text-gray-600 font-medium">Loading hires...</span>
@@ -588,9 +572,9 @@ const RecruiterDashboard: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                            src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
-                            alt={hire.assignment?.developer?.user?.name || 'Developer'}
-                            className="w-8 h-8 rounded-full object-cover mr-3"
+                          src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
+                          alt={hire.assignment?.developer?.user?.name || 'Developer'}
+                          className="w-8 h-8 rounded-full object-cover mr-3"
                         />
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
@@ -641,10 +625,9 @@ const RecruiterDashboard: React.FC = () => {
         </div>
       )}
     </div>
-  ), [dashboardLoading, filteredHires, searchTerm]); // Dependencies for renderHires
+  ), [dashboardLoading, filteredHires, searchTerm]);
 
   // --- Global Loading and Error Handling ---
-  // Combine authLoading and dashboardLoading for the initial "Loading Dashboard..." screen
   if (authLoading || dashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -656,18 +639,14 @@ const RecruiterDashboard: React.FC = () => {
     );
   }
 
-  // Handle redirection if user profile is not loaded or role is incorrect after initial loading
   if (!userProfile) {
-    // This could happen if authLoading resolves but no userProfile is found
-    // Or if user is logged out while on this page
-    return <Navigate to="/dashboard" replace />; // Assuming /dashboard redirects unauthenticated users to login
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (userProfile.role !== 'recruiter') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If recruiter is not approved, show pending approval message
   if (!isApproved) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -706,7 +685,6 @@ const RecruiterDashboard: React.FC = () => {
     );
   }
 
-  // Find the selected job role based on selectedJobId
   const selectedJobRole = jobRoles.find(job => job.id === selectedJobId);
 
   return (
@@ -728,7 +706,7 @@ const RecruiterDashboard: React.FC = () => {
           </div>
         )}
 
-        {dashboardError && ( // Use dashboardError here
+        {dashboardError && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
             <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
             <p className="text-red-800 font-medium">{dashboardError}</p>
@@ -857,18 +835,26 @@ const RecruiterDashboard: React.FC = () => {
         {activeTab === 'hires' && renderHires()}
         {activeTab === 'notifications' && (
           <NotificationList
-            notifications={notifications} // Pass notifications data to the list
+            notifications={notifications}
             onViewJobRole={handleViewNotificationJobRole}
             onViewMessage={(messageId) => {
-              // This part can be refined to select a specific message thread if messageId is used
-              // For now, it just switches to messages tab.
               setActiveTab('messages');
             }}
           />
         )}
-        {activeTab === 'tracker' && <HiringPipeline />}
+        {activeTab === 'tracker' && <HiringPipeline onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} />} {/* <-- NEW: Pass onSendMessage and onViewDeveloperProfile */}
         {activeTab === 'profile' && <RecruiterProfileForm />}
       </div>
+
+      {/* Developer Profile Modal */} {/* <-- NEW: Render DeveloperProfileModal */}
+      {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
+        <DeveloperProfileModal
+          developer={selectedDeveloperForModal}
+          isOpen={isDeveloperProfileModalOpen}
+          onClose={handleCloseDeveloperProfileModal}
+          onSendMessage={handleMessageDeveloper}
+        />
+      )}
     </div>
   );
 };
