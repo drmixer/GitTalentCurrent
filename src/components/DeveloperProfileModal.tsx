@@ -7,8 +7,9 @@ import { GitHubUserActivityDetails } from './GitHub/GitHubUserActivityDetails';
 import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
 import { useGitHub } from '@/hooks/useGitHub';
 import { PortfolioManager } from './Portfolio/PortfolioManager';
-import { RealGitHubChart } from './GitHub/RealGitHubChart';
-import EndorsementDisplay from './EndorsementDisplay';
+import { RealGitHubChart } = './GitHub/RealGitHubChart';
+import EndorsementDisplay from './EndorsementDisplay'; // CORRECTED: Imported as default
+// CORRECTED: Changed to default import
 import fetchEndorsementsForDeveloper from '../lib/endorsementUtils';
 import { Endorsement } from '../types';
 
@@ -17,15 +18,13 @@ interface DeveloperProfileModalProps {
   onClose: () => void;
 }
 
-// Changed from 'export const DeveloperProfileModal' to 'const DeveloperProfileModal'
-// and added 'export default DeveloperProfileModal' at the end.
-const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
+export const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer: initialDeveloper, onClose }) => {
   const { developer, loading, error } = useDeveloperProfile(initialDeveloper.user_id);
   const { gitHubData, loading: githubLoading, error: githubError } = useGitHub(developer || initialDeveloper);
 
   const currentDeveloper = developer || initialDeveloper;
   const displayName = currentDeveloper.user?.name || currentDeveloper.name || 'Unnamed Developer';
-  const avatarUrl = currentDeveloper.user?.avatar_pic_url || currentDeveloper.profile_pic_url;
+  const avatarUrl = currentDeveloper.user?.avatar_pic_url || currentDeveloper.profile_pic_url; // Corrected: changed avatar_url to avatar_pic_url
 
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [isLoadingEndorsements, setIsLoadingEndorsements] = useState(true);
@@ -175,6 +174,4 @@ const DeveloperProfileModal: React.FC<DeveloperProfileModalProps> = ({ developer
       </div>
     </div>
   );
-};
-
-export default DeveloperProfileModal; // <-- Changed to default export
+}
