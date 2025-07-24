@@ -427,7 +427,7 @@ const RecruiterDashboard: React.FC = () => {
     setSelectedDeveloperForModal(null);
   }, []);
 
-  // --- NEW: Handlers for MarkAsHiredModal ---
+  // --- NEW: Handlers for Mark As Hired Modal ---
   const handleInitiateHire = useCallback((candidate: CandidateType, jobRole: JobRole) => {
     setCandidateToHire(candidate);
     setJobRoleForHire(jobRole);
@@ -946,8 +946,8 @@ const RecruiterDashboard: React.FC = () => {
             job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
-            onInitiateHire={handleInitiateHire} {/* NEW PROP */}
-            onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully} {/* NEW PROP */}
+            onInitiateHire={handleInitiateHire} // NEW PROP
+            onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully} // NEW PROP
           />
         )}
         {activeTab === 'search-devs' && renderSearchDevelopers()}
