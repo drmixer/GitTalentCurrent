@@ -332,11 +332,11 @@ const RecruiterDashboard: React.FC = () => {
             .select('*, user:users(name, avatar_url, profile_pic_url)')
             .eq('user_id', currentUserId)
             .order('created_at', { ascending: false });
-          if (newNotificationsError) {
+          if (newNotificationsData) {
+            setNotifications(newNotificationsData);
+          } else if (newNotificationsError) {
             console.error("Error updating notifications via subscription:", newNotificationsError);
             setDashboardError("Failed to update notifications via live data.");
-          } else {
-            setNotifications(newNotificationsData || []);
           }
         })
         .subscribe();
@@ -371,7 +371,9 @@ const RecruiterDashboard: React.FC = () => {
     let threadJobContext: JobRole | null = null;
     if (jobRole) {
       threadJobContext = jobRole;
-      if (!threadJobContext.users?.recruiters?.[0]?.company_name && userProfile.recruiters?.company_name) {
+      // Ensure company_name is correctly accessed from the nested structure if it exists
+      const companyNameFromJob = (jobRole.users?.recruiters as any)?.[0]?.company_name; // Adjust casting based on your JobRole type if needed
+      if (!companyNameFromJob && userProfile.recruiters?.company_name) {
         threadJobContext = {
           ...threadJobContext,
           users: {
