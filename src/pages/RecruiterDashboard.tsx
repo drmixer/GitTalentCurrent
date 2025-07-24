@@ -18,6 +18,7 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
+  Eye, // Added for the Hires section, as it was used in previous context
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
@@ -962,7 +963,13 @@ const RecruiterDashboard: React.FC = () => {
             }}
           />
         )}
-        {activeTab === 'tracker' && <HiringPipeline onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} />}
+        {activeTab === 'tracker' && (
+          <HiringPipeline
+            onSendMessage={handleMessageDeveloper}
+            onViewDeveloperProfile={handleViewDeveloperProfile}
+            onInitiateHire={handleInitiateHire} {/* THIS IS THE ADDED/CONFIRMED LINE */}
+          />
+        )}
       </div>
 
       {/* Developer Profile Modal - Centralized here */}
