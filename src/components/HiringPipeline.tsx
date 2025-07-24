@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { User, JobRole, AppliedJob, Developer } from '../types'; // Import Developer
+import { User, JobRole, AppliedJob, Developer } from '../types';
 import { Eye, MessageSquare, ChevronDown, MoreVertical, Trash2, CheckSquare, Edit, FileText, Loader, AlertCircle } from 'lucide-react';
-import { DeveloperProfileModal } from './DeveloperProfileModal';
+// DeveloperProfileModal is now managed by RecruiterDashboard, so remove its import here
+// import { DeveloperProfileModal } from './DeveloperProfileModal'; // REMOVED
 
 interface SavedCandidate extends AppliedJob {
     developer: Developer & { user: User }; // Refined to reflect nested user object
     job_role: JobRole;
 }
 
+// Define props for KanbanView to accept the new onViewDeveloperProfile callback
+interface KanbanViewProps {
+    candidates: SavedCandidate[];
+    onUpdateStage: (id: string, stage: string) => void;
+    onViewDeveloperProfile: (developer: SavedCandidate['developer']) => void; // Added for eye icon
+}
+
 const STAGES = ['applied', 'viewed', 'contacted', 'interviewing', 'offer', 'hired', 'rejected'];
 
-const KanbanView: React.FC<{ candidates: SavedCandidate[], onUpdateStage: (id: string, stage: string) => void }> = ({ candidates, onUpdateStage }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile }) => {
     // This is a simplified version. A real implementation would use a drag and drop library.
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
         e.preventDefault();
@@ -29,7 +37,7 @@ const KanbanView: React.FC<{ candidates: SavedCandidate[], onUpdateStage: (id: s
     };
 
     return (
-        <div className="flex space-x-4 overflow-x-auto pb-4"> {/* Added overflow for many stages */}
+        <div className="flex space-x-4 overflow-x-auto pb-4">
             {STAGES.map(stage => (
                 <div key={stage} className="min-w-[250px] bg-gray-100 p-3 rounded-lg flex-shrink-0" onDrop={(e) => handleDrop(e, stage)} onDragOver={handleDragOver}>
                     <h2 className="font-bold mb-3 capitalize text-gray-700">{stage}</h2>
@@ -38,7 +46,14 @@ const KanbanView: React.FC<{ candidates: SavedCandidate[], onUpdateStage: (id: s
                             <p className="font-semibold text-gray-900">{c.developer.user?.name || c.developer.github_handle || 'Unknown Developer'}</p>
                             <p className="text-sm text-gray-500">{c.job_role.title}</p>
                             <div className="flex justify-end mt-2 space-x-1">
-                                <button className="p-1 hover:bg-gray-50 rounded-full text-gray-500"><Eye size={16} /></button>
+                                {/* Updated Eye icon onClick */}
+                                <button
+                                    onClick={() => onViewDeveloperProfile(c.developer)}
+                                    className="p-1 hover:bg-gray-50 rounded-full text-gray-500"
+                                    title="View Profile"
+                                >
+                                    <Eye size={16} />
+                                </button>
                                 <button className="p-1 hover:bg-gray-50 rounded-full text-gray-500"><MessageSquare size={16} /></button>
                             </div>
                         </div>
@@ -52,8 +67,12 @@ const KanbanView: React.FC<{ candidates: SavedCandidate[], onUpdateStage: (id: s
     );
 };
 
+// Define props for HiringPipeline to accept the new onViewDeveloperProfile callback
+interface HiringPipelineProps {
+    onViewDeveloperProfile: (developer: SavedCandidate['developer']) => void; // Added for eye icon
+}
 
-const HiringPipeline: React.FC = () => {
+const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile }) => { // Deconstruct prop
     const { user, userProfile } = useAuth();
     const [candidates, setCandidates] = useState<SavedCandidate[]>([]);
     const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
@@ -61,7 +80,8 @@ const HiringPipeline: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-    const [selectedDeveloper, setSelectedDeveloper] = useState<User | null>(null);
+    // Removed selectedDeveloper state as it's now managed by RecruiterDashboard
+    // const [selectedDeveloper, setSelectedDeveloper] = useState<User | null>(null); // REMOVED
     const [notes, setNotes] = useState<{ [key: string]: string }>({});
 
     useEffect(() => {
@@ -240,7 +260,7 @@ const HiringPipeline: React.FC = () => {
                     <div className="flex items-center space-x-3">
                         <select
                             onChange={(e) => handleBulkUpdateStage(e.target.value)}
-                            value="" // Reset select value after change
+                            value=""
                             className="p-2 border border-blue-300 rounded-md text-sm text-blue-700 bg-white focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Bulk Change Stage</option>
@@ -299,7 +319,14 @@ const HiringPipeline: React.FC = () => {
                                             <input type="text" value={notes[c.id] || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
                                         </td>
                                         <td className="p-3 flex items-center space-x-2">
-                                            <button onClick={() => setSelectedDeveloper(c.developer.user || null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Profile"><Eye size={18} /></button>
+                                            {/* Updated Eye icon onClick */}
+                                            <button
+                                                onClick={() => onViewDeveloperProfile(c.developer)}
+                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+                                                title="View Profile"
+                                            >
+                                                <Eye size={18} />
+                                            </button>
                                             <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} /></button>
                                         </td>
                                     </tr>
@@ -308,16 +335,10 @@ const HiringPipeline: React.FC = () => {
                         </table>
                     </div>
                 ) : (
-                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} />
+                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} />
                 )
             )}
-
-            {selectedDeveloper && (
-                <DeveloperProfileModal
-                    developer={selectedDeveloper as any} // Cast as any because User might not fully match Developer's expected User structure
-                    onClose={() => setSelectedDeveloper(null)}
-                />
-            )}
+            {/* Removed DeveloperProfileModal rendering from here */}
         </div>
     );
 };
