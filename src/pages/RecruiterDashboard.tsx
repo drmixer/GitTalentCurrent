@@ -1,3 +1,5 @@
+// src/pages/RecruiterDashboard.tsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -33,10 +35,10 @@ import { ConfirmationModal } from '../components/ConfirmationModal'; // Not used
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
-import DeveloperProfileModal from '../components/DeveloperProfileModal'; // <-- NEW: Import DeveloperProfileModal
+import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // <-- FIXED: Changed to named import
 
 // === TYPE IMPORTS ===
-import { JobRole, Hire, Message, User, DeveloperProfile } from '../types'; // <-- NEW: Import DeveloperProfile
+import { JobRole, Hire, Message, User, DeveloperProfile } from '../types';
 
 // Defining interfaces locally as per our discussion, or ensure they are in '../types'
 interface LocalMessageThread {
@@ -123,7 +125,7 @@ const RecruiterDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
 
-  // --- Developer Profile Modal States --- <-- NEW
+  // --- Developer Profile Modal States ---
   const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
   const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<DeveloperProfile | null>(null);
 
@@ -308,7 +310,7 @@ const RecruiterDashboard: React.FC = () => {
         notificationsSubscription.unsubscribe();
       };
     }
-  }, [user?.id, fetchDashboardData]); // Added fetchDashboardData to dependencies since it's used inside useEffect. React Hook useCallback will memoize it, preventing infinite loops.
+  }, [user?.id, fetchDashboardData]);
 
   // --- Handlers ---
   const handleViewApplicants = useCallback((jobId: string) => {
@@ -480,7 +482,7 @@ const RecruiterDashboard: React.FC = () => {
   const renderSearchDevelopers = useCallback(() => (
     <div className="space-y-6">
       <h2 className="text-2xl font-black text-gray-900">Search Developers</h2>
-      <DeveloperDirectory onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} /> {/* <-- NEW: Pass onViewDeveloperProfile */}
+      <DeveloperDirectory onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} />
     </div>
   ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
@@ -729,6 +731,18 @@ const RecruiterDashboard: React.FC = () => {
                 <TrendingUp className="w-5 h-5 mr-2" />
                 Overview
               </button>
+              {/* Profile Tab - Moved to second position */}
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                  activeTab === 'profile'
+                    ? 'border-blue-500 text-blue-600 bg-gray-100'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Users className="w-5 h-5 mr-2" /> {/* Reusing Users icon, consider a more specific icon like User or Settings */}
+                Profile
+              </button>
               <button
                 onClick={() => setActiveTab('my-jobs')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
@@ -805,23 +819,13 @@ const RecruiterDashboard: React.FC = () => {
                 <Users className="w-5 h-5 mr-2" />
                 Hiring Pipeline
               </button>
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                  activeTab === 'profile'
-                    ? 'border-blue-500 text-blue-600 bg-gray-100'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Users className="w-5 h-5 mr-2" /> {/* Reusing Users icon, consider a more specific icon like User or Settings */}
-                Profile
-              </button>
             </nav>
           </div>
         </div>
 
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'profile' && <RecruiterProfileForm />} {/* Moved Profile tab content */}
         {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
         {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
           <JobDetailView
@@ -842,17 +846,17 @@ const RecruiterDashboard: React.FC = () => {
             }}
           />
         )}
-        {activeTab === 'tracker' && <HiringPipeline onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} />} {/* <-- NEW: Pass onSendMessage and onViewDeveloperProfile */}
-        {activeTab === 'profile' && <RecruiterProfileForm />}
+        {activeTab === 'tracker' && <HiringPipeline onSendMessage={handleMessageDeveloper} onViewDeveloperProfile={handleViewDeveloperProfile} />}
       </div>
 
-      {/* Developer Profile Modal */} {/* <-- NEW: Render DeveloperProfileModal */}
+      {/* Developer Profile Modal - Centralized here */}
       {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
         <DeveloperProfileModal
           developer={selectedDeveloperForModal}
-          isOpen={isDeveloperProfileModalOpen}
           onClose={handleCloseDeveloperProfileModal}
-          onSendMessage={handleMessageDeveloper}
+          // The onSendMessage prop for DeveloperProfileModal is not defined in the provided code,
+          // but if it exists, ensure it's passed here.
+          // onSendMessage={handleMessageDeveloper} // Uncomment if DeveloperProfileModal expects this prop
         />
       )}
     </div>
