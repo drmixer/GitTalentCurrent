@@ -17,6 +17,7 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
+  Loader,
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
