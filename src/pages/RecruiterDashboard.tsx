@@ -28,7 +28,7 @@ import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // IMPORT THE UPDATED MODAL
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 import { ConfirmationModal } from '../components/ConfirmationModal';
@@ -36,23 +36,22 @@ import { SuccessModal } from '../components/SuccessModal';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
-import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // Corrected to named import
+import { DeveloperProfileModal } from '../components/DeveloperProfileModal';
 
 // === IMPORTING TYPES FROM src/types/index.ts ===
-// This is the CRUCIAL CHANGE: Remove local definitions and import directly.
 import {
-  User, // Renamed from UserProfile if that was the intent for the RecruiterDashboard user
+  User,
   JobRole,
   Hire,
   Message,
-  Developer, // Using 'Developer' from types, not 'DeveloperProfile'
-  AppliedJob, // This seems to be what you called CandidateType in your code
+  Developer,
+  AppliedJob,
   Notification,
-  Recruiter, // Needed for RecruiterProfileForm or nested recruiter data
-} from '../types'; // Correct path to your types/index.ts file
+  Recruiter,
+  Assignment, // <-- NEW: Import Assignment type
+} from '../types';
 
 // Re-defining internal interfaces that are not exported from types/index.ts
-// These are UI-specific types, not database entity types.
 interface LocalMessageThread {
   otherUserId: string;
   otherUserName: string;
@@ -112,12 +111,11 @@ const RecruiterDashboard: React.FC = () => {
 
   // --- Developer Profile Modal States ---
   const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
-  const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null); // Changed to 'Developer'
+  const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null);
 
-  // --- NEW: Mark As Hired Modal States ---
+  // --- NEW: Mark As Hired Modal States (UPDATED TO USE ASSIGNMENT) ---
   const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
-  const [candidateToHire, setCandidateToHire] = useState<AppliedJob | null>(null); // Changed to 'AppliedJob'
-  const [jobRoleForHire, setJobRoleForHire] = useState<JobRole | null>(null);
+  const [assignmentToHire, setAssignmentToHire] = useState<Assignment | null>(null); // <-- NEW STATE
 
   const isApproved = userProfile?.is_approved === true;
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
@@ -258,12 +256,12 @@ const RecruiterDashboard: React.FC = () => {
             `)
             .eq('marked_by', currentUserId)
             .order('created_at', { ascending: false });
-          if (newHiresError) {
+          if (newHiresData) {
+            setHires(newHiresData);
+            setStats(prev => ({ ...prev, recentHires: newHiresData?.length || 0 }));
+          } else if (newHiresError) {
             console.error("Error updating hires via subscription:", newHiresError);
             setDashboardError("Failed to update hires via live data.");
-          } else {
-            setHires(newHiresData || []);
-            setStats(prev => ({ ...prev, recentHires: newHiresData?.length || 0 }));
           }
         })
         .subscribe();
@@ -333,24 +331,20 @@ const RecruiterDashboard: React.FC = () => {
 
     let threadJobContext: JobRole | null = null;
     if (jobRoleId && jobRoleTitle) {
-      // Find the full job role object from the state if available
       const fullJobRole = jobRoles.find(job => job.id === jobRoleId);
       threadJobContext = fullJobRole || { id: jobRoleId, title: jobRoleTitle, description: '' /* add other necessary fields if not found */ };
 
-      // Ensure company_name is correctly set if not already part of the jobRole object from the DB
-      // This is a more robust way to merge company_name for context
       if (userProfile.recruiters?.company_name && (!threadJobContext.recruiter?.company_name)) {
         threadJobContext = {
           ...threadJobContext,
           recruiter: {
-            ...threadJobContext.recruiter, // Preserve existing recruiter data
+            ...threadJobContext.recruiter,
             company_name: userProfile.recruiters.company_name
           }
         };
       }
     }
 
-    // You might need to fetch the developer's profile pic here if not passed directly
     let otherUserProfilePicUrl: string | undefined;
     if (jobRoleId) {
       const { data: appliedJobData, error: appliedJobError } = await supabase
@@ -392,15 +386,14 @@ const RecruiterDashboard: React.FC = () => {
   }, [jobRoles]);
 
   const filteredHires = hires.filter(hire => {
-    // UPDATED ACCESS PATH FOR DEVELOPER NAME AND JOB TITLE
     const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
     const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
     const search = searchTerm.toLowerCase();
     return developerName.includes(search) || jobTitle.includes(search);
   });
 
-  // --- NEW: Handlers for DeveloperProfileModal ---
-  const handleViewDeveloperProfile = useCallback((developer: Developer) => { // Changed type to 'Developer'
+  // --- Handlers for DeveloperProfileModal ---
+  const handleViewDeveloperProfile = useCallback((developer: Developer) => {
     setSelectedDeveloperForModal(developer);
     setIsDeveloperProfileModalOpen(true);
   }, []);
@@ -410,114 +403,125 @@ const RecruiterDashboard: React.FC = () => {
     setSelectedDeveloperForModal(null);
   }, []);
 
-  // --- NEW: Handlers for Mark As Hired Modal ---
-  // This is called from JobDetailView when 'Hired' status is selected
-  const handleInitiateHire = useCallback((candidate: AppliedJob, jobRole: JobRole) => { // Changed type to 'AppliedJob'
-    setCandidateToHire(candidate);
-    setJobRoleForHire(jobRole);
-    setIsMarkAsHiredModalOpen(true);
-  }, []);
+  // --- NEW: Handle Initiate Hire (PREPARES ASSIGNMENT FOR MARKASHIREDMODAL) ---
+  const handleInitiateHire = useCallback(async (candidate: AppliedJob, jobRole: JobRole) => {
+    setDashboardLoading(true);
+    setDashboardError(null);
 
-  const handleCloseMarkAsHiredModal = useCallback(() => {
-    setIsMarkAsHiredModalOpen(false);
-    setCandidateToHire(null);
-    setJobRoleForHire(null);
-    setDashboardError(null); // Clear any previous error
-  }, []);
-
-  // This is called from MarkAsHiredModal on confirm
-  const handleConfirmHire = useCallback(async (salary: number, startDate: string) => {
-    // Ensure all critical data is present
-    // ADDED CHECK: !candidateToHire.developer
-    if (!userProfile?.id || !candidateToHire || !jobRoleForHire || !candidateToHire.developer) {
-      console.error("Missing user, candidate, job role, or developer data for hire. Aborting.");
-      setDashboardError("Missing required information to record hire. Please try again.");
-      setDashboardLoading(false); // Stop loading indicator if this check fails
-      return;
+    // Ensure user profile and candidate developer data exist
+    if (!userProfile?.id || !candidate.developer) {
+        setDashboardError("Missing recruiter or developer data to initiate hire. Please ensure both are fully loaded.");
+        setDashboardLoading(false);
+        return;
     }
-
-    setDashboardLoading(true); // Indicate that a background operation is happening
 
     try {
-      // 1. Update the applied_jobs record to 'hired'
-      const { error: updateError } = await supabase
-        .from('applied_jobs')
-        .update({ status: 'hired' })
-        .eq('id', candidateToHire.id); // Use candidateToHire.id which is applied_job ID
+        let targetAssignment: Assignment | null = null;
 
-      if (updateError) throw updateError;
+        // 1. Try to find an existing assignment for this developer and job role
+        // This query fetches the Assignment PLUS its nested developer, job_role, and recruiter data
+        const { data: existingAssignment, error: findError } = await supabase
+            .from('assignments')
+            .select(`
+                *,
+                developer:developers!inner (
+                    id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
+                    user:users!inner (id, name, email, avatar_url, profile_pic_url)
+                ),
+                job_role:job_roles!inner (
+                    id, recruiter_id, title, description, is_active,
+                    recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
+                ),
+                recruiter:recruiters!inner (
+                    id, user_id, company_name,
+                    user:users!inner (id, name, email)
+                )
+            `)
+            .eq('developer_id', candidate.developer.id) // Use developer.id for consistency
+            .eq('job_role_id', jobRole.id)
+            .maybeSingle(); // Use maybeSingle to get null if no row is found
 
-      // --- CRITICAL LOGIC FOR ASSIGNMENT_ID ---
-      let assignmentIdForHire = '';
-      // First, try to find an existing assignment for this developer and job role
-      const { data: existingAssignment, error: assignmentError } = await supabase
-        .from('assignments')
-        .select('id')
-        .eq('developer_id', candidateToHire.developer.user_id) // Accessing developer.user_id
-        .eq('job_role_id', jobRoleForHire.id)
-        .maybeSingle();
-
-      if (assignmentError) {
-        throw assignmentError;
-      }
-
-      if (existingAssignment) {
-        assignmentIdForHire = existingAssignment.id;
-      } else {
-        // If no assignment exists, create one (this is a simplified example)
-        console.warn("No existing assignment found for this developer and job. Creating a new assignment.");
-        const { data: newAssignment, error: createAssignmentError } = await supabase
-          .from('assignments')
-          .insert({
-            developer_id: candidateToHire.developer.user_id, // Accessing developer.user_id
-            job_role_id: jobRoleForHire.id,
-            assigned_by: userProfile.id, // Assuming the recruiter is the one creating this 'assignment' via hiring
-            status: 'hired' // Set initial status based on hire
-          })
-          .select('id')
-          .single();
-
-        if (createAssignmentError) {
-          throw createAssignmentError;
+        if (findError && findError.code !== 'PGRST116') { // PGRST116 means "No rows found", which is expected for new assignments
+            throw findError;
         }
-        assignmentIdForHire = newAssignment.id;
-      }
 
-      if (!assignmentIdForHire) {
-        throw new Error("Could not determine or create an assignment ID for the hire.");
-      }
-      // --- END CRITICAL LOGIC ---
+        if (existingAssignment) {
+            console.log("Found existing assignment:", existingAssignment);
+            targetAssignment = existingAssignment as Assignment;
+        } else {
+            // 2. If no assignment exists, create one with a default status like 'offer'
+            console.warn("No existing assignment found for this developer and job. Creating a new assignment.");
+            const { data: newAssignment, error: createError } = await supabase
+                .from('assignments')
+                .insert({
+                    developer_id: candidate.developer.id,
+                    job_role_id: jobRole.id,
+                    assigned_by: userProfile.id,
+                    status: 'offer' // Initial status, will be changed to 'hired' by the modal
+                })
+                .select(`
+                    *,
+                    developer:developers!inner (
+                        id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
+                        user:users!inner (id, name, email, avatar_url, profile_pic_url)
+                    ),
+                    job_role:job_roles!inner (
+                        id, recruiter_id, title, description, is_active,
+                        recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
+                    ),
+                    recruiter:recruiters!inner (
+                        id, user_id, company_name,
+                        user:users!inner (id, name, email)
+                    )
+                `)
+                .single();
 
-      const { error: insertError } = await supabase
-        .from('hires')
-        .insert({
-          assignment_id: assignmentIdForHire, // Use the determined assignment_id
-          salary: salary,
-          start_date: startDate,
-          hire_date: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
-          marked_by: userProfile.id,
-        });
+            if (createError) throw createError;
+            targetAssignment = newAssignment as Assignment;
+            console.log("Created new assignment:", newAssignment);
+        }
 
-      if (insertError) throw insertError;
-
-      // Use optional chaining for safe access in the success message
-      setSuccess(`Successfully hired ${candidateToHire.developer.user?.name || candidateToHire.developer.github_handle || 'the developer'} for ${jobRoleForHire.title}!`);
-      handleCloseMarkAsHiredModal(); // Close modal on success
-      fetchDashboardData(); // Re-fetch all dashboard data to ensure consistency (especially hires list)
+        if (targetAssignment) {
+            setAssignmentToHire(targetAssignment); // Set the retrieved/created assignment
+            setIsMarkAsHiredModalOpen(true); // Open the modal
+        } else {
+            // This case should ideally not be reached if previous steps are successful
+            setDashboardError("Could not prepare assignment data for hiring. No assignment found or created.");
+        }
 
     } catch (error: any) {
-      console.error("Error confirming hire:", error);
-      setDashboardError(`Failed to record hire: ${error.message || 'Unknown error'}`);
+        console.error("Error initiating hire process:", error);
+        setDashboardError(`Failed to initiate hire: ${error.message || 'Unknown error'}`);
     } finally {
-      setDashboardLoading(false);
+        setDashboardLoading(false);
     }
-  }, [userProfile?.id, candidateToHire, jobRoleForHire, fetchDashboardData, handleCloseMarkAsHiredModal]);
+  }, [userProfile?.id]);
+
+  // --- NEW: Handle Close Mark As Hired Modal ---
+  // This now just closes the modal and clears the assignment state
+  const handleCloseMarkAsHiredModal = useCallback(() => {
+    setIsMarkAsHiredModalOpen(false);
+    setAssignmentToHire(null); // Clear the assignment when the modal closes
+    setDashboardError(null); // Clear any previous errors related to the modal
+    setSuccess(null); // Clear any success messages
+  }, []);
+
+  // Callback for MarkAsHiredModal to call on successful hire (it will handle its own success message)
+  // This function in RecruiterDashboard will simply re-fetch the dashboard data to update the UI
+  const handleHireSuccessInModal = useCallback(() => {
+    setSuccess("Hire successfully recorded!"); // Optionally show a success message at the dashboard level
+    fetchDashboardData(); // Refresh main dashboard data to show new hire
+    handleCloseMarkAsHiredModal(); // Ensure modal is closed after success
+  }, [fetchDashboardData, handleCloseMarkAsHiredModal]);
 
 
   // Callback for JobDetailView to use when a candidate is hired.
   const handleCandidateHiredSuccessfully = useCallback((appliedJobId: string) => {
-    console.log(`Candidate with applied_job_id ${appliedJobId} was successfully hired. JobDetailView should update its list.`);
-  }, []);
+    // This is probably no longer needed as the modal handles its own success message and refresh.
+    // Or, if JobDetailView itself needs to update its internal state for that specific appliedJob.
+    console.log(`Candidate with applied_job_id ${appliedJobId} was successfully hired.`);
+    fetchDashboardData(); // Ensure the dashboard reflects the change
+  }, [fetchDashboardData]);
 
   // --- Render Functions for Tabs ---
   const renderOverview = useCallback(() => (
@@ -579,12 +583,10 @@ const RecruiterDashboard: React.FC = () => {
               {hires.slice(0, 3).map(hire => (
                 <div key={hire.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div>
-                    {/* UPDATED ACCESS PATH */}
                     <h4 className="font-semibold text-gray-900">
                       {hire.assignment?.developer?.user?.name || 'Unknown Developer'}
                     </h4>
                     <div className="text-sm text-gray-600 mt-1">
-                      {/* UPDATED ACCESS PATH */}
                       Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
                       ${hire.salary.toLocaleString()} annual salary
                     </div>
@@ -707,20 +709,17 @@ const RecruiterDashboard: React.FC = () => {
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {/* UPDATED ACCESS PATH */}
                         <img
                           src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
                           alt={hire.assignment?.developer?.user?.name || 'Developer'}
                           className="w-8 h-8 rounded-full object-cover mr-3"
                         />
-                        {/* UPDATED ACCESS PATH */}
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {/* UPDATED ACCESS PATH */}
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
                       </div>
@@ -778,7 +777,6 @@ const RecruiterDashboard: React.FC = () => {
     );
   }
 
-  // userProfile is of type `User` imported from types/index.ts
   if (!userProfile) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -869,7 +867,6 @@ const RecruiterDashboard: React.FC = () => {
                 <TrendingUp className="w-5 h-5 mr-2" />
                 Overview
               </button>
-              {/* Profile Tab - Moved to second position */}
               <button
                 onClick={() => setActiveTab('profile')}
                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
@@ -970,7 +967,7 @@ const RecruiterDashboard: React.FC = () => {
             job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
-            onInitiateHire={handleInitiateHire}
+            onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
             onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
           />
         )}
@@ -990,7 +987,7 @@ const RecruiterDashboard: React.FC = () => {
           <HiringPipeline
             onSendMessage={handleMessageDeveloper}
             onViewDeveloperProfile={handleViewDeveloperProfile}
-            onInitiateHire={handleInitiateHire}
+            onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
           />
         )}
       </div>
@@ -1000,20 +997,17 @@ const RecruiterDashboard: React.FC = () => {
         <DeveloperProfileModal
           developer={selectedDeveloperForModal}
           onClose={handleCloseDeveloperProfileModal}
-          // The onSendMessage prop for DeveloperProfileModal is not defined in the provided code,
-          // but if it exists, ensure it's passed here.
-          // onSendMessage={handleMessageDeveloper} // Uncomment if DeveloperProfileModal expects this prop
         />
       )}
 
-      {/* NEW: Mark As Hired Modal */}
-      {isMarkAsHiredModalOpen && candidateToHire && jobRoleForHire && (
+      {/* NEW: Mark As Hired Modal (UPDATED PROPS) */}
+      {isMarkAsHiredModalOpen && assignmentToHire && ( // Only render if assignmentToHire is not null
         <MarkAsHiredModal
           isOpen={isMarkAsHiredModalOpen}
           onClose={handleCloseMarkAsHiredModal}
-          onConfirm={handleConfirmHire}
-          candidate={candidateToHire}
-          jobRole={jobRoleForHire}
+          assignment={assignmentToHire} // Pass the fully prepared assignment
+          onSuccess={handleHireSuccessInModal} // Call this when hire is successful inside modal
+          onCancel={handleCloseMarkAsHiredModal} // Allow user to cancel and close
         />
       )}
     </div>
