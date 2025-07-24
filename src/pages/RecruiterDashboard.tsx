@@ -39,7 +39,116 @@ import JobsDashboard from '../components/Jobs/JobsDashboard';
 import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // <-- Corrected to named import based on typical usage
 
 // === TYPE IMPORTS ===
-import { JobRole, Hire, Message, User, DeveloperProfile } from '../types';
+// import { JobRole, Hire, Message, User, DeveloperProfile } from '../types'; // Adjust this line if you move types
+
+// Defining interfaces locally as per our discussion, or ensure they are in '../types'
+// If you have a separate types.ts file, move these interfaces there.
+
+interface JobRole {
+  id: string;
+  title: string;
+  description: string;
+  is_active: boolean;
+  recruiter_id: string;
+  salary_min?: number;
+  salary_max?: number;
+  location?: string;
+  job_type?: string;
+  experience_level?: string;
+  skills_required?: string[];
+  created_at?: string;
+  updated_at?: string;
+  recruiter?: { // if you're selecting recruiter data with the job role
+    company_name?: string;
+    user?: {
+      name?: string;
+      avatar_url?: string;
+      profile_pic_url?: string;
+    }
+  };
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_approved: boolean;
+  avatar_url?: string;
+  profile_pic_url?: string;
+  company_logo_url?: string;
+}
+
+interface DeveloperProfile {
+  user_id: string;
+  github_handle?: string;
+  bio?: string;
+  skills?: string[];
+  experience_years?: number;
+  linked_projects?: string[];
+  profile_pic_url?: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatar_url?: string;
+    profile_pic_url?: string;
+  };
+}
+
+interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+  job_role_id?: string;
+  assignment_id?: string;
+  sender?: User;
+  receiver?: User;
+  job_role?: JobRole;
+}
+
+// UPDATED HIRE INTERFACE
+interface Hire {
+  id: string;
+  assignment_id: string; // The ID of the assignment linked to this hire
+  salary: number;
+  hire_date?: string;
+  start_date?: string;
+  notes?: string;
+  marked_by: string; // Recruiter user ID
+  created_at?: string;
+  // Nested assignment object
+  assignment: {
+    id: string; // Assignment's own ID
+    developer_id: string; // Developer ID from the assignments table
+    developer: { // Nested developer details
+      user_id: string; // This is what developers table uses as its PK for joining with users
+      github_handle?: string;
+      bio?: string;
+      skills?: string[];
+      experience_years?: number;
+      linked_projects?: string[];
+      profile_pic_url?: string;
+      user: { // Nested user details associated with the developer
+        id: string;
+        name: string;
+        email: string;
+        avatar_url?: string;
+        profile_pic_url?: string;
+      };
+    };
+    job_role: { // Nested job_role details from assignment
+      id: string;
+      title: string;
+      description?: string;
+      // Add other job_role fields you fetch here if needed
+    };
+  };
+}
+
 
 // Assuming CandidateType is defined in types.ts or passed consistently.
 // If not explicitly defined in ../types, you might need to add it there.
@@ -73,7 +182,6 @@ interface CandidateType {
 }
 
 
-// Defining interfaces locally as per our discussion, or ensure they are in '../types'
 interface LocalMessageThread {
   otherUserId: string;
   otherUserName: string;
@@ -153,7 +261,7 @@ const RecruiterDashboard: React.FC = () => {
 
   // --- UI-related states ---
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(selectedJobId); // Initialize with null or a default
   const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
@@ -184,7 +292,6 @@ const RecruiterDashboard: React.FC = () => {
       const currentUserId = userProfile.id;
 
       // Fetch Job Roles with nested company_name
-      // === IMPORTANT CHANGE HERE: REMOVED COMMENT FROM SELECT STRING ===
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
@@ -203,15 +310,17 @@ const RecruiterDashboard: React.FC = () => {
       if (jobRolesError) throw jobRolesError;
       setJobRoles(jobRolesData || []);
 
-      // Fetch Hires
+      // Fetch Hires - UPDATED SELECT HERE
       const { data: hiresData, error: hiresError } = await supabase
         .from('hires')
         .select(`
           *,
-          developer:developers (
-            user:users (*)
-          ),
-          job_role:job_roles (*)
+          assignment:assignments (
+            developer:developers (
+              user:users (*)
+            ),
+            job_role:job_roles (*)
+          )
         `)
         .eq('marked_by', currentUserId)
         .order('created_at', { ascending: false });
@@ -270,7 +379,6 @@ const RecruiterDashboard: React.FC = () => {
       const jobRolesSubscription = supabase
         .channel('job_roles_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
-          // === IMPORTANT CHANGE HERE: REMOVED COMMENT FROM SELECT STRING ===
           const { data: newJobRolesData, error: newJobRolesError } = await supabase
             .from('job_roles')
             .select(`*, recruiter:recruiters!fk_job_roles_recruiter_user_id(company_name, user:users(name, avatar_url, profile_pic_url))`)
@@ -289,13 +397,21 @@ const RecruiterDashboard: React.FC = () => {
         })
         .subscribe();
 
-      // Hires Subscription
+      // Hires Subscription - UPDATED SELECT HERE
       const hiresSubscription = supabase
         .channel('hires_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
           const { data: newHiresData, error: newHiresError } = await supabase
             .from('hires')
-            .select(`*, developer:developers(user:users(*)), job_role:job_roles(*)`)
+            .select(`
+              *,
+              assignment:assignments (
+                developer:developers (
+                  user:users (*)
+                ),
+                job_role:job_roles (*)
+              )
+            `)
             .eq('marked_by', currentUserId)
             .order('created_at', { ascending: false });
           if (newHiresError) {
@@ -319,7 +435,7 @@ const RecruiterDashboard: React.FC = () => {
             .eq('is_read', false);
 
           if (newMessagesCountError) {
-            console.error("Error updating unread messages count via subscription:", newMessagesCountError);
+            console.error("Error updating unread messages count via subscription:", newUnreadMessagesCount);
           } else {
             setStats(prev => ({ ...prev, unreadMessages: newUnreadMessagesCount || 0 }));
           }
@@ -433,8 +549,9 @@ const RecruiterDashboard: React.FC = () => {
   }, [jobRoles]);
 
   const filteredHires = hires.filter(hire => {
-    const developerName = hire.developer?.user?.name?.toLowerCase() || ''; // Corrected path based on new fetch
-    const jobTitle = hire.job_role?.title?.toLowerCase() || ''; // Corrected path based on new fetch
+    // UPDATED ACCESS PATH FOR DEVELOPER NAME AND JOB TITLE
+    const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
+    const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
     const search = searchTerm.toLowerCase();
     return developerName.includes(search) || jobTitle.includes(search);
   });
@@ -485,11 +602,70 @@ const RecruiterDashboard: React.FC = () => {
       if (updateError) throw updateError;
 
       // 2. Insert a new record into the hires table
+      // IMPORTANT: Your `hires` table has an `assignment_id` column, not `job_id` and `developer_id` directly.
+      // You need to ensure the candidateToHire object carries the `assignment_id` or that you can get it.
+      // Assuming `candidateToHire` might be an applied_job that has an assignment_id (or you derive it)
+      // For this to work, the `applied_jobs` table should ideally link to `assignments` if not directly to developer/job.
+      // If `applied_jobs` links directly to developer_id and job_id, but `hires` needs assignment_id,
+      // you need to either:
+      // a) Create an assignment first if one doesn't exist for this application.
+      // b) Re-evaluate if `hires` should directly link to `developer_id` and `job_id` instead of `assignment_id`.
+
+      // Based on your schema analysis, 'hires' links to 'assignments'.
+      // If an 'applied_job' doesn't automatically create an 'assignment',
+      // then you'd need to create an assignment first before creating a hire.
+      // For now, assuming candidateToHire's job_id implies an assignment.
+      // *** You will likely need to adjust how the assignment_id is obtained here.
+      // For now, let's assume a direct mapping or that `candidateToHire` holds the `assignment_id` if it came from `assignments`.
+      // If `applied_jobs` is the source, it might not have an `assignment_id`.
+      // Let's use the jobRoleForHire.id and candidateToHire.developer_id to find/create an assignment.
+
+      // --- CRITICAL LOGIC FOR ASSIGNMENT_ID ---
+      let assignmentIdForHire = '';
+      // First, try to find an existing assignment for this developer and job role
+      const { data: existingAssignment, error: assignmentError } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('developer_id', candidateToHire.developer.user_id) // developer.user_id is the PK for developers table
+        .eq('job_role_id', jobRoleForHire.id)
+        .maybeSingle();
+
+      if (assignmentError) {
+        throw assignmentError;
+      }
+
+      if (existingAssignment) {
+        assignmentIdForHire = existingAssignment.id;
+      } else {
+        // If no assignment exists, create one (this is a simplified example)
+        console.warn("No existing assignment found for this developer and job. Creating a new assignment.");
+        const { data: newAssignment, error: createAssignmentError } = await supabase
+          .from('assignments')
+          .insert({
+            developer_id: candidateToHire.developer.user_id,
+            job_role_id: jobRoleForHire.id,
+            assigned_by: userProfile.id, // Assuming the recruiter is the one creating this 'assignment' via hiring
+            status: 'hired' // Set initial status based on hire
+            // Add any other required assignment fields
+          })
+          .select('id')
+          .single();
+
+        if (createAssignmentError) {
+          throw createAssignmentError;
+        }
+        assignmentIdForHire = newAssignment.id;
+      }
+
+      if (!assignmentIdForHire) {
+        throw new Error("Could not determine or create an assignment ID for the hire.");
+      }
+      // --- END CRITICAL LOGIC ---
+
       const { error: insertError } = await supabase
         .from('hires')
         .insert({
-          developer_id: candidateToHire.developer.user_id, // **THE CRITICAL FIX**
-          job_id: jobRoleForHire.id,
+          assignment_id: assignmentIdForHire, // Use the determined assignment_id
           salary: salary,
           start_date: startDate,
           hire_date: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
@@ -585,11 +761,13 @@ const RecruiterDashboard: React.FC = () => {
               {hires.slice(0, 3).map(hire => (
                 <div key={hire.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div>
+                    {/* UPDATED ACCESS PATH */}
                     <h4 className="font-semibold text-gray-900">
-                      {hire.developer?.user?.name || 'Unknown Developer'}
+                      {hire.assignment?.developer?.user?.name || 'Unknown Developer'}
                     </h4>
                     <div className="text-sm text-gray-600 mt-1">
-                      Hired for {hire.job_role?.title || 'Unknown Position'} •
+                      {/* UPDATED ACCESS PATH */}
+                      Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
                       ${hire.salary.toLocaleString()} annual salary
                     </div>
                   </div>
@@ -711,19 +889,22 @@ const RecruiterDashboard: React.FC = () => {
                   <tr key={hire.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
+                        {/* UPDATED ACCESS PATH */}
                         <img
-                          src={hire.developer?.user?.avatar_url || hire.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.developer?.user?.name || hire.developer?.user?.id || 'U')}&background=random`}
-                          alt={hire.developer?.user?.name || 'Developer'}
+                          src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
+                          alt={hire.assignment?.developer?.user?.name || 'Developer'}
                           className="w-8 h-8 rounded-full object-cover mr-3"
                         />
+                        {/* UPDATED ACCESS PATH */}
                         <div className="text-sm font-semibold text-gray-900">
-                          {hire.developer?.user?.name || 'Unknown'}
+                          {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      {/* UPDATED ACCESS PATH */}
                       <div className="text-sm font-semibold text-gray-900">
-                        {hire.job_role?.title || 'Unknown'}
+                        {hire.assignment?.job_role?.title || 'Unknown'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -963,15 +1144,15 @@ const RecruiterDashboard: React.FC = () => {
 
         {/* Tab Content */}
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'profile' && <RecruiterProfileForm />} {/* Moved Profile tab content */}
+        {activeTab === 'profile' && <RecruiterProfileForm />}
         {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
         {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
           <JobDetailView
             job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
-            onInitiateHire={handleInitiateHire} // NEW PROP
-            onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully} // NEW PROP
+            onInitiateHire={handleInitiateHire}
+            onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
           />
         )}
         {activeTab === 'search-devs' && renderSearchDevelopers()}
