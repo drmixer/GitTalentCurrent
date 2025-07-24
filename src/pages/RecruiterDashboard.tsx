@@ -18,26 +18,25 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
-  Eye, // Added for the Hires section, as it was used in previous context
+  Eye,
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
-import { JobRoleForm } from '../components/JobRoles/JobRoleForm'; // Not used in this render, but kept for context if a 'create job' flow exists elsewhere
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails'; // Not directly used in main render
+import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
-import { JobImportModal } from '../components/JobRoles/JobImportModal'; // Not used in this render
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // <--- Now used!
+import { JobImportModal } from '../components/JobRoles/JobImportModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
-import { ConfirmationModal } from '../components/ConfirmationModal'; // Not used in this render
-
-// These should be default imports:
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import { SuccessModal } from '../components/SuccessModal'; // Assuming you have this
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
-import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // <-- FIXED: Changed to named import
+import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // <-- Corrected to named import based on typical usage
 
 // === TYPE IMPORTS ===
 import { JobRole, Hire, Message, User, DeveloperProfile } from '../types';
@@ -45,32 +44,32 @@ import { JobRole, Hire, Message, User, DeveloperProfile } from '../types';
 // Assuming CandidateType is defined in types.ts or passed consistently.
 // If not explicitly defined in ../types, you might need to add it there.
 // Based on JobDetailView.tsx, CandidateType likely looks like this:
+// This interface should ideally be moved to `src/types.ts` for centralized management.
 interface CandidateType {
-    id: string; // This is the applied_job ID
-    developer_id: string;
-    job_role_id: string;
-    status: string; // e.g., 'applied', 'interviewing', 'rejected', 'hired'
-    created_at: string;
-    developer: {
-        id: string;
-        user_id: string;
-        created_at: string;
-        bio?: string;
-        skills?: string[];
-        experience?: string;
-        portfolio_url?: string;
-        linkedin_url?: string;
-        github_url?: string;
-        website_url?: string;
-        user: {
-            id: string;
-            name: string;
-            email: string;
-            avatar_url?: string;
-            profile_pic_url?: string;
-        };
+  id: string; // This is the applied_job ID
+  developer_id: string;
+  job_id: string; // Corrected from job_role_id based on applied_jobs schema
+  status: string; // e.g., 'applied', 'interviewing', 'rejected', 'hired'
+  applied_at: string; // Changed from created_at based on applied_jobs schema
+  cover_letter?: string;
+  notes?: string;
+  developer: {
+    user_id: string; // This is the actual ID for the developer in `developers` table
+    github_handle?: string;
+    bio?: string;
+    skills?: string[];
+    experience_years?: number; // Changed from 'experience' and type to number based on schema
+    linked_projects?: string[]; // Assuming this is linked_projects
+    profile_pic_url?: string; // Assuming this field exists
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      avatar_url?: string;
+      profile_pic_url?: string;
     };
-    job_role?: JobRole; // Optional, as JobDetailView might pass the main job role separately
+  };
+  job_role?: JobRole; // Optional, as JobDetailView might pass the main job role separately
 }
 
 
@@ -189,9 +188,12 @@ const RecruiterDashboard: React.FC = () => {
         .from('job_roles')
         .select(`
           *,
-          users!inner(
-            recruiters!inner(
-              company_name
+          recruiter:recruiters (
+            company_name,
+            user:users (
+              name,
+              avatar_url,
+              profile_pic_url
             )
           )
         `)
@@ -205,13 +207,10 @@ const RecruiterDashboard: React.FC = () => {
         .from('hires')
         .select(`
           *,
-          assignment:assignments (
-            *,
-            developer:developers (
-              user:users (*)
-            ),
-            job_role:job_roles (*)
-          )
+          developer:developers (
+            user:users (*)
+          ),
+          job_role:job_roles (*)
         `)
         .eq('marked_by', currentUserId)
         .order('created_at', { ascending: false });
@@ -241,11 +240,12 @@ const RecruiterDashboard: React.FC = () => {
       // Calculate Dashboard Stats
       const totalJobs = jobRolesData?.length || 0;
       const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
+      const applications = 0; // This might need a separate query for 'applied_jobs' count
       const recentHires = hiresData?.length || 0;
       setStats({
         totalJobs,
         activeJobs,
-        applications: 0,
+        applications, // Update if you fetch this data
         recentHires,
         unreadMessages: unreadMessagesCount || 0,
       });
@@ -271,7 +271,7 @@ const RecruiterDashboard: React.FC = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
           const { data: newJobRolesData, error: newJobRolesError } = await supabase
             .from('job_roles')
-            .select(`*, users!inner(recruiters!inner(company_name))`)
+            .select(`*, recruiter:recruiters(company_name, user:users(name, avatar_url, profile_pic_url))`)
             .eq('recruiter_id', currentUserId);
           if (newJobRolesError) {
             console.error("Error updating job roles via subscription:", newJobRolesError);
@@ -293,7 +293,7 @@ const RecruiterDashboard: React.FC = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
           const { data: newHiresData, error: newHiresError } = await supabase
             .from('hires')
-            .select(`*, assignment:assignments (*, developer:developers (user:users (*)), job_role:job_roles (*))`)
+            .select(`*, developer:developers(user:users(*)), job_role:job_roles(*)`)
             .eq('marked_by', currentUserId)
             .order('created_at', { ascending: false });
           if (newHiresError) {
@@ -363,37 +363,57 @@ const RecruiterDashboard: React.FC = () => {
     setTimeout(() => setSuccess(null), 5000);
   }, [fetchDashboardData]);
 
-  const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, developerProfilePicUrl?: string, jobRole?: JobRole) => {
+  const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
     if (!userProfile) {
       setDashboardError("User profile not loaded. Cannot send message.");
       return;
     }
 
     let threadJobContext: JobRole | null = null;
-    if (jobRole) {
-      threadJobContext = jobRole;
-      // Ensure company_name is correctly accessed from the nested structure if it exists
-      const companyNameFromJob = (jobRole.users?.recruiters as any)?.[0]?.company_name; // Adjust casting based on your JobRole type if needed
-      if (!companyNameFromJob && userProfile.recruiters?.company_name) {
+    if (jobRoleId && jobRoleTitle) {
+      // Find the full job role object from the state if available
+      const fullJobRole = jobRoles.find(job => job.id === jobRoleId);
+      threadJobContext = fullJobRole || { id: jobRoleId, title: jobRoleTitle, description: '' /* add other necessary fields if not found */ };
+
+      // Ensure company_name is correctly set if not already part of the jobRole object from the DB
+      // This is a more robust way to merge company_name for context
+      if (userProfile.recruiters?.company_name && (!threadJobContext.recruiter?.company_name)) {
         threadJobContext = {
           ...threadJobContext,
-          users: {
-            ...threadJobContext.users,
-            recruiters: [{ company_name: userProfile.recruiters.company_name }]
+          recruiter: {
+            ...threadJobContext.recruiter, // Preserve existing recruiter data
+            company_name: userProfile.recruiters.company_name
           }
         };
       }
     }
 
+    // You might need to fetch the developer's profile pic here if not passed directly
+    // For now, let's assume JobDetailView passes it or it's handled by DeveloperProfileModal/MessageThread
+    let otherUserProfilePicUrl: string | undefined;
+    if (jobRoleId) { // Assuming developer pic can be found via an applied job for context
+      const { data: appliedJobData, error: appliedJobError } = await supabase
+        .from('applied_jobs')
+        .select(`developer:developers(profile_pic_url, user:users(avatar_url))`)
+        .eq('job_id', jobRoleId)
+        .eq('developer_id', developerId)
+        .single();
+
+      if (!appliedJobError && appliedJobData?.developer) {
+        otherUserProfilePicUrl = appliedJobData.developer.profile_pic_url || appliedJobData.developer.user?.avatar_url;
+      }
+    }
+
+
     setSelectedThread({
       otherUserId: developerId,
       otherUserName: developerName,
       otherUserRole: 'developer',
-      otherUserProfilePicUrl: developerProfilePicUrl,
+      otherUserProfilePicUrl: otherUserProfilePicUrl,
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
-  }, [userProfile]);
+  }, [userProfile, jobRoles]); // Added jobRoles to dependency array
 
   const handleCloseMessageThread = useCallback(() => {
     setActiveTab('messages');
@@ -411,8 +431,8 @@ const RecruiterDashboard: React.FC = () => {
   }, [jobRoles]);
 
   const filteredHires = hires.filter(hire => {
-    const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
-    const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
+    const developerName = hire.developer?.user?.name?.toLowerCase() || ''; // Corrected path based on new fetch
+    const jobTitle = hire.job_role?.title?.toLowerCase() || ''; // Corrected path based on new fetch
     const search = searchTerm.toLowerCase();
     return developerName.includes(search) || jobTitle.includes(search);
   });
@@ -429,6 +449,7 @@ const RecruiterDashboard: React.FC = () => {
   }, []);
 
   // --- NEW: Handlers for Mark As Hired Modal ---
+  // This is called from JobDetailView when 'Hired' status is selected
   const handleInitiateHire = useCallback((candidate: CandidateType, jobRole: JobRole) => {
     setCandidateToHire(candidate);
     setJobRoleForHire(jobRole);
@@ -442,9 +463,11 @@ const RecruiterDashboard: React.FC = () => {
     setDashboardError(null); // Clear any previous error
   }, []);
 
-  const handleConfirmHire = useCallback(async (salary: number, startDate: string, appliedJobId: string) => {
+  // This is called from MarkAsHiredModal on confirm
+  const handleConfirmHire = useCallback(async (salary: number, startDate: string) => {
     if (!userProfile?.id || !candidateToHire || !jobRoleForHire) {
-      setDashboardError("Missing user, candidate, or job role data for hire.");
+      console.error("Missing user, candidate, or job role data for hire. Aborting.");
+      setDashboardError("Missing required information to record hire.");
       return;
     }
 
@@ -455,7 +478,7 @@ const RecruiterDashboard: React.FC = () => {
       const { error: updateError } = await supabase
         .from('applied_jobs')
         .update({ status: 'hired' })
-        .eq('id', appliedJobId);
+        .eq('id', candidateToHire.id); // Use candidateToHire.id which is applied_job ID
 
       if (updateError) throw updateError;
 
@@ -463,8 +486,8 @@ const RecruiterDashboard: React.FC = () => {
       const { error: insertError } = await supabase
         .from('hires')
         .insert({
-          developer_id: candidateToHire.developer.user_id,
-          job_role_id: jobRoleForHire.id,
+          developer_id: candidateToHire.developer.user_id, // **THE CRITICAL FIX**
+          job_id: jobRoleForHire.id,
           salary: salary,
           start_date: startDate,
           hire_date: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
@@ -473,13 +496,9 @@ const RecruiterDashboard: React.FC = () => {
 
       if (insertError) throw insertError;
 
-      setSuccess(`Successfully hired ${candidateToHire.developer.user.name} for ${jobRoleForHire.title}!`);
+      setSuccess(`Successfully hired ${candidateToHire.developer.user?.name || candidateToHire.developer.github_handle || 'the developer'} for ${jobRoleForHire.title}!`);
       handleCloseMarkAsHiredModal(); // Close modal on success
       fetchDashboardData(); // Re-fetch all dashboard data to ensure consistency (especially hires list)
-
-      // The `onCandidateHiredSuccessfully` prop for JobDetailView will be used to tell it to remove the candidate.
-      // If JobDetailView's internal state needs immediate update, it handles that itself.
-      // The `fetchDashboardData` call above ensures the global `hires` state is accurate.
 
     } catch (error: any) {
       console.error("Error confirming hire:", error);
@@ -495,12 +514,14 @@ const RecruiterDashboard: React.FC = () => {
   // to update its local list of candidates (e.g., by filtering out the hired one).
   // In RecruiterDashboard, calling fetchDashboardData() within handleConfirmHire
   // already ensures the global state for 'hires' is refreshed.
-  const handleCandidateHiredSuccessfully = useCallback(() => {
-    // No direct state update needed here in RecruiterDashboard for JobDetailView's candidates.
-    // The `fetchDashboardData` called in `handleConfirmHire` will refresh the `hires` list.
-    // JobDetailView will be responsible for its own candidates list filtering based on this prop.
+  // This prop is used by JobDetailView to remove the candidate from its list after parent confirms hire.
+  const handleCandidateHiredSuccessfully = useCallback((appliedJobId: string) => {
+    // This is called by JobDetailView AFTER RecruiterDashboard's handleConfirmHire
+    // has successfully updated the database and dismissed the modal.
+    // JobDetailView's internal state for candidates should be updated based on this.
+    // RecruiterDashboard's `fetchDashboardData` covers the global state update.
+    console.log(`Candidate with applied_job_id ${appliedJobId} was successfully hired. JobDetailView should update its list.`);
   }, []);
-
 
   // --- Render Functions for Tabs ---
   const renderOverview = useCallback(() => (
@@ -563,10 +584,10 @@ const RecruiterDashboard: React.FC = () => {
                 <div key={hire.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                   <div>
                     <h4 className="font-semibold text-gray-900">
-                      {hire.assignment?.developer?.user?.name || 'Unknown Developer'}
+                      {hire.developer?.user?.name || 'Unknown Developer'}
                     </h4>
                     <div className="text-sm text-gray-600 mt-1">
-                      Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
+                      Hired for {hire.job_role?.title || 'Unknown Position'} •
                       ${hire.salary.toLocaleString()} annual salary
                     </div>
                   </div>
@@ -689,18 +710,18 @@ const RecruiterDashboard: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                          src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
-                          alt={hire.assignment?.developer?.user?.name || 'Developer'}
+                          src={hire.developer?.user?.avatar_url || hire.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.developer?.user?.name || hire.developer?.user?.id || 'U')}&background=random`}
+                          alt={hire.developer?.user?.name || 'Developer'}
                           className="w-8 h-8 rounded-full object-cover mr-3"
                         />
                         <div className="text-sm font-semibold text-gray-900">
-                          {hire.assignment?.developer?.user?.name || 'Unknown'}
+                          {hire.developer?.user?.name || 'Unknown'}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        {hire.assignment?.job_role?.title || 'Unknown'}
+                        {hire.job_role?.title || 'Unknown'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -750,7 +771,7 @@ const RecruiterDashboard: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <span className="text-gray-600 font-medium">Loading dashboard...</span>
         </div>
       </div>
     );
@@ -795,7 +816,7 @@ const RecruiterDashboard: React.FC = () => {
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 mr-2 inline ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Checking...' : 'Check Status'}
+            {isRefreshing ? 'Check Status' : 'Check Status'}
           </button>
         </div>
       </div>
