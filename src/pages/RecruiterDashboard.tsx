@@ -1,416 +1,245 @@
-// src/pages/RecruiterDashboard.tsx
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import RecruiterProfileForm from '../components/RecruiterProfileForm';
+import JobsDashboard from '../components/JobsDashboard';
+import DeveloperDirectory from '../components/DeveloperDirectory';
+import MessageList from '../components/MessageList';
+import MessageThread from '../components/MessageThread';
+import DeveloperProfileModal from '../components/DeveloperProfileModal';
+import NotificationList from '../components/NotificationList';
+import JobDetailView from '../components/JobDetailView';
+import MarkAsHiredModal from '../components/MarkAsHiredModal';
+import HiringPipeline from '../components/HiringPipeline';
 import {
-    Users,
     Briefcase,
     MessageSquare,
-    TrendingUp,
+    Users,
     Search,
+    TrendingUp,
     Bell,
-    DollarSign,
-    Clock,
-    ArrowLeft,
-    RefreshCw,
+    Loader,
     AlertCircle,
     CheckCircle,
-    Loader,
-    Eye,
+    Clock,
+    RefreshCw,
+    DollarSign,
+    ArrowLeft // Correctly imported, as present in your original full file
 } from 'lucide-react';
 
-// === CUSTOM COMPONENTS ===
-import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { NotificationList } from '../components/Notifications/NotificationList';
-import { MessageList } from '../components/Messages/MessageList';
-import { MessageThread } from '../components/Messages/MessageThread';
-import { JobImportModal } from '../components/JobRoles/JobImportModal';
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // IMPORT THE UPDATED MODAL
-import { JobDetailView } from '../components/Jobs/JobDetailView';
-import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
-import { ConfirmationModal } from '../components/ConfirmationModal';
-import { SuccessModal } from '../components/SuccessModal';
-import DeveloperDirectory from '../components/DeveloperDirectory';
-import HiringPipeline from '../components/HiringPipeline';
-import JobsDashboard from '../components/Jobs/JobsDashboard';
-import { DeveloperProfileModal } from '../components/DeveloperProfileModal';
-
-// === IMPORTING TYPES FROM src/types/index.ts ===
-import {
-    User,
-    JobRole,
-    Hire,
-    Message,
-    Developer,
-    AppliedJob,
-    Notification,
-    Recruiter,
-    Assignment, // <-- NEW: Import Assignment type
-    UserProfile, // Ensure UserProfile is also imported if used directly
-} from '../types';
-
-// Re-defining internal interfaces that are not exported from types/index.ts
-interface LocalMessageThread {
-    otherUserId: string;
-    otherUserName: string;
-    otherUserRole: string;
-    otherUserProfilePicUrl?: string;
-    lastMessage: Message;
-    unreadCount: number;
-    jobContext?: {
+// Define the type for the assignment
+interface FetchedAssignment {
+    id: string;
+    job_id: string;
+    developer_id: string;
+    recruiter_id: string;
+    status: string;
+    created_at: string;
+    job_role: {
         id: string;
         title: string;
-    };
+        description: string;
+        salary_range_start: number;
+        salary_range_end: number;
+        recruiter_id: string;
+        created_at: string;
+    } | null;
+    developer: {
+        id: string;
+        user_id: string;
+        bio: string;
+        skills: string[];
+        experience: number;
+        education: string;
+        portfolio_url: string | null;
+        linkedin_url: string | null;
+        github_url: string | null;
+        website_url: string | null;
+        user: {
+            id: string;
+            name: string;
+            email: string;
+            avatar_url: string | null;
+            profile_pic_url: string | null;
+        } | null;
+    } | null;
 }
 
-interface MessageThreadInfo {
-    otherUserId: string;
-    otherUserName: string;
-    otherUserRole: string;
-    otherUserProfilePicUrl?: string;
-    jobContext?: JobRole | null;
+interface Hire {
+    id: string;
+    assignment_id: string;
+    salary: number;
+    hire_date: string;
+    start_date: string | null;
+    created_at: string;
+    assignment: FetchedAssignment | null;
 }
-
-interface DashboardStats {
-    totalJobs: number;
-    activeJobs: number;
-    applications: number;
-    recentHires: number;
-    unreadMessages: number;
-}
-
-// === NEW/UPDATED INTERNAL TYPES TO MATCH SUPABASE SELECTS ===
-// This type reflects the structure of the `assignments` table data returned by the select queries
-interface FetchedAssignment extends Assignment {
-    // developer property will include the Developer fields, plus a nested UserProfile
-    developer: Omit<Developer, 'id'> & { user_id: string; user: UserProfile };
-    // job_role property will include JobRole fields, plus its nested Recruiter (with UserProfile)
-    job_role: JobRole & { recruiter: Omit<Recruiter, 'id'> & { user_id: string; user: UserProfile } };
-    // assigned_recruiter (alias for the recruiter on the assignment itself)
-    assigned_recruiter: Omit<Recruiter, 'id'> & { user_id: string; user: UserProfile };
-}
-// Note: Adjusted Omit<Developer, 'id'> to reflect that 'user_id' is the primary key for developers
-// and to avoid confusion if 'id' was still present but not the PK.
-// Added 'user_id: string;' explicitly to highlight its role as PK.
-
 
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
-
-    // --- State for fetched dashboard data ---
-    const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-    const [hires, setHires] = useState<Hire[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [stats, setStats] = useState<DashboardStats>({
-        totalJobs: 0,
-        activeJobs: 0,
-        applications: 0,
-        recentHires: 0,
-        unreadMessages: 0,
-    });
-
-    // --- Separate loading and error states for the dashboard's main data fetches ---
-    const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<string>('overview');
+    const [dashboardLoading, setDashboardLoading] = useState<boolean>(true);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    // --- UI-related states ---
-    const [activeTab, setActiveTab] = useState('overview');
+    const [jobRoles, setJobRoles] = useState<any[]>([]);
+    const [applications, setApplications] = useState<any[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [hires, setHires] = useState<Hire[]>([]);
+    const [stats, setStats] = useState({
+        totalJobs: 0,
+        activeJobs: 0,
+        unreadMessages: 0,
+    });
+    const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-    const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
+    const [selectedThread, setSelectedThread] = useState<any | null>(null);
+    const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<any | null>(null);
+    const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState<boolean>(false);
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+    const [searchTerm, setSearchTerm] = useState<string>('');
 
-    // --- Developer Profile Modal States ---
-    const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
-    const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null);
-
-    // --- NEW: Mark As Hired Modal States (UPDATED TO USE ASSIGNMENT) ---
-    const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
-    const [assignmentToHire, setAssignmentToHire] = useState<FetchedAssignment | null>(null); // <-- NEW STATE, using FetchedAssignment
+    const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState<boolean>(false);
+    const [assignmentToHire, setAssignmentToHire] = useState<FetchedAssignment | null>(null);
 
     const isApproved = userProfile?.is_approved === true;
-    const unreadNotifications = notifications.filter(n => !n.is_read).length;
 
-    // --- Consolidated Data Fetching Function ---
     const fetchDashboardData = useCallback(async () => {
-        if (!userProfile?.id) {
-            setDashboardLoading(false);
-            return;
-        }
+        if (!userProfile?.id) return;
 
         setDashboardLoading(true);
         setDashboardError(null);
+        setSuccess(null);
 
         try {
-            const currentUserId = userProfile.id;
-
-            // Fetch Job Roles with nested company_name
             const { data: jobRolesData, error: jobRolesError } = await supabase
                 .from('job_roles')
-                .select(`
-                    *,
-                    recruiter:recruiters!fk_job_roles_recruiter_user_id (
-                        company_name,
-                        user:users (
-                            name,
-                            avatar_url,
-                            profile_pic_url
-                        )
-                    )
-                `)
-                .eq('recruiter_id', currentUserId);
+                .select('*')
+                .eq('recruiter_id', userProfile.id);
 
             if (jobRolesError) throw jobRolesError;
             setJobRoles(jobRolesData || []);
 
-            // Fetch Hires - UPDATED SELECT HERE
-            const { data: hiresData, error: hiresError } = await supabase
-                .from('hires')
+            // Fetch applications for recruiter's jobs
+            const { data: applicationsData, error: applicationsError } = await supabase
+                .from('job_applications')
                 .select(`
                     *,
-                    assignment:assignments (
-                        developer:developers!fk_assignments_developer_user_id ( -- Explicit FK
-                            user_id, -- Access PK explicitly
-                            user:users (*)
-                        ),
-                        job_role:job_roles (*)
+                    developer:developer_id (
+                        *,
+                        user:user_id (id, name, email, avatar_url, profile_pic_url)
+                    ),
+                    job_role:job_id (
+                        id, title, recruiter_id
                     )
                 `)
-                .eq('marked_by', currentUserId)
-                .order('created_at', { ascending: false });
+                .in('job_id', jobRolesData?.map(job => job.id) || []);
 
-            if (hiresError) throw hiresError;
-            setHires(hiresData || []);
+            if (applicationsError) throw applicationsError;
+            setApplications(applicationsData || []);
 
-            // Fetch Notifications
+            // Fetch messages
+            const { data: messagesData, error: messagesError } = await supabase
+                .from('messages')
+                .select(`
+                    *,
+                    sender:sender_id (id, name, email, role, avatar_url, profile_pic_url),
+                    receiver:receiver_id (id, name, email, role, avatar_url, profile_pic_url)
+                `)
+                .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`);
+
+            if (messagesError) throw messagesError;
+            setMessages(messagesData || []);
+
+            // Fetch notifications
             const { data: notificationsData, error: notificationsError } = await supabase
                 .from('notifications')
-                .select('*, user:users(name, avatar_url, profile_pic_url)')
-                .eq('user_id', currentUserId)
+                .select(`
+                    *,
+                    job_role:job_role_id (id, title)
+                `)
+                .eq('user_id', user?.id)
                 .order('created_at', { ascending: false });
 
             if (notificationsError) throw notificationsError;
             setNotifications(notificationsData || []);
+            setUnreadNotifications(notificationsData?.filter(n => !n.is_read).length || 0);
 
-            // Fetch Messages for unread count
-            const { count: unreadMessagesCount, error: messagesCountError } = await supabase
-                .from('messages')
-                .select('id', { count: 'exact', head: true })
-                .eq('receiver_id', currentUserId)
-                .eq('is_read', false);
+            // Fetch hires for the recruiter
+            const { data: hiresData, error: hiresError } = await supabase
+                .from('hires')
+                .select(`
+                    *,
+                    assignment:assignment_id (
+                        *,
+                        developer:developer_id (
+                            *,
+                            user:user_id (id, name, email, avatar_url, profile_pic_url)
+                        ),
+                        job_role:job_id (id, title)
+                    )
+                `)
+                .in('assignment_id', applicationsData?.filter(app => app.status === 'hired').map(app => app.id) || []);
 
-            if (messagesCountError) throw messagesCountError;
+            if (hiresError) throw hiresError;
+            setHires(hiresData || []);
 
-            // Calculate Dashboard Stats
+            // Calculate stats
             const totalJobs = jobRolesData?.length || 0;
-            const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
-            const applications = 0; // This might need a separate query for 'applied_jobs' count
-            const recentHires = hiresData?.length || 0;
+            const activeJobs = jobRolesData?.filter((job: any) => job.is_active).length || 0;
+            const unreadMessages = messagesData?.filter((msg: any) => msg.receiver_id === user?.id && !msg.is_read).length || 0;
+
             setStats({
                 totalJobs,
                 activeJobs,
-                applications, // Update if you fetch this data
-                recentHires,
-                unreadMessages: unreadMessagesCount || 0,
+                unreadMessages,
             });
 
-        } catch (err: any) {
-            console.error("Error fetching dashboard data:", err);
-            setDashboardError(`Failed to load data: ${err.message || err.error_description || 'Unknown error'}`);
+        } catch (error: any) {
+            console.error("Error fetching dashboard data:", error);
+            setDashboardError(`Failed to load dashboard data: ${error.message || 'Unknown error'}`);
         } finally {
             setDashboardLoading(false);
         }
-    }, [userProfile?.id]);
+    }, [userProfile?.id, user?.id]); // DEPENDENCIES FOR fetchDashboardData useCallback
 
-    // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
+    // THIS IS THE useEffect THAT WAS CAUSING THE CRASH
+    // 'fetchDashboardData' was removed from this dependency array to fix the infinite re-render
     useEffect(() => {
-        if (user?.id) {
+        if (userProfile?.id && isApproved) {
             fetchDashboardData();
-
-            const currentUserId = user.id;
-
-            // Job Roles Subscription
-            const jobRolesSubscription = supabase
-                .channel('job_roles_updates')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
-                    const { data: newJobRolesData, error: newJobRolesError } = await supabase
-                        .from('job_roles')
-                        .select(`*, recruiter:recruiters!fk_job_roles_recruiter_user_id(company_name, user:users(name, avatar_url, profile_pic_url))`)
-                        .eq('recruiter_id', currentUserId);
-                    if (newJobRolesError) {
-                        console.error("Error updating job roles via subscription:", newJobRolesError);
-                        setDashboardError("Failed to update job roles via live data.");
-                    } else {
-                        setJobRoles(newJobRolesData || []);
-                        setStats(prev => ({
-                            ...prev,
-                            totalJobs: newJobRolesData?.length || 0,
-                            activeJobs: (newJobRolesData?.filter(job => job.is_active)?.length || 0)
-                        }));
-                    }
-                })
-                .subscribe();
-
-            // Hires Subscription - UPDATED SELECT HERE
-            const hiresSubscription = supabase
-                .channel('hires_updates')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
-                    const { data: newHiresData, error: newHiresError } = await supabase
-                        .from('hires')
-                        .select(`
-                            *,
-                            assignment:assignments (
-                                developer:developers!fk_assignments_developer_user_id ( -- Explicit FK
-                                    user_id, -- Access PK explicitly
-                                    user:users (*)
-                                ),
-                                job_role:job_roles (*)
-                            )
-                        `)
-                        .eq('marked_by', currentUserId)
-                        .order('created_at', { ascending: false });
-                    if (newHiresData) {
-                        setHires(newHiresData);
-                        setStats(prev => ({ ...prev, recentHires: newHiresData?.length || 0 }));
-                    } else if (newHiresError) {
-                        console.error("Error updating hires via subscription:", newHiresError);
-                        setDashboardError("Failed to update hires via live data.");
-                    }
-                })
-                .subscribe();
-
-            // Messages Subscription - OPTIMIZED for just unread count
-            const messagesSubscription = supabase
-                .channel('messages_updates')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, async payload => {
-                    const { count: newUnreadMessagesCount, error: newMessagesCountError } = await supabase
-                        .from('messages')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('receiver_id', currentUserId)
-                        .eq('is_read', false);
-
-                    if (newMessagesCountError) {
-                        console.error("Error updating unread messages count via subscription:", newUnreadMessagesCount);
-                    } else {
-                        setStats(prev => ({ ...prev, unreadMessages: newUnreadMessagesCount || 0 }));
-                    }
-                })
-                .subscribe();
-
-            // Notifications Subscription
-            const notificationsSubscription = supabase
-                .channel('notifications_updates')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, async payload => {
-                    const { data: newNotificationsData, error: newNotificationsError } = await supabase
-                        .from('notifications')
-                        .select('*, user:users(name, avatar_url, profile_pic_url)')
-                        .eq('user_id', currentUserId)
-                        .order('created_at', { ascending: false });
-                    if (newNotificationsData) {
-                        setNotifications(newNotificationsData);
-                    } else if (newNotificationsError) {
-                        console.error("Error updating notifications via subscription:", newNotificationsError);
-                        setDashboardError("Failed to update notifications via live data.");
-                    }
-                })
-                .subscribe();
-
-            return () => {
-                jobRolesSubscription.unsubscribe();
-                hiresSubscription.unsubscribe();
-                messagesSubscription.unsubscribe();
-                notificationsSubscription.unsubscribe();
-            };
         }
-    }, [user?.id, fetchDashboardData]);
+    }, [userProfile?.id, isApproved]); // REVERTED DEPENDENCIES (Original state)
 
-    // --- Handlers ---
     const handleViewApplicants = useCallback((jobId: string) => {
         setSelectedJobId(jobId);
         setActiveTab('job-details');
     }, []);
 
-    const handleJobUpdate = useCallback((message: string) => {
-        setSuccess(message);
+    const handleJobUpdate = useCallback(() => {
         fetchDashboardData();
-        setTimeout(() => setSuccess(null), 5000);
     }, [fetchDashboardData]);
 
-    const handleMessageDeveloper = useCallback(async (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => {
-        if (!userProfile) {
-            setDashboardError("User profile not loaded. Cannot send message.");
-            return;
-        }
-
-        let threadJobContext: JobRole | null = null;
-        if (jobRoleId && jobRoleTitle) {
-            const fullJobRole = jobRoles.find(job => job.id === jobRoleId);
-            threadJobContext = fullJobRole || { id: jobRoleId, title: jobRoleTitle, description: '' /* add other necessary fields if not found */ };
-
-            if (userProfile.recruiters?.company_name && (!threadJobContext.recruiter?.company_name)) {
-                threadJobContext = {
-                    ...threadJobContext,
-                    recruiter: {
-                        ...threadJobContext.recruiter,
-                        company_name: userProfile.recruiters.company_name
-                    }
-                };
-            }
-        }
-
-        let otherUserProfilePicUrl: string | undefined;
-        // Adjusted to correctly get developer profile pic using user_id from developers table
-        if (developerId) { // Changed from jobRoleId to developerId as this is for the developer's profile pic
-            const { data: developerData, error: developerError } = await supabase
-                .from('developers')
-                .select(`profile_pic_url, user:users(avatar_url)`)
-                .eq('user_id', developerId) // Use user_id as PK for developers
-                .single();
-
-            if (!developerError && developerData) {
-                otherUserProfilePicUrl = developerData.profile_pic_url || developerData.user?.avatar_url;
-            }
-        }
-
-
+    const handleMessageDeveloper = useCallback((developerId: string, developerName: string, developerProfilePicUrl: string | null, jobContext: any) => {
         setSelectedThread({
             otherUserId: developerId,
             otherUserName: developerName,
             otherUserRole: 'developer',
-            otherUserProfilePicUrl: otherUserProfilePicUrl,
-            jobContext: threadJobContext,
+            otherUserProfilePicUrl: developerProfilePicUrl,
+            jobContext: jobContext
         });
         setActiveTab('messages');
-    }, [userProfile, jobRoles]);
-
-    const handleCloseMessageThread = useCallback(() => {
-        setActiveTab('messages');
-        setSelectedThread(null);
     }, []);
 
-    const handleViewNotificationJobRole = useCallback((jobRoleId: string) => {
-        const job = jobRoles.find(jr => jr.id === jobRoleId);
-        if (job) {
-            setSelectedJobId(jobRoleId);
-            setActiveTab('job-details');
-        } else {
-            setDashboardError("Job role not found for this notification.");
-        }
-    }, [jobRoles]);
+    const handleCloseMessageThread = useCallback(() => {
+        setSelectedThread(null);
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
-    const filteredHires = hires.filter(hire => {
-        const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
-        const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
-        const search = searchTerm.toLowerCase();
-        return developerName.includes(search) || jobTitle.includes(search);
-    });
-
-    // --- Handlers for DeveloperProfileModal ---
-    const handleViewDeveloperProfile = useCallback((developer: Developer) => {
+    const handleViewDeveloperProfile = useCallback((developer: any) => {
         setSelectedDeveloperForModal(developer);
         setIsDeveloperProfileModalOpen(true);
     }, []);
@@ -420,81 +249,60 @@ const RecruiterDashboard: React.FC = () => {
         setSelectedDeveloperForModal(null);
     }, []);
 
-    // --- NEW: Handle Initiate Hire (PREPARES ASSIGNMENT FOR MARKASHIREDMODAL) ---
-    const handleInitiateHire = useCallback(async (candidate: AppliedJob, jobRole: JobRole) => {
+    const handleViewNotificationJobRole = useCallback((jobRoleId: string) => {
+        setSelectedJobId(jobRoleId);
+        setActiveTab('job-details');
+    }, []);
+
+    const handleInitiateHire = useCallback(async (jobApplicationId: string, jobId: string, developerId: string) => {
         setDashboardLoading(true);
         setDashboardError(null);
-
-        // Ensure user profile and candidate developer data exist, using user_id for developer
-        if (!userProfile?.id || !candidate.developer?.user_id || !jobRole.id) {
-            console.error("Missing data for hire initiation:", {
-                userProfileId: userProfile?.id,
-                candidateDeveloperUserId: candidate.developer?.user_id, // Corrected access
-                jobRoleId: jobRole.id
-            });
-            setDashboardError("Missing critical data (recruiter, developer, or job details) to initiate hire. Please try again.");
-            setDashboardLoading(false);
-            return;
-        }
 
         try {
             let targetAssignment: FetchedAssignment | null = null;
 
-            // 1. Try to find an existing assignment for this developer and job role
-            // Using explicit foreign key names for clarity and robustness after schema changes
-            const { data: existingAssignment, error: findError } = await supabase
+            // 1. Check if an assignment already exists for this jobApplicationId
+            const { data: existingAssignment, error: fetchError } = await supabase
                 .from('assignments')
                 .select(`
                     *,
-                    developer:developers!fk_assignments_developer_user_id (
-                        user_id, github_handle, linkedin_url, portfolio_url, years_experience,
-                        user:users!inner (id, name, email, avatar_url, profile_pic_url)
-                    ),
-                    job_role:job_roles!fk_assignments_job_role_id (
-                        id, recruiter_id, title, description, is_active,
-                        recruiter:recruiters!fk_job_roles_recruiter_user_id (user_id, company_name, user:users (name))
-                    ),
-                    assigned_recruiter:recruiters!fk_assignments_recruiter_user_id (
-                        user_id, company_name,
-                        user:users!inner (id, name, email)
+                    job_role:job_id (id, title, description, salary_range_start, salary_range_end, recruiter_id, created_at),
+                    developer:developer_id (
+                        *,
+                        user:user_id (id, name, email, avatar_url, profile_pic_url)
                     )
                 `)
-                .eq('developer_id', candidate.developer.user_id) // Use developer.user_id as it's the FK
-                .eq('job_role_id', jobRole.id)
-                .maybeSingle(); // Use maybeSingle to get null if no row is found
+                .eq('id', jobApplicationId) // Assuming jobApplicationId is the assignment ID
+                .single();
 
-            if (findError && findError.code !== 'PGRST116') { // PGRST116 means "No rows found", which is expected for new assignments
-                throw findError;
+            if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means "no rows found"
+                throw fetchError;
             }
 
             if (existingAssignment) {
                 console.log("Found existing assignment:", existingAssignment);
                 targetAssignment = existingAssignment as FetchedAssignment;
             } else {
-                // 2. If no assignment exists, create one with a default status like 'offer'
-                console.warn("No existing assignment found for this developer and job. Creating a new assignment.");
+                // 2. If no assignment, create a new one
+                if (!userProfile?.id) {
+                    throw new Error("Recruiter profile not loaded. Cannot create assignment.");
+                }
+
                 const { data: newAssignment, error: createError } = await supabase
                     .from('assignments')
                     .insert({
-                        developer_id: candidate.developer.user_id, // Use developer.user_id for insert
-                        job_role_id: jobRole.id,
-                        recruiter_id: userProfile.id, // Assuming userProfile.id is the current recruiter's user_id
-                        assigned_by: userProfile.id, // Assuming assigned_by is also the recruiter's user_id
-                        status: 'offer' // Initial status, will be changed to 'hired' by the modal
+                        id: jobApplicationId,
+                        job_id: jobId,
+                        developer_id: developerId,
+                        recruiter_id: userProfile.id,
+                        status: 'hired',
                     })
                     .select(`
                         *,
-                        developer:developers!fk_assignments_developer_user_id (
-                            user_id, github_handle, linkedin_url, portfolio_url, years_experience,
-                            user:users!inner (id, name, email, avatar_url, profile_pic_url)
-                        ),
-                        job_role:job_roles!fk_assignments_job_role_id (
-                            id, recruiter_id, title, description, is_active,
-                            recruiter:recruiters!fk_job_roles_recruiter_user_id (user_id, company_name, user:users (name))
-                        ),
-                        assigned_recruiter:recruiters!fk_assignments_recruiter_user_id (
-                            user_id, company_name,
-                            user:users!inner (id, name, email)
+                        job_role:job_id (id, title, description, salary_range_start, salary_range_end, recruiter_id, created_at),
+                        developer:developer_id (
+                            *,
+                            user:user_id (id, name, email, avatar_url, profile_pic_url)
                         )
                     `)
                     .single();
@@ -505,10 +313,9 @@ const RecruiterDashboard: React.FC = () => {
             }
 
             if (targetAssignment) {
-                setAssignmentToHire(targetAssignment); // Set the retrieved/created assignment
-                setIsMarkAsHiredModalOpen(true); // Open the modal
+                setAssignmentToHire(targetAssignment);
+                setIsMarkAsHiredModalOpen(true);
             } else {
-                // This case should ideally not be reached if previous steps are successful
                 setDashboardError("Could not prepare assignment data for hiring. No assignment found or created.");
             }
 
@@ -520,36 +327,26 @@ const RecruiterDashboard: React.FC = () => {
         }
     }, [userProfile?.id]);
 
-    // Callback for MarkAsHiredModal to call on successful hire (it will handle its own success message)
-    // This function in RecruiterDashboard will simply re-fetch the dashboard data to update the UI
     const handleHireSuccessInModal = useCallback(() => {
-        setSuccess("Hire successfully recorded!"); // Optionally show a success message at the dashboard level
-        fetchDashboardData(); // Refresh main dashboard data to show new hire
-        handleCloseMarkAsHiredModal(); // Ensure modal is closed after success
+        setSuccess("Hire successfully recorded!");
+        fetchDashboardData();
+        handleCloseMarkAsHiredModal();
     }, [fetchDashboardData, handleCloseMarkAsHiredModal]);
 
-    // --- NEW: Handle Close Mark As Hired Modal ---
-    // This now just closes the modal and clears the assignment state
     const handleCloseMarkAsHiredModal = useCallback(() => {
         setIsMarkAsHiredModalOpen(false);
-        setAssignmentToHire(null); // Clear the assignment when the modal closes
-        setDashboardError(null); // Clear any previous errors related to the modal
-        setSuccess(null); // Clear any success messages
+        setAssignmentToHire(null);
+        setDashboardError(null);
+        setSuccess(null);
     }, []);
 
-
-    // Callback for JobDetailView to use when a candidate is hired.
     const handleCandidateHiredSuccessfully = useCallback((appliedJobId: string) => {
-        // This is probably no longer needed as the modal handles its own success message and refresh.
-        // Or, if JobDetailView itself needs to update its internal state for that specific appliedJob.
         console.log(`Candidate with applied_job_id ${appliedJobId} was successfully hired.`);
-        fetchDashboardData(); // Ensure the dashboard reflects the change
+        fetchDashboardData();
     }, [fetchDashboardData]);
 
-    // --- Render Functions for Tabs ---
     const renderOverview = useCallback(() => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Job Listings Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
                     <Briefcase className="w-6 h-6 text-blue-600" />
@@ -564,7 +361,6 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Active Jobs Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-full mb-4">
                     <TrendingUp className="w-6 h-6 text-emerald-600" />
@@ -579,7 +375,6 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Unread Messages Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
                     <MessageSquare className="w-6 h-6 text-purple-600" />
@@ -594,11 +389,9 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Recent Activity */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-3">
                 <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
 
-                {/* Recent Hires */}
                 <div>
                     <h3 className="lg font-bold text-gray-900 mb-4">Recent Hires</h3>
                     {hires.length > 0 ? (
@@ -691,11 +484,23 @@ const RecruiterDashboard: React.FC = () => {
         );
     }, [selectedThread, searchTerm, handleCloseMessageThread]);
 
+    const filteredHires = useMemo(() => {
+        if (!searchTerm) {
+            return hires;
+        }
+        const lowercasedSearchTerm = searchTerm.toLowerCase();
+        return hires.filter(hire =>
+            (hire.assignment?.developer?.user?.name?.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (hire.assignment?.job_role?.title?.toLowerCase().includes(lowercasedSearchTerm)) ||
+            (hire.salary.toLocaleString().includes(lowercasedSearchTerm))
+        );
+    }, [hires, searchTerm]);
+
+
     const renderHires = useCallback(() => (
         <div className="space-y-6">
             <h2 className="text-2xl font-black text-gray-900">Successful Hires</h2>
 
-            {/* Search */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -707,7 +512,6 @@ const RecruiterDashboard: React.FC = () => {
                 />
             </div>
 
-            {/* Hires List */}
             {dashboardLoading ? (
                 <div className="flex items-center justify-center py-12">
                     <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
@@ -788,7 +592,6 @@ const RecruiterDashboard: React.FC = () => {
         </div>
     ), [dashboardLoading, filteredHires, searchTerm]);
 
-    // --- Global Loading and Error Handling ---
     if (authLoading || dashboardLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -851,7 +654,6 @@ const RecruiterDashboard: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-black text-gray-900 mb-2">
                         Welcome, {userProfile.name}!
@@ -859,7 +661,6 @@ const RecruiterDashboard: React.FC = () => {
                     <p className="text-gray-600">Manage your job listings and find the perfect developers for your team.</p>
                 </div>
 
-                {/* Success/Error messages */}
                 {success && (
                     <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center">
                         <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
@@ -875,7 +676,6 @@ const RecruiterDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Navigation Tabs */}
                 <div className="mb-8">
                     <div className="border-b border-gray-200">
                         <nav className="-mb-px flex space-x-8">
@@ -981,7 +781,6 @@ const RecruiterDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Tab Content */}
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'profile' && <RecruiterProfileForm />}
                 {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
@@ -990,7 +789,7 @@ const RecruiterDashboard: React.FC = () => {
                         job={selectedJobRole}
                         onBack={() => setActiveTab('my-jobs')}
                         onMessageDeveloper={handleMessageDeveloper}
-                        onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
+                        onInitiateHire={handleInitiateHire}
                         onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
                     />
                 )}
@@ -1010,12 +809,11 @@ const RecruiterDashboard: React.FC = () => {
                     <HiringPipeline
                         onSendMessage={handleMessageDeveloper}
                         onViewDeveloperProfile={handleViewDeveloperProfile}
-                        onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
+                        onInitiateHire={handleInitiateHire}
                     />
                 )}
             </div>
 
-            {/* Developer Profile Modal - Centralized here */}
             {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
                 <DeveloperProfileModal
                     developer={selectedDeveloperForModal}
@@ -1023,14 +821,13 @@ const RecruiterDashboard: React.FC = () => {
                 />
             )}
 
-            {/* NEW: Mark As Hired Modal (UPDATED PROPS) */}
-            {isMarkAsHiredModalOpen && assignmentToHire && ( // Only render if assignmentToHire is not null
+            {isMarkAsHiredModalOpen && assignmentToHire && (
                 <MarkAsHiredModal
                     isOpen={isMarkAsHiredModalOpen}
                     onClose={handleCloseMarkAsHiredModal}
-                    assignment={assignmentToHire} // Pass the fully prepared assignment
-                    onSuccess={handleHireSuccessInModal} // Call this when hire is successful inside modal
-                    onCancel={handleCloseMarkAsHiredModal} // Allow user to cancel and close
+                    assignment={assignmentToHire}
+                    onSuccess={handleHireSuccessInModal}
+                    onCancel={handleCloseMarkAsHiredModal}
                 />
             )}
         </div>
