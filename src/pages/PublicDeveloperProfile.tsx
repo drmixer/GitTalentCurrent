@@ -31,7 +31,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         .from('developers')
         .select(`
           *,
-          user:developers_user_id_fkey(name, email, profile_pic_url) // --- THIS LINE WAS CHANGED ---
+          user:developers_user_id_fkey(name, email, profile_pic_url)
         `)
         .eq('public_profile_slug', slug)
         .single();
@@ -45,6 +45,9 @@ export const PublicDeveloperProfile: React.FC = () => {
         }
         setDeveloper(null);
       } else if (data) {
+        // --- START OF NEW ADDITION ---
+        console.log("Fetched developer data:", JSON.stringify(data, null, 2));
+        // --- END OF NEW ADDITION ---
         setDeveloper(data as Developer);
         // Recalculate and update profile strength
         const strength = calculateProfileStrength(data as Developer);
