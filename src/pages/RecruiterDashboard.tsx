@@ -32,156 +32,27 @@ import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 import { ConfirmationModal } from '../components/ConfirmationModal';
-import { SuccessModal } from '../components/SuccessModal'; // Assuming you have this
+import { SuccessModal } from '../components/SuccessModal';
 import DeveloperDirectory from '../components/DeveloperDirectory';
 import HiringPipeline from '../components/HiringPipeline';
 import JobsDashboard from '../components/Jobs/JobsDashboard';
-import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // <-- Corrected to named import based on typical usage
+import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // Corrected to named import
 
-// === TYPE IMPORTS ===
-// import { JobRole, Hire, Message, User, DeveloperProfile } from '../types'; // Adjust this line if you move types
+// === IMPORTING TYPES FROM src/types/index.ts ===
+// This is the CRUCIAL CHANGE: Remove local definitions and import directly.
+import {
+  User, // Renamed from UserProfile if that was the intent for the RecruiterDashboard user
+  JobRole,
+  Hire,
+  Message,
+  Developer, // Using 'Developer' from types, not 'DeveloperProfile'
+  AppliedJob, // This seems to be what you called CandidateType in your code
+  Notification,
+  Recruiter, // Needed for RecruiterProfileForm or nested recruiter data
+} from '../types'; // Correct path to your types/index.ts file
 
-// Defining interfaces locally as per our discussion, or ensure they are in '../types'
-// If you have a separate types.ts file, move these interfaces there.
-
-interface JobRole {
-  id: string;
-  title: string;
-  description: string;
-  is_active: boolean;
-  recruiter_id: string;
-  salary_min?: number;
-  salary_max?: number;
-  location?: string;
-  job_type?: string;
-  experience_level?: string;
-  skills_required?: string[];
-  created_at?: string;
-  updated_at?: string;
-  recruiter?: { // if you're selecting recruiter data with the job role
-    company_name?: string;
-    user?: {
-      name?: string;
-      avatar_url?: string;
-      profile_pic_url?: string;
-    }
-  };
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  is_approved: boolean;
-  avatar_url?: string;
-  profile_pic_url?: string;
-  company_logo_url?: string;
-}
-
-interface DeveloperProfile {
-  user_id: string;
-  github_handle?: string;
-  bio?: string;
-  skills?: string[];
-  experience_years?: number;
-  linked_projects?: string[];
-  profile_pic_url?: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar_url?: string;
-    profile_pic_url?: string;
-  };
-}
-
-interface Message {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  content: string;
-  created_at: string;
-  is_read: boolean;
-  job_role_id?: string;
-  assignment_id?: string;
-  sender?: User;
-  receiver?: User;
-  job_role?: JobRole;
-}
-
-// UPDATED HIRE INTERFACE
-interface Hire {
-  id: string;
-  assignment_id: string; // The ID of the assignment linked to this hire
-  salary: number;
-  hire_date?: string;
-  start_date?: string;
-  notes?: string;
-  marked_by: string; // Recruiter user ID
-  created_at?: string;
-  // Nested assignment object
-  assignment: {
-    id: string; // Assignment's own ID
-    developer_id: string; // Developer ID from the assignments table
-    developer: { // Nested developer details
-      user_id: string; // This is what developers table uses as its PK for joining with users
-      github_handle?: string;
-      bio?: string;
-      skills?: string[];
-      experience_years?: number;
-      linked_projects?: string[];
-      profile_pic_url?: string;
-      user: { // Nested user details associated with the developer
-        id: string;
-        name: string;
-        email: string;
-        avatar_url?: string;
-        profile_pic_url?: string;
-      };
-    };
-    job_role: { // Nested job_role details from assignment
-      id: string;
-      title: string;
-      description?: string;
-      // Add other job_role fields you fetch here if needed
-    };
-  };
-}
-
-
-// Assuming CandidateType is defined in types.ts or passed consistently.
-// If not explicitly defined in ../types, you might need to add it there.
-// Based on JobDetailView.tsx, CandidateType likely looks like this:
-// This interface should ideally be moved to `src/types.ts` for centralized management.
-interface CandidateType {
-  id: string; // This is the applied_job ID
-  developer_id: string;
-  job_id: string; // Corrected from job_role_id based on applied_jobs schema
-  status: string; // e.g., 'applied', 'interviewing', 'rejected', 'hired'
-  applied_at: string; // Changed from created_at based on applied_jobs schema
-  cover_letter?: string;
-  notes?: string;
-  developer: {
-    user_id: string; // This is the actual ID for the developer in `developers` table
-    github_handle?: string;
-    bio?: string;
-    skills?: string[];
-    experience_years?: number; // Changed from 'experience' and type to number based on schema
-    linked_projects?: string[]; // Assuming this is linked_projects
-    profile_pic_url?: string; // Assuming this field exists
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      avatar_url?: string;
-      profile_pic_url?: string;
-    };
-  };
-  job_role?: JobRole; // Optional, as JobDetailView might pass the main job role separately
-}
-
-
+// Re-defining internal interfaces that are not exported from types/index.ts
+// These are UI-specific types, not database entity types.
 interface LocalMessageThread {
   otherUserId: string;
   otherUserName: string;
@@ -195,32 +66,12 @@ interface LocalMessageThread {
   };
 }
 
-interface UserProfile {
-  id: string;
-  role: string;
-  name: string;
-  email: string;
-  is_approved: boolean;
-  avatar_url?: string;
-  profile_pic_url?: string;
-  company_logo_url?: string;
-  recruiters?: { company_name?: string } | null;
-}
-
-interface Notification {
-  id: string;
-  user_id: string;
-  type: string;
-  entity_id?: string;
-  entity_type?: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-  user?: {
-    name?: string;
-    avatar_url?: string;
-    profile_pic_url?: string;
-  }
+interface MessageThreadInfo {
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  otherUserProfilePicUrl?: string;
+  jobContext?: JobRole | null;
 }
 
 interface DashboardStats {
@@ -231,13 +82,6 @@ interface DashboardStats {
   unreadMessages: number;
 }
 
-interface MessageThreadInfo {
-  otherUserId: string;
-  otherUserName: string;
-  otherUserRole: string;
-  otherUserProfilePicUrl?: string;
-  jobContext?: JobRole | null;
-}
 
 const RecruiterDashboard: React.FC = () => {
   const { user, userProfile, authLoading, refreshProfile } = useAuth();
@@ -261,18 +105,18 @@ const RecruiterDashboard: React.FC = () => {
 
   // --- UI-related states ---
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(selectedJobId); // Initialize with null or a default
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
 
   // --- Developer Profile Modal States ---
   const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
-  const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<DeveloperProfile | null>(null);
+  const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null); // Changed to 'Developer'
 
   // --- NEW: Mark As Hired Modal States ---
   const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
-  const [candidateToHire, setCandidateToHire] = useState<CandidateType | null>(null);
+  const [candidateToHire, setCandidateToHire] = useState<AppliedJob | null>(null); // Changed to 'AppliedJob'
   const [jobRoleForHire, setJobRoleForHire] = useState<JobRole | null>(null);
 
   const isApproved = userProfile?.is_approved === true;
@@ -507,9 +351,8 @@ const RecruiterDashboard: React.FC = () => {
     }
 
     // You might need to fetch the developer's profile pic here if not passed directly
-    // For now, let's assume JobDetailView passes it or it's handled by DeveloperProfileModal/MessageThread
     let otherUserProfilePicUrl: string | undefined;
-    if (jobRoleId) { // Assuming developer pic can be found via an applied job for context
+    if (jobRoleId) {
       const { data: appliedJobData, error: appliedJobError } = await supabase
         .from('applied_jobs')
         .select(`developer:developers(profile_pic_url, user:users(avatar_url))`)
@@ -531,7 +374,7 @@ const RecruiterDashboard: React.FC = () => {
       jobContext: threadJobContext,
     });
     setActiveTab('messages');
-  }, [userProfile, jobRoles]); // Added jobRoles to dependency array
+  }, [userProfile, jobRoles]);
 
   const handleCloseMessageThread = useCallback(() => {
     setActiveTab('messages');
@@ -557,7 +400,7 @@ const RecruiterDashboard: React.FC = () => {
   });
 
   // --- NEW: Handlers for DeveloperProfileModal ---
-  const handleViewDeveloperProfile = useCallback((developer: DeveloperProfile) => {
+  const handleViewDeveloperProfile = useCallback((developer: Developer) => { // Changed type to 'Developer'
     setSelectedDeveloperForModal(developer);
     setIsDeveloperProfileModalOpen(true);
   }, []);
@@ -569,7 +412,7 @@ const RecruiterDashboard: React.FC = () => {
 
   // --- NEW: Handlers for Mark As Hired Modal ---
   // This is called from JobDetailView when 'Hired' status is selected
-  const handleInitiateHire = useCallback((candidate: CandidateType, jobRole: JobRole) => {
+  const handleInitiateHire = useCallback((candidate: AppliedJob, jobRole: JobRole) => { // Changed type to 'AppliedJob'
     setCandidateToHire(candidate);
     setJobRoleForHire(jobRole);
     setIsMarkAsHiredModalOpen(true);
@@ -601,25 +444,6 @@ const RecruiterDashboard: React.FC = () => {
 
       if (updateError) throw updateError;
 
-      // 2. Insert a new record into the hires table
-      // IMPORTANT: Your `hires` table has an `assignment_id` column, not `job_id` and `developer_id` directly.
-      // You need to ensure the candidateToHire object carries the `assignment_id` or that you can get it.
-      // Assuming `candidateToHire` might be an applied_job that has an assignment_id (or you derive it)
-      // For this to work, the `applied_jobs` table should ideally link to `assignments` if not directly to developer/job.
-      // If `applied_jobs` links directly to developer_id and job_id, but `hires` needs assignment_id,
-      // you need to either:
-      // a) Create an assignment first if one doesn't exist for this application.
-      // b) Re-evaluate if `hires` should directly link to `developer_id` and `job_id` instead of `assignment_id`.
-
-      // Based on your schema analysis, 'hires' links to 'assignments'.
-      // If an 'applied_job' doesn't automatically create an 'assignment',
-      // then you'd need to create an assignment first before creating a hire.
-      // For now, assuming candidateToHire's job_id implies an assignment.
-      // *** You will likely need to adjust how the assignment_id is obtained here.
-      // For now, let's assume a direct mapping or that `candidateToHire` holds the `assignment_id` if it came from `assignments`.
-      // If `applied_jobs` is the source, it might not have an `assignment_id`.
-      // Let's use the jobRoleForHire.id and candidateToHire.developer_id to find/create an assignment.
-
       // --- CRITICAL LOGIC FOR ASSIGNMENT_ID ---
       let assignmentIdForHire = '';
       // First, try to find an existing assignment for this developer and job role
@@ -646,7 +470,6 @@ const RecruiterDashboard: React.FC = () => {
             job_role_id: jobRoleForHire.id,
             assigned_by: userProfile.id, // Assuming the recruiter is the one creating this 'assignment' via hiring
             status: 'hired' // Set initial status based on hire
-            // Add any other required assignment fields
           })
           .select('id')
           .single();
@@ -688,16 +511,7 @@ const RecruiterDashboard: React.FC = () => {
 
 
   // Callback for JobDetailView to use when a candidate is hired.
-  // This function, when passed to JobDetailView, will signal JobDetailView
-  // to update its local list of candidates (e.g., by filtering out the hired one).
-  // In RecruiterDashboard, calling fetchDashboardData() within handleConfirmHire
-  // already ensures the global state for 'hires' is refreshed.
-  // This prop is used by JobDetailView to remove the candidate from its list after parent confirms hire.
   const handleCandidateHiredSuccessfully = useCallback((appliedJobId: string) => {
-    // This is called by JobDetailView AFTER RecruiterDashboard's handleConfirmHire
-    // has successfully updated the database and dismissed the modal.
-    // JobDetailView's internal state for candidates should be updated based on this.
-    // RecruiterDashboard's `fetchDashboardData` covers the global state update.
     console.log(`Candidate with applied_job_id ${appliedJobId} was successfully hired. JobDetailView should update its list.`);
   }, []);
 
@@ -960,6 +774,7 @@ const RecruiterDashboard: React.FC = () => {
     );
   }
 
+  // userProfile is of type `User` imported from types/index.ts
   if (!userProfile) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -1059,7 +874,7 @@ const RecruiterDashboard: React.FC = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <Users className="w-5 h-5 mr-2" /> {/* Reusing Users icon, consider a more specific icon like User or Settings */}
+                <Users className="w-5 h-5 mr-2" />
                 Profile
               </button>
               <button
