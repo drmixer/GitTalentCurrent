@@ -184,12 +184,12 @@ const RecruiterDashboard: React.FC = () => {
       const currentUserId = userProfile.id;
 
       // Fetch Job Roles with nested company_name
-      // === IMPORTANT CHANGE HERE ===
+      // === IMPORTANT CHANGE HERE: REMOVED COMMENT FROM SELECT STRING ===
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters!fk_job_roles_recruiter_user_id ( // <--- UPDATED LINE
+          recruiter:recruiters!fk_job_roles_recruiter_user_id (
             company_name,
             user:users (
               name,
@@ -270,9 +270,10 @@ const RecruiterDashboard: React.FC = () => {
       const jobRolesSubscription = supabase
         .channel('job_roles_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
+          // === IMPORTANT CHANGE HERE: REMOVED COMMENT FROM SELECT STRING ===
           const { data: newJobRolesData, error: newJobRolesError } = await supabase
             .from('job_roles')
-            .select(`*, recruiter:recruiters!fk_job_roles_recruiter_user_id(company_name, user:users(name, avatar_url, profile_pic_url))`) // <--- UPDATED LINE
+            .select(`*, recruiter:recruiters!fk_job_roles_recruiter_user_id(company_name, user:users(name, avatar_url, profile_pic_url))`)
             .eq('recruiter_id', currentUserId);
           if (newJobRolesError) {
             console.error("Error updating job roles via subscription:", newJobRolesError);
