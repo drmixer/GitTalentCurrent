@@ -9,7 +9,7 @@ export interface User {
   email: string;
   is_approved: boolean;
   created_at: string;
-  avatar_url: string | null;     // Added for profile pictures (used as company logo fallback)
+  avatar_url: string | null;      // Added for profile pictures (used as company logo fallback)
   profile_pic_url: string | null;  // Added as another potential profile pic URL
 }
 
@@ -88,16 +88,16 @@ export interface AuthContextType {
 export interface Developer {
   user_id: string;
   github_handle: string | null;        // Changed to nullable
-  bio: string | null;                  // Changed to nullable
-  availability: boolean | null;        // Changed to nullable
-  top_languages: string[] | null;      // Changed to nullable
-  linked_projects: string[] | null;    // Changed to nullable
-  location: string | null;             // Changed to nullable
-  experience_years: number | null;     // Changed to nullable
-  desired_salary: number | null;       // Changed to nullable
+  bio: string | null;                   // Changed to nullable
+  availability: boolean | null;         // Changed to nullable
+  top_languages: string[] | null;       // Changed to nullable
+  linked_projects: string[] | null;     // Changed to nullable
+  location: string | null;              // Changed to nullable
+  experience_years: number | null;      // Changed to nullable
+  desired_salary: number | null;        // Changed to nullable
   skills_categories: SkillCategory | null; // Changed to nullable
-  profile_strength: number | null;     // Changed to nullable
-  public_profile_slug: string | null;  // Changed to nullable
+  profile_strength: number | null;      // Changed to nullable
+  public_profile_slug: string | null;   // Changed to nullable
   notification_preferences: NotificationPreferences | null; // Changed to nullable
   resume_url?: string | null;
   profile_pic_url?: string | null;
@@ -107,7 +107,7 @@ export interface Developer {
   user: User; // Made mandatory as it's always joined in fetches
 
   // New fields for the snapshot card / existing fields for consistency
-  title?: string | null;                 // Developer's job title, from preferred_title
+  title?: string | null;                // Developer's job title, from preferred_title
   skills?: string[] | null;              // Core skills (from DB)
   public_repos_count?: number | null;    // GitHub public repositories count
   annual_contributions?: number | null; // GitHub contributions in the last year
@@ -135,14 +135,25 @@ export interface PortfolioItem {
 
 export interface Endorsement {
   id: string;
-  developer_id: string; // User ID of the developer being endorsed
-  endorser_id: string | null; // User ID of the person giving endorsement (nullable for anonymous)
-  text: string;
-  endorser_name: string | null; // Added for anonymous endorsements
-  endorser_email: string | null; // Added for anonymous endorsements
-  is_public?: boolean; // NEW: Added for controlling public visibility
   created_at: string;
-  // endorser?: User; // Commented out as current fetch doesn't join user data. Uncomment if you add join.
+  developer_id: string; // User ID of the developer being endorsed
+  endorser_id: string | null; // User ID of the person giving endorsement (nullable for anonymous or non-registered)
+  endorser_email: string | null; // Email of endorser (kept for internal use, but NOT displayed on public profile)
+  endorser_role: string | null; // Role of endorser (e.g., "Former Manager", "Colleague")
+  comment: string; // The actual endorsement text
+  skill: string; // The skill being endorsed
+  is_anonymous: boolean;
+  is_public: boolean; // For controlling public visibility
+
+  // Nested user and developer profile data for registered endorsers
+  endorser_user: {
+    name: string;
+    // 'developers' here refers to the developer profile associated with the endorser_id (user_id)
+    // It's an array because of how Supabase handles joins, but for a user, there should typically be 0 or 1 developer profile.
+    developers: {
+      public_profile_slug: string;
+    }[];
+  } | null; // This entire object is null if endorser_id is null or the join yields no data
 }
 
 export interface SavedJob {
@@ -166,9 +177,9 @@ export interface AppliedJob {
 export interface Recruiter {
   user_id: string;
   company_name: string;
-  website: string | null;     // Changed to nullable based on your schema
+  website: string | null;      // Changed to nullable based on your schema
   company_size: string | null; // Changed to nullable based on your schema
-  industry: string | null;    // Changed to nullable based on your schema
+  industry: string | null;     // Changed to nullable based on your schema
   created_at: string;
   updated_at: string;
   user: User; // Made mandatory as it's always joined in fetches
@@ -180,15 +191,15 @@ export interface JobRole {
   title: string;
   description: string;
   location: string;
-  job_type: string;                  // Changed from enum to string as per your DB schema
-  tech_stack: string[] | null;       // Changed to string[] | null as per your DB schema
-  salary: string | null;             // Changed to string | null as per your DB schema
+  job_type: string;             // Changed from enum to string as per your DB schema
+  tech_stack: string[] | null;    // Changed to string[] | null as per your DB schema
+  salary: string | null;          // Changed to string | null as per your DB schema
   experience_required: string | null; // Changed to string | null as per your DB schema
-  is_active: boolean | null;         // Changed to boolean | null as per your DB schema
-  is_featured: boolean | null;       // Changed to boolean | null as per your DB schema
+  is_active: boolean | null;      // Changed to boolean | null as per your DB schema
+  is_featured: boolean | null;    // Changed to boolean | null as per your DB schema
   created_at: string;
   updated_at: string;
-  recruiter?: Recruiter;             // Optional, as it's a joined field.
+  recruiter?: Recruiter;          // Optional, as it's a joined field.
 
   responsibilities?: string[] | null; // Added (if intended/future)
   benefits?: string[] | null;         // Added (if intended/future)
