@@ -28,7 +28,7 @@ import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // IMPORT THE UPDATED MODAL
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 import { ConfirmationModal } from '../components/ConfirmationModal';
@@ -48,7 +48,7 @@ import {
   AppliedJob,
   Notification,
   Recruiter,
-  Assignment, // <-- NEW: Import Assignment type
+  Assignment,
 } from '../types';
 
 // Re-defining internal interfaces that are not exported from types/index.ts
@@ -158,7 +158,7 @@ const RecruiterDashboard: React.FC = () => {
         .select(`
           *,
           assignment:assignments (
-            developer:developers (
+            developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
               user:users (*)
             ),
             job_role:job_roles (*)
@@ -248,7 +248,7 @@ const RecruiterDashboard: React.FC = () => {
             .select(`
               *,
               assignment:assignments (
-                developer:developers (
+                developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
                   user:users (*)
                 ),
                 job_role:job_roles (*)
@@ -424,7 +424,7 @@ const RecruiterDashboard: React.FC = () => {
             .from('assignments')
             .select(`
                 *,
-                developer:developers!inner (
+                developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
                     id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                     user:users!inner (id, name, email, avatar_url, profile_pic_url)
                 ),
@@ -461,7 +461,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .select(`
                     *,
-                    developer:developers!inner (
+                    developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
                         id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                         user:users!inner (id, name, email, avatar_url, profile_pic_url)
                     ),
@@ -965,7 +965,7 @@ const RecruiterDashboard: React.FC = () => {
             job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
-            onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
+            onInitiateHire={handleInitiateHire}
             onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
           />
         )}
@@ -985,7 +985,7 @@ const RecruiterDashboard: React.FC = () => {
           <HiringPipeline
             onSendMessage={handleMessageDeveloper}
             onViewDeveloperProfile={handleViewDeveloperProfile}
-            onInitiateHire={handleInitiateHire} // Pass the updated handleInitiateHire
+            onInitiateHire={handleInitiateHire}
           />
         )}
       </div>
@@ -999,13 +999,13 @@ const RecruiterDashboard: React.FC = () => {
       )}
 
       {/* NEW: Mark As Hired Modal (UPDATED PROPS) */}
-      {isMarkAsHiredModalOpen && assignmentToHire && ( // Only render if assignmentToHire is not null
+      {isMarkAsHiredModalOpen && assignmentToHire && (
         <MarkAsHiredModal
           isOpen={isMarkAsHiredModalOpen}
           onClose={handleCloseMarkAsHiredModal}
-          assignment={assignmentToHire} // Pass the fully prepared assignment
-          onSuccess={handleHireSuccessInModal} // Call this when hire is successful inside modal
-          onCancel={handleCloseMarkAsHiredModal} // Allow user to cancel and close
+          assignment={assignmentToHire}
+          onSuccess={handleHireSuccessInModal}
+          onCancel={handleCloseMarkAsHiredModal}
         />
       )}
     </div>
