@@ -12,8 +12,8 @@ import DOMPurify from 'dompurify';
 
 export const PublicDeveloperProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  // --- CORRECTED LINE 16 ---
-  const [loading, setLoading] = useState(true); // Changed from `true)` to `useState(true)`
+  const [developer, setDeveloper] = useState<Developer | null>(null); // Definition of 'developer'
+  const [loading, setLoading] = useState(true); // Fixed: ensure useState() is called correctly
   const [error, setError] = useState<string | null>(null);
   const [gitHubData, setGitHubData] = useState<any>(null);
   const [gitHubLoading, setGitHubLoading] = useState(true);
@@ -72,7 +72,7 @@ export const PublicDeveloperProfile: React.FC = () => {
     setGitHubLoading(true);
     setGitHubError(null);
     try {
-      // Use the correct deployed function name 'github-proxy'
+      // Corrected: Use the correct deployed function name 'github-proxy'
       const { data, error } = await supabase.functions.invoke('github-proxy', {
         body: JSON.stringify({ githubHandle, installationId }),
       });
@@ -131,6 +131,7 @@ export const PublicDeveloperProfile: React.FC = () => {
   const sanitizedBio = developer?.bio ? DOMPurify.sanitize(developer.bio) : '';
 
   const renderSection = (title: string, content: React.ReactNode, icon: React.ElementType, isLoaded: boolean = true) => {
+    // This check is fine as it relies on 'content' which is a prop passed to renderSection
     if (!content && isLoaded) return null;
 
     return (
@@ -139,6 +140,7 @@ export const PublicDeveloperProfile: React.FC = () => {
           {React.createElement(icon, { className: "w-5 h-5 mr-2 text-blue-600" })}
           {title}
         </h3>
+        {/* 'loading' state used here */}
         {loading && !content ? (
           <div className="flex items-center text-gray-500 text-sm">
             <Loader className="animate-spin mr-2 w-4 h-4" /> Loading...
@@ -148,6 +150,7 @@ export const PublicDeveloperProfile: React.FC = () => {
     );
   };
 
+  // Initial checks before rendering main content
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -167,6 +170,7 @@ export const PublicDeveloperProfile: React.FC = () => {
     );
   }
 
+  // If not loading and no error, but developer is still null (e.g., 404 from DB)
   if (!developer) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-8 text-gray-600">
@@ -177,6 +181,7 @@ export const PublicDeveloperProfile: React.FC = () => {
     );
   }
 
+  // Main rendering (only if developer is guaranteed to be an object)
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-xl overflow-hidden">
@@ -202,6 +207,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Left Column (Main Info) */}
           <div className="md:col-span-2 space-y-8">
+            {/* 'developer' is used safely after checks */}
             {renderSection("Bio",
               developer.bio ? <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizedBio }}></div> : <p className="text-gray-500 italic">No bio provided.</p>,
               MessageCircle
@@ -260,7 +266,7 @@ export const PublicDeveloperProfile: React.FC = () => {
           <div className="md:col-span-1 space-y-8">
             {renderSection("GitHub Activity",
               <>
-                {developer.github_handle ? (
+                {developer.github_handle ? ( // 'developer' is known to exist here
                   <>
                     <p className="text-sm text-gray-600 mb-3 flex items-center">
                       <Github className="w-4 h-4 mr-2" />
@@ -299,7 +305,7 @@ export const PublicDeveloperProfile: React.FC = () => {
             )}
 
             {renderSection("Availability",
-              developer.availability ? (
+              developer.availability ? ( // 'developer' is known to exist here
                 <p className="text-green-600 font-semibold flex items-center">
                   <Calendar className="w-4 h-4 mr-2" /> Available for work
                 </p>
@@ -312,7 +318,7 @@ export const PublicDeveloperProfile: React.FC = () => {
             )}
 
             {renderSection("Desired Salary",
-              developer.desired_salary ? (
+              developer.desired_salary ? ( // 'developer' is known to exist here
                 <p className="text-gray-700 flex items-center">
                   <DollarSign className="w-4 h-4 mr-2" />
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(developer.desired_salary)} / year
