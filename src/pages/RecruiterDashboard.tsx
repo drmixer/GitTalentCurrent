@@ -626,7 +626,7 @@ const RecruiterDashboard: React.FC = () => {
         <div className="space-y-6">
           <button
             onClick={handleCloseMessageThread}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center text-gray-600 hover:text-gray-900 hover:opacity-75 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Messages
@@ -715,7 +715,9 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </td>
+                      </div>
+                      {/* THIS IS THE LINE THAT WAS CAUSING THE ERROR: Removed extra `</div>` */}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
