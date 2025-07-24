@@ -1,8 +1,11 @@
+// src/pages/DeveloperDashboard.tsx
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { fetchEndorsementsForDeveloper, updateEndorsementVisibility } from '../lib/endorsementUtils';
+// CORRECTED: fetchEndorsementsForDeveloper is now a default import
+import fetchEndorsementsForDeveloper, { updateEndorsementVisibility } from '../lib/endorsementUtils';
 import {
   DeveloperProfileForm,
   PortfolioManager,
@@ -15,9 +18,8 @@ import {
   GitHubConnectPrompt,
   OverviewTab,
   JobsTab,
-  // EndorsementDisplay, // REMOVED from named import
 } from '../components';
-import EndorsementDisplay from '../components/EndorsementDisplay'; // CORRECTED: Imported as default
+import EndorsementDisplay from '../components/EndorsementDisplay'; // Corrected: Imported as default
 
 import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
