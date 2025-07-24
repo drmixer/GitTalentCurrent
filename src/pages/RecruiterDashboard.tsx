@@ -161,7 +161,7 @@ const RecruiterDashboard: React.FC = () => {
             developer:developers!fk_assignments_developer (
               user:users (*)
             ),
-            job_role:job_roles (*)
+            job_role:job_roles!fk_assignments_job_role_id (*) // <--- THIS LINE WAS CHANGED
           )
         `)
         .eq('marked_by', currentUserId)
@@ -251,7 +251,7 @@ const RecruiterDashboard: React.FC = () => {
                 developer:developers!fk_assignments_developer (
                   user:users (*)
                 ),
-                job_role:job_roles (*)
+                job_role:job_roles!fk_assignments_job_role_id (*) // <--- THIS LINE WAS CHANGED
               )
             `)
             .eq('marked_by', currentUserId)
@@ -428,7 +428,7 @@ const RecruiterDashboard: React.FC = () => {
                     id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                     user:users!inner (id, name, email, avatar_url, profile_pic_url)
                 ),
-                job_role:job_roles!inner (
+                job_role:job_roles!fk_assignments_job_role_id!inner ( // <--- THIS LINE WAS CHANGED
                     id, recruiter_id, title, description, is_active,
                     recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
                 ),
@@ -465,7 +465,7 @@ const RecruiterDashboard: React.FC = () => {
                         id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                         user:users!inner (id, name, email, avatar_url, profile_pic_url)
                     ),
-                    job_role:job_roles!inner (
+                    job_role:job_roles!fk_assignments_job_role_id!inner ( // <--- THIS LINE WAS CHANGED
                         id, recruiter_id, title, description, is_active,
                         recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
                     ),
@@ -716,7 +716,6 @@ const RecruiterDashboard: React.FC = () => {
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
                       </div>
-                      {/* THIS IS THE LINE THAT WAS CAUSING THE ERROR: Removed extra `</div>` */}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
