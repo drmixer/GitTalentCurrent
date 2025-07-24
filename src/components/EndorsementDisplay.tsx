@@ -80,7 +80,8 @@ const EndorsementDisplay: React.FC<EndorsementDisplayProps> = ({
                 </p>
               )}
               {endorsement.endorser_role && (
-                <p className="text-sm text-gray-700 font-semibold">{endorsement.endorser_role}</p> {/* Bolder role */}
+                // ENSURED: className string is complete on one line. This was the source of the "unexpected token" error.
+                <p className="text-sm text-gray-700 font-semibold">{endorsement.endorser_role}</p>
               )}
               {/* Removed endorser_email display entirely for privacy reasons */}
             </div>
