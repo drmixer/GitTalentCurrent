@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useDeveloperProfile } from '@/hooks/useDeveloperProfile'; // This hook needs to be updated
-import { usePublicGitHub } from '@/hooks/usePublicGitHub'; // This hook needs to be updated
+import { useDeveloperProfile } from '@/hooks/useDeveloperProfile';
+import { usePublicGitHub } from '@/hooks/usePublicGitHub';
 import {
   DeveloperProfileDetails,
   PortfolioManager,
-  RealGitHubChart
+  RealGitHubChart,
+  GitHubUserActivityDetails // <-- ADDED THIS IMPORT
 } from '../components';
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   Code,
   Briefcase,
   Star,
+  Github // Ensure Github icon is imported for the "not connected" state
 } from 'lucide-react';
 import { Developer, Endorsement } from '../types';
 import EndorsementDisplay from '../components/EndorsementDisplay';
@@ -229,18 +231,67 @@ export const PublicDeveloperProfile: React.FC = () => {
           {activeTab === 'portfolio' && (
             <PortfolioManager developerId={developer.user_id} isEditable={false} />
           )}
+          {/* START: GitHub Activity Tab Content (Mirrored from DeveloperDashboard.tsx) */}
           {activeTab === 'github' && developer.github_handle && (
-            // Using your original usePublicGitHub hook data
-            <RealGitHubChart
-              githubHandle={developer.github_handle}
-              gitHubData={gitHubData}
-              loading={githubLoading}
-              error={githubError}
-              className="w-full"
-              displayMode="dashboardSnippet" // Make sure this displayMode is suitable for public view
-              isGitHubAppInstalled={!!developer?.github_installation_id}
-            />
+            developer?.github_installation_id ? (
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Left Column: GitHub Chart */}
+                <div className="lg:w-2/5 flex-shrink-0">
+                  <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                    <RealGitHubChart
+                      githubHandle={developer.github_handle}
+                      gitHubData={gitHubData}
+                      loading={githubLoading}
+                      error={githubError}
+                      className="w-full"
+                      displayMode="dashboardSnippet" // Keep this for the chart display
+                      isGitHubAppInstalled={!!developer?.github_installation_id}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: GitHub Details and States */}
+                <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                  {githubLoading && (
+                    <div className="flex flex-col items-center justify-center h-64">
+                      <Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" />
+                      <p className="text-gray-600">Loading GitHub activity...</p>
+                    </div>
+                  )}
+                  {!githubLoading && githubError && (
+                    <div className="text-center py-10 px-6 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3>
+                      <p className="text-red-600 mt-2 text-sm">
+                        {typeof githubError === 'string' ? githubError : (githubError as Error)?.message || 'An unknown error occurred.'}
+                      </p>
+                      {/* On a public profile, there's no "Re-check" button as the user can't fix it directly */}
+                    </div>
+                  )}
+                  {!githubLoading && !githubError && gitHubData?.user && (
+                    <GitHubUserActivityDetails gitHubData={gitHubData} />
+                  )}
+                  {!githubLoading && !githubError && !gitHubData?.user && (
+                    <div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold">No GitHub Data Available</h3>
+                      <p className="text-gray-600 mt-2 text-sm">Could not retrieve public GitHub activity for this profile.</p>
+                      {/* On a public profile, there's no "Refresh" button as the visitor can't trigger it */}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : ( // This block handles the case where GitHub handle exists but app isn't connected
+              <div className="text-center p-8">
+                <Github className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+                <h3 className="text-2xl font-semibold">GitHub App Not Connected</h3>
+                <p className="mt-2 text-lg text-gray-600">
+                  This developer has linked their GitHub handle but has not yet connected the GitHub App to display activity.
+                </p>
+              </div>
+            )
           )}
+          {/* END: GitHub Activity Tab Content */}
           {activeTab === 'endorsements' && (
             <section className="mt-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">Endorsements</h2>
