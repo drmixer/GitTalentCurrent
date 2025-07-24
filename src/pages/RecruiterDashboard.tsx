@@ -184,11 +184,12 @@ const RecruiterDashboard: React.FC = () => {
       const currentUserId = userProfile.id;
 
       // Fetch Job Roles with nested company_name
+      // === IMPORTANT CHANGE HERE ===
       const { data: jobRolesData, error: jobRolesError } = await supabase
         .from('job_roles')
         .select(`
           *,
-          recruiter:recruiters (
+          recruiter:recruiters!fk_job_roles_recruiter_user_id ( // <--- UPDATED LINE
             company_name,
             user:users (
               name,
@@ -271,7 +272,7 @@ const RecruiterDashboard: React.FC = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'job_roles', filter: `recruiter_id=eq.${currentUserId}` }, async payload => {
           const { data: newJobRolesData, error: newJobRolesError } = await supabase
             .from('job_roles')
-            .select(`*, recruiter:recruiters(company_name, user:users(name, avatar_url, profile_pic_url))`)
+            .select(`*, recruiter:recruiters!fk_job_roles_recruiter_user_id(company_name, user:users(name, avatar_url, profile_pic_url))`) // <--- UPDATED LINE
             .eq('recruiter_id', currentUserId);
           if (newJobRolesError) {
             console.error("Error updating job roles via subscription:", newJobRolesError);
