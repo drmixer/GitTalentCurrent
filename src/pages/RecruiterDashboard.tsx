@@ -27,7 +27,7 @@ import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal'; // Not used in this render
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // Not used in this render
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal'; // <--- Now used!
 import { JobDetailView } from '../components/Jobs/JobDetailView';
 import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
 import { ConfirmationModal } from '../components/ConfirmationModal'; // Not used in this render
@@ -40,6 +40,38 @@ import { DeveloperProfileModal } from '../components/DeveloperProfileModal'; // 
 
 // === TYPE IMPORTS ===
 import { JobRole, Hire, Message, User, DeveloperProfile } from '../types';
+
+// Assuming CandidateType is defined in types.ts or passed consistently.
+// If not explicitly defined in ../types, you might need to add it there.
+// Based on JobDetailView.tsx, CandidateType likely looks like this:
+interface CandidateType {
+    id: string; // This is the applied_job ID
+    developer_id: string;
+    job_role_id: string;
+    status: string; // e.g., 'applied', 'interviewing', 'rejected', 'hired'
+    created_at: string;
+    developer: {
+        id: string;
+        user_id: string;
+        created_at: string;
+        bio?: string;
+        skills?: string[];
+        experience?: string;
+        portfolio_url?: string;
+        linkedin_url?: string;
+        github_url?: string;
+        website_url?: string;
+        user: {
+            id: string;
+            name: string;
+            email: string;
+            avatar_url?: string;
+            profile_pic_url?: string;
+        };
+    };
+    job_role?: JobRole; // Optional, as JobDetailView might pass the main job role separately
+}
+
 
 // Defining interfaces locally as per our discussion, or ensure they are in '../types'
 interface LocalMessageThread {
@@ -129,6 +161,11 @@ const RecruiterDashboard: React.FC = () => {
   // --- Developer Profile Modal States ---
   const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
   const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<DeveloperProfile | null>(null);
+
+  // --- NEW: Mark As Hired Modal States ---
+  const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
+  const [candidateToHire, setCandidateToHire] = useState<CandidateType | null>(null);
+  const [jobRoleForHire, setJobRoleForHire] = useState<JobRole | null>(null);
 
   const isApproved = userProfile?.is_approved === true;
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
@@ -387,6 +424,80 @@ const RecruiterDashboard: React.FC = () => {
     setIsDeveloperProfileModalOpen(false);
     setSelectedDeveloperForModal(null);
   }, []);
+
+  // --- NEW: Handlers for MarkAsHiredModal ---
+  const handleInitiateHire = useCallback((candidate: CandidateType, jobRole: JobRole) => {
+    setCandidateToHire(candidate);
+    setJobRoleForHire(jobRole);
+    setIsMarkAsHiredModalOpen(true);
+  }, []);
+
+  const handleCloseMarkAsHiredModal = useCallback(() => {
+    setIsMarkAsHiredModalOpen(false);
+    setCandidateToHire(null);
+    setJobRoleForHire(null);
+    setDashboardError(null); // Clear any previous error
+  }, []);
+
+  const handleConfirmHire = useCallback(async (salary: number, startDate: string, appliedJobId: string) => {
+    if (!userProfile?.id || !candidateToHire || !jobRoleForHire) {
+      setDashboardError("Missing user, candidate, or job role data for hire.");
+      return;
+    }
+
+    setDashboardLoading(true); // Indicate that a background operation is happening
+
+    try {
+      // 1. Update the applied_jobs record to 'hired'
+      const { error: updateError } = await supabase
+        .from('applied_jobs')
+        .update({ status: 'hired' })
+        .eq('id', appliedJobId);
+
+      if (updateError) throw updateError;
+
+      // 2. Insert a new record into the hires table
+      const { error: insertError } = await supabase
+        .from('hires')
+        .insert({
+          developer_id: candidateToHire.developer.id,
+          job_role_id: jobRoleForHire.id,
+          salary: salary,
+          start_date: startDate,
+          hire_date: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
+          marked_by: userProfile.id,
+        });
+
+      if (insertError) throw insertError;
+
+      setSuccess(`Successfully hired ${candidateToHire.developer.user.name} for ${jobRoleForHire.title}!`);
+      handleCloseMarkAsHiredModal(); // Close modal on success
+      fetchDashboardData(); // Re-fetch all dashboard data to ensure consistency (especially hires list)
+
+      // The `onCandidateHiredSuccessfully` prop for JobDetailView will be used to tell it to remove the candidate.
+      // If JobDetailView's internal state needs immediate update, it handles that itself.
+      // The `fetchDashboardData` call above ensures the global `hires` state is accurate.
+
+    } catch (error: any) {
+      console.error("Error confirming hire:", error);
+      setDashboardError(`Failed to record hire: ${error.message || 'Unknown error'}`);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [userProfile?.id, candidateToHire, jobRoleForHire, fetchDashboardData, handleCloseMarkAsHiredModal]);
+
+
+  // Callback for JobDetailView to use when a candidate is hired.
+  // This function, when passed to JobDetailView, will signal JobDetailView
+  // to update its local list of candidates (e.g., by filtering out the hired one).
+  // In RecruiterDashboard, calling fetchDashboardData() within handleConfirmHire
+  // already ensures the global state for 'hires' is refreshed.
+  const handleCandidateHiredSuccessfully = useCallback(() => {
+    // No direct state update needed here in RecruiterDashboard for JobDetailView's candidates.
+    // The `fetchDashboardData` called in `handleConfirmHire` will refresh the `hires` list.
+    // JobDetailView will be responsible for its own candidates list filtering based on this prop.
+  }, []);
+
 
   // --- Render Functions for Tabs ---
   const renderOverview = useCallback(() => (
@@ -833,6 +944,8 @@ const RecruiterDashboard: React.FC = () => {
             job={selectedJobRole}
             onBack={() => setActiveTab('my-jobs')}
             onMessageDeveloper={handleMessageDeveloper}
+            onInitiateHire={handleInitiateHire} {/* NEW PROP */}
+            onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully} {/* NEW PROP */}
           />
         )}
         {activeTab === 'search-devs' && renderSearchDevelopers()}
@@ -858,6 +971,17 @@ const RecruiterDashboard: React.FC = () => {
           // The onSendMessage prop for DeveloperProfileModal is not defined in the provided code,
           // but if it exists, ensure it's passed here.
           // onSendMessage={handleMessageDeveloper} // Uncomment if DeveloperProfileModal expects this prop
+        />
+      )}
+
+      {/* NEW: Mark As Hired Modal */}
+      {isMarkAsHiredModalOpen && candidateToHire && jobRoleForHire && (
+        <MarkAsHiredModal
+          isOpen={isMarkAsHiredModalOpen}
+          onClose={handleCloseMarkAsHiredModal}
+          onConfirm={handleConfirmHire}
+          candidate={candidateToHire}
+          jobRole={jobRoleForHire}
         />
       )}
     </div>
