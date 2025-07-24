@@ -31,7 +31,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         .from('developers')
         .select(`
           *,
-          user:user_id(name, email, profile_pic_url)
+          user:developers_user_id_fkey(name, email, profile_pic_url) // --- THIS LINE WAS CHANGED ---
         `)
         .eq('public_profile_slug', slug)
         .single();
@@ -40,9 +40,7 @@ export const PublicDeveloperProfile: React.FC = () => {
         if (devError.code === 'PGRST116') { // No rows found
           setError("Developer profile not found.");
         } else {
-          // --- START OF CHANGE ---
           console.error("Error fetching developer profile:", JSON.stringify(devError, null, 2));
-          // --- END OF CHANGE ---
           setError("Failed to load developer profile.");
         }
         setDeveloper(null);
