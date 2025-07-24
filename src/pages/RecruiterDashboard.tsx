@@ -158,7 +158,7 @@ const RecruiterDashboard: React.FC = () => {
         .select(`
           *,
           assignment:assignments (
-            developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
+            developer:developers!fk_assignments_developer (
               user:users (*)
             ),
             job_role:job_roles (*)
@@ -248,7 +248,7 @@ const RecruiterDashboard: React.FC = () => {
             .select(`
               *,
               assignment:assignments (
-                developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
+                developer:developers!fk_assignments_developer (
                   user:users (*)
                 ),
                 job_role:job_roles (*)
@@ -424,7 +424,7 @@ const RecruiterDashboard: React.FC = () => {
             .from('assignments')
             .select(`
                 *,
-                developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
+                developer:developers!fk_assignments_developer (
                     id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                     user:users!inner (id, name, email, avatar_url, profile_pic_url)
                 ),
@@ -461,7 +461,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .select(`
                     *,
-                    developer:developers!fk_assignments_developer (  <-- CHANGED: Use the remaining FK name
+                    developer:developers!fk_assignments_developer (
                         id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                         user:users!inner (id, name, email, avatar_url, profile_pic_url)
                     ),
@@ -715,8 +715,7 @@ const RecruiterDashboard: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">
                           {hire.assignment?.developer?.user?.name || 'Unknown'}
                         </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {hire.assignment?.job_role?.title || 'Unknown'}
