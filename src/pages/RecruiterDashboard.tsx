@@ -463,7 +463,7 @@ const RecruiterDashboard: React.FC = () => {
       const { error: insertError } = await supabase
         .from('hires')
         .insert({
-          developer_id: candidateToHire.developer.id,
+          developer_id: candidateToHire.developer.user_id,
           job_role_id: jobRoleForHire.id,
           salary: salary,
           start_date: startDate,
