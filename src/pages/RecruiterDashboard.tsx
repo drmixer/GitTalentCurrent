@@ -967,7 +967,7 @@ const RecruiterDashboard: React.FC = () => {
           <HiringPipeline
             onSendMessage={handleMessageDeveloper}
             onViewDeveloperProfile={handleViewDeveloperProfile}
-            onInitiateHire={handleInitiateHire} {/* THIS IS THE ADDED/CONFIRMED LINE */}
+            onInitiateHire={handleInitiateHire}
           />
         )}
       </div>
