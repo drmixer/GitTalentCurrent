@@ -12,8 +12,8 @@ import DOMPurify from 'dompurify';
 
 export const PublicDeveloperProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [developer, setDeveloper] = useState<Developer | null>(null);
-  const [loading, setLoading] = true);
+  // --- CORRECTED LINE 16 ---
+  const [loading, setLoading] = useState(true); // Changed from `true)` to `useState(true)`
   const [error, setError] = useState<string | null>(null);
   const [gitHubData, setGitHubData] = useState<any>(null);
   const [gitHubLoading, setGitHubLoading] = useState(true);
@@ -72,10 +72,8 @@ export const PublicDeveloperProfile: React.FC = () => {
     setGitHubLoading(true);
     setGitHubError(null);
     try {
-      // --- START OF CHANGE (1 of 2) ---
       // Use the correct deployed function name 'github-proxy'
       const { data, error } = await supabase.functions.invoke('github-proxy', {
-      // --- END OF CHANGE (1 of 2) ---
         body: JSON.stringify({ githubHandle, installationId }),
       });
 
@@ -184,13 +182,11 @@ export const PublicDeveloperProfile: React.FC = () => {
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-xl overflow-hidden">
         <div className="p-8 pb-4 border-b border-gray-200">
           <div className="flex items-center space-x-6">
-            {/* --- START OF CHANGE (2 of 2) --- */}
             <img
               src={developer.profile_pic_url || developer.user?.profile_pic_url || `/api/placeholder/150/150`}
               alt={developer.user?.name || 'Developer'}
               className="w-28 h-28 rounded-full object-cover border-4 border-blue-300 shadow-md"
             />
-            {/* --- END OF CHANGE (2 of 2) --- */}
             <div>
               <h1 className="text-4xl font-extrabold text-gray-900">{developer.user?.name || 'Developer'}</h1>
               <p className="text-xl text-gray-700 font-semibold mt-1">{developer.preferred_title || 'Developer'}</p>
