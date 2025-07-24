@@ -1,69 +1,111 @@
 // src/components/EndorsementDisplay.tsx
 
 import React from 'react';
-import { Endorsement } from '../types'; // Adjust this path to your Endorsement interface
+import { Endorsement } from '../types'; // Assuming '../types' resolves to types/index.ts due to module resolution
+import { Award, Loader, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom'; // Import Link for user profiles
 
 interface EndorsementDisplayProps {
   endorsements: Endorsement[];
-  isLoading?: boolean;
-  error?: string | null;
-  canManageVisibility?: boolean; // NEW PROP: If true, show controls to toggle visibility
-  onToggleVisibility?: (endorsementId: string, currentIsPublic: boolean) => void; // NEW PROP: Callback for toggling visibility
+  isLoading: boolean;
+  error: string | null;
+  canManageVisibility: boolean; // Indicates if the user can manage visibility
+  onToggleVisibility?: (endorsementId: string, isPublic: boolean) => void;
 }
 
-const EndorsementDisplay: React.FC<EndorsementDisplayProps> = ({ endorsements, isLoading, error, canManageVisibility, onToggleVisibility }) => {
+const EndorsementDisplay: React.FC<EndorsementDisplayProps> = ({
+  endorsements,
+  isLoading,
+  error,
+  canManageVisibility,
+  onToggleVisibility,
+}) => {
   if (isLoading) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Loading endorsements...</p>
+      <div className="flex items-center justify-center p-8">
+        <Loader className="animate-spin h-8 w-8 text-blue-500 mr-3" />
+        <p className="text-gray-600">Loading endorsements...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-red-600">
-        <p>Error loading endorsements: {error}</p>
+      <div className="text-center p-8 text-red-600 bg-red-50 rounded-lg border border-red-200">
+        <AlertCircle className="h-10 w-10 mx-auto mb-4" />
+        <p className="font-semibold">Error loading endorsements:</p>
+        <p className="text-sm">{error}</p>
       </div>
     );
   }
 
-  if (!endorsements || endorsements.length === 0) {
+  if (endorsements.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No endorsements found for this developer yet.</p>
-        {/* You could add a button/link here to encourage leaving an endorsement */}
+      <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+        <Award className="h-10 w-10 mx-auto mb-4" />
+        <p className="font-semibold">No public endorsements yet.</p>
+        {!canManageVisibility && (
+          <p className="text-sm mt-2">This developer hasn't received any public endorsements.</p>
+        )}
+        {canManageVisibility && (
+          <p className="text-sm mt-2">Share your profile to receive endorsements!</p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 bg-gray-50 rounded-lg shadow-inner">
-      <h2 className="text-2xl font-bold text-gray-900 border-b pb-2 mb-4">Endorsements ({endorsements.length})</h2>
+    <div className="space-y-6">
       {endorsements.map((endorsement) => (
-        <div key={endorsement.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <p className="text-gray-700 leading-relaxed italic">"{endorsement.text}"</p>
-          <div className="mt-4 text-right text-sm text-gray-500 flex justify-between items-center"> {/* Modified for layout */}
-            <span>
-              —{' '}
-              {endorsement.endorser_name
-                ? // Display name and optionally email for anonymous
-                  `${endorsement.endorser_name}${endorsement.endorser_email ? ` (${endorsement.endorser_email})` : ''}`
-                : // For authenticated endorsers, just say "A GitTalent User" as we're not joining profiles here
-                  'A GitTalent User'}
-              {' on '}
-              {new Date(endorsement.created_at).toLocaleDateString()}
-            </span>
-            {canManageVisibility && onToggleVisibility && ( // Render visibility toggle if allowed and callback provided
+        // Added bolder styling to the card container: stronger shadow, more defined border
+        <div
+          key={endorsement.id}
+          className="bg-white p-6 rounded-lg shadow-lg border border-gray-300 transform hover:scale-[1.005] transition-transform duration-200 ease-in-out"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              {/* Conditional rendering for endorser name/link */}
+              {endorsement.endorser_id && endorsement.endorser_user?.name && endorsement.endorser_user.developers?.[0]?.public_profile_slug ? (
+                // If it's a registered GitTalent user with a public profile slug, link to their profile
+                <Link
+                  to={`/u/${endorsement.endorser_user.developers[0].public_profile_slug}`}
+                  className="text-xl font-extrabold text-blue-700 hover:text-blue-900 transition-colors cursor-pointer" // Bolder name, darker hover
+                >
+                  {endorsement.endorser_user.name}
+                </Link>
+              ) : (
+                // If anonymous or not a registered GitTalent user with a public profile
+                <p className="text-xl font-extrabold text-gray-900"> {/* Bolder name */}
+                  {endorsement.is_anonymous ? 'Anonymous Endorser' : endorsement.endorser_user?.name || 'Endorser'}
+                </p>
+              )}
+              {endorsement.endorser_role && (
+                <p className="text-sm text-gray-700 font-semibold">{endorsement.endorser_role}</p> {/* Bolder role */}
+              )}
+              {/* Removed endorser_email display entirely for privacy reasons */}
+            </div>
+            {canManageVisibility && (
               <button
-                onClick={() => onToggleVisibility(endorsement.id, endorsement.is_public ?? true)} // Pass current status
-                className={`ml-4 px-3 py-1 text-xs rounded-full transition-colors font-medium
-                  ${(endorsement.is_public ?? true) ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'}`
-                }
+                onClick={() => onToggleVisibility && onToggleVisibility(endorsement.id, !endorsement.is_public)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  endorsement.is_public ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                }`}
               >
-                {(endorsement.is_public ?? true) ? 'Public (Click to Hide)' : 'Hidden (Click to Make Public)'}
+                {endorsement.is_public ? 'Public' : 'Private'}
               </button>
             )}
+          </div>
+          {/* Bolder comment text with darker color */}
+          <p className="text-gray-800 leading-relaxed italic text-base font-bold">
+            "{endorsement.comment}"
+          </p>
+          <p className="text-xs text-gray-600 mt-3 text-right"> {/* Darker date */}
+            {new Date(endorsement.created_at).toLocaleDateString()}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-200 text-purple-900"> {/* Darker skill tag */}
+              {endorsement.skill}
+            </span>
           </div>
         </div>
       ))}
