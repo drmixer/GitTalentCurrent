@@ -40,7 +40,9 @@ export const PublicDeveloperProfile: React.FC = () => {
         if (devError.code === 'PGRST116') { // No rows found
           setError("Developer profile not found.");
         } else {
-          console.error("Error fetching developer profile:", devError);
+          // --- START OF CHANGE ---
+          console.error("Error fetching developer profile:", JSON.stringify(devError, null, 2));
+          // --- END OF CHANGE ---
           setError("Failed to load developer profile.");
         }
         setDeveloper(null);
