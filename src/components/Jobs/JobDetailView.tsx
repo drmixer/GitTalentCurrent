@@ -146,7 +146,11 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-700">
             <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-500" /> {job.location}</div>
             <div className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-gray-500" /> {job.employment_type}</div>
-            <div className="flex items-center"><DollarSign className="w-4 h-4 mr-2 text-gray-500" /> ${job.salary_range_start?.toLocaleString() || 'N/A'} - ${job.salary_range_end?.toLocaleString() || 'N/A'} {job.salary_type || ''}</div>
+            {/* UPDATED LINE BELOW: To display the new freeform salary field */}
+            <div className="flex items-center">
+              <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+              {job.salary ? `$${job.salary}` : 'N/A'}
+            </div>
             <div className="flex items-center"><Clock className="w-4 h-4 mr-2 text-gray-500" /> Posted {new Date(job.created_at).toLocaleDateString()}</div>
           </div>
 
