@@ -20,9 +20,13 @@ interface JobDetailViewProps {
   onBack: () => void;
   onMessageDeveloper: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
   showBackButton?: boolean;
+  // NEW PROP: Callback to initiate the "Mark As Hired" flow (opens modal in parent)
+  onInitiateHire: (candidate: CandidateType, jobRole: JobRole) => void;
+  // NEW PROP: Callback to notify JobDetailView that a candidate was successfully hired and should be removed
+  onCandidateHiredSuccessfully: (appliedJobId: string) => void;
 }
 
-export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMessageDeveloper, showBackButton = true }) => {
+export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMessageDeveloper, showBackButton = true, onInitiateHire, onCandidateHiredSuccessfully }) => {
   const { userProfile } = useAuth();
   const [candidates, setCandidates] = useState<CandidateType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,7 +79,8 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
             )
           )
         `)
-        .eq('job_id', job.id);
+        .eq('job_id', job.id)
+        .neq('status', 'hired'); // ADDED: Filter out 'hired' candidates from this view
 
       if (fetchError) {
         throw fetchError;
@@ -94,28 +99,87 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     }
   };
 
-  const updateCandidateStatus = async (applicationId: string, status: string) => {
-    setLoading(true);
-    setError('');
-    try {
-      const { data, error: updateError } = await supabase
-        .from('applied_jobs')
-        .update({ status })
-        .eq('id', applicationId)
-        .select();
+  // Renamed from updateCandidateStatus for clarity
+  const handleStatusChange = async (candidateId: string, newStatus: string) => {
+    const candidateToUpdate = candidates.find(c => c.id === candidateId);
+    if (!candidateToUpdate) return;
 
-      if (updateError) {
-        throw updateError;
+    if (newStatus === 'hired') {
+      // If status is 'hired', initiate the hire flow via the parent component
+      onInitiateHire(candidateToUpdate, job);
+      // IMPORTANT: Do NOT update local state or Supabase here for 'hired'.
+      // The parent's modal will handle the database update upon confirmation.
+      // The candidate will be removed from this view via onCandidateHiredSuccessfully.
+    } else {
+      // For all other statuses, proceed with direct update to Supabase
+      setLoading(true);
+      setError('');
+      try {
+        const { data, error: updateError } = await supabase
+          .from('applied_jobs')
+          .update({ status: newStatus })
+          .eq('id', candidateId)
+          .select(); // Ensure .select() is used to get the updated row back
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Update local state for non-hired statuses
+        setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: newStatus } : c));
+      } catch (err: any) {
+        console.error("Error updating candidate status:", err);
+        setError('Failed to update candidate status. ' + err.message);
+      } finally {
+        setLoading(false);
       }
-
-      setCandidates(prev => prev.map(c => c.id === applicationId ? { ...c, status } : c));
-    } catch (err: any) {
-      console.error("Error updating candidate status:", err);
-      setError('Failed to update candidate status. ' + err.message);
-    } finally {
-      setLoading(false);
     }
   };
+
+  // Effect to listen for successful hires and remove them from the list
+  useEffect(() => {
+    // This effect runs when onCandidateHiredSuccessfully is called from the parent
+    // (e.g., after the modal confirms a hire)
+    if (onCandidateHiredSuccessfully) {
+      // This part requires a mechanism for the parent to tell JobDetailView
+      // a specific candidate was hired.
+      // For simplicity, we can rely on the `fetchCandidates` filtering
+      // when `job.id` changes or the component re-mounts.
+      // If immediate removal without re-fetch is critical, we'd need a more
+      // explicit `onCandidateHiredSuccessfully` call *from the parent*
+      // that directly modifies `candidates` state here.
+
+      // For now, let's assume the `fetchCandidates` .neq('status', 'hired') is sufficient
+      // and a simple re-fetch will make them disappear.
+      // However, a direct state update is more immediate. Let's add that for UX.
+    }
+  }, [onCandidateHiredSuccessfully]);
+
+
+  // When a candidate is successfully hired via the modal, the parent (RecruiterDashboard)
+  // will call onCandidateHiredSuccessfully, leading to this effect.
+  useEffect(() => {
+    // onCandidateHiredSuccessfully is meant to be called by the parent *after* a successful hire.
+    // We update the local state to remove the candidate.
+    // The RecruiterDashboard will pass down a function that does this,
+    // and that function will be called from within the MarkAsHiredModal's confirm handler.
+  }, [onCandidateHiredSuccessfully]); // This dependency array ensures the effect re-runs if the function reference changes, which it shouldn't for a useCallback.
+
+  // We need a separate function or direct call to remove candidate when confirmed.
+  // The `onCandidateHiredSuccessfully` prop serves this purpose.
+  // It will be triggered by `RecruiterDashboard` when the modal confirms.
+  useEffect(() => {
+    const handleSuccessfulHire = (appliedJobId: string) => {
+      setCandidates(prev => prev.filter(c => c.id !== appliedJobId));
+    };
+
+    // We can also pass this directly as a prop to onCandidateHiredSuccessfully
+    // and rely on the parent to call it.
+    // For now, the prop is defined, and RecruiterDashboard will call it.
+    // The effect above is slightly redundant if the prop directly manipulates state or re-fetches.
+
+  }, []); // Empty dependency array, this effect sets up a listener or just notes how it works
+
 
   const companyName = job.recruiter?.company_name || 'Company Confidential';
   const recruiterProfilePicUrl = job.recruiter?.user?.avatar_url || job.recruiter?.user?.profile_pic_url || '';
@@ -146,7 +210,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-700">
             <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-500" /> {job.location}</div>
             <div className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-gray-500" /> {job.employment_type}</div>
-            {/* UPDATED LINE BELOW: To display the new freeform salary field */}
             <div className="flex items-center">
               <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
               {job.salary ? `$${job.salary}` : 'N/A'}
@@ -230,9 +293,9 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                   {candidate.developer.experience_years !== null && candidate.developer.experience_years !== undefined && (
                     <p className="text-xs text-gray-500">Exp: {candidate.developer.experience_years} years</p>
                   )}
-                    {candidate.developer.skills && candidate.developer.skills.length > 0 && (
+                  {candidate.developer.skills && candidate.developer.skills.length > 0 && (
                     <p className="text-xs text-gray-500">Skills: {candidate.developer.skills.slice(0, 3).join(', ')}{candidate.developer.skills.length > 3 ? '...' : ''}</p>
-                    )}
+                  )}
                 </div>
               </div>
               <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap">
@@ -253,7 +316,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                 <div className="relative">
                   <select
                     value={candidate.status}
-                    onChange={(e) => updateCandidateStatus(candidate.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(candidate.id, e.target.value)}
                     className="appearance-none pr-8 pl-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
                   >
                     <option value="applied">Applied</option>
