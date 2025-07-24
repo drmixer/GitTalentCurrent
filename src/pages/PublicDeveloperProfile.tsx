@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Developer, Endorsement } from '../types';
 import EndorsementDisplay from '../components/EndorsementDisplay';
-import { fetchEndorsementsForDeveloper } from '../lib/endorsementUtils';
+import fetchEndorsementsForDeveloper from '../lib/endorsementUtils';
 
 export const PublicDeveloperProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
