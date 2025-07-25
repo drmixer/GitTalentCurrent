@@ -188,99 +188,99 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
   }, []);
 
-const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
-  setAuthError(null);
-  await ensureUserProfileExists();
-  console.log(`[AuthContext] fetchUserProfile START for user_id: ${authUser.id}, email: ${authUser.email}`);
-  try {
-    const { data: profile, error, status } = await supabase // Added status here
-      .from('users')
-      .select('*')
-      .eq('id', authUser.id)
-      .single();
-
-    console.log(`[AuthContext] fetchUserProfile: Initial fetch from 'users' table - Status: ${status}, Error Code: ${error?.code}, Error Message: ${error?.message}, Profile Data:`, profile);
-
-    // PGRST116 is the error code when .single() finds no rows, which can result in status 406.
-    if (error && error.code === 'PGRST116') { // This also covers the 406 scenario for .single()
-      console.log(`[AuthContext] fetchUserProfile: Profile not found for ${authUser.id} (PGRST116 / implies 406 with .single()). Attempting to create via RPC.`);
-      
-      const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
-      const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'User';
-      const companyName = localStorage.getItem('gittalent_signup_company_name') || authUser.user_metadata?.company_name || '';
-      
-      console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' params: user_id=${authUser.id}, email=${authUser.email || 'unknown@example.com'}, name=${userName}, role=${userRole}, company=${companyName}`);
-
-      const { error: rpcError } = await supabase.rpc(
-        'create_user_profile',
-        { user_id: authUser.id, user_email: authUser.email || 'unknown@example.com', user_name: userName, user_role: userRole, company_name: companyName }
-      );
-
-      if (rpcError) {
-        console.error(`[AuthContext] fetchUserProfile: Error creating profile via RPC for ${authUser.id}:`, rpcError);
-        setAuthError('Failed to create your profile: ' + rpcError.message);
-        return null;
-      }
-      
-      console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' successful for ${authUser.id}. Attempting to fetch newly created profile.`);
-      const { data: newProfile, error: fetchErrorAfterRpc, status: fetchStatusAfterRpc } = await supabase
+  const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
+    setAuthError(null);
+    await ensureUserProfileExists();
+    console.log(`[AuthContext] fetchUserProfile START for user_id: ${authUser.id}, email: ${authUser.email}`);
+    try {
+      const { data: profile, error, status } = await supabase // Added status here
         .from('users')
         .select('*')
         .eq('id', authUser.id)
         .single();
-      
-      console.log(`[AuthContext] fetchUserProfile: Fetch after RPC - Status: ${fetchStatusAfterRpc}, Error Code: ${fetchErrorAfterRpc?.code}, Error Message: ${fetchErrorAfterRpc?.message}, New Profile Data:`, newProfile);
 
-      if (fetchErrorAfterRpc) {
-        console.error(`[AuthContext] fetchUserProfile: Error fetching newly created profile for ${authUser.id}:`, fetchErrorAfterRpc);
-        setAuthError('Failed to load your profile after creation.');
-        return null;
+      console.log(`[AuthContext] fetchUserProfile: Initial fetch from 'users' table - Status: ${status}, Error Code: ${error?.code}, Error Message: ${error?.message}, Profile Data:`, profile);
+
+      // PGRST116 is the error code when .single() finds no rows, which can result in status 406.
+      if (error && error.code === 'PGRST116') { // This also covers the 406 scenario for .single()
+        console.log(`[AuthContext] fetchUserProfile: Profile not found for ${authUser.id} (PGRST116 / implies 406 with .single()). Attempting to create via RPC.`);
+        
+        const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
+        const userName = localStorage.getItem('gittalent_signup_name') || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || 'User';
+        const companyName = localStorage.getItem('gittalent_signup_company_name') || authUser.user_metadata?.company_name || '';
+        
+        console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' params: user_id=${authUser.id}, email=${authUser.email || 'unknown@example.com'}, name=${userName}, role=${userRole}, company=${companyName}`);
+
+        const { error: rpcError } = await supabase.rpc(
+          'create_user_profile',
+          { user_id: authUser.id, user_email: authUser.email || 'unknown@example.com', user_name: userName, user_role: userRole, company_name: companyName }
+        );
+
+        if (rpcError) {
+          console.error(`[AuthContext] fetchUserProfile: Error creating profile via RPC for ${authUser.id}:`, rpcError);
+          setAuthError('Failed to create your profile: ' + rpcError.message);
+          return null;
+        }
+        
+        console.log(`[AuthContext] fetchUserProfile: RPC 'create_user_profile' successful for ${authUser.id}. Attempting to fetch newly created profile.`);
+        const { data: newProfile, error: fetchErrorAfterRpc, status: fetchStatusAfterRpc } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+        
+        console.log(`[AuthContext] fetchUserProfile: Fetch after RPC - Status: ${fetchStatusAfterRpc}, Error Code: ${fetchErrorAfterRpc?.code}, Error Message: ${fetchErrorAfterRpc?.message}, New Profile Data:`, newProfile);
+
+        if (fetchErrorAfterRpc) {
+          console.error(`[AuthContext] fetchUserProfile: Error fetching newly created profile for ${authUser.id}:`, fetchErrorAfterRpc);
+          setAuthError('Failed to load your profile after creation.');
+          return null;
+        }
+        
+        if (!newProfile) {
+          console.error(`[AuthContext] fetchUserProfile: Profile still not found for ${authUser.id} after RPC creation and re-fetch. This is unexpected.`);
+          setAuthError('Profile creation seemed to succeed but could not be retrieved.');
+          return null;
+        }
+        
+        console.log(`[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`);
+        setUserProfile(newProfile); // Set the main user profile
+        if (newProfile.role === 'developer') {
+          console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
+          await ensureDeveloperProfile(authUser, developerProfile);
+        }
+        return newProfile;
+
+      } else if (error) { // Other errors during initial fetch (not PGRST116)
+        console.error(`[AuthContext] fetchUserProfile: Non-PGRST116 error fetching profile for ${authUser.id}: Code: ${error.code}, Message: ${error.message}`);
+        setAuthError('Failed to load your profile.'); return null;
       }
-      
-      if (!newProfile) {
-        console.error(`[AuthContext] fetchUserProfile: Profile still not found for ${authUser.id} after RPC creation and re-fetch. This is unexpected.`);
-        setAuthError('Profile creation seemed to succeed but could not be retrieved.');
-        return null;
+
+      // Profile existed, fetched successfully on the first try
+      if (!profile) {
+          console.error(`[AuthContext] fetchUserProfile: Initial fetch successful (no error, no PGRST116) but profile data is null/undefined for ${authUser.id}. This is unexpected.`);
+          setAuthError('Profile data was unexpectedly empty after fetch.');
+          return null;
       }
-      
-      console.log(`[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`);
-      setUserProfile(newProfile); // Set the main user profile
-      if (newProfile.role === 'developer') {
+        
+      console.log(`[AuthContext] fetchUserProfile: Profile existed and fetched successfully for ${authUser.id}.`);
+      setUserProfile(profile);
+      if (profile.role === 'developer') {
         console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
         await ensureDeveloperProfile(authUser, developerProfile);
       }
-      return newProfile;
+      return profile;
 
-    } else if (error) { // Other errors during initial fetch (not PGRST116)
-      console.error(`[AuthContext] fetchUserProfile: Non-PGRST116 error fetching profile for ${authUser.id}: Code: ${error.code}, Message: ${error.message}`);
-      setAuthError('Failed to load your profile.'); return null;
+    } catch (errorCatch) { // Renamed to avoid conflict with 'error' from supabase calls
+      console.error(`[AuthContext] fetchUserProfile: Unexpected top-level catch error for ${authUser.id}:`, errorCatch);
+      setAuthError('An unexpected error occurred while fetching your profile.'); return null;
+    } finally {
+      setLoading(false);
+      // The log message below might show stale 'loading' state due to closure.
+      // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`);
+      console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading state will be false.`);
     }
-
-    // Profile existed, fetched successfully on the first try
-    if (!profile) {
-        console.error(`[AuthContext] fetchUserProfile: Initial fetch successful (no error, no PGRST116) but profile data is null/undefined for ${authUser.id}. This is unexpected.`);
-        setAuthError('Profile data was unexpectedly empty after fetch.');
-        return null;
-    }
-      
-    console.log(`[AuthContext] fetchUserProfile: Profile existed and fetched successfully for ${authUser.id}.`);
-    setUserProfile(profile);
-    if (profile.role === 'developer') {
-      console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
-      await ensureDeveloperProfile(authUser, developerProfile);
-    }
-    return profile;
-
-  } catch (errorCatch) { // Renamed to avoid conflict with 'error' from supabase calls
-    console.error(`[AuthContext] fetchUserProfile: Unexpected top-level catch error for ${authUser.id}:`, errorCatch);
-    setAuthError('An unexpected error occurred while fetching your profile.'); return null;
-  } finally {
-    setLoading(false);
-    // The log message below might show stale 'loading' state due to closure.
-    // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`);
-    console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading state will be false.`);
-  }
-}, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]); // Added dependencies based on usage
+  }, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]); // Added dependencies based on usage
 
   const handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
     setAuthError(null);
@@ -546,7 +546,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       const newAssignmentData = {
         ...assignmentData,
         recruiter_id: user.id, // Set recruiter_id to the current user's ID
-        assigned_by: user.id,   // Set assigned_by to the current user's ID
+        assigned_by: user.id,    // Set assigned_by to the current user's ID
         status: assignmentData.status || 'Sourced' // Default status if not provided by the caller
       };
 
@@ -559,15 +559,34 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  const createHire = async (hireData: Partial<Hire>): Promise<{ data: any | null; error: any | null }> => {
-    try {
-      if (!user) { throw new Error('User must be authenticated to create hires'); }
-      const { data, error } = await supabase.from('hires').insert([hireData]).select().single();
-      if (error) { throw error; }
-      return { data, error: null };
-    } catch (error: any) {
-      return { data: null, error };
+  // MODIFIED: Replaced the placeholder createHire function with the correct, robust version.
+  const createHire = async (hireData: {
+    assignment_id: string;
+    salary: number;
+    hire_date: string;
+    start_date: string | null;
+    notes: string;
+  }) => {
+    if (!user) {
+      throw new Error("User is not authenticated.");
     }
+    
+    const { data, error } = await supabase
+      .from('hires')
+      .insert({
+        ...hireData,
+        marked_by: user.id, // Set the user who performed the action
+        platform_fee: Math.round(hireData.salary * 0.15) // Automatically calculate the 15% fee
+      })
+      .select()
+      .single();
+  
+    if (error) {
+      console.error("Error creating hire record:", error);
+      throw error;
+    }
+  
+    return data; // Return the created data
   };
 
   const updateAssignmentStatus = async (
@@ -581,7 +600,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
       }
 
       const updates: Partial<Assignment> = {
-        status: newStatus,
+        status: newStatus as any, // Cast to any to bypass strict type check if needed, or refine types
         notes: notes
       };
 
