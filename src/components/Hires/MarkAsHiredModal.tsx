@@ -105,27 +105,40 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         notes: formData.notes.trim() || ''
       };
 
+      // Step 1: Create the record in the 'hires' table
       const result = await createHire(hireData);
-
-      if (result) {
-        const { error: updateError } = await supabase
-          .from('assignments')
-          .update({ status: 'Hired' })
-          .eq('id', assignment.id);
-          
-        if (updateError) {
-          console.error('Error updating assignment status:', updateError);
-        }
-        
-        setSuccess('Hire recorded successfully!');
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-          resetForm();
-        }, 1500);
-      } else {
+      if (!result) {
         throw new Error('Failed to record hire');
       }
+
+      // Step 2: Update the status in the 'assignments' table (for the pipeline)
+      const { error: assignmentUpdateError } = await supabase
+        .from('assignments')
+        .update({ status: 'Hired' })
+        .eq('id', assignment.id);
+        
+      if (assignmentUpdateError) {
+        console.error('Error updating assignment status:', assignmentUpdateError);
+      }
+      
+      // ADDED: Step 3 - Update the status in the 'applied_jobs' table (for the applicant list)
+      const { error: appliedJobsUpdateError } = await supabase
+        .from('applied_jobs')
+        .update({ status: 'hired' })
+        .eq('developer_id', assignment.developer.user_id)
+        .eq('job_id', assignment.job_role_id);
+
+      if (appliedJobsUpdateError) {
+        console.error('Error updating applied_jobs status:', appliedJobsUpdateError);
+      }
+
+      setSuccess('Hire recorded successfully!');
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+        resetForm();
+      }, 1500);
+
     } catch (error: any) {
       setError(error.message || 'Failed to record hire');
     } finally {
@@ -183,7 +196,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
 
           {!showAgreement ? (
             <form id="hire-form" onSubmit={handleSubmit} className="space-y-6">
-              {/* Form fields (salary, dates, notes) */}
               <div>
                 <label htmlFor="salary" className="block text-sm font-bold text-gray-700 mb-2">
                   Annual Salary (USD) *
@@ -259,7 +271,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
             </form>
           ) : (
             <div className="space-y-6">
-              {/* MODIFIED: Info box text changed */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
                 <div className="flex items-start">
                   <Info className="h-5 w-5 text-blue-500 mr-3 mt-0.5" />
@@ -272,7 +283,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
               </div>
 
               <div className="border border-gray-200 rounded-xl p-6 bg-gray-50">
-                {/* MODIFIED: Title changed */}
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
                   <FileCheck className="w-5 h-5 mr-2 text-blue-600" />
                   Confirm Hire Details
@@ -282,7 +292,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
                   <div className="border-t border-gray-200 pt-4 mt-4">
                     <p className="font-semibold mb-2">Summary:</p>
                     <ol className="list-decimal pl-5 space-y-2">
-                      {/* MODIFIED: Fee-related list items removed */}
                       <li>The recruiter confirms they have hired {assignment.developer.user.name} for the position of {assignment.job_role.title}.</li>
                       <li>The annual salary for this position is ${formData.salary.toLocaleString()} USD.</li>
                       <li>The hire date is recorded as {new Date(formData.hire_date + 'T00:00:00').toLocaleDateString()}.</li>
@@ -302,7 +311,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
                       onChange={(e) => setAgreementAccepted(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                    {/* MODIFIED: Checkbox label changed */}
                     <span className="ml-2 text-sm text-gray-700">
                       I confirm the details above are correct
                     </span>
