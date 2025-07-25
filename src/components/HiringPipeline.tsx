@@ -3,10 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { User, JobRole, Developer, Assignment, SavedCandidate } from '../types'; // MODIFIED: Imported correct types
+import { User, JobRole, Developer, Assignment, SavedCandidate } from '../types';
 import { Eye, MessageSquare, ChevronDown, MoreVertical, Trash2, CheckSquare, Edit, FileText, Loader, AlertCircle } from 'lucide-react';
-
-// REMOVED: Local SavedCandidate interface is no longer needed, as it's defined globally in src/types/index.ts
 
 interface KanbanViewProps {
     candidates: SavedCandidate[];
@@ -15,7 +13,7 @@ interface KanbanViewProps {
     onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
 }
 
-const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected']; // MODIFIED: Using Assignment statuses
+const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected'];
 
 const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage }) => {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
@@ -71,7 +69,6 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
     );
 };
 
-// MODIFIED: Updated props to match what RecruiterDashboard provides
 interface HiringPipelineProps {
     onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
     onViewDeveloperProfile: (developer: Developer) => void;
@@ -80,8 +77,8 @@ interface HiringPipelineProps {
 
 const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDeveloperProfile, onInitiateHire }) => {
     const { userProfile } = useAuth();
-    const [candidates, setCandidates] = useState<SavedCandidate[]>([]); // This now holds SavedCandidate (which is an Assignment)
-    const [view, setView] = useState('list'); // 'list' or 'kanban'
+    const [candidates, setCandidates] = useState<SavedCandidate[]>([]);
+    const [view, setView] = useState('list');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
@@ -93,7 +90,6 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
     }, [userProfile]);
 
-    // MODIFIED: This is the core change. The entire data fetching logic is now one clean query from 'assignments'.
     const fetchData = async () => {
         setLoading(true);
         setError('');
@@ -103,33 +99,28 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
 
         try {
+            // CORRECTED QUERY: Explicitly naming the foreign key relationship to resolve ambiguity.
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('assignments')
                 .select(`
                     id,
-                    developer_id,
-                    job_role_id,
-                    recruiter_id,
                     status,
-                    assigned_by,
-                    assigned_at,
-                    updated_at,
                     notes,
-                    has_recruiter_contact,
-                    developer:developers!inner(
+                    assigned_at,
+                    developer:developers!inner (
                         *,
-                        user:users!inner(*)
+                        user:users!inner (*)
                     ),
-                    job_role:job_roles!inner(
+                    job_role:job_roles!assignments_job_role_id_fkey!inner (
                         *,
-                        recruiter:recruiters!inner(
+                        recruiter:recruiters!inner (
                             *,
-                            user:users!inner(*)
+                            user:users!inner (*)
                         )
                     ),
-                    recruiter:recruiters!inner(
+                    recruiter:recruiters!assignments_recruiter_id_fkey!inner (
                         *,
-                        user:users!inner(*)
+                        user:users!inner (*)
                     )
                 `)
                 .eq('recruiter_id', userProfile.id);
@@ -138,7 +129,6 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                 throw assignmentsError;
             }
 
-            // The fetched data now perfectly matches the SavedCandidate shape
             setCandidates((assignmentsData as SavedCandidate[]) || []);
 
         } catch (err: any) {
@@ -157,31 +147,27 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
 
         if (stage === 'Hired') {
-            // MODIFIED: onInitiateHire now takes the single SavedCandidate object
             onInitiateHire(candidate);
         } else {
-            // MODIFIED: Update the 'assignments' table instead of 'applied_jobs'
             const { error } = await supabase.from('assignments').update({ status: stage as any }).eq('id', candidateId);
             if (error) {
                 setError('Failed to update stage: ' + error.message);
             } else {
-                fetchData(); // Refresh all data to reflect the change
+                fetchData();
             }
         }
     };
 
     const handleBulkUpdateStage = async (stage: string) => {
         if (stage === 'Hired') {
-            setError("Bulk 'hired' status change is not supported. Please mark candidates as hired individually.");
+            setError("Bulk 'hired' status change is not supported.");
             return;
         }
-
-        // MODIFIED: Update the 'assignments' table
         const { error } = await supabase.from('assignments').update({ status: stage as any }).in('id', selectedCandidates);
         if (error) {
             setError('Failed to bulk update stages: ' + error.message);
         } else {
-            fetchData(); // Refresh
+            fetchData();
             setSelectedCandidates([]);
         }
     };
@@ -200,12 +186,10 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
 
     const handleUpdateNotes = async (candidateId: string) => {
         const note = notes[candidateId] || '';
-        // MODIFIED: Update the 'assignments' table
         const { error } = await supabase.from('assignments').update({ notes: note }).eq('id', candidateId);
         if (error) {
             setError("Failed to save notes: " + error.message);
         } else {
-            // Optionally show a success message or just rely on local state
             console.log("Note saved.");
         }
     };
