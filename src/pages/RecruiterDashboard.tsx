@@ -516,27 +516,15 @@ const RecruiterDashboard: React.FC = () => {
     const renderMessages = useCallback(() => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
-            {/* --- Left Pane: Conversation List --- */}
-            <div className="md:col-span-1 flex flex-col space-y-4 h-full">
-                <div className="flex-shrink-0 flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-gray-900">Messages</h2>
-                </div>
-                 <div className="flex-shrink-0 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input 
-                        type="text" 
-                        placeholder="Search messages..." 
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" 
-                        value={searchTerm} 
-                        onChange={(e) => setSearchTerm(e.target.value)} 
-                    />
-                 </div>
-                 <div className="flex-grow min-h-0 overflow-y-auto">
-                    <MessageList onThreadSelect={setSelectedThread} searchTerm={searchTerm} />
-                 </div>
+            {/* Left Pane */}
+            <div className="md:col-span-1 h-full flex flex-col">
+              <MessageList 
+                onThreadSelect={setSelectedThread} 
+                searchTerm={searchTerm} 
+              />
             </div>
 
-            {/* --- Right Pane: Selected Thread or Placeholder --- */}
+            {/* Right Pane */}
             <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 {selectedThread ? (
                     <MessageThread
@@ -545,8 +533,7 @@ const RecruiterDashboard: React.FC = () => {
                         otherUserRole={selectedThread.otherUserRole}
                         otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
                         jobContext={selectedThread.jobContext}
-                        // On smaller screens, this back button will be visible inside the thread
-                        onBack={() => setSelectedThread(null)} 
+                        onBack={() => setSelectedThread(null)}
                     />
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
