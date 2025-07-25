@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { JobRole, AppliedJob, Developer } from '../../types';
 import {
-  Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare,
+  Briefcase, User as UserIcon, Clock, Eye, MessageSquare,
   Loader, AlertCircle, ArrowLeft, MapPin, DollarSign,
   Building, PlusCircle, CheckCircle as CheckCircleIcon
 } from 'lucide-react';
@@ -17,7 +17,6 @@ type CandidateType = AppliedJob & {
   };
 };
 
-// MODIFIED: Removed obsolete props related to hiring
 interface JobDetailViewProps {
   job: JobRole;
   onBack: () => void;
@@ -32,8 +31,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
-
-  // ADDED: State to track which candidates have been added to the pipeline
   const [pipelineStatus, setPipelineStatus] = useState<{ [appliedJobId: string]: 'idle' | 'loading' | 'added' }>({});
 
   useEffect(() => {
@@ -53,7 +50,8 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
             user:users (*)
           )
         `)
-        .eq('job_id', job.id);
+        .eq('job_id', job.id)
+        .neq('status', 'hired'); // This line removes already-hired candidates
 
       if (fetchError) throw fetchError;
       
@@ -63,7 +61,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
       
       setCandidates(validCandidates);
 
-      // Also check which of these candidates are already in the assignments table
       const developerIds = validCandidates.map(c => c.developer.user_id);
       if (developerIds.length > 0) {
         const { data: assignmentsData } = await supabase
@@ -88,7 +85,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     }
   };
 
-  // ADDED: The function to create an assignment record, adding the applicant to the pipeline
   const addCandidateToPipeline = async (candidate: CandidateType) => {
     if (!userProfile?.id) {
         setError("You must be logged in to perform this action.");
@@ -111,8 +107,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
             });
 
         if (createError) {
-            // Handle cases where the assignment might already exist (unique constraint violation)
-            if (createError.code === '23505') { // unique_violation code in PostgreSQL
+            if (createError.code === '23505') { 
                 setSuccess(`${candidate.developer.user.name} is already in the pipeline.`);
             } else {
                 throw createError;
@@ -162,8 +157,17 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
 
       {job && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">{job.title}</h2>
-            {/* ... other job details ... */}
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{job.title}</h2>
+          <p className="text-gray-700 mb-4 whitespace-pre-line">{job.description}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-700">
+            <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-500" /> {job.location}</div>
+            <div className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-gray-500" /> {job.employment_type}</div>
+            <div className="flex items-center">
+              <DollarSign className="w-4 h-4 mr-2 text-gray-500" />
+              {job.salary ? `$${job.salary.toLocaleString()}` : 'N/A'}
+            </div>
+            <div className="flex items-center"><Clock className="w-4 h-4 mr-2 text-gray-500" /> Posted {new Date(job.created_at).toLocaleDateString()}</div>
+          </div>
         </div>
       )}
 
@@ -194,7 +198,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
                     </div>
                 </div>
               <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap">
-                {/* ADDED: The new "Add to Pipeline" button with logic */}
                 <button
                     onClick={() => addCandidateToPipeline(candidate)}
                     disabled={pipelineStatus[candidate.id] === 'loading' || pipelineStatus[candidate.id] === 'added'}
