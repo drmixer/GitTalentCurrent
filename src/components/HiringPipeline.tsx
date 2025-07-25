@@ -1,31 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+// src/components/HiringPipeline.tsx
+
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { User, JobRole, AppliedJob, Developer } from '../types';
+import { User, JobRole, Developer, Assignment, SavedCandidate } from '../types'; // MODIFIED: Imported correct types
 import { Eye, MessageSquare, ChevronDown, MoreVertical, Trash2, CheckSquare, Edit, FileText, Loader, AlertCircle } from 'lucide-react';
 
-interface SavedCandidate extends AppliedJob {
-    developer: Developer & { user: User }; // Refined to reflect nested user object
-    job_role: JobRole;
-}
+// REMOVED: Local SavedCandidate interface is no longer needed, as it's defined globally in src/types/index.ts
 
-// Define props for KanbanView to accept the new onViewDeveloperProfile callback
 interface KanbanViewProps {
     candidates: SavedCandidate[];
-    onUpdateStage: (id: string, stage: string, candidate: SavedCandidate) => void; // MODIFIED: Added candidate for 'hired' logic
-    onViewDeveloperProfile: (developer: SavedCandidate['developer']) => void; // Added for eye icon
+    onUpdateStage: (id: string, stage: string, candidate: SavedCandidate) => void;
+    onViewDeveloperProfile: (developer: Developer) => void;
+    onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
 }
 
-const STAGES = ['applied', 'viewed', 'contacted', 'interviewing', 'offer', 'hired', 'rejected'];
+const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected']; // MODIFIED: Using Assignment statuses
 
-const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile }) => {
-    // This is a simplified version. A real implementation would use a drag and drop library.
+const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage }) => {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
         e.preventDefault();
         const candidateId = e.dataTransfer.getData("candidateId");
         const candidate = candidates.find(c => c.id === candidateId);
         if (candidate) {
-            onUpdateStage(candidateId, stage, candidate); // Pass candidate object
+            onUpdateStage(candidateId, stage, candidate);
         }
     };
 
@@ -44,10 +42,9 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                     <h2 className="font-bold mb-3 capitalize text-gray-700">{stage}</h2>
                     {candidates.filter(c => c.status === stage).map(c => (
                         <div key={c.id} draggable onDragStart={(e) => handleDragStart(e, c.id)} className="p-3 bg-white rounded-lg shadow-sm mb-3 cursor-grab border border-gray-200">
-                            <p className="font-semibold text-gray-900">{c.developer.user?.name || c.developer.github_handle || 'Unknown Developer'}</p>
+                            <p className="font-semibold text-gray-900">{c.developer.user?.name || 'Unknown Developer'}</p>
                             <p className="text-sm text-gray-500">{c.job_role.title}</p>
                             <div className="flex justify-end mt-2 space-x-1">
-                                {/* Updated Eye icon onClick */}
                                 <button
                                     onClick={() => onViewDeveloperProfile(c.developer)}
                                     className="p-1 hover:bg-gray-50 rounded-full text-gray-500"
@@ -55,7 +52,13 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                 >
                                     <Eye size={16} />
                                 </button>
-                                <button className="p-1 hover:bg-gray-50 rounded-full text-gray-500"><MessageSquare size={16} /></button>
+                                <button
+                                    onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name, c.job_role.id, c.job_role.title)}
+                                    className="p-1 hover:bg-gray-50 rounded-full text-gray-500"
+                                    title="Send Message"
+                                >
+                                    <MessageSquare size={16} />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -68,17 +71,16 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
     );
 };
 
-// Define props for HiringPipeline to accept the new onViewDeveloperProfile callback
+// MODIFIED: Updated props to match what RecruiterDashboard provides
 interface HiringPipelineProps {
-    onViewDeveloperProfile: (developer: SavedCandidate['developer']) => void;
-    // ADDED: onInitiateHire prop
-    onInitiateHire: (candidate: SavedCandidate, jobRole: JobRole) => void;
+    onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
+    onViewDeveloperProfile: (developer: Developer) => void;
+    onInitiateHire: (assignment: SavedCandidate) => void;
 }
 
-const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile, onInitiateHire }) => { // Deconstruct new prop
-    const { user, userProfile } = useAuth();
-    const [candidates, setCandidates] = useState<SavedCandidate[]>([]);
-    const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDeveloperProfile, onInitiateHire }) => {
+    const { userProfile } = useAuth();
+    const [candidates, setCandidates] = useState<SavedCandidate[]>([]); // This now holds SavedCandidate (which is an Assignment)
     const [view, setView] = useState('list'); // 'list' or 'kanban'
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -89,158 +91,55 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
         if (userProfile?.id) {
             fetchData();
         }
-    }, [userProfile]); // Dependency on userProfile to refetch when it loads
+    }, [userProfile]);
 
+    // MODIFIED: This is the core change. The entire data fetching logic is now one clean query from 'assignments'.
     const fetchData = async () => {
         setLoading(true);
         setError('');
+        if (!userProfile?.id) {
+            setLoading(false);
+            return;
+        }
+
         try {
-            // First fetch job roles (full data, not just ID, for onInitiateHire)
-            const { data: jobRolesData, error: jobRolesError } = await supabase
-                .from('job_roles')
-                .select('*') // MODIFIED: Fetch full job role data
-                .eq('recruiter_id', userProfile?.id);
-
-            if (jobRolesError) throw jobRolesError;
-            setJobRoles(jobRolesData || []);
-
-            const jobIds = jobRolesData?.map(j => j.id) || [];
-
-            if (jobIds.length === 0) {
-                setCandidates([]); // No jobs, no candidates
-                setLoading(false);
-                return;
-            }
-
-            // Then fetch candidates using the fetched job IDs
-            const { data: candidatesData, error: candidatesError } = await supabase
-                .from('applied_jobs')
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+                .from('assignments')
                 .select(`
                     id,
                     developer_id,
-                    job_id,
-                    applied_at,
+                    job_role_id,
+                    recruiter_id,
                     status,
-                    cover_letter,
+                    assigned_by,
+                    assigned_at,
+                    updated_at,
                     notes,
-                    developer:developers!applied_jobs_developer_id_fkey(
-                        user_id,
-                        github_handle,
-                        bio,
-                        availability,
-                        top_languages,
-                        linked_projects,
-                        location,
-                        experience_years,
-                        desired_salary,
-                        created_at,
-                        updated_at,
-                        skills_categories,
-                        profile_strength,
-                        public_profile_slug,
-                        notification_preferences,
-                        resume_url,
-                        profile_pic_url,
-                        github_installation_id,
-                        public_profile_enabled,
-                        profile_view_count,
-                        search_appearance_count,
-                        skills,
-                        preferred_title,
-                        looking_for_job,
-                        user:users!developers_user_id_fkey(
-                            id,
-                            name,
-                            email,
-                            avatar_url,
-                            profile_pic_url
+                    has_recruiter_contact,
+                    developer:developers!inner(
+                        *,
+                        user:users!inner(*)
+                    ),
+                    job_role:job_roles!inner(
+                        *,
+                        recruiter:recruiters!inner(
+                            *,
+                            user:users!inner(*)
                         )
                     ),
-                    job_role:job_roles!applied_jobs_job_id_fkey(
-                        id,
-                        recruiter_id,
-                        title,
-                        description,
-                        location,
-                        job_type,
-                        tech_stack,
-                        experience_required,
-                        is_active,
-                        created_at,
-                        updated_at,
-                        is_featured,
-                        salary
+                    recruiter:recruiters!inner(
+                        *,
+                        user:users!inner(*)
                     )
-                `); // Removed the incorrect comment from here
-            // Ensure the .in() clause is correctly applied.
-            if (jobIds.length > 0) {
-                const { data: filteredCandidates, error: filterError } = await supabase
-                    .from('applied_jobs')
-                    .select(`
-                        id,
-                        developer_id,
-                        job_id,
-                        applied_at,
-                        status,
-                        cover_letter,
-                        notes,
-                        developer:developers!applied_jobs_developer_id_fkey(
-                            user_id,
-                            github_handle,
-                            bio,
-                            availability,
-                            top_languages,
-                            linked_projects,
-                            location,
-                            experience_years,
-                            desired_salary,
-                            created_at,
-                            updated_at,
-                            skills_categories,
-                            profile_strength,
-                            public_profile_slug,
-                            notification_preferences,
-                            resume_url,
-                            profile_pic_url,
-                            github_installation_id,
-                            public_profile_enabled,
-                            profile_view_count,
-                            search_appearance_count,
-                            skills,
-                            preferred_title,
-                            looking_for_job,
-                            user:users!developers_user_id_fkey(
-                                id,
-                                name,
-                                email,
-                                avatar_url,
-                                profile_pic_url
-                            )
-                        ),
-                        job_role:job_roles!applied_jobs_job_id_fkey(
-                            id,
-                            recruiter_id,
-                            title,
-                            description,
-                            location,
-                            job_type,
-                            tech_stack,
-                            experience_required,
-                            is_active,
-                            created_at,
-                            updated_at,
-                            is_featured,
-                            salary
-                        )
-                    `)
-                    .in('job_id', jobIds);
-                
-                if (filterError) throw filterError;
-                setCandidates(filteredCandidates as SavedCandidate[] || []);
+                `)
+                .eq('recruiter_id', userProfile.id);
 
-            } else {
-                setCandidates([]); // No job IDs means no candidates to fetch
+            if (assignmentsError) {
+                throw assignmentsError;
             }
+
+            // The fetched data now perfectly matches the SavedCandidate shape
+            setCandidates((assignmentsData as SavedCandidate[]) || []);
 
         } catch (err: any) {
             setError('Failed to fetch pipeline data: ' + err.message);
@@ -250,28 +149,19 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
         }
     };
 
-
-    // MODIFIED: handleUpdateStage to trigger modal for 'hired' status
     const handleUpdateStage = async (candidateId: string, stage: string, candidateToUpdate?: SavedCandidate) => {
-        // Find the full candidate object if not passed directly (e.g., from List View)
         const candidate = candidateToUpdate || candidates.find(c => c.id === candidateId);
         if (!candidate) {
             setError('Candidate not found for update.');
             return;
         }
 
-        if (stage === 'hired') {
-            // If the new status is 'hired', trigger the hire modal flow
-            // The modal and its confirmation will handle the actual DB update
-            // and then refresh the pipeline.
-            if (candidate.job_role && candidate.developer) { // Ensure both job_role and developer are present
-                onInitiateHire(candidate, candidate.job_role);
-            } else {
-                setError("Cannot initiate hire: Job role or developer details missing for candidate.");
-            }
+        if (stage === 'Hired') {
+            // MODIFIED: onInitiateHire now takes the single SavedCandidate object
+            onInitiateHire(candidate);
         } else {
-            // For any other status change, update directly in the database
-            const { error } = await supabase.from('applied_jobs').update({ status: stage }).eq('id', candidateId);
+            // MODIFIED: Update the 'assignments' table instead of 'applied_jobs'
+            const { error } = await supabase.from('assignments').update({ status: stage as any }).eq('id', candidateId);
             if (error) {
                 setError('Failed to update stage: ' + error.message);
             } else {
@@ -281,12 +171,13 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
     };
 
     const handleBulkUpdateStage = async (stage: string) => {
-        if (stage === 'hired') {
-            setError("Bulk 'hired' status change is not supported. Please mark candidates as hired individually to provide details.");
+        if (stage === 'Hired') {
+            setError("Bulk 'hired' status change is not supported. Please mark candidates as hired individually.");
             return;
         }
 
-        const { error } = await supabase.from('applied_jobs').update({ status: stage }).in('id', selectedCandidates);
+        // MODIFIED: Update the 'assignments' table
+        const { error } = await supabase.from('assignments').update({ status: stage as any }).in('id', selectedCandidates);
         if (error) {
             setError('Failed to bulk update stages: ' + error.message);
         } else {
@@ -308,11 +199,15 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
     };
 
     const handleUpdateNotes = async (candidateId: string) => {
-        const note = notes[candidateId];
-        // In a real app, you'd probably have a dedicated notes table or field in applied_jobs
-        // For now, we'll just log it. If 'notes' is a column in applied_jobs, update it here.
-        console.log(`Saving note for ${candidateId}: ${note}`);
-        // Example: await supabase.from('applied_jobs').update({ notes: note }).eq('id', candidateId);
+        const note = notes[candidateId] || '';
+        // MODIFIED: Update the 'assignments' table
+        const { error } = await supabase.from('assignments').update({ notes: note }).eq('id', candidateId);
+        if (error) {
+            setError("Failed to save notes: " + error.message);
+        } else {
+            // Optionally show a success message or just rely on local state
+            console.log("Note saved.");
+        }
     };
 
     if (loading) {
@@ -355,8 +250,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                             className="p-2 border border-blue-300 rounded-md text-sm text-blue-700 bg-white focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Bulk Change Stage</option>
-                            {/* Prevent 'hired' from being a bulk option */}
-                            {STAGES.filter(s => s !== 'hired').map(s => <option key={`bulk-${s}`} value={s} className="capitalize">{s}</option>)}
+                            {STAGES.filter(s => s !== 'Hired').map(s => <option key={`bulk-${s}`} value={s} className="capitalize">{s}</option>)}
                         </select>
                         <button className="px-3 py-2 border border-red-300 rounded-md text-sm text-red-700 bg-red-50 hover:bg-red-100 transition-colors flex items-center">
                             <Trash2 size={16} className="mr-1" /> Delete
@@ -369,7 +263,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                 <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
                     <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Candidates Found</h3>
-                    <p className="text-gray-600">Start by creating job roles or check your filter settings.</p>
+                    <p className="text-gray-600">No developers have been assigned to your jobs yet.</p>
                 </div>
             ) : (
                 view === 'list' ? (
@@ -380,7 +274,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                                     <th className="p-3 w-8 text-left"><input type="checkbox" onChange={handleSelectAll} checked={selectedCandidates.length === candidates.length && candidates.length > 0} /></th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job</th>
-                                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applied Date</th>
+                                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -393,19 +287,18 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                                         <td className="p-3">
                                             <div className="flex items-center space-x-3">
                                                 <img
-                                                    src={c.developer.user?.avatar_url || c.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.developer.user?.name || c.developer.github_handle || 'U')}&background=random`}
+                                                    src={c.developer.user?.avatar_url || c.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.developer.user?.name || 'U')}&background=random`}
                                                     alt={c.developer.user?.name || 'Unknown'}
-                                                    className="h-8 w-8 rounded-full object-cover" // Added alt and styling for image
+                                                    className="h-8 w-8 rounded-full object-cover"
                                                 />
-                                                <span className="font-medium text-gray-900">{c.developer.user?.name || c.developer.github_handle || 'Unknown'}</span>
+                                                <span className="font-medium text-gray-900">{c.developer.user?.name || 'Unknown'}</span>
                                             </div>
                                         </td>
                                         <td className="p-3 text-gray-700">{c.job_role.title}</td>
-                                        <td className="p-3 text-sm text-gray-500">{new Date(c.applied_at).toLocaleDateString()}</td>
+                                        <td className="p-3 text-sm text-gray-500">{new Date(c.assigned_at).toLocaleDateString()}</td>
                                         <td className="p-3">
                                             <select
                                                 value={c.status}
-                                                // MODIFIED: Pass the full candidate object to handleUpdateStage
                                                 onChange={(e) => handleUpdateStage(c.id, e.target.value, c)}
                                                 className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                             >
@@ -413,10 +306,9 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                                             </select>
                                         </td>
                                         <td className="p-3">
-                                            <input type="text" value={notes[c.id] || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
+                                            <input type="text" value={notes[c.id] || c.notes || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
                                         </td>
                                         <td className="p-3 flex items-center space-x-2">
-                                            {/* Updated Eye icon onClick */}
                                             <button
                                                 onClick={() => onViewDeveloperProfile(c.developer)}
                                                 className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
@@ -424,7 +316,10 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                                             >
                                                 <Eye size={18} />
                                             </button>
-                                            <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} /></button>
+                                            <button
+                                                onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name, c.job_role.id, c.job_role.title)}
+                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -432,7 +327,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                         </table>
                     </div>
                 ) : (
-                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} />
+                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} onSendMessage={onSendMessage}/>
                 )
             )}
         </div>
