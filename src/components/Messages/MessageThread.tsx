@@ -338,155 +338,104 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     );
   }
 
-  return (
-    // MODIFIED: This is the standard, reliable flexbox layout for a chat component.
+return (
     <div className="flex flex-col h-full bg-white">
-      {/* Header (Fixed Height) */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
-        <div className="flex items-center space-x-4">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
-          )}
-          {otherUserProfilePicUrl ? (
-            <img 
-              src={otherUserProfilePicUrl} 
-              alt={otherUserName}
-              className="w-12 h-12 rounded-xl object-cover shadow-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const fallback = document.createElement('div');
-                  fallback.className = "w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg";
-                  fallback.textContent = showLimitedInfo ? "?" : otherUserName.split(' ').map(n => n[0]).join('');
-                  parent.appendChild(fallback);
-                }
-              }}
-            />
-          ) : (
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-              {showLimitedInfo ? (
-                <Lock className="w-6 h-6" />
-              ) : (
-                otherUserName.split(' ').map(n => n[0]).join('')
-              )}
-            </div>
-          )}
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-black text-gray-900">
-                {showLimitedInfo ? "Recruiter" : otherUserName}
-              </h2>
-              <div className="flex items-center text-gray-500">
-                {getRoleIcon(otherUserRole)}
-                <span className="ml-1 text-sm capitalize">{otherUserRole}</span>
-              </div>
-            </div>
-            {jobContext && (
-              <p className="text-sm text-blue-600 font-medium">
-                Re: {jobContext.title}
-              </p>
-            )}
-            {showLimitedInfo && (
-              <p className="text-xs text-gray-500 mt-1">
-                <Lock className="w-3 h-3 inline mr-1" />
-                Full details will be visible after the recruiter contacts you
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Message List (Takes up remaining space and scrolls) */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-        {messages.map((message) => {
-            const isFromCurrentUser = message.sender_id === userProfile?.id;
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                    isFromCurrentUser
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm leading-relaxed">{message.body}</p>
-                  <div className={`flex items-center justify-end mt-2 text-xs ${
-                    isFromCurrentUser ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    <span>{formatTime(message.sent_at)}</span>
-                    {isFromCurrentUser && message.is_read && (
-                      <CheckCircle className="w-3 h-3 ml-2" />
-                    )}
-                  </div>
+        {/* Header (Fixed Height) */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
+            <div className="flex items-center space-x-4">
+                {onBack && (
+                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <ArrowLeft className="w-5 h-5 text-gray-600" />
+                    </button>
+                )}
+                {otherUserProfilePicUrl ? (
+                    <img 
+                        src={otherUserProfilePicUrl} 
+                        alt={otherUserName}
+                        className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                    />
+                ) : (
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                        {otherUserName.split(' ').map(n => n[0]).join('')}
+                    </div>
+                )}
+                <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                        <h2 className="text-xl font-black text-gray-900">{otherUserName}</h2>
+                        <div className="flex items-center text-gray-500">
+                            {getRoleIcon(otherUserRole)}
+                            <span className="ml-1 text-sm capitalize">{otherUserRole}</span>
+                        </div>
+                    </div>
+                    {jobContext && (<p className="text-sm text-blue-600 font-medium">Re: {jobContext.title}</p>)}
                 </div>
-              </div>
-            );
-          })
-        }
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
-              <p className="text-sm leading-relaxed italic">Typing...</p>
             </div>
-          </div>
-        )}
-        {/* MODIFIED: This empty div is the target for our auto-scroll */}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Message Input (Fixed Height) */}
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 p-6">
-        {messages.length === 0 && (
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Subject (optional)"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              disabled={!canSendMessage}
-            />
-          </div>
-        )}
-        <div className="flex space-x-4">
-          <textarea
-            placeholder={canSendMessage ? "Type your message..." : "You can reply after the recruiter contacts you first"}
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
-            rows={3}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={sending || !canSendMessage}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!newMessage.trim() || sending || !canSendMessage}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
-          >
-            {sending ? (
-              <Loader className="animate-spin w-5 h-5" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </button>
         </div>
-        {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
-          <div className="mt-2 text-xs text-amber-600 font-medium">
-            <Lock className="w-3 h-3 inline mr-1" />
-            You can only reply after the recruiter contacts you first
-          </div>
-        )}
-      </div>
+
+        {/* Message List (Takes all remaining space and scrolls) */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+            {messages.map((message) => {
+                const isFromCurrentUser = message.sender_id === userProfile?.id;
+                return (
+                    <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${isFromCurrentUser ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                            <p className="text-sm leading-relaxed">{message.body}</p>
+                            <div className={`flex items-center justify-end mt-2 text-xs ${isFromCurrentUser ? 'text-blue-100' : 'text-gray-500'}`}>
+                                <span>{formatTime(message.sent_at)}</span>
+                                {isFromCurrentUser && message.is_read && (<CheckCircle className="w-3 h-3 ml-2" />)}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+            {isTyping && (
+                <div className="flex justify-start">
+                    <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
+                        <p className="text-sm leading-relaxed italic">Typing...</p>
+                    </div>
+                </div>
+            )}
+            <div ref={messagesEndRef} />
+        </div>
+
+        {/* Message Input (Fixed Height) */}
+        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-6">
+            {messages.length === 0 && (
+                <div className="mb-4">
+                    <input
+                        type="text"
+                        placeholder="Subject (optional)"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        disabled={!canSendMessage}
+                    />
+                </div>
+            )}
+            <div className="flex space-x-4">
+                <textarea
+                    placeholder={canSendMessage ? "Type your message..." : "You can reply after the recruiter contacts you first"}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+                    rows={3}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={sending || !canSendMessage}
+                />
+                <button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim() || sending || !canSendMessage}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                >
+                    {sending ? <Loader className="animate-spin w-5 h-5" /> : <Send className="w-5 h-5" />}
+                </button>
+            </div>
+            {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
+                <div className="mt-2 text-xs text-amber-600 font-medium">
+                    <Lock className="w-3 h-3 inline mr-1" />
+                    You can only reply after the recruiter contacts you first
+                </div>
+            )}
+        </div>
     </div>
-  );
-};
+);
