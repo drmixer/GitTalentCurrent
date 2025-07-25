@@ -99,7 +99,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
 
         try {
-            // CORRECTED QUERY: Explicitly naming the foreign key relationship to resolve ambiguity.
+            // FINAL CORRECTED QUERY: Keep the hint for job_roles, remove it for recruiters.
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('assignments')
                 .select(`
@@ -118,7 +118,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                             user:users!inner (*)
                         )
                     ),
-                    recruiter:recruiters!assignments_recruiter_id_fkey!inner (
+                    recruiter:recruiters!inner (
                         *,
                         user:users!inner (*)
                     )
