@@ -9,15 +9,15 @@ export interface User {
   email: string;
   is_approved: boolean;
   created_at: string;
-  avatar_url: string | null;      // Added for profile pictures (used as company logo fallback)
-  profile_pic_url: string | null;  // Added as another potential profile pic URL
+  avatar_url: string | null;
+  profile_pic_url: string | null;
 }
 
 export interface SkillCategory {
   [category: string]: {
     skills: string[];
     proficiency: 'beginner' | 'intermediate' | 'expert';
-    company_name: string; // This seems odd for a SkillCategory, might need review but keeping as is
+    company_name: string; // This still seems unusual for a skill category, but kept as per your original file
   };
 }
 
@@ -74,7 +74,7 @@ export interface AuthContextType {
   signOut: () => Promise<{ error: any | null }>;
   refreshProfile?: () => Promise<void>;
   setResolvedDeveloperProfile?: (developerData: Developer) => void;
-  lastProfileUpdateTime?: number | null; // Added for explicit refresh signal
+  lastProfileUpdateTime?: number | null;
   createDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
   updateDeveloperProfile?: (profileData: Partial<Developer>) => Promise<boolean>;
   createJobRole?: (jobData: Partial<JobRole>) => Promise<any>;
@@ -87,18 +87,18 @@ export interface AuthContextType {
 
 export interface Developer {
   user_id: string;
-  github_handle: string | null;        // Changed to nullable
-  bio: string | null;                   // Changed to nullable
-  availability: boolean | null;         // Changed to nullable
-  top_languages: string[] | null;       // Changed to nullable
-  linked_projects: string[] | null;     // Changed to nullable
-  location: string | null;              // Changed to nullable
-  experience_years: number | null;      // Changed to nullable
-  desired_salary: number | null;        // Changed to nullable
-  skills_categories: SkillCategory | null; // Changed to nullable
-  profile_strength: number | null;      // Changed to nullable
-  public_profile_slug: string | null;   // Changed to nullable
-  notification_preferences: NotificationPreferences | null; // Changed to nullable
+  github_handle: string | null;
+  bio: string | null;
+  availability: boolean | null;
+  top_languages: string[] | null;
+  linked_projects: string[] | null;
+  location: string | null;
+  experience_years: number | null;
+  desired_salary: number | null;
+  skills_categories: SkillCategory | null;
+  profile_strength: number | null;
+  public_profile_slug: string | null;
+  notification_preferences: NotificationPreferences | null;
   resume_url?: string | null;
   profile_pic_url?: string | null;
   github_installation_id?: string | null;
@@ -107,16 +107,16 @@ export interface Developer {
   user: User; // Made mandatory as it's always joined in fetches
 
   // New fields for the snapshot card / existing fields for consistency
-  title?: string | null;                // Developer's job title, from preferred_title
-  skills?: string[] | null;              // Core skills (from DB)
-  public_repos_count?: number | null;    // GitHub public repositories count
-  annual_contributions?: number | null; // GitHub contributions in the last year
+  title?: string | null;
+  skills?: string[] | null;
+  public_repos_count?: number | null;
+  annual_contributions?: number | null;
 
   // Fields for Overview tab snapshot cards
   endorsements_count?: number | null;
   saved_jobs_count?: number | null;
   applied_jobs_count?: number | null;
-  public_profile_enabled?: boolean | null; // For public/private toggle
+  public_profile_enabled?: boolean | null;
 }
 
 export interface PortfolioItem {
@@ -136,24 +136,21 @@ export interface PortfolioItem {
 export interface Endorsement {
   id: string;
   created_at: string;
-  developer_id: string; // User ID of the developer being endorsed
-  endorser_id: string | null; // User ID of the person giving endorsement (nullable for anonymous or non-registered)
-  endorser_email: string | null; // Email of endorser (kept for internal use, but NOT displayed on public profile)
-  endorser_role: string | null; // Role of endorser (e.g., "Former Manager", "Colleague")
-  comment: string; // The actual endorsement text
-  skill: string; // The skill being endorsed
+  developer_id: string;
+  endorser_id: string | null;
+  endorser_email: string | null;
+  endorser_role: string | null;
+  comment: string;
+  skill: string;
   is_anonymous: boolean;
-  is_public: boolean; // For controlling public visibility
+  is_public: boolean;
 
-  // Nested user and developer profile data for registered endorsers
   endorser_user: {
     name: string;
-    // 'developers' here refers to the developer profile associated with the endorser_id (user_id)
-    // It's an array because of how Supabase handles joins, but for a user, there should typically be 0 or 1 developer profile.
     developers: {
       public_profile_slug: string;
     }[];
-  } | null; // This entire object is null if endorser_id is null or the join yields no data
+  } | null;
 }
 
 export interface SavedJob {
@@ -161,7 +158,7 @@ export interface SavedJob {
   developer_id: string;
   job_id: string;
   saved_at: string;
-  job_role?: JobRole; // Optional: for displaying job info
+  job_role?: JobRole;
 }
 
 export interface AppliedJob {
@@ -170,16 +167,16 @@ export interface AppliedJob {
   job_id: string;
   applied_at: string;
   status: 'applied' | 'viewed' | 'interviewing' | 'offer' | 'rejected' | 'archived';
-  job_role?: JobRole; // Optional: for displaying job info
-  developer?: Developer; // Added: Represents the joined developer object
+  job_role?: JobRole;
+  developer?: Developer;
 }
 
 export interface Recruiter {
   user_id: string;
   company_name: string;
-  website: string | null;      // Changed to nullable based on your schema
-  company_size: string | null; // Changed to nullable based on your schema
-  industry: string | null;     // Changed to nullable based on your schema
+  website: string | null;
+  company_size: string | null;
+  industry: string | null;
   created_at: string;
   updated_at: string;
   user: User; // Made mandatory as it's always joined in fetches
@@ -191,18 +188,18 @@ export interface JobRole {
   title: string;
   description: string;
   location: string;
-  job_type: string;             // Changed from enum to string as per your DB schema
-  tech_stack: string[] | null;    // Changed to string[] | null as per your DB schema
-  salary: string | null;          // Changed to string | null as per your DB schema
-  experience_required: string | null; // Changed to string | null as per your DB schema
-  is_active: boolean | null;      // Changed to boolean | null as per your DB schema
-  is_featured: boolean | null;    // Changed to boolean | null as per your DB schema
+  job_type: string;
+  tech_stack: string[] | null;
+  salary: string | null;
+  experience_required: string | null;
+  is_active: boolean | null;
+  is_featured: boolean | null;
   created_at: string;
   updated_at: string;
-  recruiter?: Recruiter;          // Optional, as it's a joined field.
+  recruiter?: Recruiter; // Optional, as it's a joined field.
 
-  responsibilities?: string[] | null; // Added (if intended/future)
-  benefits?: string[] | null;         // Added (if intended/future)
+  responsibilities?: string[] | null;
+  benefits?: string[] | null;
 }
 
 export interface CSVJobImport {
@@ -210,7 +207,7 @@ export interface CSVJobImport {
   description: string;
   location: string;
   job_type: string;
-  tech_stack: string; // Note: if imported as string, might need parsing to string[]
+  tech_stack: string;
   salary: string;
   experience_required?: string;
   is_active?: boolean | string;
@@ -222,14 +219,22 @@ export interface Assignment {
   job_role_id: string;
   recruiter_id: string;
   status: 'New' | 'Contacted' | 'Shortlisted' | 'Hired' | 'Rejected';
-  assigned_by: string;
+  assigned_by: string; // User ID of the recruiter who made the assignment
   assigned_at: string;
   updated_at: string;
   notes: string;
   has_recruiter_contact?: boolean;
-  developer?: Developer;
-  job_role?: JobRole;
-  recruiter?: Recruiter;
+  developer?: Developer; // Can include joined Developer
+  job_role?: JobRole;   // Can include joined JobRole
+  recruiter?: Recruiter; // Can include joined Recruiter, added for MarkAsHiredModal display
+}
+
+// Define SavedCandidate as an Assignment where developer, job_role, and recruiter
+// are guaranteed to be present for dashboard display and modal usage.
+export interface SavedCandidate extends Assignment {
+    developer: Developer; // Make developer non-optional
+    job_role: JobRole;   // Make job_role non-optional
+    recruiter: Recruiter; // Make recruiter non-optional for the modal's agreement text
 }
 
 export interface Message {
