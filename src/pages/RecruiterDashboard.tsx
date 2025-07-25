@@ -49,7 +49,7 @@ import {
     Notification,
     Recruiter,
     Assignment,
-    SavedCandidate, // ADDED: Import the new SavedCandidate type
+    SavedCandidate,
 } from '../types';
 
 // Re-defining internal interfaces that are not exported from types/index.ts
@@ -113,9 +113,8 @@ const RecruiterDashboard: React.FC = () => {
     const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
     const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null);
 
-    // --- MODIFIED: Mark As Hired Modal States ---
+    // --- Mark As Hired Modal States ---
     const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
-    // This state now holds the complete SavedCandidate object, which includes nested developer/job_role data.
     const [assignmentToHire, setAssignmentToHire] = useState<SavedCandidate | null>(null);
 
     const isApproved = userProfile?.is_approved === true;
@@ -153,7 +152,7 @@ const RecruiterDashboard: React.FC = () => {
             if (jobRolesError) throw jobRolesError;
             setJobRoles(jobRolesData || []);
 
-            // Fetch Hires - UPDATED SELECT HERE
+            // Fetch Hires
             const { data: hiresData, error: hiresError } = await supabase
                 .from('hires')
                 .select(`
@@ -193,12 +192,12 @@ const RecruiterDashboard: React.FC = () => {
             // Calculate Dashboard Stats
             const totalJobs = jobRolesData?.length || 0;
             const activeJobs = (jobRolesData?.filter(job => job.is_active)?.length || 0);
-            const applications = 0; // This might need a separate query for 'applied_jobs' count
+            const applications = 0;
             const recentHires = hiresData?.length || 0;
             setStats({
                 totalJobs,
                 activeJobs,
-                applications, // Update if you fetch this data
+                applications,
                 recentHires,
                 unreadMessages: unreadMessagesCount || 0,
             });
@@ -240,7 +239,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .subscribe();
 
-            // Hires Subscription - UPDATED SELECT HERE
+            // Hires Subscription
             const hiresSubscription = supabase
                 .channel('hires_updates')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
@@ -267,7 +266,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .subscribe();
 
-            // Messages Subscription - OPTIMIZED for just unread count
+            // Messages Subscription
             const messagesSubscription = supabase
                 .channel('messages_updates')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, async payload => {
@@ -392,7 +391,6 @@ const RecruiterDashboard: React.FC = () => {
         return developerName.includes(search) || jobTitle.includes(search);
     });
 
-    // --- Handlers for DeveloperProfileModal ---
     const handleViewDeveloperProfile = useCallback((developer: Developer) => {
         setSelectedDeveloperForModal(developer);
         setIsDeveloperProfileModalOpen(true);
@@ -403,16 +401,11 @@ const RecruiterDashboard: React.FC = () => {
         setSelectedDeveloperForModal(null);
     }, []);
 
-    // --- MODIFIED: Handle Initiate Hire ---
-    // This function now accepts the complete SavedCandidate object directly.
-    // This simplifies the logic, as the calling component (HiringPipeline) is responsible
-    // for providing the fully-formed assignment object.
     const handleInitiateHire = useCallback((assignment: SavedCandidate) => {
         setAssignmentToHire(assignment);
         setIsMarkAsHiredModalOpen(true);
     }, []);
 
-    // --- Handle Modal Close and Success ---
     const handleCloseMarkAsHiredModal = useCallback(() => {
         setIsMarkAsHiredModalOpen(false);
         setAssignmentToHire(null);
@@ -431,10 +424,8 @@ const RecruiterDashboard: React.FC = () => {
         fetchDashboardData();
     }, [fetchDashboardData]);
 
-    // --- Render Functions for Tabs ---
     const renderOverview = useCallback(() => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Job Listings Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
                     <Briefcase className="w-6 h-6 text-blue-600" />
@@ -449,7 +440,6 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Active Jobs Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-full mb-4">
                     <TrendingUp className="w-6 h-6 text-emerald-600" />
@@ -464,7 +454,6 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Unread Messages Stat Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-start">
                 <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
                     <MessageSquare className="w-6 h-6 text-purple-600" />
@@ -479,11 +468,8 @@ const RecruiterDashboard: React.FC = () => {
                 </button>
             </div>
             
-            {/* Recent Activity */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 lg:col-span-3">
                 <h2 className="text-xl font-black text-gray-900 mb-6">Recent Activity</h2>
-
-                {/* Recent Hires */}
                 <div>
                     <h3 className="lg font-bold text-gray-900 mb-4">Recent Hires</h3>
                     {hires.length > 0 ? (
@@ -498,9 +484,6 @@ const RecruiterDashboard: React.FC = () => {
                                             Hired for {hire.assignment?.job_role?.title || 'Unknown Position'} •
                                             ${hire.salary.toLocaleString()} annual salary
                                         </div>
-                                    </div>
-                                    <div className="text-sm font-semibold text-emerald-600">
-                                        ${Math.round(hire.salary * 0.15).toLocaleString()} fee
                                     </div>
                                 </div>
                             ))}
@@ -579,8 +562,6 @@ const RecruiterDashboard: React.FC = () => {
     const renderHires = useCallback(() => (
         <div className="space-y-6">
             <h2 className="text-2xl font-black text-gray-900">Successful Hires</h2>
-
-            {/* Search */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -592,7 +573,6 @@ const RecruiterDashboard: React.FC = () => {
                 />
             </div>
 
-            {/* Hires List */}
             {dashboardLoading ? (
                 <div className="flex items-center justify-center py-12">
                     <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
@@ -607,7 +587,7 @@ const RecruiterDashboard: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Platform Fee</th>
+                                    {/* REMOVED: Platform Fee header */}
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
                                 </tr>
@@ -618,7 +598,7 @@ const RecruiterDashboard: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <img
-                                                    src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || hire.assignment?.developer?.user?.id || 'U')}&background=random`}
+                                                    src={hire.assignment?.developer?.user?.avatar_url || hire.assignment?.developer?.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(hire.assignment?.developer?.user?.name || 'U')}&background=random`}
                                                     alt={hire.assignment?.developer?.user?.name || 'Developer'}
                                                     className="w-8 h-8 rounded-full object-cover mr-3"
                                                 />
@@ -637,11 +617,7 @@ const RecruiterDashboard: React.FC = () => {
                                                 ${hire.salary.toLocaleString()}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-bold text-emerald-600">
-                                                ${Math.round(hire.salary * 0.15).toLocaleString()}
-                                            </div>
-                                        </td>
+                                        {/* REMOVED: Platform Fee cell */}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-500">
                                                 {new Date(hire.hire_date || '').toLocaleDateString()}
@@ -665,15 +641,11 @@ const RecruiterDashboard: React.FC = () => {
                     <p className="text-gray-600">
                         {searchTerm ? "No hires match your search criteria" : "You haven't recorded any successful hires yet"}
                     </p>
-                    <p className="text-sm text-gray-500 mt-4">
-                        When you successfully hire a developer, record it here to track your platform fees.
-                    </p>
                 </div>
             )}
         </div>
     ), [dashboardLoading, filteredHires, searchTerm]);
 
-    // --- Global Loading and Error Handling ---
     if (authLoading || dashboardLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -724,7 +696,7 @@ const RecruiterDashboard: React.FC = () => {
                         className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                         <RefreshCw className={`w-4 h-4 mr-2 inline ${isRefreshing ? 'animate-spin' : ''}`} />
-                        {isRefreshing ? 'Check Status' : 'Check Status'}
+                        {isRefreshing ? 'Checking Status' : 'Check Status'}
                     </button>
                 </div>
             </div>
@@ -736,7 +708,6 @@ const RecruiterDashboard: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-black text-gray-900 mb-2">
                         Welcome, {userProfile.name}!
@@ -744,7 +715,6 @@ const RecruiterDashboard: React.FC = () => {
                     <p className="text-gray-600">Manage your job listings and find the perfect developers for your team.</p>
                 </div>
 
-                {/* Success/Error messages */}
                 {success && (
                     <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center">
                         <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
@@ -760,7 +730,6 @@ const RecruiterDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Navigation Tabs */}
                 <div className="mb-8">
                     <div className="border-b border-gray-200">
                         <nav className="-mb-px flex space-x-8">
@@ -866,7 +835,6 @@ const RecruiterDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Tab Content */}
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'profile' && <RecruiterProfileForm />}
                 {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
@@ -875,11 +843,6 @@ const RecruiterDashboard: React.FC = () => {
                         job={selectedJobRole}
                         onBack={() => setActiveTab('my-jobs')}
                         onMessageDeveloper={handleMessageDeveloper}
-                        // NOTE: The signature for onInitiateHire has changed to accept a SavedCandidate.
-                        // This call from JobDetailView would need to be adapted to construct a SavedCandidate
-                        // object before calling this function.
-                        onInitiateHire={handleInitiateHire as any}
-                        onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
                     />
                 )}
                 {activeTab === 'search-devs' && renderSearchDevelopers()}
@@ -903,7 +866,6 @@ const RecruiterDashboard: React.FC = () => {
                 )}
             </div>
 
-            {/* Developer Profile Modal - Centralized here */}
             {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
                 <DeveloperProfileModal
                     developer={selectedDeveloperForModal}
@@ -911,7 +873,6 @@ const RecruiterDashboard: React.FC = () => {
                 />
             )}
 
-            {/* MODIFIED: Mark As Hired Modal now receives a clean SavedCandidate object */}
             {isMarkAsHiredModalOpen && assignmentToHire && (
                 <MarkAsHiredModal
                     isOpen={isMarkAsHiredModalOpen}
