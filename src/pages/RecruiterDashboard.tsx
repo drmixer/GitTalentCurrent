@@ -406,8 +406,8 @@ const RecruiterDashboard: React.FC = () => {
         setDashboardLoading(true);
         setDashboardError(null);
 
-        // Explicitly log the IDs to verify they are present - FIXED to use user_id
-        console.log("handleInitiateHire received - Candidate Developer user_id:", candidate.developer?.user_id);
+        // Explicitly log the IDs to verify they are present
+        console.log("handleInitiateHire received - Candidate Developer ID:", candidate.developer?.id);
         console.log("handleInitiateHire received - Job Role ID:", jobRole.id);
 
         // Ensure user profile, candidate developer data, and jobRole data exist
@@ -416,7 +416,7 @@ const RecruiterDashboard: React.FC = () => {
             setDashboardLoading(false);
             return;
         }
-        if (!candidate.developer?.user_id) { // CHANGED from .id to .user_id
+        if (!candidate.developer?.id) {
             setDashboardError("Missing developer ID from candidate data to initiate hire.");
             setDashboardLoading(false);
             return;
@@ -437,7 +437,7 @@ const RecruiterDashboard: React.FC = () => {
                 .select(`
                     *,
                     developer:developers!fk_assignments_developer (
-                        user_id, github_handle, linkedin_url, portfolio_url, years_experience,
+                        id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                         user:users!inner (id, name, email, avatar_url, profile_pic_url)
                     ),
                     job_role:job_roles!fk_assignments_job_role_id!inner (
@@ -449,7 +449,7 @@ const RecruiterDashboard: React.FC = () => {
                         user:users!inner (id, name, email)
                     )
                 `)
-                .eq('developer_id', candidate.developer.user_id) // CHANGED from .id to .user_id
+                .eq('developer_id', candidate.developer.id) // Use developer.id for consistency
                 .eq('job_role_id', jobRole.id)
                 .maybeSingle(); // Use maybeSingle to get null if no row is found
 
@@ -466,7 +466,7 @@ const RecruiterDashboard: React.FC = () => {
                 const { data: newAssignment, error: createError } = await supabase
                     .from('assignments')
                     .insert({
-                        developer_id: candidate.developer.user_id, // CHANGED from .id to .user_id
+                        developer_id: candidate.developer.id,
                         job_role_id: jobRole.id,
                         assigned_by: userProfile.id,
                         status: 'offer' // Initial status, will be changed to 'hired' by the modal
@@ -474,7 +474,7 @@ const RecruiterDashboard: React.FC = () => {
                     .select(`
                         *,
                         developer:developers!fk_assignments_developer (
-                            user_id, github_handle, linkedin_url, portfolio_url, years_experience,
+                            id, user_id, github_handle, linkedin_url, portfolio_url, years_experience,
                             user:users!inner (id, name, email, avatar_url, profile_pic_url)
                         ),
                         job_role:job_roles!fk_assignments_job_role_id!inner (
@@ -613,153 +613,7 @@ const RecruiterDashboard: React.FC = () => {
                     {hires.length > 0 && (
                         <div className="mt-4 text-center">
                             <button
-                                onClick={() => setActiveTab('profile')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'profile'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Users className="w-5 h-5 mr-2" />
-                                Profile
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('my-jobs')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'my-jobs'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Briefcase className="w-5 h-5 mr-2" />
-                                My Job Listings
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('search-devs')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'search-devs'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Search className="w-5 h-5 mr-2" />
-                                Search Developers
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('messages')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'messages'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <MessageSquare className="w-5 h-5 mr-2" />
-                                Messages
-                                {stats.unreadMessages > 0 && (
-                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {stats.unreadMessages}
-                                    </span>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('notifications')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'notifications'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Bell className="w-5 h-5 mr-2" />
-                                Notifications
-                                {unreadNotifications > 0 && (
-                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {unreadNotifications}
-                                    </span>
-                                )}
-                            </button>
-                            <button
                                 onClick={() => setActiveTab('hires')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'hires'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <DollarSign className="w-5 h-5 mr-2" />
-                                Hires
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('tracker')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'tracker'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Users className="w-5 h-5 mr-2" />
-                                Hiring Pipeline
-                            </button>
-                        </nav>
-                    </div>
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === 'overview' && renderOverview()}
-                {activeTab === 'profile' && <RecruiterProfileForm />}
-                {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
-                {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
-                    <JobDetailView
-                        job={selectedJobRole}
-                        onBack={() => setActiveTab('my-jobs')}
-                        onMessageDeveloper={handleMessageDeveloper}
-                        onInitiateHire={handleInitiateHire}
-                        onCandidateHiredSuccessfully={handleCandidateHiredSuccessfully}
-                    />
-                )}
-                {activeTab === 'search-devs' && renderSearchDevelopers()}
-                {activeTab === 'messages' && renderMessages()}
-                {activeTab === 'hires' && renderHires()}
-                {activeTab === 'notifications' && (
-                    <NotificationList
-                        notifications={notifications}
-                        onViewJobRole={handleViewNotificationJobRole}
-                        onViewMessage={(messageId) => {
-                            setActiveTab('messages');
-                        }}
-                    />
-                )}
-                {activeTab === 'tracker' && (
-                    <HiringPipeline
-                        onSendMessage={handleMessageDeveloper}
-                        onViewDeveloperProfile={handleViewDeveloperProfile}
-                        onInitiateHire={handleInitiateHire}
-                    />
-                )}
-            </div>
-
-            {/* Developer Profile Modal - Centralized here */}
-            {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
-                <DeveloperProfileModal
-                    developer={selectedDeveloperForModal}
-                    onClose={handleCloseDeveloperProfileModal}
-                />
-            )}
-
-            {/* NEW: Mark As Hired Modal (UPDATED PROPS) */}
-            {isMarkAsHiredModalOpen && assignmentToHire && (
-                <MarkAsHiredModal
-                    isOpen={isMarkAsHiredModalOpen}
-                    onClose={handleCloseMarkAsHiredModal}
-                    assignment={assignmentToHire}
-                    onSuccess={handleHireSuccessInModal}
-                    onCancel={handleCloseMarkAsHiredModal}
-                />
-            )}
-        </div>
-    );
-};
-
-export default RecruiterDashboard; setActiveTab('hires')}
                                 className="text-blue-600 hover:text-blue-800 font-medium"
                             >
                                 View All Hires
