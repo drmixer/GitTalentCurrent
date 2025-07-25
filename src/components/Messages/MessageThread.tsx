@@ -94,8 +94,12 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   // MODIFIED: Re-introduced the standard useEffect for scrolling to the bottom
   useEffect(() => {
+  const timer = setTimeout(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [messages]);
 
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
