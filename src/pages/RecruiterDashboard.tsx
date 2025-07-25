@@ -475,7 +475,7 @@ const RecruiterDashboard: React.FC = () => {
                         *,
                         developer:developers!fk_assignments_developer (
                             user_id, github_handle, experience_years,
-                            user:users!inner (user_id, name, email, avatar_url, profile_pic_url)
+                            user:users!inner (id, name, email, avatar_url, profile_pic_url)
                         ),
                         job_role:job_roles!fk_assignments_job_role_id!inner (
                             id, recruiter_id, title, description, is_active,
