@@ -99,7 +99,6 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
 
         try {
-            // DEFINITIVE QUERY: Using the exact foreign key names from your schema.
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('assignments')
                 .select(`
@@ -123,7 +122,8 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                         user:users!inner (*)
                     )
                 `)
-                .eq('recruiter_id', userProfile.id);
+                .eq('recruiter_id', userProfile.id)
+                .neq('status', 'Hired'); // ADDED: This line filters out hired candidates
 
             if (assignmentsError) {
                 throw assignmentsError;
@@ -247,7 +247,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                 <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
                     <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Candidates Found</h3>
-                    <p className="text-gray-600">No developers have been assigned to your jobs yet.</p>
+                    <p className="text-gray-600">No active candidates in your pipeline. Add them from the job details page.</p>
                 </div>
             ) : (
                 view === 'list' ? (
