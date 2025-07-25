@@ -826,7 +826,7 @@ const RecruiterDashboard: React.FC = () => {
                         </nav>
                     </div>
                 </div>
-
+            <div className="mt-8 flex-grow flex flex-col">
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'profile' && <RecruiterProfileForm />}
                 {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
