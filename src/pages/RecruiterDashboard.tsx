@@ -1,8 +1,8 @@
 // src/pages/RecruiterDashboard.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth.ts'; // Added .ts extension
-import { supabase } from '../lib/supabase.ts'; // Added .ts extension
+import { useAuth } from 'src/hooks/useAuth.ts'; // Changed from ../ to src/
+import { supabase } from 'src/lib/supabase.ts'; // Changed from ../ to src/
 import { Navigate } from 'react-router-dom';
 import {
     Users,
@@ -22,21 +22,21 @@ import {
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
-import { JobRoleForm } from '../components/JobRoles/JobRoleForm.tsx'; // Added .tsx extension
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails.tsx'; // Added .tsx extension
-import { NotificationList } from '../components/Notifications/NotificationList.tsx'; // Added .tsx extension
-import { MessageList } from '../components/Messages/MessageList.tsx'; // Added .tsx extension
-import { MessageThread } from '../components/Messages/MessageThread.tsx'; // Added .tsx extension
-import { JobImportModal } from '../components/JobRoles/JobImportModal.tsx'; // Added .tsx extension
-import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal.tsx'; // Added .tsx extension
-import { JobDetailView } from '../components/Jobs/JobDetailView.tsx'; // Added .tsx extension
-import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm.tsx'; // Added .tsx extension
-import { ConfirmationModal } from '../components/ConfirmationModal.tsx'; // Added .tsx extension
-import { SuccessModal } from '../components/SuccessModal.tsx'; // Added .tsx extension
-import DeveloperDirectory from '../components/DeveloperDirectory.tsx'; // Added .tsx extension
-import HiringPipeline from '../components/HiringPipeline.tsx'; // Added .tsx extension
-import JobsDashboard from '../components/Jobs/JobsDashboard.tsx'; // Added .tsx extension
-import { DeveloperProfileModal } from '../components/DeveloperProfileModal.tsx'; // Added .tsx extension
+import { JobRoleForm } from 'src/components/JobRoles/JobRoleForm.tsx'; // Changed from ../ to src/
+import { JobRoleDetails } from 'src/components/JobRoles/JobRoleDetails.tsx'; // Changed from ../ to src/
+import { NotificationList } from 'src/components/Notifications/NotificationList.tsx'; // Changed from ../ to src/
+import { MessageList } from 'src/components/Messages/MessageList.tsx'; // Changed from ../ to src/
+import { MessageThread } from 'src/components/Messages/MessageThread.tsx'; // Changed from ../ to src/
+import { JobImportModal } from 'src/components/JobRoles/JobImportModal.tsx'; // Changed from ../ to src/
+import { MarkAsHiredModal } from 'src/components/Hires/MarkAsHiredModal.tsx'; // Changed from ../ to src/
+import { JobDetailView } from 'src/components/Jobs/JobDetailView.tsx'; // Changed from ../ to src/
+import { RecruiterProfileForm } from 'src/components/Profile/RecruiterProfileForm.tsx'; // Changed from ../ to src/
+import { ConfirmationModal } from 'src/components/ConfirmationModal.tsx'; // Changed from ../ to src/
+import { SuccessModal } from 'src/components/SuccessModal.tsx'; // Changed from ../ to src/
+import DeveloperDirectory from 'src/components/DeveloperDirectory.tsx'; // Changed from ../ to src/
+import HiringPipeline from 'src/components/HiringPipeline.tsx'; // Changed from ../ to src/
+import JobsDashboard from 'src/components/Jobs/JobsDashboard.tsx'; // Changed from ../ to src/
+import { DeveloperProfileModal } from 'src/components/DeveloperProfileModal.tsx'; // Changed from ../ to src/
 
 // === IMPORTING TYPES FROM src/types/index.ts ===
 import {
@@ -44,16 +44,16 @@ import {
     JobRole,
     Hire,
     Message,
-    Developer, // This type will be updated internally for clarity
+    Developer,
     AppliedJob,
     Notification,
     Recruiter,
     Assignment,
-} from '../types'; // Kept as is, assuming it resolves to index.ts or types.ts implicitly
+} from 'src/types'; // Changed from ../ to src/
 
 // Re-defining internal interfaces that are not exported from types/index.ts
 // IMPORTANT: Adjusting Developer type to explicitly use user_id as per schema
-// Assuming Developer type from '../types' is similar but we're enforcing user_id here.
+// Assuming Developer type from 'src/types' is similar but we're enforcing user_id here.
 // If the original 'Developer' type has 'id' and 'user_id', ensure 'user_id' is used as the primary key.
 type CustomDeveloper = Omit<Developer, 'id'> & {
     user_id: string; // Ensure user_id is always present and used as the identifier
