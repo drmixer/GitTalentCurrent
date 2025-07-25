@@ -47,7 +47,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [canSendMessage, setCanSendMessage] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // REMOVED: The messagesEndRef is no longer needed with the CSS-based approach.
+  // MODIFIED: Re-introduced the ref for the scroll target
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (userProfile && otherUserId) {
@@ -91,7 +92,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   }, [userProfile, otherUserId, jobContext]);
 
-  // REMOVED: The useEffect hook for programmatic scrolling is no longer necessary.
+  // MODIFIED: Re-introduced the standard useEffect for scrolling to the bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
@@ -263,8 +267,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   };
 
-  // REMOVED: The scrollToBottom function is no longer needed with the CSS-based approach.
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -333,9 +335,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-6">
+    // MODIFIED: This is the standard, reliable flexbox layout for a chat component.
+    <div className="flex flex-col h-full bg-white">
+      {/* Header (Fixed Height) */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
         <div className="flex items-center space-x-4">
           {onBack && (
             <button
@@ -351,7 +354,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               alt={otherUserName}
               className="w-12 h-12 rounded-xl object-cover shadow-lg"
               onError={(e) => {
-                // Fallback to initials if image fails to load
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const parent = target.parentElement;
@@ -397,19 +399,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         </div>
       </div>
 
-      {/* Messages */}
-      {/* MODIFIED: Added flex-col-reverse and space-y-reverse to anchor the chat to the bottom */}
-      <div className="flex-1 flex flex-col-reverse overflow-y-auto p-6 space-y-4 space-y-reverse">
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
-              <p className="text-sm leading-relaxed italic">Typing...</p>
-            </div>
-          </div>
-        )}
-        {messages.length > 0 ? (
-          // MODIFIED: Reversed the array before mapping to ensure correct chronological order
-          messages.slice().reverse().map((message) => {
+      {/* Message List (Takes up remaining space and scrolls) */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.map((message) => {
             const isFromCurrentUser = message.sender_id === userProfile?.id;
             return (
               <div
@@ -436,23 +428,20 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               </div>
             );
           })
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              {getRoleIcon(otherUserRole)}
+        }
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
+              <p className="text-sm leading-relaxed italic">Typing...</p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Start a conversation</h3>
-            <p className="text-gray-600">
-              {showLimitedInfo 
-                ? "Send a message to introduce yourself to the recruiter" 
-                : `Send a message to ${otherUserName} to get started.`}
-            </p>
           </div>
         )}
+        {/* MODIFIED: This empty div is the target for our auto-scroll */}
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
-      <div className="bg-white border-t border-gray-200 p-6">
+      {/* Message Input (Fixed Height) */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-200 p-6">
         {messages.length === 0 && (
           <div className="mb-4">
             <input
