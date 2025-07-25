@@ -246,20 +246,32 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         subject: subject.trim() || (jobContext ? `Re: ${jobContext.title}` : 'Message'),
         body: newMessage.trim(),
         job_role_id: jobContext?.id || null,
-        assignment_id: null, // Could be enhanced to link to specific assignments
+        assignment_id: null,
         is_read: false
       };
 
-      const { error } = await supabase
+      // Ask Supabase to return the newly created message
+      const { data: newMsgData, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select(`
+            *,
+            sender:users!messages_sender_id_fkey(*),
+            receiver:users!messages_receiver_id_fkey(*)
+        `)
+        .single();
 
       if (error) throw error;
+
+      // Add just the new message to our state, instead of re-fetching everything
+      if (newMsgData) {
+        setMessages(prev => [...prev, newMsgData]);
+      }
 
       setNewMessage('');
       setSubject('');
       setHasInitiatedContact(true);
-      await fetchMessages();
+      // We no longer call fetchMessages() here
       if (onNewMessage) {
         onNewMessage();
       }
