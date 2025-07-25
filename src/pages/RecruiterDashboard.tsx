@@ -482,7 +482,7 @@ const RecruiterDashboard: React.FC = () => {
                             recruiter:recruiters!inner (company_name, user_id, user:users (name))
                         ),
                         recruiter:recruiters!inner (
-                            id, user_id, company_name,
+                            user_id, company_name,
                             user:users!inner (id, name, email)
                         )
                     `)
