@@ -124,8 +124,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                     cover_letter,
                     notes,
                     developer:developers!applied_jobs_developer_id_fkey(
-                        id,
-                        user_id,
+                        user_id, // Removed 'id' here to resolve the Supabase query error
                         github_handle,
                         bio,
                         availability,
