@@ -404,7 +404,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       </div>
 
       {/* Message List (Takes up remaining space and scrolls) */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
         {messages.map((message) => {
             const isFromCurrentUser = message.sender_id === userProfile?.id;
             return (
