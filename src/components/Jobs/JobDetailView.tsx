@@ -12,7 +12,9 @@ import {
 import { DeveloperProfileModal } from '../DeveloperProfileModal';
 
 type CandidateType = AppliedJob & {
-  developer: Developer;
+  developer: Developer & {
+    user_id: string; // Make sure this is included since developers table uses user_id as primary key
+  };
 };
 
 interface JobDetailViewProps {
@@ -46,7 +48,6 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .select(`
           *,
           developer:developers (
-            id, // <-- ADDED THIS LINE: Crucial for accessing developer.id later
             user_id,
             github_handle,
             bio,
@@ -91,6 +92,14 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         appliedJob.developer && appliedJob.developer.user
       ) as CandidateType[];
 
+      // Debug logging to verify developer data is fetched correctly
+      console.log("Fetched candidates with developer data:", validCandidates.map(c => ({ 
+        appliedJobId: c.id, 
+        developerId: c.developer?.user_id, 
+        developerUserId: c.developer?.user_id,
+        developerName: c.developer?.user?.name 
+      })));
+
       setCandidates(validCandidates);
     } catch (err: any) {
       console.error("Error fetching candidates:", err);
@@ -108,7 +117,10 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
     if (newStatus === 'hired') {
       // If status is 'hired', initiate the hire flow via the parent component
       console.log("JobDetailView - Initiating hire for candidate:", candidateToUpdate); // Added for debugging
-      console.log("JobDetailView - Candidate Developer ID:", candidateToUpdate.developer?.id); // Added for debugging
+      console.log("JobDetailView - Candidate Developer user_id:", candidateToUpdate.developer?.user_id); // Changed from id to user_id
+      console.log("Full candidate object:", JSON.stringify(candidateToUpdate, null, 2));
+      console.log("Developer object:", JSON.stringify(candidateToUpdate.developer, null, 2));
+      
       onInitiateHire(candidateToUpdate, job);
       // IMPORTANT: Do NOT update local state or Supabase here for 'hired'.
       // The parent's modal will handle the database update upon confirmation.
