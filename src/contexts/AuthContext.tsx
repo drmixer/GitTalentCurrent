@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           updates.profile_pic_url = avatarUrl;
           needsUpdate = true;
         }
-         if (userBio && profileToSet.bio !== userBio) {
+        if (userBio && profileToSet.bio !== userBio) {
           updates.bio = userBio;
           needsUpdate = true;
         }
@@ -119,9 +119,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Creating a new profile
       let newDevProfileData: Partial<Developer> = {
-        user_id: authUser.id, 
-        github_handle: githubUsername, 
-        bio: userBio, 
+        user_id: authUser.id,
+        github_handle: githubUsername,
+        bio: userBio,
         location: userLocation,
         profile_pic_url: avatarUrl,
         // github_installation_id: currentGhInstIdInState || null, // Let this be set by GitHubAppSetup or DB default initially
@@ -131,10 +131,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // For a brand new user, this would typically be null/undefined, so it won't be included,
       // allowing the GitHub app installation callback to set it cleanly.
       if (currentGhInstIdInState) {
-         newDevProfileData.github_installation_id = currentGhInstIdInState;
-         console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
+          newDevProfileData.github_installation_id = currentGhInstIdInState;
+          console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
       } else {
-         console.log(`[AuthContext] ensureDeveloperProfile (creating new): Not including ghInstId in new profile data as it's not in current context state. It should be set by GitHub App installation flow.`);
+          console.log(`[AuthContext] ensureDeveloperProfile (creating new): Not including ghInstId in new profile data as it's not in current context state. It should be set by GitHub App installation flow.`);
       }
 
       const { data: insertedProfile, error: createError } = await supabase.from('developers').insert(newDevProfileData).select().single();
@@ -275,9 +275,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     console.error(`[AuthContext] fetchUserProfile: Unexpected top-level catch error for ${authUser.id}:`, errorCatch);
     setAuthError('An unexpected error occurred while fetching your profile.'); return null;
   } finally {
-    setLoading(false); 
+    setLoading(false);
     // The log message below might show stale 'loading' state due to closure.
-    // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`); 
+    // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`);
     console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading state will be false.`);
   }
 }, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]); // Added dependencies based on usage
@@ -431,11 +431,11 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     const role = localStorage.getItem('gittalent_signup_role') || 'developer';
     
     // Data to be available after OAuth callback
-    const intentData = { 
-      name, 
-      role: role || 'developer', 
-      install_after_auth: true, 
-      ...(stateParams || {}) 
+    const intentData = {
+      name,
+      role: role || 'developer',
+      install_after_auth: true,
+      ...(stateParams || {})
     };
     localStorage.setItem('oauth_intent_data', JSON.stringify(intentData));
     console.log('[AuthContext] signInWithGitHub: Stored in localStorage oauth_intent_data:', intentData);
@@ -445,13 +445,13 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     try {
       // We don't need to pass our application state in options.state if using localStorage bridge
       // Supabase handles its own state for CSRF if needed.
-      const { error } = await supabase.auth.signInWithOAuth({ 
-        provider: 'github', 
-        options: { 
-          redirectTo, 
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo,
           scopes: 'read:user user:email'
           // Not passing 'state' here, relying on localStorage bridge for app-specific state
-        } 
+        }
       });
       if (error) { throw error; }
       return { error: null };
@@ -558,6 +558,44 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
+  // NEW FUNCTION: updateAssignmentStatus
+  const updateAssignmentStatus = async (
+    assignmentId: string,
+    newStatus: string,
+    notes: string | null = null // Optional notes field
+  ): Promise<{ data: Assignment | null; error: any | null }> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to update assignment status');
+      }
+
+      // Prepare the updates payload
+      const updates: Partial<Assignment> = {
+        status: newStatus,
+        notes: notes // Include notes if provided
+      };
+
+      // Perform the UPDATE operation on the 'assignments' table
+      const { data, error } = await supabase
+        .from('assignments')
+        .update(updates)
+        .eq('id', assignmentId)
+        .select() // Select the updated row
+        .single(); // Expect a single updated row
+
+      if (error) {
+        console.error("Error updating assignment status:", error.message, error.details);
+        throw error;
+      }
+
+      console.log(`Assignment ${assignmentId} status updated to ${newStatus}.`);
+      return { data, error: null };
+    } catch (error: any) {
+      console.error("Caught error in updateAssignmentStatus:", error.message);
+      return { data: null, error };
+    }
+  };
+
   const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
     try {
       if (!user) {
@@ -638,7 +676,9 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     lastProfileUpdateTime,
     signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
-    createAssignment, createHire, updateUserApprovalStatus, updateProfileStrength,
+    createAssignment, createHire, // createHire remains for inserting into 'hires' table
+    updateAssignmentStatus, // <--- NEW: Added to context value
+    updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
     refreshUserProfile: refreshProfile,
     setResolvedDeveloperProfile, // This is the one called by GitHubAppSetup
