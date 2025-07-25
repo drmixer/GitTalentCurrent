@@ -99,7 +99,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
 
         try {
-            // FINAL CORRECTED QUERY: Keep the hint for job_roles, remove it for recruiters.
+            // DEFINITIVE QUERY: Using the exact foreign key names from your schema.
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('assignments')
                 .select(`
@@ -107,18 +107,18 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     status,
                     notes,
                     assigned_at,
-                    developer:developers!inner (
+                    developer:developers!fk_assignments_developer!inner (
                         *,
                         user:users!inner (*)
                     ),
-                    job_role:job_roles!assignments_job_role_id_fkey!inner (
+                    job_role:job_roles!fk_assignments_job_role_id!inner (
                         *,
                         recruiter:recruiters!inner (
                             *,
                             user:users!inner (*)
                         )
                     ),
-                    recruiter:recruiters!inner (
+                    recruiter:recruiters!fk_assignments_recruiter_user_id!inner (
                         *,
                         user:users!inner (*)
                     )
