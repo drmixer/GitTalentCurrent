@@ -536,18 +536,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // UPDATED: This function now automatically adds recruiter_id and assigned_by
   const createAssignment = async (assignmentData: Partial<Assignment>): Promise<{ data: any | null; error: any | null }> => {
     try {
       if (!user) { throw new Error('User must be authenticated to create assignments'); }
 
-      // Ensure recruiter_id and assigned_by are set to the current user's ID
-      // Also provide a default status if not already present
       const newAssignmentData = {
         ...assignmentData,
-        recruiter_id: user.id, // Set recruiter_id to the current user's ID
-        assigned_by: user.id,    // Set assigned_by to the current user's ID
-        status: assignmentData.status || 'Sourced' // Default status if not provided by the caller
+        recruiter_id: user.id,
+        assigned_by: user.id,
+        status: assignmentData.status || 'Sourced'
       };
 
       const { data, error } = await supabase.from('assignments').insert([newAssignmentData]).select().single();
@@ -559,7 +556,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // MODIFIED: Replaced the placeholder createHire function with the correct, robust version.
+  // MODIFIED: This function no longer inserts a platform_fee
   const createHire = async (hireData: {
     assignment_id: string;
     salary: number;
@@ -575,8 +572,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .from('hires')
       .insert({
         ...hireData,
-        marked_by: user.id, // Set the user who performed the action
-        platform_fee: Math.round(hireData.salary * 0.15) // Automatically calculate the 15% fee
+        marked_by: user.id,
       })
       .select()
       .single();
@@ -586,7 +582,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw error;
     }
   
-    return data; // Return the created data
+    return data;
   };
 
   const updateAssignmentStatus = async (
@@ -600,7 +596,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const updates: Partial<Assignment> = {
-        status: newStatus as any, // Cast to any to bypass strict type check if needed, or refine types
+        status: newStatus as any,
         notes: notes
       };
 
@@ -640,7 +636,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         return data.success;
       } else {
-        // Rejection logic remains the same (deletion)
         const { error } = await supabase.from('users').delete().eq('id', userId);
         if (error) {
           console.error("Error deleting user:", error);
@@ -674,7 +669,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setLoading(true);
 
-    // Invalidate the cache for the 'users' table for the specific user
     await supabase.from('users').select('*').eq('id', user.id).then(({ data, error }) => {
       if (error) console.error("Cache invalidation might not be fully effective:", error);
     });
