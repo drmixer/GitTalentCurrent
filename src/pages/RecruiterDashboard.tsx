@@ -516,21 +516,15 @@ const RecruiterDashboard: React.FC = () => {
     const renderMessages = useCallback(() => {
         if (selectedThread) {
             return (
-                <div className="space-y-6">
-                    <button
-                        onClick={handleCloseMessageThread}
-                        className="flex items-center text-gray-600 hover:text-gray-900 hover:opacity-75 transition-colors"
-                    >
-                        <ArrowLeft className="w-5 h-5 mr-2" />
-                        Back to Messages
-                    </button>
+                // MODIFIED: This container now creates a defined height for the MessageThread component
+                <div className="flex flex-col h-[calc(100vh-300px)] bg-white rounded-xl shadow-sm border border-gray-200">
                     <MessageThread
                         otherUserId={selectedThread.otherUserId}
                         otherUserName={selectedThread.otherUserName}
                         otherUserRole={selectedThread.otherUserRole}
                         otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
                         jobContext={selectedThread.jobContext}
-                        onClose={handleCloseMessageThread}
+                        onBack={handleCloseMessageThread}
                     />
                 </div>
             );
@@ -587,7 +581,6 @@ const RecruiterDashboard: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
-                                    {/* REMOVED: Platform Fee header */}
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
                                 </tr>
@@ -617,7 +610,6 @@ const RecruiterDashboard: React.FC = () => {
                                                 ${hire.salary.toLocaleString()}
                                             </div>
                                         </td>
-                                        {/* REMOVED: Platform Fee cell */}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-500">
                                                 {new Date(hire.hire_date || '').toLocaleDateString()}
