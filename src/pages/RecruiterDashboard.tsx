@@ -442,10 +442,10 @@ const RecruiterDashboard: React.FC = () => {
                     ),
                     job_role:job_roles!fk_assignments_job_role_id!inner (
                         id, recruiter_id, title, description, is_active,
-                        recruiter:recruiters!inner (id, company_name, user_id, user:users (name))
+                        recruiter:recruiters!inner (company_name, user_id, user:users (name))
                     ),
                     recruiter:recruiters!inner (
-                        id, user_id, company_name,
+                        user_id, company_name,
                         user:users!inner (id, name, email)
                     )
                 `)
