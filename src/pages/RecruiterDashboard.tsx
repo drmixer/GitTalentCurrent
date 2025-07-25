@@ -1,8 +1,8 @@
 // src/pages/RecruiterDashboard.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from 'src/hooks/useAuth.ts'; // Changed from ../ to src/
-import { supabase } from 'src/lib/supabase.ts'; // Changed from ../ to src/
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
 import {
     Users,
@@ -22,21 +22,21 @@ import {
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
-import { JobRoleForm } from 'src/components/JobRoles/JobRoleForm.tsx'; // Changed from ../ to src/
-import { JobRoleDetails } from 'src/components/JobRoles/JobRoleDetails.tsx'; // Changed from ../ to src/
-import { NotificationList } from 'src/components/Notifications/NotificationList.tsx'; // Changed from ../ to src/
-import { MessageList } from 'src/components/Messages/MessageList.tsx'; // Changed from ../ to src/
-import { MessageThread } from 'src/components/Messages/MessageThread.tsx'; // Changed from ../ to src/
-import { JobImportModal } from 'src/components/JobRoles/JobImportModal.tsx'; // Changed from ../ to src/
-import { MarkAsHiredModal } from 'src/components/Hires/MarkAsHiredModal.tsx'; // Changed from ../ to src/
-import { JobDetailView } from 'src/components/Jobs/JobDetailView.tsx'; // Changed from ../ to src/
-import { RecruiterProfileForm } from 'src/components/Profile/RecruiterProfileForm.tsx'; // Changed from ../ to src/
-import { ConfirmationModal } from 'src/components/ConfirmationModal.tsx'; // Changed from ../ to src/
-import { SuccessModal } from 'src/components/SuccessModal.tsx'; // Changed from ../ to src/
-import DeveloperDirectory from 'src/components/DeveloperDirectory.tsx'; // Changed from ../ to src/
-import HiringPipeline from 'src/components/HiringPipeline.tsx'; // Changed from ../ to src/
-import JobsDashboard from 'src/components/Jobs/JobsDashboard.tsx'; // Changed from ../ to src/
-import { DeveloperProfileModal } from 'src/components/DeveloperProfileModal.tsx'; // Changed from ../ to src/
+import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+import { NotificationList } from '../components/Notifications/NotificationList';
+import { MessageList } from '../components/Messages/MessageList';
+import { MessageThread } from '../components/Messages/MessageThread';
+import { JobImportModal } from '../components/JobRoles/JobImportModal';
+import { MarkAsHiredModal } from '../components/Hires/MarkAsHiredModal';
+import { JobDetailView } from '../components/Jobs/JobDetailView';
+import { RecruiterProfileForm } from '../components/Profile/RecruiterProfileForm';
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import { SuccessModal } from '../components/SuccessModal';
+import DeveloperDirectory from '../components/DeveloperDirectory';
+import HiringPipeline from '../components/HiringPipeline';
+import JobsDashboard from '../components/Jobs/JobsDashboard';
+import { DeveloperProfileModal } from '../components/DeveloperProfileModal';
 
 // === IMPORTING TYPES FROM src/types/index.ts ===
 import {
@@ -49,17 +49,9 @@ import {
     Notification,
     Recruiter,
     Assignment,
-} from 'src/types'; // Changed from ../ to src/
+} from '../types';
 
 // Re-defining internal interfaces that are not exported from types/index.ts
-// IMPORTANT: Adjusting Developer type to explicitly use user_id as per schema
-// Assuming Developer type from 'src/types' is similar but we're enforcing user_id here.
-// If the original 'Developer' type has 'id' and 'user_id', ensure 'user_id' is used as the primary key.
-type CustomDeveloper = Omit<Developer, 'id'> & {
-    user_id: string; // Ensure user_id is always present and used as the identifier
-    id?: string; // Keep id as optional if it might still exist but isn't the primary key
-};
-
 interface LocalMessageThread {
     otherUserId: string;
     otherUserName: string;
@@ -89,31 +81,12 @@ interface DashboardStats {
     unreadMessages: number;
 }
 
-// Custom type for AppliedJob to correctly reflect the nested developer structure with user_id
-type CandidateType = AppliedJob & {
-    developer: CustomDeveloper & {
-        user?: User; // Nested user profile
-    };
-    job_role: JobRole; // Ensure job_role is always present
-};
-
-// Custom type for Hire to correctly reflect the nested developer structure with user_id
-type CustomHire = Omit<Hire, 'assignment'> & {
-    assignment: Assignment & {
-        developer: CustomDeveloper & {
-            user?: User;
-        };
-        job_role: JobRole;
-    };
-};
-
-
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
 
     // --- State for fetched dashboard data ---
     const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-    const [hires, setHires] = useState<CustomHire[]>([]); // Using CustomHire
+    const [hires, setHires] = useState<Hire[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [stats, setStats] = useState<DashboardStats>({
         totalJobs: 0,
@@ -137,7 +110,7 @@ const RecruiterDashboard: React.FC = () => {
 
     // --- Developer Profile Modal States ---
     const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
-    const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null); // This still uses the original Developer type as it's passed to a component that might expect 'id'
+    const [selectedDeveloperForModal, setSelectedDeveloperForModal] = useState<Developer | null>(null);
 
     // --- NEW: Mark As Hired Modal States (UPDATED TO USE ASSIGNMENT) ---
     const [isMarkAsHiredModalOpen, setIsMarkAsHiredModalOpen] = useState(false);
@@ -178,14 +151,13 @@ const RecruiterDashboard: React.FC = () => {
             if (jobRolesError) throw jobRolesError;
             setJobRoles(jobRolesData || []);
 
-            // Fetch Hires - UPDATED SELECT to include developer.user_id
+            // Fetch Hires - UPDATED SELECT HERE
             const { data: hiresData, error: hiresError } = await supabase
                 .from('hires')
                 .select(`
                     *,
                     assignment:assignments (
                         developer:developers!fk_assignments_developer (
-                            user_id, // <-- IMPORTANT: Added user_id here
                             user:users (*)
                         ),
                         job_role:job_roles!fk_assignments_job_role_id (*)
@@ -195,7 +167,7 @@ const RecruiterDashboard: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (hiresError) throw hiresError;
-            setHires(hiresData as CustomHire[] || []); // Cast to CustomHire
+            setHires(hiresData || []);
 
             // Fetch Notifications
             const { data: notificationsData, error: notificationsError } = await supabase
@@ -266,7 +238,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .subscribe();
 
-            // Hires Subscription - UPDATED SELECT to include developer.user_id
+            // Hires Subscription - UPDATED SELECT HERE
             const hiresSubscription = supabase
                 .channel('hires_updates')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'hires', filter: `marked_by=eq.${currentUserId}` }, async payload => {
@@ -276,7 +248,6 @@ const RecruiterDashboard: React.FC = () => {
                             *,
                             assignment:assignments (
                                 developer:developers!fk_assignments_developer (
-                                    user_id, // <-- IMPORTANT: Added user_id here
                                     user:users (*)
                                 ),
                                 job_role:job_roles!fk_assignments_job_role_id (*)
@@ -285,7 +256,7 @@ const RecruiterDashboard: React.FC = () => {
                         .eq('marked_by', currentUserId)
                         .order('created_at', { ascending: false });
                     if (newHiresData) {
-                        setHires(newHiresData as CustomHire[]); // Cast to CustomHire
+                        setHires(newHiresData);
                         setStats(prev => ({ ...prev, recentHires: newHiresData?.length || 0 }));
                     } else if (newHiresError) {
                         console.error("Error updating hires via subscription:", newHiresError);
@@ -379,7 +350,7 @@ const RecruiterDashboard: React.FC = () => {
                 .from('applied_jobs')
                 .select(`developer:developers(profile_pic_url, user:users(avatar_url))`)
                 .eq('job_id', jobRoleId)
-                .eq('developer_id', developerId) // This developerId is likely the user_id from the applied_jobs table
+                .eq('developer_id', developerId)
                 .single();
 
             if (!appliedJobError && appliedJobData?.developer) {
@@ -430,13 +401,12 @@ const RecruiterDashboard: React.FC = () => {
         setSelectedDeveloperForModal(null);
     }, []);
 
-    // --- NEW: Handle Initiate Hire (PREPARES ASSIGNMENT FOR MARKASHIREDMODAL) ---
-    const handleInitiateHire = useCallback(async (candidate: CandidateType, jobRole: JobRole) => {
+    // --- UPDATED: Handle Initiate Hire (PREPARES ASSIGNMENT FOR MARKASHIREDMODAL) ---
+    const handleInitiateHire = useCallback(async (candidate: AppliedJob, jobRole: JobRole) => {
         setDashboardLoading(true);
         setDashboardError(null);
 
-        // Explicitly log the IDs to verify they are present
-        // --- FIX: Changed from .id to .user_id ---
+        // Explicitly log the IDs to verify they are present - UPDATED TO USE user_id
         console.log("handleInitiateHire received - Candidate Developer ID:", candidate.developer?.user_id);
         console.log("handleInitiateHire received - Job Role ID:", jobRole.id);
 
@@ -446,8 +416,7 @@ const RecruiterDashboard: React.FC = () => {
             setDashboardLoading(false);
             return;
         }
-        // --- FIX: Changed from .id to .user_id ---
-        if (!candidate.developer?.user_id) {
+        if (!candidate.developer?.user_id) { // UPDATED: Changed from .id to .user_id
             setDashboardError("Missing developer ID from candidate data to initiate hire.");
             setDashboardLoading(false);
             return;
@@ -480,8 +449,7 @@ const RecruiterDashboard: React.FC = () => {
                         user:users!inner (id, name, email)
                     )
                 `)
-                // --- FIX: Changed from .id to .user_id ---
-                .eq('developer_id', candidate.developer.user_id)
+                .eq('developer_id', candidate.developer.user_id) // UPDATED: Changed from .id to .user_id
                 .eq('job_role_id', jobRole.id)
                 .maybeSingle(); // Use maybeSingle to get null if no row is found
 
@@ -498,8 +466,7 @@ const RecruiterDashboard: React.FC = () => {
                 const { data: newAssignment, error: createError } = await supabase
                     .from('assignments')
                     .insert({
-                        // --- FIX: Changed from .id to .user_id ---
-                        developer_id: candidate.developer.user_id,
+                        developer_id: candidate.developer.user_id, // UPDATED: Changed from .id to .user_id
                         job_role_id: jobRole.id,
                         assigned_by: userProfile.id,
                         status: 'offer' // Initial status, will be changed to 'hired' by the modal
