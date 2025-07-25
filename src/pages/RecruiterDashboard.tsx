@@ -515,20 +515,20 @@ const RecruiterDashboard: React.FC = () => {
 
     const renderMessages = useCallback(() => {
         if (selectedThread) {
-            return (
-                // MODIFIED: This container now creates a defined height for the MessageThread component
-                <div className="flex flex-col h-[calc(100vh-300px)] bg-white rounded-xl shadow-sm border border-gray-200">
-                    <MessageThread
-                        otherUserId={selectedThread.otherUserId}
-                        otherUserName={selectedThread.otherUserName}
-                        otherUserRole={selectedThread.otherUserRole}
-                        otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
-                        jobContext={selectedThread.jobContext}
-                        onBack={handleCloseMessageThread}
-                    />
-                </div>
-            );
-        }
+    return (
+        // This new container provides the necessary height for the chat component
+        <div className="flex flex-col h-[calc(100vh-280px)] bg-white rounded-xl shadow-sm border border-gray-200">
+            <MessageThread
+                otherUserId={selectedThread.otherUserId}
+                otherUserName={selectedThread.otherUserName}
+                otherUserRole={selectedThread.otherUserRole}
+                otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+                jobContext={selectedThread.jobContext}
+                onBack={handleCloseMessageThread}
+            />
+        </div>
+    );
+}
 
         return (
             <div className="space-y-6">
