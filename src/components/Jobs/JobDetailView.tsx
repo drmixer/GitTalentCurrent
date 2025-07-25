@@ -46,6 +46,7 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
         .select(`
           *,
           developer:developers (
+            id, // <-- ADDED THIS LINE: Crucial for accessing developer.id later
             user_id,
             github_handle,
             bio,
@@ -106,6 +107,8 @@ export const JobDetailView: React.FC<JobDetailViewProps> = ({ job, onBack, onMes
 
     if (newStatus === 'hired') {
       // If status is 'hired', initiate the hire flow via the parent component
+      console.log("JobDetailView - Initiating hire for candidate:", candidateToUpdate); // Added for debugging
+      console.log("JobDetailView - Candidate Developer ID:", candidateToUpdate.developer?.id); // Added for debugging
       onInitiateHire(candidateToUpdate, job);
       // IMPORTANT: Do NOT update local state or Supabase here for 'hired'.
       // The parent's modal will handle the database update upon confirmation.
