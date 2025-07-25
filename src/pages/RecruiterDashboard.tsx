@@ -515,20 +515,23 @@ const RecruiterDashboard: React.FC = () => {
 
     const renderMessages = useCallback(() => {
         if (selectedThread) {
-    return (
-        // This new container provides the necessary height for the chat component
-        <div className="flex flex-col h-[calc(100vh-280px)] bg-white rounded-xl shadow-sm border border-gray-200">
-            <MessageThread
-                otherUserId={selectedThread.otherUserId}
-                otherUserName={selectedThread.otherUserName}
-                otherUserRole={selectedThread.otherUserRole}
-                otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
-                jobContext={selectedThread.jobContext}
-                onBack={handleCloseMessageThread}
-            />
-        </div>
-    );
-}
+            return (
+                <div className="space-y-6">
+                    <button onClick={handleCloseMessageThread} className="flex items-center text-gray-600 hover:text-gray-900 hover:opacity-75 transition-colors">
+                        <ArrowLeft className="w-5 h-5 mr-2" />
+                        Back to Messages
+                    </button>
+                    <MessageThread
+                        otherUserId={selectedThread.otherUserId}
+                        otherUserName={selectedThread.otherUserName}
+                        otherUserRole={selectedThread.otherUserRole}
+                        otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+                        jobContext={selectedThread.jobContext}
+                        onClose={handleCloseMessageThread}
+                    />
+                </div>
+            );
+        }
 
         return (
             <div className="space-y-6">
@@ -826,37 +829,39 @@ const RecruiterDashboard: React.FC = () => {
                         </nav>
                     </div>
                 </div>
-            <div className="mt-8 flex-grow flex flex-col">
-    {activeTab === 'overview' && renderOverview()}
-    {activeTab === 'profile' && <RecruiterProfileForm />}
-    {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
-    {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
-        <JobDetailView
-            job={selectedJobRole}
-            onBack={() => setActiveTab('my-jobs')}
-            onMessageDeveloper={handleMessageDeveloper}
-        />
-    )}
-    {activeTab === 'search-devs' && renderSearchDevelopers()}
-    {activeTab === 'messages' && renderMessages()}
-    {activeTab === 'hires' && renderHires()}
-    {activeTab === 'notifications' && (
-        <NotificationList
-            notifications={notifications}
-            onViewJobRole={handleViewNotificationJobRole}
-            onViewMessage={(messageId) => {
-                setActiveTab('messages');
-            }}
-        />
-    )}
-    {activeTab === 'tracker' && (
-        <HiringPipeline
-            onSendMessage={handleMessageDeveloper}
-            onViewDeveloperProfile={handleViewDeveloperProfile}
-            onInitiateHire={handleInitiateHire}
-        />
-    )}
-</div>
+
+                <div className="mt-8 flex-grow flex flex-col">
+                    {activeTab === 'overview' && renderOverview()}
+                    {activeTab === 'profile' && <RecruiterProfileForm />}
+                    {activeTab === 'my-jobs' && <JobsDashboard jobRoles={jobRoles} onViewApplicants={handleViewApplicants} onJobUpdate={handleJobUpdate} />}
+                    {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
+                        <JobDetailView
+                            job={selectedJobRole}
+                            onBack={() => setActiveTab('my-jobs')}
+                            onMessageDeveloper={handleMessageDeveloper}
+                        />
+                    )}
+                    {activeTab === 'search-devs' && renderSearchDevelopers()}
+                    {activeTab === 'messages' && renderMessages()}
+                    {activeTab === 'hires' && renderHires()}
+                    {activeTab === 'notifications' && (
+                        <NotificationList
+                            notifications={notifications}
+                            onViewJobRole={handleViewNotificationJobRole}
+                            onViewMessage={(messageId) => {
+                                setActiveTab('messages');
+                            }}
+                        />
+                    )}
+                    {activeTab === 'tracker' && (
+                        <HiringPipeline
+                            onSendMessage={handleMessageDeveloper}
+                            onViewDeveloperProfile={handleViewDeveloperProfile}
+                            onInitiateHire={handleInitiateHire}
+                        />
+                    )}
+                </div>
+            </div>
 
             {isDeveloperProfileModalOpen && selectedDeveloperForModal && (
                 <DeveloperProfileModal
