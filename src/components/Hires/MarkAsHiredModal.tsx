@@ -1,5 +1,3 @@
-// src/components/Hires/MarkAsHiredModal.tsx
-
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -121,11 +119,12 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         console.error('Error updating assignment status:', assignmentUpdateError);
       }
       
-      // ADDED: Step 3 - Update the status in the 'applied_jobs' table (for the applicant list)
+      // Step 3: Update the status in the 'applied_jobs' table (for the applicant list)
       const { error: appliedJobsUpdateError } = await supabase
         .from('applied_jobs')
         .update({ status: 'hired' })
-        .eq('developer_id', assignment.developer.user_id)
+        // MODIFIED: This now uses the correct primary ID for the developer
+        .eq('developer_id', assignment.developer.id) 
         .eq('job_id', assignment.job_role_id);
 
       if (appliedJobsUpdateError) {
