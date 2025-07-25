@@ -47,14 +47,13 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [canSendMessage, setCanSendMessage] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // REMOVED: The messagesEndRef is no longer needed with the CSS-based approach.
 
   useEffect(() => {
     if (userProfile && otherUserId) {
       fetchMessages();
       checkCanSendMessage();
       
-      // Set up real-time subscription for new messages and typing events
       const channel = supabase.channel(`messaging:${userProfile.id}`);
 
       channel
@@ -92,17 +91,11 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   }, [userProfile, otherUserId, jobContext]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // REMOVED: The useEffect hook for programmatic scrolling is no longer necessary.
 
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
 
-    // Simplified check, as RLS policies now handle the core logic.
-    // We can perform a quick check to provide a better UX, but the database is the source of truth.
-
-    // Developers messaging recruiters is the main case we need to handle for the UI.
     if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
       try {
         const { count, error } = await supabase
@@ -119,7 +112,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         setCanSendMessage(false); // Default to false on error
       }
     } else {
-      // For all other roles, we can assume they can send, and RLS will enforce it.
       setCanSendMessage(true);
     }
   };
@@ -271,9 +263,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // REMOVED: The scrollToBottom function is no longer needed with the CSS-based approach.
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -328,7 +318,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     });
   };
 
-  // Determine if we should show limited info for the other user
   const shouldShowLimitedInfo = () => {
     return false;
   };
@@ -409,9 +398,18 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      {/* MODIFIED: Added flex-col-reverse and space-y-reverse to anchor the chat to the bottom */}
+      <div className="flex-1 flex flex-col-reverse overflow-y-auto p-6 space-y-4 space-y-reverse">
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
+              <p className="text-sm leading-relaxed italic">Typing...</p>
+            </div>
+          </div>
+        )}
         {messages.length > 0 ? (
-          messages.map((message) => {
+          // MODIFIED: Reversed the array before mapping to ensure correct chronological order
+          messages.slice().reverse().map((message) => {
             const isFromCurrentUser = message.sender_id === userProfile?.id;
             return (
               <div
@@ -426,7 +424,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
                   }`}
                 >
                   <p className="text-sm leading-relaxed">{message.body}</p>
-                  <div className={`flex items-center justify-between mt-2 text-xs ${
+                  <div className={`flex items-center justify-end mt-2 text-xs ${
                     isFromCurrentUser ? 'text-blue-100' : 'text-gray-500'
                   }`}>
                     <span>{formatTime(message.sent_at)}</span>
@@ -449,14 +447,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
                 ? "Send a message to introduce yourself to the recruiter" 
                 : `Send a message to ${otherUserName} to get started.`}
             </p>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
-              <p className="text-sm leading-relaxed italic">Typing...</p>
-            </div>
           </div>
         )}
       </div>
