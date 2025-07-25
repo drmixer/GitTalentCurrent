@@ -1,3 +1,5 @@
+// src/components/Hires/MarkAsHiredModal.tsx
+
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -12,16 +14,21 @@ import {
   FileCheck,
   Info
 } from 'lucide-react';
-import { Assignment } from '../../types';
+// MODIFIED: Imported SavedCandidate for stronger prop typing
+import { Assignment, SavedCandidate } from '../../types';
 
 interface MarkAsHiredModalProps {
   isOpen: boolean;
   onClose: () => void;
-  assignment: Assignment;
-  assignmentId?: string;
+  // MODIFIED: Prop type changed to SavedCandidate.
+  // This guarantees that developer, job_role, and recruiter objects are present and non-optional.
+  assignment: SavedCandidate;
   onSuccess?: () => void;
-  onHire?: () => void;
   onCancel?: () => void;
+  // The 'assignmentId' and 'onHire' props are no longer used by the parent component,
+  // but we will leave them here in case they are used elsewhere.
+  assignmentId?: string;
+  onHire?: () => void;
 }
 
 export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
@@ -62,15 +69,12 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
     setLoading(true);
 
     try {
-      // Validate form data
       if (formData.salary <= 0) {
         throw new Error('Salary must be greater than 0');
       }
       if (!formData.hire_date) {
         throw new Error('Hire date is required');
       }
-
-      // Show the digital agreement before proceeding
       setShowAgreement(true);
       setLoading(false);
       return;
@@ -102,7 +106,6 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
       const result = await createHire?.(hireData);
 
       if (result) {
-        // Also update the assignment status to "Hired"
         const { error: updateError } = await supabase
           .from('assignments')
           .update({ status: 'Hired' })
@@ -115,7 +118,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         setSuccess('Hire recorded successfully!');
         setTimeout(() => {
           onSuccess?.();
-          onHire?.();
+          onHire?.(); // Kept for legacy reasons if needed
           onClose();
           resetForm();
         }, 1500);
@@ -182,9 +185,11 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
         {/* Assignment Info */}
         <div className="bg-gray-50 rounded-xl p-4 mb-6">
           <h3 className="font-bold text-gray-900 mb-2">Assignment Details</h3>
-          <div className="text-sm text-gray-600">
-            <div><strong>Developer:</strong> {assignment.developer?.name || 'Unknown'}</div>
-            <div><strong>Job:</strong> {assignment.job_role?.title || 'Unknown'}</div>
+          <div className="text-sm text-gray-600 space-y-1">
+            {/* MODIFIED: No optional chaining needed (`?.`) because SavedCandidate guarantees these exist. */}
+            <div><strong>Developer:</strong> {assignment.developer.user.name}</div>
+            <div><strong>Job:</strong> {assignment.job_role.title}</div>
+            <div><strong>Company:</strong> {assignment.recruiter.user.company_name}</div>
           </div>
         </div>
 
@@ -205,7 +210,7 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
                   required
                   className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
                   placeholder="120000"
-                  value={formData.salary}
+                  value={formData.salary === 0 ? '' : formData.salary}
                   onChange={handleChange}
                 />
               </div>
@@ -321,17 +326,18 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
               
               <div className="space-y-4 text-sm text-gray-700">
                 <p>This agreement is made between:</p>
-                <p><strong>Recruiter:</strong> {userProfile?.name} (representing {assignment.recruiter?.name})</p>
+                <p><strong>Recruiter:</strong> {userProfile?.name} (representing {assignment.recruiter.user.company_name})</p>
                 <p><strong>Platform:</strong> GitTalent</p>
                 
                 <div className="border-t border-gray-200 pt-4 mt-4">
                   <p className="font-semibold mb-2">Terms:</p>
                   <ol className="list-decimal pl-5 space-y-2">
-                    <li>The recruiter confirms they have hired {assignment.developer?.name} for the position of {assignment.job_role?.title}.</li>
+                    {/* MODIFIED: Safely accessing guaranteed data */}
+                    <li>The recruiter confirms they have hired {assignment.developer.user.name} for the position of {assignment.job_role.title}.</li>
                     <li>The annual salary for this position is ${formData.salary.toLocaleString()} USD.</li>
                     <li>The recruiter agrees to pay a one-time fee of ${Math.round(formData.salary * 0.15).toLocaleString()} USD (15% of annual salary).</li>
                     <li>This fee will be invoiced separately and is due within 30 days of this agreement.</li>
-                    <li>The hire date is recorded as {new Date(formData.hire_date).toLocaleDateString()}.</li>
+                    <li>The hire date is recorded as {new Date(formData.hire_date + 'T00:00:00').toLocaleDateString()}.</li>
                   </ol>
                 </div>
                 
