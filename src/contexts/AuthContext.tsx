@@ -536,13 +536,25 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
+  // UPDATED: This function now automatically adds recruiter_id and assigned_by
   const createAssignment = async (assignmentData: Partial<Assignment>): Promise<{ data: any | null; error: any | null }> => {
     try {
       if (!user) { throw new Error('User must be authenticated to create assignments'); }
-      const { data, error } = await supabase.from('assignments').insert([assignmentData]).select().single();
+
+      // Ensure recruiter_id and assigned_by are set to the current user's ID
+      // Also provide a default status if not already present
+      const newAssignmentData = {
+        ...assignmentData,
+        recruiter_id: user.id, // Set recruiter_id to the current user's ID
+        assigned_by: user.id,   // Set assigned_by to the current user's ID
+        status: assignmentData.status || 'Sourced' // Default status if not provided by the caller
+      };
+
+      const { data, error } = await supabase.from('assignments').insert([newAssignmentData]).select().single();
       if (error) { throw error; }
       return { data, error: null };
     } catch (error: any) {
+      console.error("Error creating assignment:", error.message, error.details);
       return { data: null, error };
     }
   };
@@ -558,30 +570,27 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     }
   };
 
-  // NEW FUNCTION: updateAssignmentStatus
   const updateAssignmentStatus = async (
     assignmentId: string,
     newStatus: string,
-    notes: string | null = null // Optional notes field
+    notes: string | null = null
   ): Promise<{ data: Assignment | null; error: any | null }> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to update assignment status');
       }
 
-      // Prepare the updates payload
       const updates: Partial<Assignment> = {
         status: newStatus,
-        notes: notes // Include notes if provided
+        notes: notes
       };
 
-      // Perform the UPDATE operation on the 'assignments' table
       const { data, error } = await supabase
         .from('assignments')
         .update(updates)
         .eq('id', assignmentId)
-        .select() // Select the updated row
-        .single(); // Expect a single updated row
+        .select()
+        .single();
 
       if (error) {
         console.error("Error updating assignment status:", error.message, error.details);
@@ -668,7 +677,7 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     } else {
       console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
     }
-  }, [setDeveloperProfile, setLastProfileUpdateTime]); // Added dependencies
+  }, [setDeveloperProfile, setLastProfileUpdateTime]);
 
 
   const value: AuthContextType = {
@@ -676,12 +685,13 @@ const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<Use
     lastProfileUpdateTime,
     signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
-    createAssignment, createHire, // createHire remains for inserting into 'hires' table
-    updateAssignmentStatus, // <--- NEW: Added to context value
+    createAssignment,
+    createHire,
+    updateAssignmentStatus, // Keep this function for its intended purpose (updating status)
     updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
     refreshUserProfile: refreshProfile,
-    setResolvedDeveloperProfile, // This is the one called by GitHubAppSetup
+    setResolvedDeveloperProfile,
     needsOnboarding: !developerProfile && userProfile?.role === 'developer',
   };
 
