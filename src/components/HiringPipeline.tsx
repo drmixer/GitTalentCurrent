@@ -124,7 +124,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                     cover_letter,
                     notes,
                     developer:developers!applied_jobs_developer_id_fkey(
-                        user_id, // Removed 'id' here to resolve the Supabase query error
+                        user_id,
                         github_handle,
                         bio,
                         availability,
@@ -171,11 +171,76 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onViewDeveloperProfile,
                         is_featured,
                         salary
                     )
-                `)
-                .in('job_id', jobIds);
+                `); // Removed the incorrect comment from here
+            // Ensure the .in() clause is correctly applied.
+            if (jobIds.length > 0) {
+                const { data: filteredCandidates, error: filterError } = await supabase
+                    .from('applied_jobs')
+                    .select(`
+                        id,
+                        developer_id,
+                        job_id,
+                        applied_at,
+                        status,
+                        cover_letter,
+                        notes,
+                        developer:developers!applied_jobs_developer_id_fkey(
+                            user_id,
+                            github_handle,
+                            bio,
+                            availability,
+                            top_languages,
+                            linked_projects,
+                            location,
+                            experience_years,
+                            desired_salary,
+                            created_at,
+                            updated_at,
+                            skills_categories,
+                            profile_strength,
+                            public_profile_slug,
+                            notification_preferences,
+                            resume_url,
+                            profile_pic_url,
+                            github_installation_id,
+                            public_profile_enabled,
+                            profile_view_count,
+                            search_appearance_count,
+                            skills,
+                            preferred_title,
+                            looking_for_job,
+                            user:users!developers_user_id_fkey(
+                                id,
+                                name,
+                                email,
+                                avatar_url,
+                                profile_pic_url
+                            )
+                        ),
+                        job_role:job_roles!applied_jobs_job_id_fkey(
+                            id,
+                            recruiter_id,
+                            title,
+                            description,
+                            location,
+                            job_type,
+                            tech_stack,
+                            experience_required,
+                            is_active,
+                            created_at,
+                            updated_at,
+                            is_featured,
+                            salary
+                        )
+                    `)
+                    .in('job_id', jobIds);
+                
+                if (filterError) throw filterError;
+                setCandidates(filteredCandidates as SavedCandidate[] || []);
 
-            if (candidatesError) throw candidatesError;
-            setCandidates(candidatesData as SavedCandidate[] || []);
+            } else {
+                setCandidates([]); // No job IDs means no candidates to fetch
+            }
 
         } catch (err: any) {
             setError('Failed to fetch pipeline data: ' + err.message);
