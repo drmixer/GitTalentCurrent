@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, MapPin, Github, ExternalLink, Plus, X, Search, Upload, Loader, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -60,6 +60,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [activeSkillCategory, setActiveSkillCategory] = useState<string | null>(null);
   const [newSkill, setNewSkill] = useState('');
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<DeveloperProfile>({
     user_id: user?.id || '',
@@ -83,24 +84,20 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     resume_url: '',
     profile_pic_url: '',
     github_installation_id: '',
-    public_profile_enabled: initialData?.public_profile_enabled === undefined ? true : initialData.public_profile_enabled, // Default to true if not set
+    public_profile_enabled: initialData?.public_profile_enabled === undefined ? true : initialData.public_profile_enabled,
     ...initialData
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Set initial profile picture from GitHub if not already set and available
     if (!formData.profile_pic_url && user?.user_metadata?.avatar_url) {
       setFormData(prev => ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
       }));
     }
-    // This effect should run when initialData or user context changes,
-    // primarily to populate the form on mount or data refresh.
-    // The dependency array should reflect what `formData` depends on for its initial state.
-  }, [initialData, user]); // Rerun if initialData or user changes
+  }, [initialData, user]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -158,12 +155,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
     try {
       const profileStrength = calculateProfileStrength(formData);
-      const { user, skills_categories, ...developerDataOnly } = formData;
-      const skills = Object.values(skills_categories).flat();
+      const { user, ...developerDataOnly } = formData;
+      const skills = Object.values(formData.skills_categories).flat();
       const dataToSave = {
         ...developerDataOnly,
         skills: skills,
-        skills_categories,
+        skills_categories: formData.skills_categories,
         profile_strength: profileStrength
       };
 
@@ -174,7 +171,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       if (error) throw error;
 
       setSaveStatus('success');
-      setTimeout(() => setSaveStatus(null), 3000); // Reset after 3 seconds
+      setTimeout(() => setSaveStatus(null), 3000);
       onSuccess?.();
     } catch (error: any) {
       console.error('Error saving developer profile:', error);
@@ -198,7 +195,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   };
 
   const handleConnectGitHub = () => {
-    // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
     // navigate('/github-setup');
   };
@@ -344,7 +340,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               Basic Information
             </h3>
 
-            {/* MODIFIED: This entire block is replaced to ensure the `htmlFor` and `id` are correct */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Profile Picture
@@ -370,10 +365,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                       if (file) handleFileUpload(file, 'profile_pic');
                     }}
                     className="hidden"
-                    id="profile-pic-upload"
+                    ref={fileInputRef}
                   />
-                  <label
-                    htmlFor="profile-pic-upload"
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
                   >
                     {uploadingProfilePic ? (
@@ -382,7 +378,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                       <Upload className="w-4 h-4 mr-2" />
                     )}
                     {uploadingProfilePic ? 'Uploading...' : 'Upload Photo'}
-                  </label>
+                  </button>
                   <button
                     type="button"
                     onClick={handleUseGitHubAvatar}
