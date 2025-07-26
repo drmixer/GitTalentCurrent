@@ -514,43 +514,38 @@ const RecruiterDashboard: React.FC = () => {
     ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
     const renderMessages = useCallback(() => {
-        if (selectedThread) {
-            return (
-                <div className="flex flex-col h-[calc(100vh-280px)] bg-white rounded-xl shadow-sm border border-gray-200">
-                    <MessageThread
-                        otherUserId={selectedThread.otherUserId}
-                        otherUserName={selectedThread.otherUserName}
-                        otherUserRole={selectedThread.otherUserRole}
-                        otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
-                        jobContext={selectedThread.jobContext}
-                        onBack={handleCloseMessageThread}
-                    />
-                </div>
-            );
-        }
-
         return (
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-gray-900">Messages</h2>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                            type="text"
-                            placeholder="Search messages..."
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
+                {/* Left Pane */}
+                <div className="md:col-span-1 h-full flex flex-col">
+                  <MessageList 
+                    onThreadSelect={setSelectedThread} 
+                    searchTerm={searchTerm} 
+                  />
                 </div>
-                <MessageList
-                    onThreadSelect={setSelectedThread}
-                    searchTerm={searchTerm}
-                />
+    
+                {/* Right Pane */}
+                <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+                    {selectedThread ? (
+                        <MessageThread
+                            otherUserId={selectedThread.otherUserId}
+                            otherUserName={selectedThread.otherUserName}
+                            otherUserRole={selectedThread.otherUserRole}
+                            otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+                            jobContext={selectedThread.jobContext}
+                            onBack={() => setSelectedThread(null)}
+                        />
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
+                            <MessageSquare size={48} className="mb-4 text-gray-300" />
+                            <h3 className="text-xl font-semibold">Select a conversation</h3>
+                            <p className="text-sm">Choose a conversation from the list to view messages.</p>
+                        </div>
+                    )}
+                </div>
             </div>
         );
-    }, [selectedThread, searchTerm, handleCloseMessageThread]);
+    }, [selectedThread, searchTerm]);
 
     const renderHires = useCallback(() => (
         <div className="space-y-6">
@@ -723,8 +718,7 @@ const RecruiterDashboard: React.FC = () => {
 
                 <div className="mb-8">
                     <div className="border-b border-gray-200">
-                        {/* MODIFIED: The order of the <button> elements below has been updated for better UX. */}
-                        <nav className="-mb-px flex space-x-8">
+                        <nav className="-mb-px flex space-x-8 overflow-x-auto">
                             <button
                                 onClick={() => setActiveTab('overview')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
