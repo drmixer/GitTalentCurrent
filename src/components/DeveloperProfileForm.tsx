@@ -294,7 +294,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       const { data: { publicUrl } } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
-
+console.log('DEBUG: Generated Supabase publicUrl:', publicUrl);
       setFormData(prev => ({
     ...prev,
     [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
