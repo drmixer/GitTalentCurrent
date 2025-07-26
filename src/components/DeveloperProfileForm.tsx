@@ -296,9 +296,9 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         .getPublicUrl(filePath);
 
       setFormData(prev => ({
-        ...prev,
-        [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl
-      }));
+    ...prev,
+    [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
+ }));
 
     } catch (error) {
       console.error(`Error uploading ${type}:`, error);
