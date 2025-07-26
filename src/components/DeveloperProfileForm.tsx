@@ -278,7 +278,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       const { data: { publicUrl } } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
-      
+
       setFormData(prev => ({
         ...prev,
         [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
@@ -293,34 +293,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       } else {
         setUploadingProfilePic(false);
       }
-    }
-  };
-
-  // ADDED: New temporary function for isolated debugging
-  const testUpload = async (file: File) => {
-    alert('DEBUG STEP 1: testUpload function has been called.');
-    try {
-        const filePath = `profile_pics/test-${new Date().getTime()}.png`;
-        alert(`DEBUG STEP 2: Attempting to upload to path: ${filePath}`);
-        
-        const { error: uploadError } = await supabase.storage
-            .from('developer-files')
-            .upload(filePath, file);
-
-        if (uploadError) {
-            alert(`DEBUG FAIL: Upload error: ${uploadError.message}`);
-            return;
-        }
-
-        alert('DEBUG STEP 3: Upload successful! Getting public URL...');
-
-        const { data } = supabase.storage
-            .from('developer-files')
-            .getPublicUrl(filePath);
-
-        alert(`DEBUG STEP 4: The public URL is: ${data.publicUrl}`);
-    } catch (err: any) {
-        alert(`DEBUG FAIL: An unexpected error occurred in testUpload: ${err.message}`);
     }
   };
 
@@ -372,6 +344,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               Basic Information
             </h3>
 
+            {/* MODIFIED: This entire block is replaced to ensure the `htmlFor` and `id` are correct */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Profile Picture
@@ -389,15 +362,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   </div>
                 )}
                 <div>
-                  {/* MODIFIED: Temporarily changed to call testUpload */}
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        testUpload(file);
-                      }
+                      if (file) handleFileUpload(file, 'profile_pic');
                     }}
                     className="hidden"
                     id="profile-pic-upload"
