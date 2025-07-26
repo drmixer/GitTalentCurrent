@@ -514,38 +514,43 @@ const RecruiterDashboard: React.FC = () => {
     ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
     const renderMessages = useCallback(() => {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
-            {/* Left Pane */}
-            <div className="md:col-span-1 h-full flex flex-col">
-              <MessageList 
-                onThreadSelect={setSelectedThread} 
-                searchTerm={searchTerm} 
-              />
-            </div>
-
-            {/* Right Pane */}
-            <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
-                {selectedThread ? (
+        if (selectedThread) {
+            return (
+                <div className="flex flex-col h-[calc(100vh-280px)] bg-white rounded-xl shadow-sm border border-gray-200">
                     <MessageThread
                         otherUserId={selectedThread.otherUserId}
                         otherUserName={selectedThread.otherUserName}
                         otherUserRole={selectedThread.otherUserRole}
                         otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
                         jobContext={selectedThread.jobContext}
-                        onBack={() => setSelectedThread(null)}
+                        onBack={handleCloseMessageThread}
                     />
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
-                        <MessageSquare size={48} className="mb-4 text-gray-300" />
-                        <h3 className="text-xl font-semibold">Select a conversation</h3>
-                        <p className="text-sm">Choose a conversation from the list to view messages.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-black text-gray-900">Messages</h2>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                            type="text"
+                            placeholder="Search messages..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                )}
+                </div>
+                <MessageList
+                    onThreadSelect={setSelectedThread}
+                    searchTerm={searchTerm}
+                />
             </div>
-        </div>
-    );
-}, [selectedThread, searchTerm]);
+        );
+    }, [selectedThread, searchTerm, handleCloseMessageThread]);
 
     const renderHires = useCallback(() => (
         <div className="space-y-6">
@@ -718,6 +723,7 @@ const RecruiterDashboard: React.FC = () => {
 
                 <div className="mb-8">
                     <div className="border-b border-gray-200">
+                        {/* MODIFIED: The order of the <button> elements below has been updated for better UX. */}
                         <nav className="-mb-px flex space-x-8">
                             <button
                                 onClick={() => setActiveTab('overview')}
@@ -731,17 +737,6 @@ const RecruiterDashboard: React.FC = () => {
                                 Overview
                             </button>
                             <button
-                                onClick={() => setActiveTab('profile')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'profile'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Users className="w-5 h-5 mr-2" />
-                                Profile
-                            </button>
-                            <button
                                 onClick={() => setActiveTab('my-jobs')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'my-jobs'
@@ -751,6 +746,17 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('tracker')}
+                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                                    activeTab === 'tracker'
+                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <Users className="w-5 h-5 mr-2" />
+                                Hiring Pipeline
                             </button>
                             <button
                                 onClick={() => setActiveTab('search-devs')}
@@ -780,6 +786,17 @@ const RecruiterDashboard: React.FC = () => {
                                 )}
                             </button>
                             <button
+                                onClick={() => setActiveTab('hires')}
+                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
+                                    activeTab === 'hires'
+                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <DollarSign className="w-5 h-5 mr-2" />
+                                Hires
+                            </button>
+                            <button
                                 onClick={() => setActiveTab('notifications')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'notifications'
@@ -796,26 +813,15 @@ const RecruiterDashboard: React.FC = () => {
                                 )}
                             </button>
                             <button
-                                onClick={() => setActiveTab('hires')}
+                                onClick={() => setActiveTab('profile')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'hires'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <DollarSign className="w-5 h-5 mr-2" />
-                                Hires
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('tracker')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'tracker'
+                                    activeTab === 'profile'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
                                 <Users className="w-5 h-5 mr-2" />
-                                Hiring Pipeline
+                                Profile
                             </button>
                         </nav>
                     </div>
