@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { User, Mail, MapPin, Github, ExternalLink, Plus, X, Search, Upload, Loader, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -60,7 +61,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const [activeSkillCategory, setActiveSkillCategory] = useState<string | null>(null);
   const [newSkill, setNewSkill] = useState('');
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<DeveloperProfile>({
     user_id: user?.id || '',
@@ -84,20 +84,24 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     resume_url: '',
     profile_pic_url: '',
     github_installation_id: '',
-    public_profile_enabled: initialData?.public_profile_enabled === undefined ? true : initialData.public_profile_enabled,
+    public_profile_enabled: initialData?.public_profile_enabled === undefined ? true : initialData.public_profile_enabled, // Default to true if not set
     ...initialData
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Set initial profile picture from GitHub if not already set and available
     if (!formData.profile_pic_url && user?.user_metadata?.avatar_url) {
       setFormData(prev => ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
       }));
     }
-  }, [initialData, user]);
+    // This effect should run when initialData or user context changes,
+    // primarily to populate the form on mount or data refresh.
+    // The dependency array should reflect what `formData` depends on for its initial state.
+  }, [initialData, user]); // Rerun if initialData or user changes
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -118,6 +122,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       newErrors.desired_salary = 'Desired salary cannot be negative';
     }
 
+    // Removed top_languages validation
+    // if (formData.top_languages.length === 0) {
+    //   newErrors.top_languages = 'At least one programming language is required';
+    // }
+
     if (formData.public_profile_slug && !/^[a-z0-9-]+$/.test(formData.public_profile_slug)) {
       newErrors.public_profile_slug = 'Profile slug can only contain lowercase letters, numbers, and hyphens';
     }
@@ -132,6 +141,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     if (data.bio.trim()) strength += 15;
     if (data.location.trim()) strength += 10;
     if (data.github_handle.trim()) strength += 15;
+    // if (data.top_languages.length > 0) strength += 15; // Removed top_languages from strength calculation
     if (data.linked_projects.length > 0) strength += 10;
     if (data.experience_years > 0) strength += 10;
     if (data.desired_salary > 0) strength += 5;
@@ -155,13 +165,15 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
     try {
       const profileStrength = calculateProfileStrength(formData);
-      const { user, ...developerDataOnly } = formData;
-      const skills = Object.values(formData.skills_categories).flat();
+      // Destructure to remove the 'user' object if it exists, and any other non-column data
+      const { user, skills_categories, ...developerDataOnly } = formData;
+      const skills = Object.values(skills_categories).flat();
       const dataToSave = {
         ...developerDataOnly,
         skills: skills,
-        skills_categories: formData.skills_categories,
+        skills_categories,
         profile_strength: profileStrength
+        // user_id is already part of formData and thus in developerDataOnly
       };
 
       const { error } = await supabase
@@ -171,7 +183,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       if (error) throw error;
 
       setSaveStatus('success');
-      setTimeout(() => setSaveStatus(null), 3000);
+      setTimeout(() => setSaveStatus(null), 3000); // Reset after 3 seconds
       onSuccess?.();
     } catch (error: any) {
       console.error('Error saving developer profile:', error);
@@ -189,15 +201,22 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
       }));
+      // Optionally, add a toast message here: "GitHub avatar applied. Save changes to make it permanent."
     } else {
+      // Optionally, add a toast message: "GitHub avatar URL not found."
       console.warn("Attempted to use GitHub avatar, but URL not found in user metadata.");
     }
   };
 
   const handleConnectGitHub = () => {
+    // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
+    // Navigate to GitHub setup page
+    // Navigate to GitHub setup page
     // navigate('/github-setup');
   };
+
+  // Removed addLanguage and removeLanguage functions
 
   const addProject = () => {
     if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
@@ -291,6 +310,19 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       }
     }
   };
+  
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      handleFileUpload(file, 'profile_pic');
+    }
+  }, [user]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': ['.jpeg', '.png', '.gif', '.jpg'] },
+    multiple: false
+  });
 
   const currentProfileStrength = calculateProfileStrength(formData);
 
@@ -356,39 +388,31 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                     <User className="w-8 h-8 text-gray-400" />
                   </div>
                 )}
-                <div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'profile_pic');
-                    }}
-                    className="hidden"
-                    ref={fileInputRef}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
-                  >
-                    {uploadingProfilePic ? (
-                      <Loader className="animate-spin w-4 h-4 mr-2" />
-                    ) : (
-                      <Upload className="w-4 h-4 mr-2" />
-                    )}
-                    {uploadingProfilePic ? 'Uploading...' : 'Upload Photo'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleUseGitHubAvatar}
-                    className="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                    title="Use your GitHub profile picture"
-                  >
-                    <Github className="w-4 h-4 mr-2 text-gray-500" />
-                    Use GitHub Avatar
-                  </button>
+                <div {...getRootProps()} className={`flex-grow p-4 border-2 border-dashed rounded-lg cursor-pointer flex flex-col items-center justify-center text-center transition-colors ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}>
+                  <input {...getInputProps()} />
+                  {uploadingProfilePic ? (
+                    <>
+                      <Loader className="animate-spin w-6 h-6 text-gray-500 mb-2" />
+                      <p className="text-sm text-gray-600">Uploading...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">
+                        {isDragActive ? 'Drop the image here...' : "Drag 'n' drop or click to upload"}
+                      </p>
+                      <p className="text-xs text-gray-500">PNG, JPG, GIF</p>
+                    </>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleUseGitHubAvatar}
+                  className="p-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50"
+                  title="Use your GitHub profile picture"
+                >
+                  <Github className="w-5 h-5 text-gray-600" />
+                </button>
               </div>
               {errors.profile_pic && (
                 <p className="text-red-600 text-sm mt-1">{errors.profile_pic}</p>
