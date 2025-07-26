@@ -283,7 +283,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}-${type}-${Date.now()}.${fileExt}`;
-      const filePath = `${type}s/${fileName}`;
+      // This path needs to match your RLS policy
+      const filePath = `profile_pics/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('developer-files')
@@ -294,11 +295,15 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       const { data: { publicUrl } } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
-console.log('DEBUG: Generated Supabase publicUrl:', publicUrl);
+
+      // This is the crucial debugging log
+      console.log('DEBUG: Generated Supabase publicUrl:', publicUrl);
+
+      // This adds the cache-busting timestamp
       setFormData(prev => ({
-    ...prev,
-    [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
- }));
+        ...prev,
+        [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
+      }));
 
     } catch (error) {
       console.error(`Error uploading ${type}:`, error);
