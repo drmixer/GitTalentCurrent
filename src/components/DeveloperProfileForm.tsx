@@ -121,11 +121,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       newErrors.desired_salary = 'Desired salary cannot be negative';
     }
 
-    // Removed top_languages validation
-    // if (formData.top_languages.length === 0) {
-    //   newErrors.top_languages = 'At least one programming language is required';
-    // }
-
     if (formData.public_profile_slug && !/^[a-z0-9-]+$/.test(formData.public_profile_slug)) {
       newErrors.public_profile_slug = 'Profile slug can only contain lowercase letters, numbers, and hyphens';
     }
@@ -140,7 +135,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     if (data.bio.trim()) strength += 15;
     if (data.location.trim()) strength += 10;
     if (data.github_handle.trim()) strength += 15;
-    // if (data.top_languages.length > 0) strength += 15; // Removed top_languages from strength calculation
     if (data.linked_projects.length > 0) strength += 10;
     if (data.experience_years > 0) strength += 10;
     if (data.desired_salary > 0) strength += 5;
@@ -164,7 +158,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
     try {
       const profileStrength = calculateProfileStrength(formData);
-      // Destructure to remove the 'user' object if it exists, and any other non-column data
       const { user, skills_categories, ...developerDataOnly } = formData;
       const skills = Object.values(skills_categories).flat();
       const dataToSave = {
@@ -172,7 +165,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         skills: skills,
         skills_categories,
         profile_strength: profileStrength
-        // user_id is already part of formData and thus in developerDataOnly
       };
 
       const { error } = await supabase
@@ -200,9 +192,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
       }));
-      // Optionally, add a toast message here: "GitHub avatar applied. Save changes to make it permanent."
     } else {
-      // Optionally, add a toast message: "GitHub avatar URL not found."
       console.warn("Attempted to use GitHub avatar, but URL not found in user metadata.");
     }
   };
@@ -210,12 +200,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const handleConnectGitHub = () => {
     // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
-    // Navigate to GitHub setup page
-    // Navigate to GitHub setup page
     // navigate('/github-setup');
   };
-
-  // Removed addLanguage and removeLanguage functions
 
   const addProject = () => {
     if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
@@ -292,7 +278,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       const { data: { publicUrl } } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
-
+      
       setFormData(prev => ({
         ...prev,
         [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
@@ -307,6 +293,34 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       } else {
         setUploadingProfilePic(false);
       }
+    }
+  };
+
+  // ADDED: New temporary function for isolated debugging
+  const testUpload = async (file: File) => {
+    alert('DEBUG STEP 1: testUpload function has been called.');
+    try {
+        const filePath = `profile_pics/test-${new Date().getTime()}.png`;
+        alert(`DEBUG STEP 2: Attempting to upload to path: ${filePath}`);
+        
+        const { error: uploadError } = await supabase.storage
+            .from('developer-files')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            alert(`DEBUG FAIL: Upload error: ${uploadError.message}`);
+            return;
+        }
+
+        alert('DEBUG STEP 3: Upload successful! Getting public URL...');
+
+        const { data } = supabase.storage
+            .from('developer-files')
+            .getPublicUrl(filePath);
+
+        alert(`DEBUG STEP 4: The public URL is: ${data.publicUrl}`);
+    } catch (err: any) {
+        alert(`DEBUG FAIL: An unexpected error occurred in testUpload: ${err.message}`);
     }
   };
 
@@ -375,16 +389,14 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   </div>
                 )}
                 <div>
-                  {/* MODIFIED: Added debugging alerts to the onChange handler */}
+                  {/* MODIFIED: Temporarily changed to call testUpload */}
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
-                      alert('File input onChange event fired!');
                       const file = e.target.files?.[0];
                       if (file) {
-                        alert('File found! Calling handleFileUpload...');
-                        handleFileUpload(file, 'profile_pic');
+                        testUpload(file);
                       }
                     }}
                     className="hidden"
