@@ -36,8 +36,6 @@ interface DeveloperProfileFormProps {
   isOnboarding?: boolean;
 }
 
-// const PROGRAMMING_LANGUAGES = [ ... ]; // Removed
-
 const SKILL_CATEGORIES = {
   'Frontend': ['React', 'Vue.js', 'Angular', 'Svelte', 'Next.js', 'Nuxt.js', 'Gatsby', 'HTML5', 'CSS3', 'Sass', 'Less', 'Tailwind CSS', 'Bootstrap', 'Material-UI', 'Ant Design'],
   'Backend': ['Node.js', 'Express.js', 'Django', 'Flask', 'FastAPI', 'Spring Boot', 'ASP.NET', 'Ruby on Rails', 'Laravel', 'Symfony', 'Phoenix', 'Gin', 'Echo'],
@@ -123,11 +121,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       newErrors.desired_salary = 'Desired salary cannot be negative';
     }
 
-    // Removed top_languages validation
-    // if (formData.top_languages.length === 0) {
-    //   newErrors.top_languages = 'At least one programming language is required';
-    // }
-
     if (formData.public_profile_slug && !/^[a-z0-9-]+$/.test(formData.public_profile_slug)) {
       newErrors.public_profile_slug = 'Profile slug can only contain lowercase letters, numbers, and hyphens';
     }
@@ -142,7 +135,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     if (data.bio.trim()) strength += 15;
     if (data.location.trim()) strength += 10;
     if (data.github_handle.trim()) strength += 15;
-    // if (data.top_languages.length > 0) strength += 15; // Removed top_languages from strength calculation
     if (data.linked_projects.length > 0) strength += 10;
     if (data.experience_years > 0) strength += 10;
     if (data.desired_salary > 0) strength += 5;
@@ -167,14 +159,13 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     try {
       const profileStrength = calculateProfileStrength(formData);
       // Destructure to remove the 'user' object if it exists, and any other non-column data
-      const { user, skills_categories, ...developerDataOnly } = formData;
-      const skills = Object.values(skills_categories).flat();
+      const { user, ...developerDataOnly } = formData;
+      const skills = Object.values(formData.skills_categories).flat();
       const dataToSave = {
         ...developerDataOnly,
         skills: skills,
-        skills_categories,
+        skills_categories: formData.skills_categories,
         profile_strength: profileStrength
-        // user_id is already part of formData and thus in developerDataOnly
       };
 
       const { error } = await supabase
@@ -202,22 +193,16 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
       }));
-      // Optionally, add a toast message here: "GitHub avatar applied. Save changes to make it permanent."
     } else {
-      // Optionally, add a toast message: "GitHub avatar URL not found."
       console.warn("Attempted to use GitHub avatar, but URL not found in user metadata.");
     }
   };
 
   const handleConnectGitHub = () => {
-    // Set a flag to indicate we're connecting GitHub
     setConnectingGitHub(true);
-    // Navigate to GitHub setup page
-    // Navigate to GitHub setup page
-    navigate('/github-setup');
+    // This should use the navigate function from react-router-dom
+    // navigate('/github-setup'); 
   };
-
-  // Removed addLanguage and removeLanguage functions
 
   const addProject = () => {
     if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
@@ -280,33 +265,49 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       setUploadingProfilePic(true);
     }
 
+    // MODIFIED: Entire try...catch block replaced with a more robust version for debugging
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}-${type}-${Date.now()}.${fileExt}`;
-      // This path needs to match your RLS policy
       const filePath = `profile_pics/${fileName}`;
+
+      console.log("DEBUG: Uploading to bucket 'developer-files' with path:", filePath);
 
       const { error: uploadError } = await supabase.storage
         .from('developer-files')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+          console.error("DEBUG: Supabase upload failed.", uploadError);
+          throw uploadError;
+      }
 
-      const { data: { publicUrl } } = supabase.storage
+      console.log("DEBUG: Upload successful. Getting public URL...");
+
+      // Safer way to get public URL without risky destructuring
+      const { data, error: urlError } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
 
-      // This is the crucial debugging log
+      if (urlError) {
+        console.error("DEBUG: Failed to get public URL.", urlError);
+        throw urlError;
+      }
+      if (!data || !data.publicUrl) {
+          console.error("DEBUG: Public URL data is empty or malformed.", data);
+          throw new Error("Failed to retrieve a valid public URL from Supabase.");
+      }
+
+      const { publicUrl } = data;
       console.log('DEBUG: Generated Supabase publicUrl:', publicUrl);
 
-      // This adds the cache-busting timestamp
       setFormData(prev => ({
         ...prev,
         [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl + '?t=' + new Date().getTime()
       }));
 
     } catch (error) {
-      console.error(`Error uploading ${type}:`, error);
+      console.error(`DEBUG: Error caught in handleFileUpload for ${type}:`, error);
       setErrors({ [type]: `Failed to upload ${type}. Please try again.` });
     } finally {
       if (type === 'resume') {
@@ -335,7 +336,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
-          {/* User Name and GitHub Handle Display */}
           {initialData?.user?.name && initialData?.github_handle && (
             <div className="mb-6 pb-4 border-b border-gray-200">
               <h1 className="text-3xl font-bold text-gray-900">{initialData.user.name}</h1>
@@ -343,7 +343,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </div>
           )}
 
-          {/* Profile Strength Indicator */}
           <div className="bg-gray-50 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Profile Strength</h3>
@@ -362,13 +361,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </p>
           </div>
 
-          {/* Basic Information */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
               Basic Information
             </h3>
 
-            {/* Profile Picture Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Profile Picture
@@ -423,7 +420,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               )}
             </div>
 
-            {/* Bio */}
             <div>
               <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
                 Bio *
@@ -441,7 +437,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               )}
             </div>
 
-            {/* Preferred Title */}
             <div>
               <label htmlFor="preferred_title" className="block text-sm font-medium text-gray-700 mb-2">
                 Preferred Title
@@ -456,7 +451,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               />
             </div>
 
-            {/* Location */}
             <div>
               <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
                 Location *
@@ -477,7 +471,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               )}
             </div>
 
-            {/* Experience and Salary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700 mb-2">
@@ -521,7 +514,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               </div>
             </div>
 
-            {/* Availability */}
             <div>
               <label className="flex items-center space-x-3">
                 <input
@@ -537,15 +529,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </div>
           </div>
 
-          {/* Technical Skills */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
               Technical Skills
             </h3>
 
-            {/* Programming Languages section removed */}
-
-            {/* Skills by Category */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Skills by Category
@@ -564,7 +552,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                       </button>
                     </div>
 
-                    {/* Current skills in this category */}
                     <div className="flex flex-wrap gap-2 mb-3">
                       {(formData.skills_categories[category] || []).map((skill) => (
                         <span
@@ -583,7 +570,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                       ))}
                     </div>
 
-                    {/* Add new skill */}
                     {activeSkillCategory === category && (
                       <div className="space-y-3">
                         <div className="flex space-x-2">
@@ -604,7 +590,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                           </button>
                         </div>
 
-                        {/* Predefined skills */}
                         <div>
                           <p className="text-sm text-gray-600 mb-2">Or choose from popular {category.toLowerCase()} skills:</p>
                           <div className="flex flex-wrap gap-2">
@@ -629,14 +614,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               </div>
             </div>
           </div>
-
-          {/* Profile Settings */}
+          
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
               Profile Settings
             </h3>
 
-            {/* Public Profile Enabled Toggle */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Public Profile Visibility
@@ -664,7 +647,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               </p>
             </div>
 
-            {/* Public Profile Slug and URL Display */}
             <div>
               <label htmlFor="public_profile_slug" className="block text-sm font-medium text-gray-700 mb-2">
                 Public Profile URL Slug
@@ -714,7 +696,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               )}
             </div>
 
-            {/* Notification Preferences */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Notification Preferences
@@ -743,7 +724,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             </div>
           </div>
 
-          {/* Submit Buttons and Feedback */}
           <div className="pt-6 border-t border-gray-200">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex-grow">
