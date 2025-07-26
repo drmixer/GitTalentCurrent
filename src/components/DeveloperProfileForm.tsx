@@ -282,7 +282,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}-${type}-${Date.now()}.${fileExt}`;
-      const filePath = `profile_pics/${fileName}`;
+      const filePath = `${user?.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('developer-files')
