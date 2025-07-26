@@ -278,7 +278,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         .upload(filePath, file);
 
       if (uploadError) {
-          console.error("DEBUG: Supabase upload failed.", uploadError);
+          alert('DEBUG: The publicUrl is: ' + publicUrl);
           throw uploadError;
       }
 
