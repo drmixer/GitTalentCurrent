@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 // CORRECTED PATHS BELOW:
 import { NotificationBadge } from '../Notifications/NotificationBadge';
 import { NotificationsDropdownContent } from '../Notifications/NotificationsDropdownContent';
+import { DarkModeToggle } from './DarkModeToggle';
 
 
 export const Header = () => {
@@ -46,18 +47,31 @@ export const Header = () => {
 
   const scrollToSection = (sectionId: string) => {
     setMobileMenuOpen(false);
+    const headerHeight = document.querySelector('header')?.offsetHeight || 0;
     if (location.pathname !== '/') {
       navigate('/');
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth"
+          });
         }
       }, 100);
     } else {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
       }
     }
   };
@@ -117,6 +131,7 @@ export const Header = () => {
           {/* Desktop Navigation */}
           {isPublicPage ? (
             <nav className="hidden md:flex items-center space-x-8">
+              <DarkModeToggle />
               {[
                 { label: 'Features', id: 'why-gittalent' },
                 { label: 'About', id: 'about' },
