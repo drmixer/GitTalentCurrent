@@ -1,21 +1,25 @@
 // src/components/HiringPipeline.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { User, JobRole, Developer, Assignment, SavedCandidate } from '../types';
-import { Eye, MessageSquare, ChevronDown, MoreVertical, Trash2, CheckSquare, Edit, FileText, Loader, AlertCircle } from 'lucide-react';
+import { Developer, SavedCandidate } from '../types';
+import { Eye, MessageSquare, Trash2, FileText, Loader, AlertCircle, Code, FileCheck, X } from 'lucide-react';
+import SendTestModal from './Assignments/SendTestModal';
+import TestResults from './Assignments/TestResults';
 
 interface KanbanViewProps {
     candidates: SavedCandidate[];
     onUpdateStage: (id: string, stage: string, candidate: SavedCandidate) => void;
     onViewDeveloperProfile: (developer: Developer) => void;
     onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
+    onSendTest: (developerId: string, jobId: string) => void;
+    onViewResults: (assignmentId: string) => void;
 }
 
 const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected'];
 
-const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage, onSendTest, onViewResults }) => {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
         e.preventDefault();
         const candidateId = e.dataTransfer.getData("candidateId");
@@ -51,12 +55,21 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                     <Eye size={16} />
                                 </button>
                                 <button
-                                    onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name, c.job_role.id, c.job_role.title)}
+                                    onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name || '', c.job_role.id, c.job_role.title)}
                                     className="p-1 hover:bg-gray-50 rounded-full text-gray-500"
                                     title="Send Message"
                                 >
                                     <MessageSquare size={16} />
                                 </button>
+                                {c.status === 'Completed' ? (
+                                     <button onClick={() => onViewResults(c.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="View Test Results">
+                                        <FileCheck size={16} />
+                                    </button>
+                                ) : (
+                                    <button onClick={() => onSendTest(c.developer.id, c.job_role.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="Send Test">
+                                        <Code size={16} />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -83,14 +96,12 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
     const [error, setError] = useState('');
     const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
     const [notes, setNotes] = useState<{ [key: string]: string }>({});
+    const [isSendTestModalOpen, setIsSendTestModalOpen] = useState(false);
+    const [selectedCandidateForTest, setSelectedCandidateForTest] = useState<{devId: string, jobId: string} | null>(null);
+    const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (userProfile?.id) {
-            fetchData();
-        }
-    }, [userProfile]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError('');
         if (!userProfile?.id) {
@@ -106,38 +117,43 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     status,
                     notes,
                     assigned_at,
-                    developer:developers!fk_assignments_developer!inner (
-                        *,
-                        user:users!inner (*)
-                    ),
-                    job_role:job_roles!fk_assignments_job_role_id!inner (
-                        *,
-                        recruiter:recruiters!inner (
-                            *,
-                            user:users!inner (*)
+                    developer:developers!inner (
+                        id,
+                        user_id,
+                        user:users!inner (
+                            id,
+                            name,
+                            avatar_url,
+                            profile_pic_url
                         )
                     ),
-                    recruiter:recruiters!fk_assignments_recruiter_user_id!inner (
-                        *,
-                        user:users!inner (*)
+                    job_role:job_roles!inner (
+                        id,
+                        title
                     )
                 `)
                 .eq('recruiter_id', userProfile.id)
-                .neq('status', 'Hired'); // ADDED: This line filters out hired candidates
+                .neq('status', 'Hired');
 
             if (assignmentsError) {
                 throw assignmentsError;
             }
 
-            setCandidates((assignmentsData as SavedCandidate[]) || []);
+            setCandidates(assignmentsData || []);
 
-        } catch (err: any) {
-            setError('Failed to fetch pipeline data: ' + err.message);
+        } catch (err) {
+            setError('Failed to fetch pipeline data: ' + (err as Error).message);
             console.error("Error fetching pipeline data:", err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [userProfile?.id]);
+
+    useEffect(() => {
+        if (userProfile?.id) {
+            fetchData();
+        }
+    }, [userProfile, fetchData]);
 
     const handleUpdateStage = async (candidateId: string, stage: string, candidateToUpdate?: SavedCandidate) => {
         const candidate = candidateToUpdate || candidates.find(c => c.id === candidateId);
@@ -149,7 +165,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         if (stage === 'Hired') {
             onInitiateHire(candidate);
         } else {
-            const { error } = await supabase.from('assignments').update({ status: stage as any }).eq('id', candidateId);
+            const { error } = await supabase.from('assignments').update({ status: stage }).eq('id', candidateId);
             if (error) {
                 setError('Failed to update stage: ' + error.message);
             } else {
@@ -163,7 +179,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
             setError("Bulk 'hired' status change is not supported.");
             return;
         }
-        const { error } = await supabase.from('assignments').update({ status: stage as any }).in('id', selectedCandidates);
+        const { error } = await supabase.from('assignments').update({ status: stage }).in('id', selectedCandidates);
         if (error) {
             setError('Failed to bulk update stages: ' + error.message);
         } else {
@@ -192,6 +208,32 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         } else {
             console.log("Note saved.");
         }
+    };
+
+    const handleOpenSendTestModal = (developerId: string, jobId: string) => {
+        setSelectedCandidateForTest({ devId: developerId, jobId: jobId });
+        setIsSendTestModalOpen(true);
+    };
+
+    const handleCloseSendTestModal = () => {
+        setIsSendTestModalOpen(false);
+        setSelectedCandidateForTest(null);
+    };
+
+    const handleTestSent = () => {
+        // Here you might want to show a success message or refresh data
+        console.log("Test sent successfully!");
+        fetchData();
+    };
+
+    const handleOpenResultsModal = (assignmentId: string) => {
+        setSelectedAssignmentId(assignmentId);
+        setIsResultsModalOpen(true);
+    };
+
+    const handleCloseResultsModal = () => {
+        setIsResultsModalOpen(false);
+        setSelectedAssignmentId(null);
     };
 
     if (loading) {
@@ -301,9 +343,18 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                                 <Eye size={18} />
                                             </button>
                                             <button
-                                                onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name, c.job_role.id, c.job_role.title)}
+                                                onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name || '', c.job_role.id, c.job_role.title)}
                                                 className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} />
                                             </button>
+                                            {c.status === 'Completed' ? (
+                                                <button onClick={() => handleOpenResultsModal(c.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
+                                                    <FileCheck size={18} />
+                                                </button>
+                                            ) : (
+                                                <button onClick={() => handleOpenSendTestModal(c.developer.id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
+                                                    <Code size={18} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -311,8 +362,30 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                         </table>
                     </div>
                 ) : (
-                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} onSendMessage={onSendMessage}/>
+                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} onSendMessage={onSendMessage} onSendTest={handleOpenSendTestModal} onViewResults={handleOpenResultsModal} />
                 )
+            )}
+             {isSendTestModalOpen && selectedCandidateForTest && (
+                <SendTestModal
+                    isOpen={isSendTestModalOpen}
+                    onClose={handleCloseSendTestModal}
+                    developerId={selectedCandidateForTest.devId}
+                    jobId={selectedCandidateForTest.jobId}
+                    onTestSent={handleTestSent}
+                />
+            )}
+            {isResultsModalOpen && selectedAssignmentId && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Test Results</h2>
+                            <button onClick={handleCloseResultsModal} className="p-1 rounded-full hover:bg-gray-200">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <TestResults assignmentId={selectedAssignmentId} />
+                    </div>
+                </div>
             )}
         </div>
     );
