@@ -127,7 +127,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                             profile_pic_url
                         )
                     ),
-                    job_role:job_roles!inner (
+                    job_role:job_roles!fk_assignments_job_role_id!inner (
                         id,
                         title
                     )
