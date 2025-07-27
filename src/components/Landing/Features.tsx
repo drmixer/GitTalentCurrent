@@ -1,19 +1,20 @@
 import React from 'react';
 import { Brain, Users, MessageSquare, TrendingUp, Shield, Zap, CheckCircle, Target, Code, Award, Search, DollarSign, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const features = [
   {
     icon: Brain,
     title: 'AI-Powered Matching',
-    description: 'Our AI analyzes GitHub activity, code quality, and skills to recommend the perfect candidates for your job openings.',
+    description: 'Our AI analyzes GitHub activity to match developers with the right opportunities.',
     color: 'from-blue-500 to-indigo-600',
     bgColor: 'from-blue-50 to-indigo-50',
     borderColor: 'border-blue-200',
   },
   {
     icon: Search,
-    title: 'Open Access Profiles',
-    description: 'Browse all developer profiles and job listings freely. No restrictions or gatekeeping—just transparent access to talent.',
+    title: 'Transparent Profiles',
+    description: 'Browse developer profiles and job listings freely to find the perfect match.',
     color: 'from-purple-500 to-pink-600',
     bgColor: 'from-purple-50 to-pink-50',
     borderColor: 'border-purple-200',
@@ -21,44 +22,52 @@ const features = [
   {
     icon: MessageSquare,
     title: 'Direct Communication',
-    description: 'Message developers directly about specific job opportunities with our built-in messaging system.',
+    description: 'Connect directly with developers and recruiters through our messaging system.',
     color: 'from-emerald-500 to-teal-600',
     bgColor: 'from-emerald-50 to-teal-50',
     borderColor: 'border-emerald-200',
   },
   {
     icon: Shield,
-    title: 'Verified Profiles',
-    description: 'Every developer profile is authenticated through GitHub integration with real-time activity tracking and skill verification.',
+    title: 'Verified GitHub Profiles',
+    description: 'Ensure authenticity with profiles verified through GitHub.',
     color: 'from-cyan-500 to-blue-600',
     bgColor: 'from-cyan-50 to-blue-50',
     borderColor: 'border-cyan-200',
   },
   {
     icon: Zap,
-    title: 'Self-Managed Search',
-    description: 'Both recruiters and developers can search and filter to find their perfect match without waiting for manual intervention.',
+    title: 'Self-Directed Search',
+    description: 'Take control of your search with powerful filtering and search tools.',
     color: 'from-yellow-500 to-orange-600',
     bgColor: 'from-yellow-50 to-orange-50',
     borderColor: 'border-yellow-200',
+  },
+  {
+    icon: Award,
+    title: 'Free During Launch',
+    description: 'Enjoy all features for free during our early access period.',
+    color: 'from-red-500 to-pink-600',
+    bgColor: 'from-red-50 to-pink-50',
+    borderColor: 'border-red-200',
   },
 ];
 
 const benefits = [
   {
     icon: CheckCircle,
-    title: 'AI Matching That Makes Sense',
-    description: 'Match by GitHub activity and real-world skills, not just resumes.',
+    title: 'Hire Based on Skill',
+    description: 'Our AI matches candidates based on demonstrated skills, not just resumes.',
   },
   {
     icon: Code,
-    title: 'Developer Profiles That Show the Work',
-    description: 'See actual contributions, not just claims.',
+    title: 'See the Real Work',
+    description: 'View actual GitHub contributions to assess the quality of a developer\'s work.',
   },
   {
-    icon: Award,
-    title: 'Free While We Grow',
-    description: 'No monthly fees. No hiring costs during Early Access',
+    icon: Sparkles,
+    title: 'Free to Get Started',
+    description: 'No monthly fees or hiring costs during our Early Access program.',
   },
 ];
 
@@ -70,17 +79,17 @@ export const Features = () => {
         <div className="text-center mb-20">
           <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 mb-6">
             <Zap className="w-4 h-4 mr-2" />
-            Powerful Features
+            Why GitTalent?
           </div>
           <h2 className="text-5xl lg:text-6xl font-black text-gray-900 mb-6 leading-tight">
-            Everything you need to
+            A Better Way to Hire
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-              find perfect matches
+              and Get Hired
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Our platform provides AI-powered tools to create meaningful connections 
-            between talented developers and forward-thinking companies.
+            GitTalent is a hiring platform built for engineers, by engineers.
+            We connect talented developers with innovative companies.
           </p>
         </div>
 
@@ -102,9 +111,9 @@ export const Features = () => {
         {/* Benefits Section */}
         <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-black text-gray-900 mb-4">Why GitTalent?</h3>
+            <h3 className="text-3xl font-black text-gray-900 mb-4">The GitTalent Advantage</h3>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-             The hiring platform built for engineers — not just HR.
+             A hiring platform built for engineers — not just HR.
             </p>
           </div>
           
@@ -122,10 +131,10 @@ export const Features = () => {
 
           <div className="text-center">
             <div className="inline-flex flex-col sm:flex-row gap-4">
-              <Link to="/signup" className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 duration-300">
+              <Link to="/signup?role=recruiter" className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 duration-300">
                 Start Hiring Today
               </Link>
-              <Link to="/signup" className="px-8 py-4 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:border-gray-400 hover:bg-gray-50 transition-all duration-300">
+              <Link to="/signup?role=developer" className="px-8 py-4 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:border-gray-400 hover:bg-gray-50 transition-all duration-300">
                 Find Your Dream Job
               </Link>
             </div>
@@ -135,6 +144,3 @@ export const Features = () => {
     </div>
   );
 };
-
-// Add missing import
-import { Link } from 'react-router-dom';
