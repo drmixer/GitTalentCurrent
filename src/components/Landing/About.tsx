@@ -6,7 +6,7 @@ export const About = () => {
     <div id="about" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Built by Developers, for Developers and Recruiters</h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">A New Way To Connect Devs & Companies Looking For Top Talent</h2>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -23,6 +23,9 @@ export const About = () => {
             <p className="text-lg text-gray-600">
               We are just getting started. Join us while we grow and help shape the future of developer hiring.
             </p>
+          </div>
+          <div>
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations//Code%20typing-bro.png" alt="Illustration of a person coding" />
           </div>
         </div>
       </div>
