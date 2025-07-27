@@ -1,6 +1,6 @@
 import React from 'react';
 import { Hero } from '../components/Landing/Hero';
-import { Features } from '../components/Landing/Features';
+import { WhyGitTalent } from '../components/Landing/WhyGitTalent';
 import { HowItWorks } from '../components/Landing/HowItWorks';
 import { About } from '../components/Landing/About';
 import { FAQ } from '../components/Landing/FAQ';
@@ -10,8 +10,8 @@ export const LandingPage = () => {
   return (
     <div>
       <Hero />
-      <Features />
       <HowItWorks />
+      <WhyGitTalent />
       <About />
       <FAQ />
       <Contact />
