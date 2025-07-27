@@ -118,7 +118,6 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     notes,
                     assigned_at,
                     developer:developers!inner (
-                        id,
                         user_id,
                         user:users!inner (
                             id,
