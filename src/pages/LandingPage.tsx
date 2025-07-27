@@ -1,6 +1,6 @@
 import React from 'react';
 import { Hero } from '../components/Landing/Hero';
-import { WhyGitTalent } from '../components/Landing/WhyGitTalent';
+import { Features } from '../components/Landing/Features';
 import { HowItWorks } from '../components/Landing/HowItWorks';
 import { About } from '../components/Landing/About';
 import { FAQ } from '../components/Landing/FAQ';
@@ -11,7 +11,7 @@ export const LandingPage = () => {
     <div>
       <Hero />
       <HowItWorks />
-      <WhyGitTalent />
+      <Features />
       <About />
       <FAQ />
       <Contact />
