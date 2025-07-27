@@ -27,14 +27,6 @@ const features = [
     borderColor: 'border-emerald-200',
   },
   {
-    icon: DollarSign,
-    title: 'Pay-Per-Hire Model',
-    description: 'Only pay when you successfully hire. No subscription fees, no upfront costs—just a simple 15% fee on successful hires.',
-    color: 'from-orange-500 to-red-600',
-    bgColor: 'from-orange-50 to-red-50',
-    borderColor: 'border-orange-200',
-  },
-  {
     icon: Shield,
     title: 'Verified Profiles',
     description: 'Every developer profile is authenticated through GitHub integration with real-time activity tracking and skill verification.',
@@ -55,18 +47,18 @@ const features = [
 const benefits = [
   {
     icon: CheckCircle,
-    title: '3x Faster Hiring',
-    description: 'Reduce time-to-hire from months to weeks with AI-powered matching and open access to profiles.',
+    title: 'AI Matching That Makes Sense',
+    description: 'Match by GitHub activity and real-world skills, not just resumes.',
   },
   {
     icon: Code,
-    title: '95% Match Accuracy',
-    description: 'Our AI ensures technical compatibility by analyzing real GitHub contributions and coding patterns.',
+    title: 'Developer Profiles That Show the Work',
+    description: 'See actual contributions, not just claims.',
   },
   {
     icon: Award,
-    title: 'Zero Risk Investment',
-    description: 'Pay only when you successfully hire. No upfront costs, no subscriptions, no risk.',
+    title: 'Free While We Grow',
+    description: 'No monthly fees. No hiring costs during Early Access',
   },
 ];
 
@@ -110,9 +102,9 @@ export const Features = () => {
         {/* Benefits Section */}
         <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-black text-gray-900 mb-4">Why Companies Choose GitTalent</h3>
+            <h3 className="text-3xl font-black text-gray-900 mb-4">Why GitTalent?</h3>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Join hundreds of companies who have transformed their hiring process with our AI-powered, pay-per-hire platform.
+             The hiring platform built for engineers — not just HR.
             </p>
           </div>
           

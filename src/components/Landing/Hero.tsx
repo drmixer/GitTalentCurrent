@@ -54,26 +54,13 @@ export const Hero = () => {
                   Start Hiring Today
                   <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <button className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-gray-700 bg-white border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 shadow-lg hover:shadow-xl transition-all duration-300">
-                  <Play className="mr-3 w-5 h-5 text-blue-600" />
-                  Watch Demo
-                </button>
-              </div>
-
-              {/* Trust Indicators */}
-              <div className="grid grid-cols-3 gap-8 pt-8 border-t border-gray-200">
-                <div className="text-center">
-                  <div className="text-3xl font-black text-gray-900 mb-1">2.5K+</div>
-                  <div className="text-sm font-medium text-gray-600">Active Developers</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-black text-gray-900 mb-1">450+</div>
-                  <div className="text-sm font-medium text-gray-600">Companies</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-black text-gray-900 mb-1">98%</div>
-                  <div className="text-sm font-medium text-gray-600">Success Rate</div>
-                </div>
+                <Link
+                  to="/signup?role=developer"
+                  className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300"
+                >
+                  Devs - Start Now
+                  <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
               </div>
             </div>
           </div>
