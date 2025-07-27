@@ -23,6 +23,7 @@ import { GitHubAppSetup } from './pages/GitHubAppSetup';
 import { AuthCallback } from './pages/AuthCallback';
 import { ApplyForJob } from './pages/ApplyForJob';
 import TestPage from './pages/TestPage';
+import AdminTests from './pages/AdminTests';
 
 // !! NEW IMPORT !!
 import EndorsementPage from './pages/EndorsementPage'; // Assuming default export for EndorsementPage
