@@ -515,9 +515,9 @@ const RecruiterDashboard: React.FC = () => {
 
     const renderMessages = useCallback(() => {
     return (
-        <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-280px)]">
+        <div className="flex flex-col md:flex-row gap-6 flex-grow">
             {/* Left Pane */}
-            <div className="md:w-1/3 h-full">
+            <div className="md:w-1/3 flex flex-col">
               <MessageList 
                 onThreadSelect={setSelectedThread} 
                 searchTerm={searchTerm} 
@@ -525,7 +525,7 @@ const RecruiterDashboard: React.FC = () => {
             </div>
 
             {/* Right Pane */}
-            <div className="md:w-2/3 h-full bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+            <div className="md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 {selectedThread ? (
                     <MessageThread
                         otherUserId={selectedThread.otherUserId}
