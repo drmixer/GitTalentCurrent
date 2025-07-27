@@ -46,7 +46,7 @@ export { DeveloperOnboarding } from './Onboarding/DeveloperOnboarding';
 
 // Landing page components
 export { Hero } from './Landing/Hero';
-export { WhyGitTalent } from './Landing/WhyGitTalent';
+export { Features } from './Landing/Features';
 export { About } from './Landing/About';
 export { FAQ } from './Landing/FAQ';
 export { Contact } from './Landing/Contact';

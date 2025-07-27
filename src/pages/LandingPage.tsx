@@ -10,8 +10,8 @@ export const LandingPage = () => {
   return (
     <div>
       <Hero />
-      <HowItWorks />
       <Features />
+      <HowItWorks />
       <About />
       <FAQ />
       <Contact />
