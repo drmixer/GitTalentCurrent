@@ -73,7 +73,7 @@ export const LoginForm = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 dark:from-dark-background dark:via-gray-900/30 dark:to-blue-900/50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
@@ -93,16 +93,16 @@ export const LoginForm = () => {
             <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center hidden">
               <GitBranch className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-black text-gray-900 dark:text-dark-text">GitTalent</span>
+            <span className="text-2xl font-black text-gray-900">GitTalent</span>
           </Link>
-          <h2 className="text-3xl font-black text-gray-900 dark:text-dark-text mb-3">
+          <h2 className="text-3xl font-black text-gray-900 mb-3">
             Welcome back
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600">
             Don't have an account?{' '}
             <Link
               to="/signup"
-              className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              className="font-semibold text-blue-600 hover:text-blue-500 transition-colors"
             >
               Sign up for free
             </Link>
@@ -110,16 +110,16 @@ export const LoginForm = () => {
         </div>
 
         {/* Form */}
-        <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 dark:border-dark-border/50 p-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-8">
           {/* GitHub Sign In Button */}
           <button
             onClick={handleGitHubSignIn}
             disabled={githubLoading || loading}
-            className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-300 dark:border-dark-border rounded-2xl text-gray-700 dark:text-dark-text bg-white dark:bg-dark-card hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-300 font-bold mb-6 group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-300 rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-300 font-bold mb-6 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {githubLoading ? (
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 dark:border-dark-text mr-3"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-3"></div>
                 Connecting to GitHub...
               </div>
             ) : (
@@ -130,7 +130,7 @@ export const LoginForm = () => {
             )}
           </button>
           
-          <p className="text-center text-sm text-blue-600 dark:text-blue-400 mb-6">
+          <p className="text-center text-sm text-blue-600 mb-6">
             <Github className="w-4 h-4 inline mr-1" />
             Developers: Sign in with GitHub to access your account
           </p>
@@ -138,16 +138,16 @@ export const LoginForm = () => {
           {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-dark-border" />
+              <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white dark:bg-dark-card text-gray-500 dark:text-gray-400 font-medium">Or continue with email</span>
+              <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
             </div>
             {error && error.includes('session') && (
               <div className="mt-2">
                 <button
                   onClick={() => window.location.reload()}
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium flex items-center"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
                 >
                   <RefreshCw className="w-3 h-3 mr-1" />
                   Refresh page to try again
@@ -158,17 +158,17 @@ export const LoginForm = () => {
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-500/50 rounded-2xl p-4">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
                 <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-400 dark:text-red-300 mr-3" />
-                  <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+                  <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+                  <p className="text-sm font-medium text-red-800">{error}</p>
                 </div>
               </div>
             )}
             
             <div className="space-y-5">
               <div>
-                <label htmlFor="email" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
                   Email address
                 </label>
                 <div className="relative">
@@ -180,7 +180,7 @@ export const LoginForm = () => {
                     autoComplete="email"
                     required
                     disabled={loading || githubLoading}
-                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 dark:border-dark-border placeholder-gray-500 text-gray-900 dark:text-dark-text rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-dark-card"
+                    className="appearance-none relative block w-full pl-12 pr-4 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -189,7 +189,7 @@ export const LoginForm = () => {
               </div>
               
               <div>
-                <label htmlFor="password" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -201,7 +201,7 @@ export const LoginForm = () => {
                     autoComplete="current-password"
                     required
                     disabled={loading || githubLoading}
-                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 dark:border-dark-border placeholder-gray-500 text-gray-900 dark:text-dark-text rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-dark-card"
+                    className="appearance-none relative block w-full pl-12 pr-12 py-4 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -209,7 +209,7 @@ export const LoginForm = () => {
                   <button
                     type="button"
                     disabled={loading || githubLoading}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -229,15 +229,15 @@ export const LoginForm = () => {
                   name="remember-me"
                   type="checkbox"
                   disabled={loading || githubLoading}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded disabled:opacity-50"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="remember-me" className="ml-2 block text-sm font-medium text-gray-700">
                   Remember me
                 </label>
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
+                <a href="#" className="font-semibold text-blue-600 hover:text-blue-500 transition-colors">
                   Forgot password?
                 </a>
               </div>
@@ -264,13 +264,13 @@ export const LoginForm = () => {
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600">
             By signing in, you agree to our{' '}
-            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500">
               Terms of Service
             </a>{' '}
             and{' '}
-            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+            <a href="#" className="font-semibold text-blue-600 hover:text-blue-500">
               Privacy Policy
             </a>
           </p>
