@@ -514,38 +514,38 @@ const RecruiterDashboard: React.FC = () => {
     ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
     const renderMessages = useCallback(() => {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
-                {/* Left Pane */}
-                <div className="md:col-span-1 h-full flex flex-col">
-                  <MessageList 
-                    onThreadSelect={setSelectedThread} 
-                    searchTerm={searchTerm} 
-                  />
-                </div>
-    
-                {/* Right Pane */}
-                <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
-                    {selectedThread ? (
-                        <MessageThread
-                            otherUserId={selectedThread.otherUserId}
-                            otherUserName={selectedThread.otherUserName}
-                            otherUserRole={selectedThread.otherUserRole}
-                            otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
-                            jobContext={selectedThread.jobContext}
-                            onBack={() => setSelectedThread(null)}
-                        />
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
-                            <MessageSquare size={48} className="mb-4 text-gray-300" />
-                            <h3 className="text-xl font-semibold">Select a conversation</h3>
-                            <p className="text-sm">Choose a conversation from the list to view messages.</p>
-                        </div>
-                    )}
-                </div>
+    return (
+        <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-280px)]">
+            {/* Left Pane */}
+            <div className="md:w-1/3 h-full">
+              <MessageList 
+                onThreadSelect={setSelectedThread} 
+                searchTerm={searchTerm} 
+              />
             </div>
-        );
-    }, [selectedThread, searchTerm]);
+
+            {/* Right Pane */}
+            <div className="md:w-2/3 h-full bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+                {selectedThread ? (
+                    <MessageThread
+                        otherUserId={selectedThread.otherUserId}
+                        otherUserName={selectedThread.otherUserName}
+                        otherUserRole={selectedThread.otherUserRole}
+                        otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+                        jobContext={selectedThread.jobContext}
+                        onBack={() => setSelectedThread(null)}
+                    />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
+                        <MessageSquare size={48} className="mb-4 text-gray-300" />
+                        <h3 className="text-xl font-semibold">Select a conversation</h3>
+                        <p className="text-sm">Choose a conversation from the list to view messages.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}, [selectedThread, searchTerm]);
 
     const renderHires = useCallback(() => (
         <div className="space-y-6">
