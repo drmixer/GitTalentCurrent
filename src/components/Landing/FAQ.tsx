@@ -8,11 +8,11 @@ const faqs = [
   },
   {
     question: "Is GitTalent free for developers?",
-    answer: "Yes! GitTalent is completely free for developers. You can create your profile, showcase your GitHub activity, browse job opportunities, and communicate with recruiters at no cost."
+    answer: "Yes! GitTalent is completely free for developers, and always will be. You can create your profile, showcase your GitHub activity, browse job opportunities, and communicate with recruiters at no cost."
   },
   {
-    question: "How does the payment system work for recruiters?",
-    answer: "Recruiters only pay when they successfully hire a developer - 15% of the first-year salary. There are no upfront costs, subscription fees, or hidden charges. You only pay for results."
+    question: "How much does GitTalent cost for recruiters?",
+    answer: "During our launch phase, GitTalent is completely free for recruiters. There are no upfront costs, subscription fees, or hiring fees. Enjoy full access to our platform and hire top developers at no cost."
   },
   {
     question: "Can developers contact recruiters directly?",
@@ -33,10 +33,6 @@ const faqs = [
   {
     question: "How do I express interest in a job as a developer?",
     answer: "Developers can browse all job listings and express interest in specific positions. This notifies the recruiter, who can then review your profile and initiate contact if they're interested."
-  },
-  {
-    question: "What happens after a successful hire?",
-    answer: "Once you hire a developer, you'll mark them as 'Hired' in the system and provide salary details. You'll sign a digital agreement, and the 15% fee will be calculated based on the first-year salary you report."
   },
   {
     question: "Can I see all developers on the platform?",
