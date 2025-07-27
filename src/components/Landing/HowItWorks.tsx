@@ -22,10 +22,10 @@ const steps = [
 
 export const HowItWorks = () => {
   return (
-    <div id="how-it-works" className="py-24 bg-white">
+    <div id="how-it-works" className="py-24 bg-white dark:bg-dark-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-20">
-          <h2 className="text-5xl lg:text-6xl font-black text-gray-900 mb-6 leading-tight">
+          <h2 className="text-5xl lg:text-6xl font-black text-gray-900 dark:text-dark-text mb-6 leading-tight">
             How It Works
           </h2>
         </div>
@@ -36,7 +36,7 @@ export const HowItWorks = () => {
               <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <step.icon className="w-12 h-12 text-white" />
               </div>
-              <h4 className="text-xl font-black text-gray-900">{step.title}</h4>
+              <h4 className="text-xl font-black text-gray-900 dark:text-dark-text">{step.title}</h4>
             </div>
           ))}
         </div>

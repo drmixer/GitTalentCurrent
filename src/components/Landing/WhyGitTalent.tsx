@@ -22,11 +22,11 @@ const benefits = [
 
 export const WhyGitTalent = () => {
   return (
-    <div id="why-gittalent" className="py-24 bg-white">
+    <div id="why-gittalent" className="py-24 bg-white dark:bg-dark-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-20">
-          <h2 className="text-5xl lg:text-6xl font-black text-gray-900 mb-6 leading-tight">
+          <h2 className="text-5xl lg:text-6xl font-black text-gray-900 dark:text-dark-text mb-6 leading-tight">
             Designed for Developers.
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
               Trusted by Recruiters.
@@ -35,15 +35,15 @@ export const WhyGitTalent = () => {
         </div>
 
         {/* Benefits Section */}
-        <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
+        <div className="bg-gradient-to-br from-gray-50 to-slate-100 dark:from-dark-card dark:to-gray-800 rounded-3xl p-12 border border-gray-200 dark:border-dark-border">
           <div className="grid md:grid-cols-3 gap-8 mb-12">
             {benefits.map((benefit, index) => (
               <div key={benefit.title} className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <benefit.icon className="w-8 h-8 text-white" />
                 </div>
-                <h4 className="text-xl font-black text-gray-900 mb-3">{benefit.title}</h4>
-                <p className="text-gray-600 leading-relaxed font-medium">{benefit.description}</p>
+                <h4 className="text-xl font-black text-gray-900 dark:text-dark-text mb-3">{benefit.title}</h4>
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{benefit.description}</p>
               </div>
             ))}
           </div>

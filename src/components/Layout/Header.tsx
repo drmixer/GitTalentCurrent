@@ -105,7 +105,7 @@ export const Header = () => {
   }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
+    <header className="bg-white/95 dark:bg-dark-background/95 backdrop-blur-md border-b border-gray-200/50 dark:border-dark-border/50 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-48">
           {/* Logo */}
@@ -129,29 +129,29 @@ export const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          {isPublicPage ? (
-            <nav className="hidden md:flex items-center space-x-8">
-              <DarkModeToggle />
-              {[
-                { label: 'Features', id: 'why-gittalent' },
-                { label: 'About', id: 'about' },
-                { label: 'Contact', id: 'contact' },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => scrollToSection(item.id)}
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200 hover:scale-105"
-                >
-                  {item.label}
-                </button>
-              ))}
-              
-              {user ? (
-                <div className="flex items-center space-x-4">
-                  {userProfile?.role === 'admin' && (
-                    <Link
-                      to="/admin"
-                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+          <div className="flex items-center">
+            {isPublicPage ? (
+              <nav className="hidden md:flex items-center space-x-8">
+                {[
+                  { label: 'Features', id: 'why-gittalent' },
+                  { label: 'About', id: 'about' },
+                  { label: 'Contact', id: 'contact' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => scrollToSection(item.id)}
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors duration-200 hover:scale-105"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+
+                {user ? (
+                  <div className="flex items-center space-x-4">
+                    {userProfile?.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                      className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                       Admin
                     </Link>
@@ -164,7 +164,7 @@ export const Header = () => {
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-all"
+                    className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
                   >
                     <LogOut className="w-5 h-5" />
                   </button>
@@ -173,7 +173,7 @@ export const Header = () => {
                 <div className="flex items-center space-x-4">
                   <Link
                     to="/login"
-                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200 px-4 py-2"
+                    className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors duration-200 px-4 py-2"
                   >
                     Login
                   </Link>
@@ -186,13 +186,13 @@ export const Header = () => {
                 </div>
               )}
             </nav>
-          ) : (
+            ) : (
             // Authenticated User Navigation (Desktop)
             user && userProfile && (
               <nav className="hidden md:flex items-center space-x-6">
                 <Link
                   to={getDashboardPath()}
-                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                  className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <Briefcase className="w-4 h-4" />
                   <span>Dashboard</span>
@@ -200,7 +200,7 @@ export const Header = () => {
                 <div className="flex items-center space-x-4">
                   <Link
                     to={`${getDashboardPath()}?tab=profile`}
-                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100"
+                    className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm font-semibold">{getDisplayName()}</span>
@@ -211,7 +211,7 @@ export const Header = () => {
                     <button
                       id="notification-button" // Added ID for click outside logic
                       onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
+                      className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 relative"
                     >
                       <Bell className="w-4 h-4" /> {/* The one and only bell icon */}
                       <NotificationBadge className="absolute -top-1 -right-1" /> {/* Position badge relative to this bell */}
@@ -221,7 +221,7 @@ export const Header = () => {
                     {showNotificationsDropdown && (
                       <div 
                         id="notification-dropdown" // Added ID for click outside logic
-                        className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+                        className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-lg shadow-lg py-2 z-50"
                       >
                         <NotificationsDropdownContent 
                             onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
@@ -233,7 +233,7 @@ export const Header = () => {
 
                   <button
                     onClick={handleSignOut}
-                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100 flex items-center"
+                    className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                   >
                     <LogOut className="w-4 h-4 mr-1" />
                     <span>Sign Out</span>
@@ -241,7 +241,11 @@ export const Header = () => {
                 </div>
               </nav>
             )
-          )}
+            )}
+            <div className="absolute top-4 right-4">
+              <DarkModeToggle />
+            </div>
+          </div>
 
           {/* Mobile Menu Button */}
           <button
@@ -258,27 +262,26 @@ export const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-48 left-0 right-0 bg-white border-b border-gray-200 shadow-lg">
+          <div className="md:hidden absolute top-48 left-0 right-0 bg-white dark:bg-dark-background border-b border-gray-200 dark:border-dark-border shadow-lg">
             <div className="px-4 py-6 space-y-4">
               {isPublicPage ? (
                 <>
                   {[
-                    { label: 'Features', id: 'features' },
-                    { label: 'Pricing', id: 'pricing' },
+                    { label: 'Features', id: 'why-gittalent' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
                   ].map((item) => (
                     <button
                       key={item.id}
                       onClick={() => scrollToSection(item.id)}
-                      className="block w-full text-left text-gray-600 hover:text-gray-900 font-medium py-2"
+                      className="block w-full text-left text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium py-2"
                     >
                       {item.label}
                     </button>
                   ))}
                   
                   {user ? (
-                    <div className="pt-4 border-t border-gray-200 space-y-4">
+                    <div className="pt-4 border-t border-gray-200 dark:border-dark-border space-y-4">
                       <Link
                         to={getDashboardPath()}
                         className="block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl font-bold text-center"
@@ -288,17 +291,17 @@ export const Header = () => {
                       </Link>
                       <button
                         onClick={handleSignOut}
-                        className="block w-full text-left text-gray-600 hover:text-gray-900 py-2 flex items-center"
+                        className="block w-full text-left text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-2 flex items-center"
                       >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                       </button>
                     </div>
                   ) : (
-                    <div className="pt-4 border-t border-gray-200 space-y-4">
+                    <div className="pt-4 border-t border-gray-200 dark:border-dark-border space-y-4">
                       <Link
                         to="/login"
-                        className="block text-gray-600 hover:text-gray-900 font-medium py-2"
+                        className="block text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium py-2"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Login
@@ -319,7 +322,7 @@ export const Header = () => {
                   <div className="space-y-4">
                     <Link
                       to={getDashboardPath()}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Briefcase className="w-4 h-4" />
@@ -327,7 +330,7 @@ export const Header = () => {
                     </Link>
                     <Link
                       to={`${getDashboardPath()}?tab=profile`}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <User className="w-4 h-4" />
@@ -337,7 +340,7 @@ export const Header = () => {
                     {/* For now, leaving mobile bell out to keep changes focused, but you can replicate the desktop bell logic here */}
                     <button
                       onClick={handleSignOut}
-                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
+                      className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-2"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
