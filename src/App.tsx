@@ -26,14 +26,17 @@ import { ApplyForJob } from './pages/ApplyForJob';
 // !! NEW IMPORT !!
 import EndorsementPage from './pages/EndorsementPage'; // Assuming default export for EndorsementPage
 
+import { HelmetProvider } from 'react-helmet-async';
+
 function App() {
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Header /> {/* This component renders your navigation bar */}
-        <Routes>
-          {/* Main Routes */}
-          <Route path="/" element={<LandingPage />} />
+    <HelmetProvider>
+      <AuthProvider>
+        <div className="min-h-screen bg-gray-50">
+          <Header /> {/* This component renders your navigation bar */}
+          <Routes>
+            {/* Main Routes */}
+            <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginForm />} />
           <Route path="/signup" element={<SignupForm />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -80,6 +83,7 @@ function App() {
         </Routes>
       </div>
     </AuthProvider>
+    </HelmetProvider>
   );
 }
 

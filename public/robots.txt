@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gittalent.com/sitemap.xml

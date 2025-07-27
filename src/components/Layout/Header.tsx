@@ -171,12 +171,14 @@ export const Header = () => {
                 <div className="flex items-center space-x-4">
                   <Link
                     to="/login"
+                    onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
                     className="text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200 px-4 py-2"
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
+                    onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
                     className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-bold shadow-lg hover:shadow-xl hover:scale-105 duration-300"
                   >
                     Sign Up
