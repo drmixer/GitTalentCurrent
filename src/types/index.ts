@@ -277,3 +277,48 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
 }
+
+export interface CodingTest {
+    id: string;
+    title: string;
+    description: string;
+    role: string;
+    difficulty: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CodingQuestion {
+    id: string;
+    test_id: string;
+    question_text: string;
+    language: string;
+    starter_code?: string;
+    expected_output?: string;
+    test_cases?: { stdin: string; expected_output: string }[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface TestAssignment {
+    id: string;
+    developer_id: string;
+    job_id: string;
+    test_id: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    coding_tests: CodingTest;
+}
+
+export interface TestResult {
+    id: string;
+    assignment_id: string;
+    question_id: string;
+    score: number;
+    stdout: string;
+    stderr: string;
+    passed_test_cases: number;
+    total_test_cases: number;
+    created_at: string;
+}

@@ -1,0 +1,167 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { CodingTest, CodingQuestion } from '../types';
+import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+
+const AdminTests: React.FC = () => {
+    const [tests, setTests] = useState<CodingTest[]>([]);
+    const [questions, setQuestions] = useState<{ [key: string]: CodingQuestion[] }>({});
+    const [editingTest, setEditingTest] = useState<Partial<CodingTest> | null>(null);
+    const [editingQuestion, setEditingQuestion] = useState<Partial<CodingQuestion> | null>(null);
+
+    useEffect(() => {
+        fetchTests();
+    }, []);
+
+    const fetchTests = async () => {
+        const { data, error } = await supabase.from('coding_tests').select('*');
+        if (error) console.error('Error fetching tests:', error);
+        else setTests(data as CodingTest[]);
+    };
+
+    const fetchQuestions = async (testId: string) => {
+        const { data, error } = await supabase.from('coding_questions').select('*').eq('test_id', testId);
+        if (error) console.error('Error fetching questions:', error);
+        else setQuestions(prev => ({ ...prev, [testId]: data as CodingQuestion[] }));
+    };
+
+    const handleSaveTest = async () => {
+        if (!editingTest) return;
+        const { id, ...testData } = editingTest;
+        const { error } = id
+            ? await supabase.from('coding_tests').update(testData).eq('id', id)
+            : await supabase.from('coding_tests').insert(testData);
+
+        if (error) console.error('Error saving test:', error);
+        else {
+            setEditingTest(null);
+            fetchTests();
+        }
+    };
+
+    const handleDeleteTest = async (testId: string) => {
+        if (window.confirm('Are you sure you want to delete this test and all its questions?')) {
+            const { error } = await supabase.from('coding_tests').delete().eq('id', testId);
+            if (error) console.error('Error deleting test:', error);
+            else fetchTests();
+        }
+    };
+
+    const handleSaveQuestion = async () => {
+        if (!editingQuestion || !editingQuestion.test_id) return;
+        const { id, ...questionData } = editingQuestion;
+        const { error } = id
+            ? await supabase.from('coding_questions').update(questionData).eq('id', id)
+            : await supabase.from('coding_questions').insert(questionData);
+
+        if (error) console.error('Error saving question:', error);
+        else {
+            fetchQuestions(editingQuestion.test_id);
+            setEditingQuestion(null);
+        }
+    };
+
+    const handleDeleteQuestion = async (questionId: string, testId: string) => {
+        const { error } = await supabase.from('coding_questions').delete().eq('id', questionId);
+        if (error) console.error('Error deleting question:', error);
+        else fetchQuestions(testId);
+    };
+
+    return (
+        <div className="p-4">
+            <h1 className="text-2xl font-bold mb-4">Manage Coding Tests</h1>
+            <button onClick={() => setEditingTest({})} className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-md flex items-center">
+                <Plus size={16} className="mr-2" /> Add New Test
+            </button>
+
+            {editingTest && (
+                <div className="mb-4 p-4 border rounded-md">
+                    <h2 className="text-xl font-semibold mb-2">{editingTest.id ? 'Edit Test' : 'New Test'}</h2>
+                    <input
+                        type="text"
+                        placeholder="Title"
+                        value={editingTest.title || ''}
+                        onChange={(e) => setEditingTest({ ...editingTest, title: e.target.value })}
+                        className="w-full p-2 mb-2 border rounded-md"
+                    />
+                    <textarea
+                        placeholder="Description"
+                        value={editingTest.description || ''}
+                        onChange={(e) => setEditingTest({ ...editingTest, description: e.target.value })}
+                        className="w-full p-2 mb-2 border rounded-md"
+                    />
+                    <div className="flex justify-end space-x-2">
+                        <button onClick={() => setEditingTest(null)}><X /></button>
+                        <button onClick={handleSaveTest}><Save /></button>
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-4">
+                {tests.map(test => (
+                    <div key={test.id} className="p-4 border rounded-md">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-semibold">{test.title}</h2>
+                            <div>
+                                <button onClick={() => setEditingTest(test)}><Edit className="mr-2" /></button>
+                                <button onClick={() => handleDeleteTest(test.id)}><Trash2 /></button>
+                            </div>
+                        </div>
+                        <p className="text-gray-600">{test.description}</p>
+                        <div className="mt-4">
+                            <h3 className="font-bold">Questions</h3>
+                            <button onClick={() => fetchQuestions(test.id)} className="text-sm text-blue-600">Load Questions</button>
+                            <button onClick={() => setEditingQuestion({ test_id: test.id })} className="ml-4 px-2 py-1 bg-gray-200 rounded-md text-sm">Add Question</button>
+                            {questions[test.id] && (
+                                <div className="space-y-2 mt-2">
+                                    {questions[test.id].map(q => (
+                                        <div key={q.id} className="p-2 border rounded-md">
+                                            <p>{q.question_text}</p>
+                                            <div className="flex justify-end space-x-2">
+                                                <button onClick={() => setEditingQuestion(q)}><Edit size={16} /></button>
+                                                <button onClick={() => handleDeleteQuestion(q.id, test.id)}><Trash2 size={16} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {editingQuestion && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                        <h2 className="text-xl font-bold mb-4">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h2>
+                        <textarea
+                            placeholder="Question Text"
+                            value={editingQuestion.question_text || ''}
+                            onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
+                            className="w-full p-2 mb-2 border rounded-md"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Language (e.g., javascript)"
+                            value={editingQuestion.language || ''}
+                            onChange={(e) => setEditingQuestion({ ...editingQuestion, language: e.target.value })}
+                            className="w-full p-2 mb-2 border rounded-md"
+                        />
+                        <textarea
+                            placeholder="Starter Code"
+                            value={editingQuestion.starter_code || ''}
+                            onChange={(e) => setEditingQuestion({ ...editingQuestion, starter_code: e.target.value })}
+                            className="w-full p-2 mb-2 border rounded-md h-32"
+                        />
+                        <div className="flex justify-end space-x-2">
+                            <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
+                            <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default AdminTests;

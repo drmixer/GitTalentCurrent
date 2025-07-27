@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     console.log(`Fetching GitHub data for: ${handle}, Installation ID: ${installationId || 'not provided'}`);
 
     // Determine if we should use GitHub App authentication or public access
-    let headers: Record<string, string> = {
+    const headers: Record<string, string> = {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "GitTalent-App", 
     };

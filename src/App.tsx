@@ -22,6 +22,7 @@ import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
 import { GitHubAppSetup } from './pages/GitHubAppSetup';
 import { AuthCallback } from './pages/AuthCallback';
 import { ApplyForJob } from './pages/ApplyForJob';
+import TestPage from './pages/TestPage';
 
 // !! NEW IMPORT !!
 import EndorsementPage from './pages/EndorsementPage'; // Assuming default export for EndorsementPage
@@ -41,6 +42,7 @@ function App() {
 
           {/* User-Specific Dashboards/Profiles */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/tests" element={<AdminTests />} />
           <Route path="/recruiter" element={<RecruiterDashboard />} />
           <Route path="/developer" element={<DeveloperDashboard />} />
 
@@ -55,6 +57,7 @@ function App() {
           <Route path="/recruiters/:id" element={<RecruiterProfilePage />} />
           <Route path="/company/:id" element={<CompanyProfilePage />} />
           <Route path="/apply/job/:jobId" element={<ApplyForJob />} />
+          <Route path="/test/:assignmentId" element={<TestPage />} />
 
           {/* !! IMPORTANT: NEW ENDORSEMENT ROUTE - Place more specific routes BEFORE less specific ones !! */}
           {/* This route will match '/u/some-uuid/endorse' */}
