@@ -23,11 +23,11 @@ export const Contact = () => {
   };
 
   return (
-    <div id="contact" className="py-20 bg-white dark:bg-dark-background">
+    <div id="contact" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 dark:text-dark-text mb-4">Get in Touch</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">Get in Touch</h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Have questions about GitTalent? We'd love to hear from you. 
             Send us a message and we'll respond as soon as possible.
           </p>
@@ -36,60 +36,60 @@ export const Contact = () => {
         <div className="grid lg:grid-cols-2 gap-16">
           {/* Contact Information */}
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-8">Contact Information</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-8">Contact Information</h3>
             
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">Email</h4>
-                  <p className="text-gray-600 dark:text-gray-400">hello@gittalent.dev</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">We'll get back to you within 24 hours</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Email</h4>
+                  <p className="text-gray-600">hello@gittalent.dev</p>
+                  <p className="text-sm text-gray-500">We'll get back to you within 24 hours</p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">Phone</h4>
-                  <p className="text-gray-600 dark:text-gray-400">+1 (555) 123-4567</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">Mon-Fri from 8am to 5pm PST</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Phone</h4>
+                  <p className="text-gray-600">+1 (555) 123-4567</p>
+                  <p className="text-sm text-gray-500">Mon-Fri from 8am to 5pm PST</p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">Office</h4>
-                  <p className="text-gray-600 dark:text-gray-400">San Francisco, CA</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">Remote-first company</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Office</h4>
+                  <p className="text-gray-600">San Francisco, CA</p>
+                  <p className="text-sm text-gray-500">Remote-first company</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-dark-card dark:to-gray-800 rounded-2xl">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-3">Our Commitment</h4>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <div className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Our Commitment</h4>
+              <p className="text-gray-600 mb-4">
                 We're dedicated to transforming the tech hiring process with:
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">AI-Powered Matching</span>
-                  <span className="font-medium text-gray-900 dark:text-dark-text">95% accuracy</span>
+                  <span className="text-gray-600">AI-Powered Matching</span>
+                  <span className="font-medium text-gray-900">95% accuracy</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Open Access Platform</span>
-                  <span className="font-medium text-gray-900 dark:text-dark-text">No gatekeeping</span>
+                  <span className="text-gray-600">Open Access Platform</span>
+                  <span className="font-medium text-gray-900">No gatekeeping</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Pay-Per-Hire Model</span>
-                  <span className="font-medium text-gray-900 dark:text-dark-text">Zero upfront cost</span>
+                  <span className="text-gray-600">Pay-Per-Hire Model</span>
+                  <span className="font-medium text-gray-900">Zero upfront cost</span>
                 </div>
               </div>
             </div>
@@ -100,7 +100,7 @@ export const Contact = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                     Name
                   </label>
                   <input
@@ -110,12 +110,12 @@ export const Contact = () => {
                     required
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white dark:bg-dark-card dark:text-dark-text"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     placeholder="Your name"
                   />
                 </div>
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                     Email
                   </label>
                   <input
@@ -125,14 +125,14 @@ export const Contact = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white dark:bg-dark-card dark:text-dark-text"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     placeholder="your@email.com"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
                   Subject
                 </label>
                 <select
@@ -141,7 +141,7 @@ export const Contact = () => {
                   required
                   value={formData.subject}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white dark:bg-dark-card dark:text-dark-text"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
                   <option value="">Select a subject</option>
                   <option value="general">General Inquiry</option>
@@ -153,7 +153,7 @@ export const Contact = () => {
               </div>
 
               <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
                   Message
                 </label>
                 <textarea
@@ -163,7 +163,7 @@ export const Contact = () => {
                   rows={6}
                   value={formData.message}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none bg-white dark:bg-dark-card dark:text-dark-text"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
                   placeholder="Tell us how we can help you..."
                 />
               </div>
