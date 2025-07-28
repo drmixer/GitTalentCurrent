@@ -72,7 +72,7 @@ interface DashboardLocationState {
 }
 
 const initialStateForGitHubData = { user: null, repos: [], languages: {}, totalStars: 0, contributions: [] };
-const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs', 'endorsements'];
+const validTabs = ['overview', 'profile', 'portfolio', 'github-activity', 'messages', 'jobs', 'endorsements', 'tests'];
 
 export const DeveloperDashboard: React.FC = () => {
   const {
@@ -489,6 +489,7 @@ export const DeveloperDashboard: React.FC = () => {
         </div>
       )}
       {activeTab === 'jobs' && <JobsTab />}
+      {activeTab === 'tests' && <DeveloperTests />}
       {activeTab === 'endorsements' && (
         <section className="endorsements-tab-content">
             <EndorsementDisplay
