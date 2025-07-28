@@ -25,8 +25,9 @@ import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
 import {
   User, Briefcase, MessageSquare, Search, Github, Star, TrendingUp, Calendar,
-  DollarSign, MapPin, Clock, Send, ExternalLink, Building, Eye, SearchCheck, Loader, AlertCircle,
+  DollarSign, MapPin, Clock, Send, ExternalLink, Building, Eye, SearchCheck, Loader, AlertCircle, Code,
 } from 'lucide-react';
+import DeveloperTests from './DeveloperTests';
 import {
   Developer,
   JobRole,
