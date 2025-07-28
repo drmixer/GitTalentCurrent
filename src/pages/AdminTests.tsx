@@ -50,14 +50,20 @@ const AdminTests: React.FC = () => {
     const handleSaveQuestion = async () => {
         if (!editingQuestion || !editingQuestion.test_id) return;
         const { id, ...questionData } = editingQuestion;
-        const { error } = id
-            ? await supabase.from('coding_questions').update(questionData).eq('id', id)
-            : await supabase.from('coding_questions').insert(questionData);
-
-        if (error) console.error('Error saving question:', error);
-        else {
-            fetchQuestions(editingQuestion.test_id);
-            setEditingQuestion(null);
+        if (id) {
+            const { error } = await supabase.from('coding_questions').update(questionData).eq('id', id);
+            if (error) console.error('Error updating question:', error);
+            else {
+                fetchQuestions(editingQuestion.test_id);
+                setEditingQuestion(null);
+            }
+        } else {
+            const { error } = await supabase.from('coding_questions').insert(questionData);
+            if (error) console.error('Error inserting question:', error);
+            else {
+                fetchQuestions(editingQuestion.test_id);
+                setEditingQuestion(null);
+            }
         }
     };
 
