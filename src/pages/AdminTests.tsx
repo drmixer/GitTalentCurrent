@@ -130,6 +130,13 @@ const AdminTests: React.FC = () => {
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
                                     <h2 className="text-xl font-bold mb-4">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h2>
+                                    <input
+                                        type="text"
+                                        placeholder="Title"
+                                        value={editingQuestion.title || ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, title: e.target.value })}
+                                        className="w-full p-2 mb-2 border rounded-md"
+                                    />
                                     <textarea
                                         placeholder="Question Text"
                                         value={editingQuestion.question_text || ''}
@@ -146,6 +153,9 @@ const AdminTests: React.FC = () => {
                                         <option value="javascript">JavaScript</option>
                                         <option value="java">Java</option>
                                         <option value="c++">C++</option>
+                                        <option value="react">React</option>
+                                        <option value="angular">Angular</option>
+                                        <option value="vue">Vue</option>
                                     </select>
                                     <textarea
                                         placeholder="Starter Code"
