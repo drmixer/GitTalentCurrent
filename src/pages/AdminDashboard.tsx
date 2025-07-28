@@ -37,6 +37,7 @@ import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileD
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
+import TestInsert from '../components/Assignments/TestInsert';
 
 interface PendingRecruiter {
   user_id: string;
@@ -502,6 +503,7 @@ export const AdminDashboard = () => {
             <span className="font-semibold text-gray-900">View Hires</span>
             <span className="text-sm text-gray-600 mt-1">Track successful placements</span>
           </button>
+          <TestInsert />
           <button
             onClick={() => navigate('/admin/tests')}
             className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
