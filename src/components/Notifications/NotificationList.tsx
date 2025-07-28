@@ -11,8 +11,10 @@ import {
   Loader,
   AlertCircle,
   Check,
-  X
+  X,
+  Code
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -137,6 +139,8 @@ export const NotificationList: React.FC<NotificationListProps> = ({
     }
   };
 
+  const navigate = useNavigate();
+
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read
     if (!notification.is_read) {
@@ -148,6 +152,8 @@ export const NotificationList: React.FC<NotificationListProps> = ({
       onViewMessage(notification.entity_id);
     } else if (notification.type === 'job_interest' && notification.entity_type === 'job_roles' && onViewJobRole) {
       onViewJobRole(notification.entity_id);
+    } else if (notification.type === 'test_assignment') {
+      navigate(`/test/${notification.entity_id}`);
     }
   };
 
@@ -157,6 +163,8 @@ export const NotificationList: React.FC<NotificationListProps> = ({
         return <MessageSquare className="w-5 h-5 text-purple-500" />;
       case 'job_interest':
         return <Briefcase className="w-5 h-5 text-blue-500" />;
+      case 'test_assignment':
+        return <Code className="w-5 h-5 text-green-500" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
