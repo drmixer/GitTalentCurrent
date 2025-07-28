@@ -117,7 +117,7 @@ const AdminTests: React.FC = () => {
                         <div className="mt-4">
                             <h3 className="font-bold">Questions</h3>
                             <button onClick={() => fetchQuestions(test.id)} className="text-sm text-blue-600">Load Questions</button>
-                            <button onClick={() => setEditingQuestion({ test_id: test.id })} className="ml-4 px-2 py-1 bg-gray-200 rounded-md text-sm">Add Question</button>
+                            <button onClick={() => setEditingQuestion({ test_id: test.id, language: 'python' })} className="ml-4 px-2 py-1 bg-gray-200 rounded-md text-sm">Add Question</button>
                             {questions[test.id] && (
                                 <div className="space-y-2 mt-2">
                                     {questions[test.id].map(q => (
