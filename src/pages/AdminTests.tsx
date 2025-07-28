@@ -150,10 +150,10 @@ const AdminTests: React.FC = () => {
                                         className="w-full p-2 mb-2 border rounded-md h-32"
                                     />
                                     <textarea
-                                        placeholder="Expected Output"
-                                        value={editingQuestion.expected_output || ''}
-                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, expected_output: e.target.value })}
-                                        className="w-full p-2 mb-2 border rounded-md"
+                                        placeholder='Test Cases (JSON format): [{"stdin": "input", "expected_output": "output"}]'
+                                        value={editingQuestion.test_cases ? JSON.stringify(editingQuestion.test_cases, null, 2) : ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, test_cases: JSON.parse(e.target.value) })}
+                                        className="w-full p-2 mb-2 border rounded-md h-32"
                                     />
                                     <div className="flex justify-end space-x-2">
                                         <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
