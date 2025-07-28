@@ -291,6 +291,7 @@ export interface CodingTest {
 export interface CodingQuestion {
     id: string;
     test_id: string;
+    title: string;
     question_text: string;
     language: string;
     starter_code?: string;
