@@ -130,7 +130,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                         id,
                         title
                     ),
-                    test_assignments (
+                    test_assignment:test_assignments (
                         id,
                         status
                     )
@@ -349,8 +349,8 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                                 onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name || '', c.job_role.id, c.job_role.title)}
                                                 className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} />
                                             </button>
-                                            {c.test_assignments && c.test_assignments.status === 'Completed' ? (
-                                                <button onClick={() => handleOpenResultsModal(c.test_assignments.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
+                                            {c.test_assignment && c.test_assignment.status === 'Completed' ? (
+                                                <button onClick={() => handleOpenResultsModal(c.test_assignment.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
                                                     <FileCheck size={18} />
                                                 </button>
                                             ) : (
