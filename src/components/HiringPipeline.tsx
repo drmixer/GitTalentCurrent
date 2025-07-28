@@ -129,6 +129,10 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     job_role:job_roles!fk_assignments_job_role_id!inner (
                         id,
                         title
+                    ),
+                    test_assignments (
+                        id,
+                        status
                     )
                 `)
                 .eq('recruiter_id', userProfile.id)
@@ -345,12 +349,12 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                                 onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name || '', c.job_role.id, c.job_role.title)}
                                                 className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} />
                                             </button>
-                                            {c.status === 'Completed' ? (
-                                                <button onClick={() => handleOpenResultsModal(c.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
+                                            {c.test_assignments && c.test_assignments.status === 'Completed' ? (
+                                                <button onClick={() => handleOpenResultsModal(c.test_assignments.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
                                                     <FileCheck size={18} />
                                                 </button>
                                             ) : (
-                                                <button onClick={() => handleOpenSendTestModal(c.developer.user_id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
+                                                <button onClick={() => handleOpenSendTestModal(c.developer.id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
                                                     <Code size={18} />
                                                 </button>
                                             )}
