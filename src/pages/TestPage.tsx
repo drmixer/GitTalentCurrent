@@ -121,6 +121,10 @@ const TestPage: React.FC = () => {
         return <div>Test not found.</div>;
     }
 
+    if (questions.length === 0) {
+        return <div>This test has no questions.</div>;
+    }
+
     const currentQuestion = questions[currentQuestionIndex];
 
     return (
