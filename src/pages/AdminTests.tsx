@@ -15,14 +15,20 @@ const AdminTests: React.FC = () => {
 
     const fetchTests = async () => {
         const { data, error } = await supabase.from('coding_tests').select('*');
-        if (error) console.error('Error fetching tests:', error);
-        else setTests(data as CodingTest[]);
+        if (error) {
+            console.error('Error fetching tests:', error);
+        } else {
+            setTests(data as CodingTest[]);
+        }
     };
 
     const fetchQuestions = async (testId: string) => {
         const { data, error } = await supabase.from('coding_questions').select('*').eq('test_id', testId);
-        if (error) console.error('Error fetching questions:', error);
-        else setQuestions(prev => ({ ...prev, [testId]: data as CodingQuestion[] }));
+        if (error) {
+            console.error('Error fetching questions:', error);
+        } else {
+            setQuestions(prev => ({ ...prev, [testId]: data as CodingQuestion[] }));
+        }
     };
 
     const handleSaveTest = async () => {
@@ -32,8 +38,9 @@ const AdminTests: React.FC = () => {
             ? await supabase.from('coding_tests').update(testData).eq('id', id)
             : await supabase.from('coding_tests').insert(testData);
 
-        if (error) console.error('Error saving test:', error);
-        else {
+        if (error) {
+            console.error('Error saving test:', error);
+        } else {
             setEditingTest(null);
             fetchTests();
         }
@@ -42,25 +49,41 @@ const AdminTests: React.FC = () => {
     const handleDeleteTest = async (testId: string) => {
         if (window.confirm('Are you sure you want to delete this test and all its questions?')) {
             const { error } = await supabase.from('coding_tests').delete().eq('id', testId);
-            if (error) console.error('Error deleting test:', error);
-            else fetchTests();
+            if (error) {
+                console.error('Error deleting test:', error);
+            } else {
+                fetchTests();
+            }
         }
     };
 
     const handleSaveQuestion = async () => {
         if (!editingQuestion || !editingQuestion.test_id) return;
-        const { id, ...questionData } = editingQuestion;
-        if (id) {
-            const { error } = await supabase.from('coding_questions').update(questionData).eq('id', id);
-            if (error) console.error('Error updating question:', error);
-            else {
+
+        const questionData = {
+            test_id: editingQuestion.test_id,
+            title: editingQuestion.title,
+            question_text: editingQuestion.question_text,
+            language: editingQuestion.language,
+            starter_code: editingQuestion.starter_code,
+            test_cases: editingQuestion.test_cases,
+        };
+
+        if (editingQuestion.id) {
+            // Update existing question
+            const { error } = await supabase.from('coding_questions').update(questionData).eq('id', editingQuestion.id);
+            if (error) {
+                console.error('Error updating question:', error);
+            } else {
                 fetchQuestions(editingQuestion.test_id);
                 setEditingQuestion(null);
             }
         } else {
+            // Insert new question
             const { error } = await supabase.from('coding_questions').insert(questionData);
-            if (error) console.error('Error inserting question:', error);
-            else {
+            if (error) {
+                console.error('Error inserting question:', error);
+            } else {
                 fetchQuestions(editingQuestion.test_id);
                 setEditingQuestion(null);
             }
@@ -69,8 +92,11 @@ const AdminTests: React.FC = () => {
 
     const handleDeleteQuestion = async (questionId: string, testId: string) => {
         const { error } = await supabase.from('coding_questions').delete().eq('id', questionId);
-        if (error) console.error('Error deleting question:', error);
-        else fetchQuestions(testId);
+        if (error) {
+            console.error('Error deleting question:', error);
+        } else {
+            fetchQuestions(testId);
+        }
     };
 
     return (
@@ -122,7 +148,7 @@ const AdminTests: React.FC = () => {
                                 <div className="space-y-2 mt-2">
                                     {questions[test.id].map(q => (
                                         <div key={q.id} className="p-2 border rounded-md">
-                                            <p>{q.question_text}</p>
+                                            <p>{q.title}</p>
                                             <div className="flex justify-end space-x-2">
                                                 <button onClick={() => setEditingQuestion(q)}><Edit size={16} /></button>
                                                 <button onClick={() => handleDeleteQuestion(q.id, test.id)}><Trash2 size={16} /></button>
