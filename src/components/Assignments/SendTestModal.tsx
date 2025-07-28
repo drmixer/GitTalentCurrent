@@ -16,6 +16,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
     const [selectedTest, setSelectedTest] = useState<string>('');
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -40,6 +41,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
         }
         setIsSending(true);
         setError('');
+        setSuccessMessage('');
 
         const { error: insertError } = await supabase.from('test_assignments').insert({
             developer_id: developerId,
@@ -51,8 +53,11 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
         if (insertError) {
             setError('Failed to send test: ' + insertError.message);
         } else {
-            onTestSent();
-            onClose();
+            setSuccessMessage('Test sent successfully!');
+            setTimeout(() => {
+                onTestSent();
+                onClose();
+            }, 2000);
         }
         setIsSending(false);
     };
@@ -88,6 +93,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
                         </select>
                     </div>
                     {error && <p className="text-red-500 text-sm">{error}</p>}
+                    {successMessage && <p className="text-green-500 text-sm">{successMessage}</p>}
                 </div>
                 <div className="mt-6 flex justify-end space-x-3">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
