@@ -65,6 +65,12 @@ const TestPage: React.FC = () => {
                 return 62;
             case 'c++':
                 return 54;
+            case 'react':
+                return 63; // Use JavaScript for React
+            case 'angular':
+                return 63; // Use JavaScript for Angular
+            case 'vue':
+                return 63; // Use JavaScript for Vue
             default:
                 return 71; // Default to Python
         }
@@ -146,12 +152,13 @@ const TestPage: React.FC = () => {
         <div className="flex h-screen">
             <div className="w-1/3 p-4 overflow-y-auto">
                 <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
-                <h2 className="text-xl font-semibold mb-2">{currentQuestion.question_text}</h2>
+                <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                <p>{currentQuestion.question_text}</p>
             </div>
             <div className="w-2/3 flex flex-col">
                 <Editor
                     height="60vh"
-                    language={currentQuestion.language.toLowerCase()}
+                    language={currentQuestion.language.toLowerCase() === 'react' || currentQuestion.language.toLowerCase() === 'angular' || currentQuestion.language.toLowerCase() === 'vue' ? 'javascript' : currentQuestion.language.toLowerCase()}
                     value={code}
                     onChange={(value) => setCode(value || '')}
                     theme="vs-dark"
