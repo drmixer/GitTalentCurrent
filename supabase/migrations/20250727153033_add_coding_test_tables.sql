@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS coding_tests (
 CREATE TABLE IF NOT EXISTS coding_questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     test_id UUID REFERENCES coding_tests(id) ON DELETE CASCADE,
+    title TEXT,
     question_text TEXT NOT NULL,
     language TEXT NOT NULL,
     starter_code TEXT,

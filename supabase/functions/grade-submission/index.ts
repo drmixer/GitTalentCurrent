@@ -13,7 +13,34 @@ serve(async (req) => {
   }
 
   try {
-    const { code, language_id, stdin, expected_output } = await req.json()
+    const { code, language, stdin, expected_output } = await req.json()
+
+    let language_id;
+    switch (language) {
+        case 'python':
+            language_id = 71;
+            break;
+        case 'javascript':
+            language_id = 63;
+            break;
+        case 'java':
+            language_id = 62;
+            break;
+        case 'c++':
+            language_id = 54;
+            break;
+        case 'react':
+            language_id = 63; // Use JavaScript for React
+            break;
+        case 'angular':
+            language_id = 63; // Use JavaScript for Angular
+            break;
+        case 'vue':
+            language_id = 63; // Use JavaScript for Vue
+            break;
+        default:
+            language_id = 71; // Default to Python
+    }
 
     const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
       method: 'POST',
@@ -30,6 +57,18 @@ serve(async (req) => {
       }),
     })
 
+    console.log('Judge0 request body:', {
+        source_code: code,
+        language_id: language_id,
+        stdin: stdin,
+        expected_output: expected_output,
+    });
+
+    if (!response.ok) {
+        const errorData = await response.text();
+        console.error(`Error from Judge0: ${response.status} ${errorData}`);
+        throw new Error(`Failed to create submission on Judge0: ${response.status}`);
+    }
     const submission = await response.json()
     const token = submission.token
 
