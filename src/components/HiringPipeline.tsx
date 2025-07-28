@@ -66,7 +66,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                         <FileCheck size={16} />
                                     </button>
                                 ) : (
-                                    <button onClick={() => onSendTest(c.developer.id, c.job_role.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="Send Test">
+                                    <button onClick={() => onSendTest(c.developer.user_id, c.job_role.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="Send Test">
                                         <Code size={16} />
                                     </button>
                                 )}
@@ -350,7 +350,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                                     <FileCheck size={18} />
                                                 </button>
                                             ) : (
-                                                <button onClick={() => handleOpenSendTestModal(c.developer.id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
+                                                <button onClick={() => handleOpenSendTestModal(c.developer.user_id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
                                                     <Code size={18} />
                                                 </button>
                                             )}
