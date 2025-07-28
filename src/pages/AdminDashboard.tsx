@@ -502,6 +502,14 @@ export const AdminDashboard = () => {
             <span className="font-semibold text-gray-900">View Hires</span>
             <span className="text-sm text-gray-600 mt-1">Track successful placements</span>
           </button>
+          <button
+            onClick={() => navigate('/admin/tests')}
+            className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
+          >
+            <Code className="w-8 h-8 text-gray-600 mb-3" />
+            <span className="font-semibold text-gray-900">Manage Tests</span>
+            <span className="text-sm text-gray-600 mt-1">Create and edit coding tests</span>
+          </button>
         </div>
       </div>
 
