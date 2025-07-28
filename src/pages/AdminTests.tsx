@@ -136,25 +136,59 @@ const AdminTests: React.FC = () => {
                                         onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
                                         className="w-full p-2 mb-2 border rounded-md"
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Language (e.g., javascript)"
+                                    <select
                                         value={editingQuestion.language || ''}
                                         onChange={(e) => setEditingQuestion({ ...editingQuestion, language: e.target.value })}
                                         className="w-full p-2 mb-2 border rounded-md"
-                                    />
+                                    >
+                                        <option value="">Select Language</option>
+                                        <option value="python">Python</option>
+                                        <option value="javascript">JavaScript</option>
+                                        <option value="java">Java</option>
+                                        <option value="c++">C++</option>
+                                    </select>
                                     <textarea
                                         placeholder="Starter Code"
                                         value={editingQuestion.starter_code || ''}
                                         onChange={(e) => setEditingQuestion({ ...editingQuestion, starter_code: e.target.value })}
                                         className="w-full p-2 mb-2 border rounded-md h-32"
                                     />
-                                    <textarea
-                                        placeholder='Test Cases (JSON format): [{"stdin": "input", "expected_output": "output"}]'
-                                        value={editingQuestion.test_cases ? JSON.stringify(editingQuestion.test_cases, null, 2) : ''}
-                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, test_cases: JSON.parse(e.target.value) })}
-                                        className="w-full p-2 mb-2 border rounded-md h-32"
-                                    />
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Test Cases</h3>
+                                        {editingQuestion.test_cases?.map((tc, index) => (
+                                            <div key={index} className="flex space-x-2 mb-2">
+                                                <textarea
+                                                    placeholder="Stdin"
+                                                    value={tc.stdin}
+                                                    onChange={(e) => {
+                                                        const newTestCases = [...(editingQuestion.test_cases || [])];
+                                                        newTestCases[index] = { ...newTestCases[index], stdin: e.target.value };
+                                                        setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                                    }}
+                                                    className="w-full p-2 border rounded-md"
+                                                />
+                                                <textarea
+                                                    placeholder="Expected Output"
+                                                    value={tc.expected_output}
+                                                    onChange={(e) => {
+                                                        const newTestCases = [...(editingQuestion.test_cases || [])];
+                                                        newTestCases[index] = { ...newTestCases[index], expected_output: e.target.value };
+                                                        setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                                    }}
+                                                    className="w-full p-2 border rounded-md"
+                                                />
+                                                <button onClick={() => {
+                                                    const newTestCases = [...(editingQuestion.test_cases || [])];
+                                                    newTestCases.splice(index, 1);
+                                                    setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                                }}><Trash2 size={16} /></button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => {
+                                            const newTestCases = [...(editingQuestion.test_cases || []), { stdin: '', expected_output: '' }];
+                                            setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                        }} className="text-sm text-blue-600">Add Test Case</button>
+                                    </div>
                                     <div className="flex justify-end space-x-2">
                                         <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
                                         <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
