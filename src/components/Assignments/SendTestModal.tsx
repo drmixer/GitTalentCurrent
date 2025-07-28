@@ -51,7 +51,11 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
         }).select().single();
 
         if (insertError) {
-            setError('Failed to send test: ' + insertError.message);
+            if (insertError.code === '23505') {
+                setError('This developer has already been assigned this test.');
+            } else {
+                setError('Failed to send test: ' + insertError.message);
+            }
         } else {
             // Create notification
             await supabase.from('notifications').insert({

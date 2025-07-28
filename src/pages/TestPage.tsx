@@ -55,6 +55,21 @@ const TestPage: React.FC = () => {
         }
     }, [questions, currentQuestionIndex]);
 
+    const getLanguageId = (language: string) => {
+        switch (language) {
+            case 'python':
+                return 71;
+            case 'javascript':
+                return 63;
+            case 'java':
+                return 62;
+            case 'c++':
+                return 54;
+            default:
+                return 71; // Default to Python
+        }
+    }
+
     const handleRunCode = async () => {
         setOutput('');
         setIsSubmitting(true);
@@ -62,13 +77,13 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke('grade-submission', {
             body: {
                 code,
-                language_id: 71, // Python
+                language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
             },
         });
 
         if (error) {
-            setOutput(`Error: ${error.message}`);
+            setOutput(`Error running code: ${error.message}`);
         } else {
             setOutput(data.stdout || data.stderr || 'No output');
         }
@@ -82,14 +97,14 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke<{ status: { id: number }, stdout: string, stderr: string }>('grade-submission', {
             body: {
                 code,
-                language_id: 71, // Python
+                language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
                 expected_output: question.expected_output,
             },
         });
 
         if (error) {
-            // Handle error
+            setError('Failed to submit code: ' + error.message);
         } else if (data) {
             // Store result
             await supabase.from('test_results').insert({
