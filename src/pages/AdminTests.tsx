@@ -126,40 +126,46 @@ const AdminTests: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        {editingQuestion && editingQuestion.test_id === test.id && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                                    <h2 className="text-xl font-bold mb-4">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h2>
+                                    <textarea
+                                        placeholder="Question Text"
+                                        value={editingQuestion.question_text || ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
+                                        className="w-full p-2 mb-2 border rounded-md"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Language (e.g., javascript)"
+                                        value={editingQuestion.language || ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, language: e.target.value })}
+                                        className="w-full p-2 mb-2 border rounded-md"
+                                    />
+                                    <textarea
+                                        placeholder="Starter Code"
+                                        value={editingQuestion.starter_code || ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, starter_code: e.target.value })}
+                                        className="w-full p-2 mb-2 border rounded-md h-32"
+                                    />
+                                    <textarea
+                                        placeholder="Expected Output"
+                                        value={editingQuestion.expected_output || ''}
+                                        onChange={(e) => setEditingQuestion({ ...editingQuestion, expected_output: e.target.value })}
+                                        className="w-full p-2 mb-2 border rounded-md"
+                                    />
+                                    <div className="flex justify-end space-x-2">
+                                        <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
+                                        <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
 
-            {editingQuestion && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
-                        <h2 className="text-xl font-bold mb-4">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h2>
-                        <textarea
-                            placeholder="Question Text"
-                            value={editingQuestion.question_text || ''}
-                            onChange={(e) => setEditingQuestion({ ...editingQuestion, question_text: e.target.value })}
-                            className="w-full p-2 mb-2 border rounded-md"
-                        />
-                        <input
-                            type="text"
-                            placeholder="Language (e.g., javascript)"
-                            value={editingQuestion.language || ''}
-                            onChange={(e) => setEditingQuestion({ ...editingQuestion, language: e.target.value })}
-                            className="w-full p-2 mb-2 border rounded-md"
-                        />
-                        <textarea
-                            placeholder="Starter Code"
-                            value={editingQuestion.starter_code || ''}
-                            onChange={(e) => setEditingQuestion({ ...editingQuestion, starter_code: e.target.value })}
-                            className="w-full p-2 mb-2 border rounded-md h-32"
-                        />
-                        <div className="flex justify-end space-x-2">
-                            <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
-                            <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
