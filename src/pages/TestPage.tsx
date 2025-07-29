@@ -76,6 +76,27 @@ const TestPage: React.FC = () => {
         }
     }
 
+    const getLanguageId = (language: string) => {
+        switch (language) {
+            case 'python':
+                return 71;
+            case 'javascript':
+                return 63;
+            case 'java':
+                return 62;
+            case 'c++':
+                return 54;
+            case 'react':
+                return 63; // Use JavaScript for React
+            case 'angular':
+                return 63; // Use JavaScript for Angular
+            case 'vue':
+                return 63; // Use JavaScript for Vue
+            default:
+                return 71; // Default to Python
+        }
+    }
+
     const handleRunCode = async () => {
         setOutput('');
         setIsSubmitting(true);
@@ -83,7 +104,7 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke('grade-submission', {
             body: {
                 code,
-                language: question.language,
+                language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
             },
         });
@@ -103,7 +124,7 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke<{ status: { id: number }, stdout: string, stderr: string }>('grade-submission', {
             body: {
                 code,
-                language: question.language,
+                language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
                 expected_output: question.expected_output,
             },
