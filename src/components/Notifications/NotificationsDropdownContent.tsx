@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
 
 interface Notification {
@@ -22,6 +22,7 @@ interface NotificationsDropdownContentProps {
 
 export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath }) => {
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +199,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
               onClick={() => {
                 markAsRead(notification.id);
                 if (notification.link) {
-                  window.location.href = notification.link.startsWith('/') ? notification.link : `${getDashboardPath()}${notification.link}`;
+                  const path = notification.link.startsWith('/') ? notification.link : `${getDashboardPath()}${notification.link}`;
+                  navigate(path);
                 }
                 onClose();
               }}
