@@ -134,7 +134,7 @@ const TestPage: React.FC = () => {
             await supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId);
             setIsCompleted(true);
             setTimeout(() => {
-                navigate('/developer/dashboard');
+                navigate('/developer');
             }, 3000);
         }
         setIsSubmitting(false);
