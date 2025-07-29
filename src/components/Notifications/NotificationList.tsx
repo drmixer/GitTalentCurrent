@@ -105,14 +105,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
 
       if (error) throw error;
       
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.id === notificationId 
-            ? { ...notification, is_read: true } 
-            : notification
-        )
-      );
+      fetchNotifications();
     } catch (error: any) {
       console.error('Error marking notification as read:', error);
     } finally {
@@ -128,10 +121,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
 
       if (error) throw error;
       
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, is_read: true }))
-      );
+      fetchNotifications();
     } catch (error: any) {
       console.error('Error marking all notifications as read:', error);
     } finally {
