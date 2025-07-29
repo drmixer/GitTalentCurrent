@@ -39,6 +39,24 @@ serve(async (req) => {
 
       message = `A developer has completed a coding test.`
       userId = assignment.recruiter_id
+    } else if (type === 'INSERT' && record.table === 'messages') {
+        // Notify receiver
+        message = `You have a new message.`
+        userId = record.receiver_id
+    } else if (type === 'INSERT' && record.table === 'applied_jobs') {
+        // Notify recruiter
+        const { data: job, error } = await supabase
+            .from('job_roles')
+            .select('recruiter_id')
+            .eq('id', record.job_id)
+            .single()
+
+        if (error) {
+            throw error
+        }
+
+        message = `A developer has applied for one of your jobs.`
+        userId = job.recruiter_id
     }
 
     if (message && userId) {
