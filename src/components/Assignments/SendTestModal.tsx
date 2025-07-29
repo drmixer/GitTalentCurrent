@@ -67,7 +67,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
             if (updateError) {
                 setError('Failed to associate test with assignment: ' + updateError.message);
             } else {
-                // Create notification
+                // Create notification for developer
                 await supabase.from('notifications').insert({
                     user_id: developerId,
                     message: 'You have been assigned a new coding test.',
