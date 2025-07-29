@@ -83,7 +83,7 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke('grade-submission', {
             body: {
                 code,
-                language_id: getLanguageId(question.language),
+                language: question.language,
                 stdin: question.test_cases?.[0]?.stdin || '',
             },
         });
@@ -103,7 +103,7 @@ const TestPage: React.FC = () => {
         const { data, error } = await supabase.functions.invoke<{ status: { id: number }, stdout: string, stderr: string }>('grade-submission', {
             body: {
                 code,
-                language_id: getLanguageId(question.language),
+                language: question.language,
                 stdin: question.test_cases?.[0]?.stdin || '',
                 expected_output: question.expected_output,
             },
