@@ -13,34 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { code, language, stdin, expected_output } = await req.json()
-
-    let language_id;
-    switch (language) {
-        case 'python':
-            language_id = 71;
-            break;
-        case 'javascript':
-            language_id = 63;
-            break;
-        case 'java':
-            language_id = 62;
-            break;
-        case 'c++':
-            language_id = 54;
-            break;
-        case 'react':
-            language_id = 63; // Use JavaScript for React
-            break;
-        case 'angular':
-            language_id = 63; // Use JavaScript for Angular
-            break;
-        case 'vue':
-            language_id = 63; // Use JavaScript for Vue
-            break;
-        default:
-            language_id = 71; // Default to Python
-    }
+    const { code, language_id, stdin, expected_output } = await req.json()
 
     const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
       method: 'POST',
