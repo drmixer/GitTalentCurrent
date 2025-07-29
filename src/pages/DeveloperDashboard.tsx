@@ -119,6 +119,7 @@ export const DeveloperDashboard: React.FC = () => {
   const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
   const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
   const [unreadTestAssignmentCount, setUnreadTestAssignmentCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
@@ -250,6 +251,19 @@ export const DeveloperDashboard: React.FC = () => {
         console.error('[Dashboard] Error fetching unread test assignment count:', unreadTestAssignmentCountError);
       } else {
         setUnreadTestAssignmentCount(unreadTestAssignmentCount ?? 0);
+      }
+
+      const { count: unreadMessageCount, error: unreadMessageCountError } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .eq('type', 'message')
+        .eq('is_read', false);
+
+      if (unreadMessageCountError) {
+        console.error('[Dashboard] Error fetching unread message count:', unreadMessageCountError);
+      } else {
+        setUnreadMessageCount(unreadMessageCount ?? 0);
       }
 
     } catch (error) {
@@ -451,6 +465,11 @@ export const DeveloperDashboard: React.FC = () => {
               {tabName === 'tests' && unreadTestAssignmentCount > 0 && (
                 <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                   {unreadTestAssignmentCount}
+                </span>
+              )}
+              {tabName === 'messages' && unreadMessageCount > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {unreadMessageCount}
                 </span>
               )}
             </button>

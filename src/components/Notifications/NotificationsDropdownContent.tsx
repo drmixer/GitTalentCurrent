@@ -195,7 +195,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
               key={notification.id}
               className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
                 } hover:bg-gray-50 transition-colors cursor-pointer`}
-              onClick={() => markAsRead(notification.id)} // Mark as read on click
+              onClick={() => {
+                markAsRead(notification.id);
+                if (notification.link) {
+                  window.location.href = notification.link.startsWith('/') ? notification.link : `${getDashboardPath()}${notification.link}`;
+                }
+                onClose();
+              }}
             >
               <div className="flex-shrink-0 mt-0.5">
                 {getNotificationIcon(notification.type, notification.is_read)}
@@ -210,19 +216,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 <p className="text-xs text-gray-400 mt-1">
                   {formatSimpleDate(notification.created_at)}
                 </p>
-                {notification.link && (
-                  <Link
-                    to={notification.link.startsWith('/') ? notification.link : `${getDashboardPath()}${notification.link}`}
-                    className="text-blue-600 hover:underline text-xs mt-1 block"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent li onClick from firing
-                      markAsRead(notification.id); // Mark as read on link click
-                      onClose(); // Close dropdown after navigating
-                    }}
-                  >
-                    View Details
-                  </Link>
-                )}
               </div>
             </li>
           ))}
