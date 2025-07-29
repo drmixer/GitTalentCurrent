@@ -8,12 +8,15 @@ const corsHeaders = {
 const JUDGE0_API_URL = 'https://judge0-ce.p.rapidapi.com';
 
 serve(async (req) => {
+  console.log("grade-submission function invoked");
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { code, language_id, stdin, expected_output, assignment_id } = await req.json()
+    const requestBody = await req.json()
+    console.log("Request body:", requestBody);
+    const { code, language_id, stdin, expected_output, assignment_id } = requestBody;
 
     const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
       method: 'POST',
@@ -42,7 +45,8 @@ serve(async (req) => {
         console.error(`Error from Judge0: ${response.status} ${errorData}`);
         throw new Error(`Failed to create submission on Judge0: ${response.status}`);
     }
-    const submission = await response.json()
+    const submission = await response.json();
+    console.log("Submission response from Judge0:", submission);
     const token = submission.token
 
     let processing = true
