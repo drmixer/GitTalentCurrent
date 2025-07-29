@@ -68,11 +68,23 @@ serve(async (req) => {
     }
 
     if (message && userId) {
+      let link = '';
+      if (notificationType === 'message') {
+        link = '/dashboard?tab=messages';
+      } else if (notificationType === 'job_application') {
+        link = '/dashboard?tab=jobs';
+      } else if (notificationType === 'test_assignment') {
+        link = '/dashboard?tab=tests';
+      } else if (notificationType === 'test_completion') {
+        link = '/dashboard?tab=pipeline';
+      }
       const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,
         message,
         type: notificationType,
         entity_id: record.id,
+        link,
+        title: message,
       })
       if (error) {
         console.error("Error inserting notification:", error);
