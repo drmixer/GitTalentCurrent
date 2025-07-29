@@ -120,6 +120,7 @@ const RecruiterDashboard: React.FC = () => {
     const isApproved = userProfile?.is_approved === true;
     const unreadNotifications = notifications.filter(n => !n.is_read).length;
     const [unreadJobApplicationCount, setUnreadJobApplicationCount] = useState(0);
+    const [unreadTestCompletionCount, setUnreadTestCompletionCount] = useState(0);
 
     // --- Consolidated Data Fetching Function ---
     const fetchDashboardData = useCallback(async () => {
@@ -200,6 +201,16 @@ const RecruiterDashboard: React.FC = () => {
 
             if (unreadJobApplicationCountError) throw unreadJobApplicationCountError;
             setUnreadJobApplicationCount(unreadJobApplicationCount || 0);
+
+            const { count: unreadTestCompletionCount, error: unreadTestCompletionCountError } = await supabase
+                .from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', currentUserId)
+                .eq('is_read', false)
+                .eq('type', 'test_completion');
+
+            if (unreadTestCompletionCountError) throw unreadTestCompletionCountError;
+            setUnreadTestCompletionCount(unreadTestCompletionCount || 0);
 
             // Calculate Dashboard Stats
             const totalJobs = jobRolesData?.length || 0;

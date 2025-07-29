@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { code, language_id, stdin, expected_output } = await req.json()
+    const { code, language_id, stdin, expected_output, assignment_id } = await req.json()
 
     const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
       method: 'POST',
@@ -69,20 +69,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    const { data: testAssignment, error } = await supabase
-      .from('test_assignments')
-      .select('id, developer_id, job_id')
-      .eq('id', submission.id)
-      .single()
+    if (assignment_id) {
+      const { data: testAssignment, error } = await supabase
+        .from('test_assignments')
+        .select('id, developer_id, job_id')
+        .eq('id', assignment_id)
+        .single()
 
-    if (testAssignment) {
-      await supabase.functions.invoke('notify-user', {
-        body: {
-          type: 'UPDATE',
-          table: 'test_assignments',
-          record: { ...testAssignment, status: 'Completed' },
-        },
-      })
+      if (testAssignment) {
+        await supabase.functions.invoke('notify-user', {
+          body: {
+            type: 'UPDATE',
+            table: 'test_assignments',
+            record: { ...testAssignment, status: 'Completed' },
+          },
+        })
+      }
     }
 
     return new Response(JSON.stringify(result), {

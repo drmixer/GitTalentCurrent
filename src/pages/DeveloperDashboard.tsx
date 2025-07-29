@@ -118,6 +118,7 @@ export const DeveloperDashboard: React.FC = () => {
 
   const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
   const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
+  const [unreadTestAssignmentCount, setUnreadTestAssignmentCount] = useState(0);
 
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
@@ -237,6 +238,19 @@ export const DeveloperDashboard: React.FC = () => {
         console.log('[Dashboard] Applied jobs count fetched:', appliedCount);
       }
       setAppliedJobs([]);
+
+      const { count: unreadTestAssignmentCount, error: unreadTestAssignmentCountError } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .eq('type', 'test_assignment')
+        .eq('is_read', false);
+
+      if (unreadTestAssignmentCountError) {
+        console.error('[Dashboard] Error fetching unread test assignment count:', unreadTestAssignmentCountError);
+      } else {
+        setUnreadTestAssignmentCount(unreadTestAssignmentCount ?? 0);
+      }
 
     } catch (error) {
       console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
@@ -434,6 +448,11 @@ export const DeveloperDashboard: React.FC = () => {
             <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
               className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+              {tabName === 'tests' && unreadTestAssignmentCount > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {unreadTestAssignmentCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
