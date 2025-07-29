@@ -57,19 +57,30 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ isOpen, onClose, develope
                 setError('Failed to send test: ' + insertError.message);
             }
         } else {
-            // Create notification
-            await supabase.from('notifications').insert({
-                user_id: developerId,
-                message: 'You have been assigned a new coding test.',
-                type: 'test_assignment',
-                entity_id: testAssignment.id,
-            });
+            // Update the assignment with the new test_assignment_id
+            const { error: updateError } = await supabase
+                .from('assignments')
+                .update({ test_assignment_id: testAssignment.id })
+                .eq('developer_id', developerId)
+                .eq('job_role_id', jobId);
 
-            setSuccessMessage('Test sent successfully!');
-            setTimeout(() => {
-                onTestSent();
-                onClose();
-            }, 2000);
+            if (updateError) {
+                setError('Failed to associate test with assignment: ' + updateError.message);
+            } else {
+                // Create notification
+                await supabase.from('notifications').insert({
+                    user_id: developerId,
+                    message: 'You have been assigned a new coding test.',
+                    type: 'test_assignment',
+                    entity_id: testAssignment.id,
+                });
+
+                setSuccessMessage('Test sent successfully!');
+                setTimeout(() => {
+                    onTestSent();
+                    onClose();
+                }, 2000);
+            }
         }
         setIsSending(false);
     };
