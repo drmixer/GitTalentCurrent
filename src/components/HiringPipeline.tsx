@@ -305,6 +305,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
+                                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Status</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -333,6 +334,17 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             >
                                                 {STAGES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
                                             </select>
+                                        </td>
+                                        <td className="p-3">
+                                            {c.test_assignment ? (
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                    c.test_assignment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                    {c.test_assignment.status}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-500">Not Sent</span>
+                                            )}
                                         </td>
                                         <td className="p-3">
                                             <input type="text" value={notes[c.id] || c.notes || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />

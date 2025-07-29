@@ -231,10 +231,13 @@ export interface Assignment {
 
 // Define SavedCandidate as an Assignment where developer, job_role, and recruiter
 // are guaranteed to be present for dashboard display and modal usage.
+import { TestAssignment } from './index';
+
 export interface SavedCandidate extends Assignment {
     developer: Developer; // Make developer non-optional
     job_role: JobRole;   // Make job_role non-optional
     recruiter: Recruiter; // Make recruiter non-optional for the modal's agreement text
+    test_assignment?: TestAssignment;
 }
 
 export interface Message {

@@ -25,6 +25,7 @@ import { ApplyForJob } from './pages/ApplyForJob';
 import TestPage from './pages/TestPage';
 import AdminTests from './pages/AdminTests';
 import DeveloperTests from './pages/DeveloperTests';
+import TestResultsPage from './pages/TestResultsPage';
 
 // !! NEW IMPORT !!
 import EndorsementPage from './pages/EndorsementPage'; // Assuming default export for EndorsementPage
@@ -48,6 +49,7 @@ function App() {
           <Route path="/recruiter" element={<RecruiterDashboard />} />
           <Route path="/developer" element={<DeveloperDashboard />} />
           <Route path="/developer/tests" element={<DeveloperTests />} />
+          <Route path="/recruiter/results/:assignmentId" element={<TestResultsPage />} />
 
           {/* Navigation Redirects (if any) */}
           <Route path="/dashboard/jobs" element={<Navigate to="/developer?tab=jobs" />} />
