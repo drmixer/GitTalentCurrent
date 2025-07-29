@@ -119,6 +119,7 @@ const RecruiterDashboard: React.FC = () => {
 
     const isApproved = userProfile?.is_approved === true;
     const unreadNotifications = notifications.filter(n => !n.is_read).length;
+    const [unreadJobApplicationCount, setUnreadJobApplicationCount] = useState(0);
 
     // --- Consolidated Data Fetching Function ---
     const fetchDashboardData = useCallback(async () => {
@@ -188,6 +189,17 @@ const RecruiterDashboard: React.FC = () => {
                 .eq('is_read', false);
 
             if (messagesCountError) throw messagesCountError;
+
+            // Fetch unread job application notifications count
+            const { count: unreadJobApplicationCount, error: unreadJobApplicationCountError } = await supabase
+                .from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', currentUserId)
+                .eq('is_read', false)
+                .eq('type', 'job_application');
+
+            if (unreadJobApplicationCountError) throw unreadJobApplicationCountError;
+            setUnreadJobApplicationCount(unreadJobApplicationCount || 0);
 
             // Calculate Dashboard Stats
             const totalJobs = jobRolesData?.length || 0;
@@ -740,6 +752,11 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
+                                {unreadJobApplicationCount > 0 && (
+                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                        {unreadJobApplicationCount}
+                                    </span>
+                                )}
                             </button>
                             <button
                                 onClick={() => setActiveTab('tracker')}

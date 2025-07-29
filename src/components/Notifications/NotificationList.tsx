@@ -139,15 +139,13 @@ export const NotificationList: React.FC<NotificationListProps> = ({
     
     // Navigate based on notification type and entity
     if (notification.type === 'message') {
-        if (onViewMessage) {
-            onViewMessage(notification.entity_id);
-        }
+        navigate('/developer/dashboard?tab=messages');
     } else if (notification.type === 'job_application') {
         navigate('/recruiter/dashboard?tab=jobs');
     } else if (notification.type === 'test_assignment') {
-        navigate(`/developer/tests`);
+        navigate(`/developer/dashboard?tab=tests`);
     } else if (notification.type === 'test_completion') {
-        navigate(`/recruiter/results/${notification.entity_id}`);
+        navigate(`/recruiter/dashboard?tab=pipeline`);
     }
   };
 
