@@ -21,10 +21,13 @@ serve(async (req) => {
     let message = ''
     let userId = ''
 
+    let notificationType = ''
+
     if (type === 'INSERT' && record.table === 'test_assignments') {
       // Notify developer
       message = `You have been assigned a new coding test.`
       userId = record.developer_id
+      notificationType = 'test_assignment'
     } else if (type === 'UPDATE' && record.table === 'test_assignments' && record.status === 'Completed') {
       // Notify recruiter
       const { data: assignment, error } = await supabase
@@ -39,10 +42,12 @@ serve(async (req) => {
 
       message = `A developer has completed a coding test.`
       userId = assignment.recruiter_id
+      notificationType = 'test_completion'
     } else if (type === 'INSERT' && record.table === 'messages') {
         // Notify receiver
         message = `You have a new message.`
         userId = record.receiver_id
+        notificationType = 'message'
     } else if (type === 'INSERT' && record.table === 'applied_jobs') {
         // Notify recruiter
         const { data: job, error } = await supabase
@@ -57,13 +62,14 @@ serve(async (req) => {
 
         message = `A developer has applied for one of your jobs.`
         userId = job.recruiter_id
+        notificationType = 'job_application'
     }
 
     if (message && userId) {
       await supabase.from('notifications').insert({
         user_id: userId,
         message,
-        type: 'test_assignment',
+        type: notificationType,
         entity_id: record.id,
       })
     }

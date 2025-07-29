@@ -62,6 +62,29 @@ serve(async (req) => {
       await new Promise((resolve) => setTimeout(resolve, 1000))
     }
 
+    // Notify the recruiter
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    )
+
+    const { data: testAssignment, error } = await supabase
+      .from('test_assignments')
+      .select('id, developer_id, job_id')
+      .eq('id', submission.id)
+      .single()
+
+    if (testAssignment) {
+      await supabase.functions.invoke('notify-user', {
+        body: {
+          type: 'UPDATE',
+          table: 'test_assignments',
+          record: { ...testAssignment, status: 'Completed' },
+        },
+      })
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
