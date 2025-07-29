@@ -232,6 +232,18 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
     const handleOpenResultsModal = (assignmentId: string) => {
         setSelectedAssignmentId(assignmentId);
         setIsResultsModalOpen(true);
+        markNotificationAsRead(assignmentId);
+    };
+
+    const markNotificationAsRead = async (assignmentId: string) => {
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('entity_id', assignmentId)
+            .eq('type', 'test_completion');
+        if (error) {
+            console.error('Error marking notification as read:', error);
+        }
     };
 
     const handleCloseResultsModal = () => {

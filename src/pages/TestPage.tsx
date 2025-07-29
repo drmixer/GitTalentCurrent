@@ -50,7 +50,20 @@ const TestPage: React.FC = () => {
 
     useEffect(() => {
         fetchAssignmentAndQuestions();
+        markNotificationAsRead();
     }, [fetchAssignmentAndQuestions]);
+
+    const markNotificationAsRead = async () => {
+        if (!assignmentId) return;
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('entity_id', assignmentId)
+            .eq('type', 'test_assignment');
+        if (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    };
 
     useEffect(() => {
         if (questions.length > 0) {
@@ -88,6 +101,7 @@ const TestPage: React.FC = () => {
                 code,
                 language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
+                assignment_id: assignmentId,
             },
         });
 
@@ -109,6 +123,7 @@ const TestPage: React.FC = () => {
                 language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
                 expected_output: question.expected_output,
+                assignment_id: assignmentId,
             },
         });
 
