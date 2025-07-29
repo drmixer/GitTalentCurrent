@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CodingQuestion, TestAssignment } from '../types';
 import Editor from '@monaco-editor/react';
-import { Play, Send, Loader } from 'lucide-react';
+import { Play, Send, Loader, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TestPage: React.FC = () => {
     const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -14,6 +15,8 @@ const TestPage: React.FC = () => {
     const [output, setOutput] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCompleted, setIsCompleted] = useState(false);
+    const navigate = useNavigate();
 
     const fetchAssignmentAndQuestions = useCallback(async () => {
         if (!assignmentId) return;
@@ -129,7 +132,10 @@ const TestPage: React.FC = () => {
         } else {
             // Test finished
             await supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId);
-            // Redirect or show completion message
+            setIsCompleted(true);
+            setTimeout(() => {
+                navigate('/developer/dashboard');
+            }, 3000);
         }
         setIsSubmitting(false);
     };
@@ -146,34 +152,47 @@ const TestPage: React.FC = () => {
         return <div>This test has no questions.</div>;
     }
 
+    if (isCompleted) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+                <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
+                <h1 className="text-2xl font-bold mb-2">Test Completed!</h1>
+                <p className="text-gray-600">Your results have been sent to the recruiter.</p>
+                <p className="text-gray-600">You will be redirected to your dashboard shortly.</p>
+            </div>
+        );
+    }
+
     const currentQuestion = questions[currentQuestionIndex];
 
     return (
-        <div className="flex h-screen">
-            <div className="w-1/3 p-4 overflow-y-auto">
-                <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
-                <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                <p>{currentQuestion.question_text}</p>
-            </div>
-            <div className="w-2/3 flex flex-col">
-                <Editor
-                    height="60vh"
-                    language={currentQuestion.language.toLowerCase() === 'react' || currentQuestion.language.toLowerCase() === 'angular' || currentQuestion.language.toLowerCase() === 'vue' ? 'javascript' : currentQuestion.language.toLowerCase()}
-                    value={code}
-                    onChange={(value) => setCode(value || '')}
-                    theme="vs-dark"
-                />
-                <div className="p-4 bg-gray-800 text-white flex-grow">
-                    <h3 className="text-lg font-semibold">Output</h3>
-                    <pre className="whitespace-pre-wrap">{output}</pre>
+        <div className="p-8">
+            <div className="flex h-screen">
+                <div className="w-1/3 p-4 overflow-y-auto">
+                    <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
+                    <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                    <p>{currentQuestion.question_text}</p>
                 </div>
-                <div className="p-4 border-t border-gray-200 flex justify-end space-x-4">
-                    <button onClick={handleRunCode} disabled={isSubmitting} className="px-4 py-2 bg-gray-200 rounded-md flex items-center">
-                        <Play size={16} className="mr-2" /> Run
-                    </button>
-                    <button onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center">
-                        <Send size={16} className="mr-2" /> Submit
-                    </button>
+                <div className="w-2/3 flex flex-col">
+                    <Editor
+                        height="60vh"
+                        language={currentQuestion.language.toLowerCase() === 'react' || currentQuestion.language.toLowerCase() === 'angular' || currentQuestion.language.toLowerCase() === 'vue' ? 'javascript' : currentQuestion.language.toLowerCase()}
+                        value={code}
+                        onChange={(value) => setCode(value || '')}
+                        theme="vs-dark"
+                    />
+                    <div className="p-4 bg-gray-800 text-white flex-grow">
+                        <h3 className="text-lg font-semibold">Output</h3>
+                        <pre className="whitespace-pre-wrap">{output}</pre>
+                    </div>
+                    <div className="p-4 border-t border-gray-200 flex justify-end space-x-4">
+                        <button onClick={handleRunCode} disabled={isSubmitting} className="px-4 py-2 bg-gray-200 rounded-md flex items-center">
+                            <Play size={16} className="mr-2" /> Run
+                        </button>
+                        <button onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center">
+                            <Send size={16} className="mr-2" /> Submit
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
