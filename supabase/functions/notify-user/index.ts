@@ -6,12 +6,14 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log("notify-user function invoked");
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const { type, record } = await req.json()
+    console.log("Request body:", { type, record });
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -66,12 +68,17 @@ serve(async (req) => {
     }
 
     if (message && userId) {
-      await supabase.from('notifications').insert({
+      const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,
         message,
         type: notificationType,
         entity_id: record.id,
       })
+      if (error) {
+        console.error("Error inserting notification:", error);
+        throw error;
+      }
+      console.log("Notification inserted:", data);
     }
 
     return new Response(JSON.stringify({ message: 'Notification processed' }), {
