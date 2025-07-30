@@ -97,7 +97,7 @@ export const DeveloperDashboard: React.FC = () => {
           return 'github-activity';
       }
       const params = new URLSearchParams(location.search);
-      const tabFromUrl = params.get('tab') as typeof activeTab | null;
+      const tabFromUrl = params.get('tab');
       if (tabFromUrl && validTabs.includes(tabFromUrl)) {
           console.log(`[Dashboard] Initializing activeTab to '${tabFromUrl}' from URL.`);
           return tabFromUrl;
@@ -324,6 +324,8 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]);
 
+  // REMOVED: This useEffect conflicts with the one below. The URL should be the single source of truth.
+  /*
   useEffect(() => {
     const currentParams = new URLSearchParams(location.search);
     const currentTabInUrl = currentParams.get('tab');
@@ -343,10 +345,12 @@ export const DeveloperDashboard: React.FC = () => {
       });
     }
   }, [activeTab, location.pathname, navigate]);
+  */
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
-    const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
+    // MODIFIED: Added explicit type cast for safety
+    const tabFromUrl = queryParams.get('tab') as string | null;
 
     if (locationState?.fromGitHubSetup) return;
 
@@ -359,7 +363,8 @@ export const DeveloperDashboard: React.FC = () => {
       console.log(`[Dashboard] URL to State Sync: No tab in URL, setting activeTab to 'overview'.`);
       setActiveTab('overview');
     }
-  }, [location.search]);
+  // MODIFIED: Added activeTab dependency to prevent stale state issues.
+  }, [location.search, activeTab, locationState]);
 
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
@@ -461,7 +466,8 @@ export const DeveloperDashboard: React.FC = () => {
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
-            <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
+            // MODIFIED: onClick handler now uses navigate to change the URL
+            <button key={tabName} onClick={() => navigate(`/developer?tab=${tabName}`)}
               className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
               {tabName === 'tests' && tabCounts.tests > 0 && (
