@@ -46,7 +46,6 @@ export const useNotifications = () => {
       setTabCounts(newTabCounts);
       setUnreadCount(data.length);
 
-      // ADDED: Update document title based on new count
       if (data.length > 0) {
         document.title = `(${data.length}) GitTalent`;
       } else {
@@ -60,9 +59,12 @@ export const useNotifications = () => {
     }
   }, [userProfile]);
 
-  // ADDED: New function to mark all notifications as read
   const markAllAsRead = useCallback(async () => {
     if (!userProfile?.id || unreadCount === 0) return;
+    
+    // MODIFIED: Add this line for an immediate, optimistic title update
+    document.title = 'GitTalent'; 
+    
     try {
       await supabase
         .from('notifications')
@@ -125,6 +127,5 @@ export const useNotifications = () => {
     }
   }, [userProfile, fetchUnreadCount]);
 
-  // MODIFIED: Return the new function
   return { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAllAsRead };
 };
