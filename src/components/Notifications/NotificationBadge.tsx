@@ -5,56 +5,10 @@ import { supabase } from '../../lib/supabase';
 
 interface NotificationBadgeProps {
   className?: string;
+  unreadCount: number;
 }
 
-export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' }) => {
-  const { userProfile } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Using useCallback for fetchUnreadCount to prevent re-creation on every render
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userProfile.id)
-        .eq('is_read', false); // Assuming 'is_read' false means unread
-
-      if (error) throw error;
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching unread notification count:', error);
-    }
-  }, [userProfile]); // Dependency on userProfile
-
-  useEffect(() => {
-    if (userProfile) {
-      fetchUnreadCount();
-      
-      // Set up real-time subscription for new notifications
-      const subscription = supabase
-        .channel(`notification-count-changes-${userProfile.id}`) // Use userProfile.id to make channel unique
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen for any change that might affect the count (INSERT, UPDATE of is_read, DELETE)
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${userProfile.id}`
-          },
-          () => {
-            fetchUnreadCount(); // Re-fetch count on any relevant change
-          }
-        )
-        .subscribe();
-      
-      return () => {
-        supabase.removeChannel(subscription);
-      };
-    }
-  }, [userProfile, fetchUnreadCount]); // Added fetchUnreadCount to deps
+export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '', unreadCount }) => {
 
   if (unreadCount === 0) {
     return null; // Don't render anything if there are no unread notifications

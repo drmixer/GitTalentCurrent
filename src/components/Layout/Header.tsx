@@ -14,6 +14,24 @@ export const Header = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      if (!userProfile?.id) return;
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userProfile.id)
+        .eq('is_read', false); // Assuming 'is_read' false means unread
+
+      if (error) throw error;
+      setUnreadCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching unread notification count:', error);
+    }
+  }, [userProfile]);
 
   // Re-define getDashboardPath here to be passed down
   const getDashboardPath = () => {
@@ -214,7 +232,7 @@ export const Header = () => {
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                     >
                       <Bell className="w-4 h-4" /> {/* The one and only bell icon */}
-                      <NotificationBadge className="absolute -top-1 -right-1" /> {/* Position badge relative to this bell */}
+                      <NotificationBadge className="absolute -top-1 -right-1" unreadCount={unreadCount} /> {/* Position badge relative to this bell */}
                     </button>
 
                     {/* Notifications Dropdown (Render the new component here) */}
@@ -226,6 +244,7 @@ export const Header = () => {
                         <NotificationsDropdownContent 
                             onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
                             getDashboardPath={getDashboardPath} // Pass the helper function
+                            fetchUnreadCount={fetchUnreadCount}
                         />
                       </div>
                     )}

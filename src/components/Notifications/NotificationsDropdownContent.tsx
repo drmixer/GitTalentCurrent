@@ -18,9 +18,10 @@ interface Notification {
 interface NotificationsDropdownContentProps {
   onClose: () => void;
   getDashboardPath: () => string; // Function to get dashboard path based on role
+  fetchUnreadCount: () => void;
 }
 
-export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath }) => {
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath, fetchUnreadCount }) => {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -94,6 +95,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
       );
+      fetchUnreadCount();
     } catch (err: any) {
       console.error('Error marking notification as read:', err.message);
       // Optionally, show a toast or message to the user
@@ -199,7 +201,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
               onClick={() => {
                 markAsRead(notification.id);
                 if (notification.link) {
-                  navigate(notification.link);
+                  const path = notification.link.startsWith('/') ? notification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${notification.link}`;
+                  navigate(path);
                 }
                 onClose();
               }}
