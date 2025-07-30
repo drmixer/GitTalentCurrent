@@ -199,8 +199,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
               onClick={() => {
                 markAsRead(notification.id);
                 if (notification.link) {
-                  const path = notification.link.startsWith('/') ? notification.link : `${getDashboardPath()}${notification.link}`;
-                  navigate(path);
+                  navigate(notification.link);
                 }
                 onClose();
               }}
