@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import { supabase } from '../lib/supabase';
-import { Navigate } from 'react-router-dom';
+// MODIFIED: Import useLocation
+import { Navigate, useLocation } from 'react-router-dom';
 import {
     Users,
     Briefcase,
@@ -85,6 +86,8 @@ interface DashboardStats {
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
     const { tabCounts } = useNotifications();
+    // ADDED: Initialize useLocation
+    const location = useLocation();
 
     // --- State for fetched dashboard data ---
     const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
@@ -233,6 +236,18 @@ const RecruiterDashboard: React.FC = () => {
             setDashboardLoading(false);
         }
     }, [userProfile?.id]);
+    
+    // ADDED: useEffect to sync URL search params with the active tab state
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tabFromUrl = params.get('tab');
+        
+        const validTabs = ['overview', 'my-jobs', 'tracker', 'search-devs', 'messages', 'hires', 'profile', 'job-details'];
+  
+        if (tabFromUrl && validTabs.includes(tabFromUrl) && activeTab !== tabFromUrl) {
+          setActiveTab(tabFromUrl);
+        }
+      }, [location.search, activeTab]);
 
     // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
     useEffect(() => {
