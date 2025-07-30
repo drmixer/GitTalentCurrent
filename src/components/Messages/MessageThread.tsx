@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNotifications } from '../../hooks/useNotifications';
+import { useNotifications } from '../../contexts/NotificationsContext'; // MODIFIED: Corrected import path
 import { supabase } from '../../lib/supabase';
 import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
 import { 
