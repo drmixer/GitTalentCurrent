@@ -18,13 +18,14 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
+  // MODIFIED: Corrected the 'recruiter' path
   const getDashboardPath = () => {
     if (!userProfile) return '/login'; // Fallback if profile not loaded
     switch (userProfile.role) {
       case 'admin':
         return '/admin';
       case 'recruiter':
-        return '/recruiter-dashboard';
+        return '/recruiter'; // Corrected path to match App.tsx
       case 'developer':
         return '/developer';
       default:
