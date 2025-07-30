@@ -1,29 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+// MODIFIED: useNavigate is no longer needed here
+// import { useNavigate } from 'react-router-dom';
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
 
 interface Notification {
   id: string;
   created_at: string;
   user_id: string;
-  type: 'application_status' | 'message' | 'system';
+  type: string; // Loosened for the custom types you have
   title: string;
   message: string;
   is_read: boolean;
   link?: string;
 }
 
+// MODIFIED: Updated props interface
 interface NotificationsDropdownContentProps {
   onClose: () => void;
-  getDashboardPath: () => string; // Function to get dashboard path based on role
+  onNavigate: (tab: string) => void;
   fetchUnreadCount: () => void;
 }
 
-export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, getDashboardPath, fetchUnreadCount }) => {
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount }) => {
   const { userProfile } = useAuth();
-  const navigate = useNavigate();
+  // REMOVED: const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         .select('*')
         .eq('user_id', userProfile.id)
         .order('created_at', { ascending: false })
-        .limit(20); // Limit to recent notifications
+        .limit(20);
 
       if (error) throw error;
       setNotifications(data || []);
@@ -58,20 +60,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
   useEffect(() => {
     fetchNotifications();
 
-    // Set up real-time subscription for new notifications
     const channel = supabase
       .channel(`notifications-for-user-${userProfile?.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen for any change (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${userProfile?.id}`
         },
         (payload) => {
-          // A more robust approach would be to process payload.new/payload.old
-          // For simplicity, refetch all notifications on any change
           console.log('Realtime notification change detected:', payload);
           fetchNotifications();
         }
@@ -98,7 +97,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       fetchUnreadCount();
     } catch (err: any) {
       console.error('Error marking notification as read:', err.message);
-      // Optionally, show a toast or message to the user
     }
   };
 
@@ -118,7 +116,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       fetchUnreadCount();
     } catch (err: any) {
       console.error('Error marking all notifications as read:', err.message);
-      // Optionally, show a toast or message to the user
     }
   };
 
@@ -140,7 +137,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }
   };
 
-  // Function to format date more simply without date-fns
   const formatSimpleDate = (isoString: string) => {
     const date = new Date(isoString);
     const now = new Date();
@@ -154,8 +150,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
 
-    // Fallback for older dates
-    return date.toLocaleDateString(); // Or any other simple format
+    return date.toLocaleDateString();
   };
 
   const groupNotifications = (notifications: Notification[]) => {
@@ -215,13 +210,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   key={notification.id}
                   className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  onClick={() => {
-                    markAsRead(notification.id);
-                    if (notification.link) {
-                      const path = `${getDashboardPath()}/dashboard${notification.link}`;
-                      navigate(path);
+                  // MODIFIED: onClick handler to use onNavigate
+                  onClick={async () => {
+                    if (!notification.is_read) {
+                      await markAsRead(notification.id);
                     }
-                    onClose();
+                    if (notification.link) {
+                      const tab = notification.link.substring(notification.link.indexOf('=') + 1);
+                      onNavigate(tab);
+                    } else {
+                      onClose();
+                    }
                   }}
                 >
                   <div className="flex-shrink-0 mt-0.5">
@@ -247,14 +246,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   key={type}
                   className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  onClick={() => {
-                    // Mark all notifications of this type as read
-                    groupedNotifications.forEach(n => markAsRead(n.id));
-                    if (latestNotification.link) {
-                      const path = `${getDashboardPath()}/dashboard${latestNotification.link}`;
-                      navigate(path);
+                  // MODIFIED: onClick handler to use onNavigate for grouped notifications
+                  onClick={async () => {
+                    for (const n of groupedNotifications) {
+                      if (!n.is_read) await markAsRead(n.id);
                     }
-                    onClose();
+                    if (latestNotification.link) {
+                      const tab = latestNotification.link.substring(latestNotification.link.indexOf('=') + 1);
+                      onNavigate(tab);
+                    } else {
+                      onClose();
+                    }
                   }}
                 >
                   <div className="flex-shrink-0 mt-0.5">
@@ -262,7 +264,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   </div>
                   <div className="flex-grow">
                     <p className={`text-sm font-medium ${latestNotification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
-                      {groupedNotifications.length} new {type.replace('_', ' ')}s
+                      {groupedNotifications.length} new {type.replace(/_/g, ' ')}s
                     </p>
                     <p className={`text-sm ${latestNotification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
                       {latestNotification.message}
