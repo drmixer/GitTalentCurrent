@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
 import { supabase } from '../../lib/supabase';
 // CORRECTED PATHS BELOW:
 import { NotificationBadge } from '../Notifications/NotificationBadge';
@@ -10,28 +11,11 @@ import { NotificationsDropdownContent } from '../Notifications/NotificationsDrop
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
+  const { unreadCount, fetchUnreadCount } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      if (!userProfile?.id) return;
-
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userProfile.id)
-        .eq('is_read', false); // Assuming 'is_read' false means unread
-
-      if (error) throw error;
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching unread notification count:', error);
-    }
-  }, [userProfile]);
 
   // Re-define getDashboardPath here to be passed down
   const getDashboardPath = () => {

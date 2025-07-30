@@ -332,7 +332,7 @@ const RecruiterDashboard: React.FC = () => {
                 notificationsSubscription.unsubscribe();
             };
         }
-    }, [user?.id, fetchDashboardData, activeTab]);
+    }, [user?.id, fetchDashboardData]);
 
     // --- Handlers ---
     const handleViewApplicants = useCallback((jobId: string) => {
