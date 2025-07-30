@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNotifications } from '../../hooks/useNotifications';
+// MODIFIED: Corrected the import path to point to the new Context file
+import { useNotifications } from '../../contexts/NotificationsContext';
 import { supabase } from '../../lib/supabase';
 // CORRECTED PATHS BELOW:
 import { NotificationBadge } from '../Notifications/NotificationBadge';
@@ -11,21 +12,19 @@ import { NotificationsDropdownContent } from '../Notifications/NotificationsDrop
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
-  // MODIFIED: Import markAllAsRead from the hook
   const { unreadCount, fetchUnreadCount, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
-  // MODIFIED: Corrected the 'recruiter' path
   const getDashboardPath = () => {
     if (!userProfile) return '/login'; // Fallback if profile not loaded
     switch (userProfile.role) {
       case 'admin':
         return '/admin';
       case 'recruiter':
-        return '/recruiter'; // Corrected path to match App.tsx
+        return '/recruiter';
       case 'developer':
         return '/developer';
       default:
@@ -33,7 +32,6 @@ export const Header = () => {
     }
   };
 
-  // ADDED: New handler to navigate to a dashboard tab from a notification
   const handleNavigateToTab = (tab: string) => {
     const dashboardPath = getDashboardPath();
     navigate(`${dashboardPath}?tab=${tab}`);
@@ -218,7 +216,6 @@ export const Header = () => {
                   
                   {/* NOTIFICATION BELL BUTTON AND DROPDOWN */}
                   <div className="relative"> {/* Container for the bell and its dropdown */}
-                    {/* MODIFIED: onClick handler for bell */}
                     <button
                       id="notification-button" // Added ID for click outside logic
                       onClick={() => {
@@ -233,7 +230,6 @@ export const Header = () => {
                       <NotificationBadge className="absolute -top-1 -right-1" unreadCount={unreadCount} /> {/* Position badge relative to this bell */}
                     </button>
 
-                    {/* MODIFIED: Pass new onNavigate prop */}
                     {showNotificationsDropdown && (
                       <div 
                         id="notification-dropdown" // Added ID for click outside logic
