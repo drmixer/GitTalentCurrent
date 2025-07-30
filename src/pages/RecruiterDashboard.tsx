@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotifications } from '../contexts/NotificationsContext'; // MODIFIED: Corrected import path
 import { supabase } from '../lib/supabase';
 // MODIFIED: Import useLocation
 import { Navigate, useLocation } from 'react-router-dom';
