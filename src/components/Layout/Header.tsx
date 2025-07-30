@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
