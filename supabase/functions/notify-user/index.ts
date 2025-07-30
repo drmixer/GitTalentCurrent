@@ -25,46 +25,49 @@ serve(async (req) => {
 
     let notificationType = ''
 
-    if (type === 'INSERT' && record.table === 'test_assignments') {
-      // Notify developer
-      message = `You have been assigned a new coding test.`
-      userId = record.developer_id
-      notificationType = 'test_assignment'
-    } else if (type === 'UPDATE' && record.table === 'test_assignments' && record.status === 'Completed') {
-      // Notify recruiter
-      const { data: assignment, error } = await supabase
-        .from('assignments')
-        .select('recruiter_id')
-        .eq('test_assignment_id', record.id)
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      message = `A developer has completed a coding test.`
-      userId = assignment.recruiter_id
-      notificationType = 'test_completion'
-    } else if (type === 'INSERT' && record.table === 'messages') {
-        // Notify receiver
-        message = `You have a new message.`
-        userId = record.receiver_id
-        notificationType = 'message'
-    } else if (type === 'INSERT' && record.table === 'applied_jobs') {
-        // Notify recruiter
-        const { data: job, error } = await supabase
-            .from('job_roles')
+    switch (`${type}:${record.table}`) {
+      case 'INSERT:test_assignments':
+        message = `You have been assigned a new coding test.`;
+        userId = record.developer_id;
+        notificationType = 'test_assignment';
+        break;
+      case 'UPDATE:test_assignments':
+        if (record.status === 'Completed') {
+          const { data: assignment, error } = await supabase
+            .from('assignments')
             .select('recruiter_id')
-            .eq('id', record.job_id)
-            .single()
-
-        if (error) {
-            throw error
+            .eq('test_assignment_id', record.id)
+            .single();
+          if (error) throw error;
+          message = `A developer has completed a coding test.`;
+          userId = assignment.recruiter_id;
+          notificationType = 'test_completion';
         }
-
-        message = `A developer has applied for one of your jobs.`
-        userId = job.recruiter_id
-        notificationType = 'job_application'
+        break;
+      case 'INSERT:messages':
+        message = `You have a new message.`;
+        userId = record.receiver_id;
+        notificationType = 'message';
+        break;
+      case 'INSERT:applied_jobs':
+        const { data: job, error } = await supabase
+          .from('job_roles')
+          .select('recruiter_id')
+          .eq('id', record.job_id)
+          .single();
+        if (error) throw error;
+        message = `A developer has applied for one of your jobs.`;
+        userId = job.recruiter_id;
+        notificationType = 'job_application';
+        break;
+      case 'UPDATE:applied_jobs':
+        if (record.status === 'viewed') {
+            // Notify developer that their application has been viewed
+            message = `Your application for a job has been viewed.`;
+            userId = record.developer_id;
+            notificationType = 'application_viewed';
+        }
+        break;
     }
 
     if (message && userId) {
@@ -81,11 +84,13 @@ serve(async (req) => {
           link = '/recruiter/dashboard?tab=messages';
         }
       } else if (notificationType === 'job_application') {
-        link = '/dashboard?tab=jobs';
+        link = '/recruiter/dashboard?tab=jobs';
       } else if (notificationType === 'test_assignment') {
-        link = '/dashboard?tab=tests';
+        link = '/developer/dashboard?tab=tests';
       } else if (notificationType === 'test_completion') {
-        link = '/dashboard?tab=pipeline';
+        link = '/recruiter/dashboard?tab=pipeline';
+      } else if (notificationType === 'application_viewed') {
+        link = '/developer/dashboard?tab=jobs';
       }
       const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,

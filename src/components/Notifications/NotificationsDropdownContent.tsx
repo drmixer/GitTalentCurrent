@@ -128,6 +128,12 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         return <CheckCircle className={`w-5 h-5 ${isRead ? 'text-gray-400' : 'text-green-500'}`} />;
       case 'message':
         return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-message-square ${isRead ? 'text-gray-400' : 'text-blue-500'}`}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+      case 'test_assignment':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-code ${isRead ? 'text-gray-400' : 'text-green-500'}`}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
+      case 'test_completion':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-file-check ${isRead ? 'text-gray-400' : 'text-indigo-500'}`}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>;
+      case 'job_application':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-briefcase ${isRead ? 'text-gray-400' : 'text-yellow-500'}`}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
       case 'system':
       default:
         return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-bell ${isRead ? 'text-gray-400' : 'text-purple-500'}`}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
@@ -150,6 +156,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
 
     // Fallback for older dates
     return date.toLocaleDateString(); // Or any other simple format
+  };
+
+  const groupNotifications = (notifications: Notification[]) => {
+    return notifications.reduce((acc, notification) => {
+      (acc[notification.type] = acc[notification.type] || []).push(notification);
+      return acc;
+    }, {} as Record<string, Notification[]>);
   };
 
   return (
@@ -194,36 +207,74 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
 
       {!isLoading && !error && notifications.length > 0 && (
         <ul className="divide-y divide-gray-100 flex-grow overflow-y-auto">
-          {notifications.map((notification) => (
-            <li
-              key={notification.id}
-              className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
-                } hover:bg-gray-50 transition-colors cursor-pointer`}
-              onClick={() => {
-                markAsRead(notification.id);
-                if (notification.link) {
-                  const path = notification.link.startsWith('/') ? notification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${notification.link}`;
-                  navigate(path);
-                }
-                onClose();
-              }}
-            >
-              <div className="flex-shrink-0 mt-0.5">
-                {getNotificationIcon(notification.type, notification.is_read)}
-              </div>
-              <div className="flex-grow">
-                <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
-                  {notification.title}
-                </p>
-                <p className={`text-sm ${notification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
-                  {notification.message}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {formatSimpleDate(notification.created_at)}
-                </p>
-              </div>
-            </li>
-          ))}
+          {Object.entries(groupNotifications(notifications)).map(([type, groupedNotifications]) => {
+            if (groupedNotifications.length === 1) {
+              const notification = groupedNotifications[0];
+              return (
+                <li
+                  key={notification.id}
+                  className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
+                    } hover:bg-gray-50 transition-colors cursor-pointer`}
+                  onClick={() => {
+                    markAsRead(notification.id);
+                    if (notification.link) {
+                      const path = notification.link.startsWith('/') ? notification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${notification.link}`;
+                      navigate(path);
+                    }
+                    onClose();
+                  }}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getNotificationIcon(notification.type, notification.is_read)}
+                  </div>
+                  <div className="flex-grow">
+                    <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
+                      {notification.title}
+                    </p>
+                    <p className={`text-sm ${notification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
+                      {notification.message}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatSimpleDate(notification.created_at)}
+                    </p>
+                  </div>
+                </li>
+              );
+            } else {
+              const latestNotification = groupedNotifications[0];
+              return (
+                <li
+                  key={type}
+                  className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
+                    } hover:bg-gray-50 transition-colors cursor-pointer`}
+                  onClick={() => {
+                    // Mark all notifications of this type as read
+                    groupedNotifications.forEach(n => markAsRead(n.id));
+                    if (latestNotification.link) {
+                      const path = latestNotification.link.startsWith('/') ? latestNotification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${latestNotification.link}`;
+                      navigate(path);
+                    }
+                    onClose();
+                  }}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
+                  </div>
+                  <div className="flex-grow">
+                    <p className={`text-sm font-medium ${latestNotification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
+                      {groupedNotifications.length} new {type.replace('_', ' ')}s
+                    </p>
+                    <p className={`text-sm ${latestNotification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
+                      {latestNotification.message}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatSimpleDate(latestNotification.created_at)}
+                    </p>
+                  </div>
+                </li>
+              );
+            }
+          })}
         </ul>
       )}
     </div>
