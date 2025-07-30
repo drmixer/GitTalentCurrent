@@ -89,7 +89,7 @@ export const useNotifications = () => {
 
       if (error) throw error;
 
-      fetchUnreadCount();
+      await fetchUnreadCount();
     } catch (error) {
       console.error('Error marking notification as read by entity:', error);
     }

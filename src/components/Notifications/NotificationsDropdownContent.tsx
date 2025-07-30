@@ -218,7 +218,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   onClick={() => {
                     markAsRead(notification.id);
                     if (notification.link) {
-                      const path = notification.link.startsWith('/') ? notification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${notification.link}`;
+                      const path = `${getDashboardPath()}${notification.link}`;
                       navigate(path);
                     }
                     onClose();
@@ -251,7 +251,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                     // Mark all notifications of this type as read
                     groupedNotifications.forEach(n => markAsRead(n.id));
                     if (latestNotification.link) {
-                      const path = latestNotification.link.startsWith('/') ? latestNotification.link.replace('/dashboard', getDashboardPath()) : `${getDashboardPath()}${latestNotification.link}`;
+                      const path = `${getDashboardPath()}${latestNotification.link}`;
                       navigate(path);
                     }
                     onClose();

@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { type, record } = await req.json()
+    const { type, record } = await req.json();
     console.log("Request body:", { type, record });
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabase = createClient(
@@ -79,18 +79,18 @@ serve(async (req) => {
           .eq('id', userId)
           .single();
         if (user?.role === 'developer') {
-          link = '/developer/dashboard?tab=messages';
+          link = '?tab=messages';
         } else {
-          link = '/recruiter/dashboard?tab=messages';
+          link = '?tab=messages';
         }
       } else if (notificationType === 'job_application') {
-        link = '/recruiter/dashboard?tab=jobs';
+        link = '?tab=jobs';
       } else if (notificationType === 'test_assignment') {
-        link = '/developer/dashboard?tab=tests';
+        link = '?tab=tests';
       } else if (notificationType === 'test_completion') {
-        link = '/recruiter/dashboard?tab=pipeline';
+        link = '?tab=pipeline';
       } else if (notificationType === 'application_viewed') {
-        link = '/developer/dashboard?tab=jobs';
+        link = '?tab=jobs';
       }
       const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,
