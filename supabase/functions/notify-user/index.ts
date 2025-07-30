@@ -70,7 +70,16 @@ serve(async (req) => {
     if (message && userId) {
       let link = '';
       if (notificationType === 'message') {
-        link = '/dashboard?tab=messages';
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .single();
+        if (user?.role === 'developer') {
+          link = '/developer/dashboard?tab=messages';
+        } else {
+          link = '/recruiter/dashboard?tab=messages';
+        }
       } else if (notificationType === 'job_application') {
         link = '/dashboard?tab=jobs';
       } else if (notificationType === 'test_assignment') {
