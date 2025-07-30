@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotifications } from '../contexts/NotificationsContext'; // MODIFIED: Corrected import path
 import { TestResult, CodingQuestion } from '../types';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 
