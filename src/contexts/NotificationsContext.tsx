@@ -1,8 +1,6 @@
-// src/contexts/NotificationsContext.tsx
-
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from './useAuth';
+import { useAuth } from './AuthContext'; // CORRECTED IMPORT PATH
 
 interface TabCounts {
   messages: number;
