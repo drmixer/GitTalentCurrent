@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
 import { supabase } from '../../lib/supabase';
 import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
 import { 
@@ -38,6 +39,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   onNewMessage
 }) => {
   const { userProfile } = useAuth();
+  const { markAsReadByEntity } = useNotifications();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -54,6 +56,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     if (userProfile && otherUserId) {
       fetchMessages();
       checkCanSendMessage();
+      markAsReadByEntity(otherUserId, 'message');
       
       const channel = supabase.channel(`messaging:${userProfile.id}`);
 

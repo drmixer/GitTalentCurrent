@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
 import {
@@ -24,7 +25,6 @@ import {
 // === CUSTOM COMPONENTS ===
 import { JobRoleForm } from '../components/JobRoles/JobRoleForm';
 import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
-import { NotificationList } from '../components/Notifications/NotificationList';
 import { MessageList } from '../components/Messages/MessageList';
 import { MessageThread } from '../components/Messages/MessageThread';
 import { JobImportModal } from '../components/JobRoles/JobImportModal';
@@ -84,6 +84,7 @@ interface DashboardStats {
 
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
+    const { tabCounts } = useNotifications();
 
     // --- State for fetched dashboard data ---
     const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
@@ -763,9 +764,9 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
-                                {unreadJobApplicationCount > 0 && (
+                                {tabCounts.jobs > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {unreadJobApplicationCount}
+                                        {tabCounts.jobs}
                                     </span>
                                 )}
                             </button>
@@ -779,6 +780,11 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Users className="w-5 h-5 mr-2" />
                                 Hiring Pipeline
+                                {tabCounts.pipeline > 0 && (
+                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                        {tabCounts.pipeline}
+                                    </span>
+                                )}
                             </button>
                             <button
                                 onClick={() => setActiveTab('search-devs')}
@@ -801,9 +807,9 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <MessageSquare className="w-5 h-5 mr-2" />
                                 Messages
-                                {stats.unreadMessages > 0 && (
+                                {tabCounts.messages > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {stats.unreadMessages}
+                                        {tabCounts.messages}
                                     </span>
                                 )}
                             </button>
@@ -864,13 +870,12 @@ const RecruiterDashboard: React.FC = () => {
                     {activeTab === 'messages' && renderMessages()}
                     {activeTab === 'hires' && renderHires()}
                     {activeTab === 'notifications' && (
-                        <NotificationList
-                            notifications={notifications}
-                            onViewJobRole={handleViewNotificationJobRole}
-                            onViewMessage={(messageId) => {
-                                setActiveTab('messages');
-                            }}
-                        />
+                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Notifications</h2>
+                            <p className="text-gray-600">
+                            Your notifications will appear here. You can view them by clicking the bell icon in the header.
+                            </p>
+                        </div>
                     )}
                     {activeTab === 'tracker' && (
                         <HiringPipeline

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useNotifications } from '../hooks/useNotifications';
 import { TestResult, CodingQuestion } from '../types';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 
@@ -8,9 +9,13 @@ const TestResultsPage: React.FC = () => {
     const { assignmentId } = useParams<{ assignmentId: string }>();
     const [results, setResults] = useState<(TestResult & { coding_questions: CodingQuestion })[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { markAsReadByEntity } = useNotifications();
 
     useEffect(() => {
         fetchResults();
+        if (assignmentId) {
+            markAsReadByEntity(assignmentId, 'test_completion');
+        }
     }, [assignmentId]);
 
     const fetchResults = async () => {

@@ -35,7 +35,6 @@ export { MessageList } from './Messages/MessageList';
 export { MessageThread } from './Messages/MessageThread';
 
 // Notification components
-export { NotificationList } from './Notifications/NotificationList';
 export { NotificationBadge } from './Notifications/NotificationBadge';
 
 // Hire components
