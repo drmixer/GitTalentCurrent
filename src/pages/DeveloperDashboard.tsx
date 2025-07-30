@@ -304,7 +304,7 @@ export const DeveloperDashboard: React.FC = () => {
         setIsLoadingEndorsements(false);
         setEndorsementError("Not authenticated to load endorsements.");
     }
-  }, [authUser, authContextLoading, fetchDeveloperPageData, activeTab]);
+  }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);

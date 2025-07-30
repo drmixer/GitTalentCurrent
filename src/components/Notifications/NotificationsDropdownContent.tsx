@@ -115,6 +115,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       if (error) throw error;
 
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      fetchUnreadCount();
     } catch (err: any) {
       console.error('Error marking all notifications as read:', err.message);
       // Optionally, show a toast or message to the user
