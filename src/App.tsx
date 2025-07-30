@@ -2,17 +2,18 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // AuthContext: Named export
-import { AuthProvider } from './contexts/AuthContext.tsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext.tsx'; // MODIFIED: Imported useAuth
 
 // Components: All confirmed as Named Exports
 import { Header } from './components/Layout/Header';
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
 import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding';
+import { ProtectedRoute } from './components/ProtectedRoute'; // ADDED: Import ProtectedRoute
 
 // Pages: Mixed exports - Pay close attention!
 import { LandingPage } from './pages/LandingPage';
-import { Dashboard } from './pages/Dashboard';
+// REMOVED: import { Dashboard } from './pages/Dashboard'; // No longer used directly in routing
 import { AdminDashboard } from './pages/AdminDashboard';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import RecruiterProfilePage from './pages/RecruiterProfilePage';
@@ -30,6 +31,17 @@ import TestResultsPage from './pages/TestResultsPage';
 // !! NEW IMPORT !!
 import EndorsementPage from './pages/EndorsementPage'; // Assuming default export for EndorsementPage
 
+// ADDED: Helper component to redirect users from a generic /dashboard
+const RoleBasedRedirect = () => {
+  const { userProfile } = useAuth();
+  if (userProfile?.role === 'developer') return <Navigate to="/developer" replace />;
+  if (userProfile?.role === 'recruiter') return <Navigate to="/recruiter" replace />;
+  if (userProfile?.role === 'admin') return <Navigate to="/admin" replace />;
+  // Fallback while profile is loading or for unknown roles
+  return <Navigate to="/" replace />; 
+};
+
+
 function App() {
   return (
     <AuthProvider>
@@ -40,16 +52,68 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginForm />} />
           <Route path="/signup" element={<SignupForm />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* MODIFIED: The old /dashboard route is replaced by the protected routes below */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['developer', 'recruiter', 'admin']}>
+                <RoleBasedRedirect />
+              </ProtectedRoute>
+            } 
+          />
+
           <Route path="/onboarding" element={<DeveloperOnboarding />} />
 
-          {/* User-Specific Dashboards/Profiles */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/tests" element={<AdminTests />} />
-          <Route path="/recruiter" element={<RecruiterDashboard />} />
-          <Route path="/developer" element={<DeveloperDashboard />} />
-          <Route path="/developer/tests" element={<DeveloperTests />} />
-          <Route path="/recruiter/results/:assignmentId" element={<TestResultsPage />} />
+          {/* MODIFIED: User-Specific Dashboards/Profiles are now protected */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/tests" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminTests />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/recruiter" 
+            element={
+              <ProtectedRoute allowedRoles={['recruiter']}>
+                <RecruiterDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/developer" 
+            element={
+              <ProtectedRoute allowedRoles={['developer']}>
+                <DeveloperDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/developer/tests" 
+            element={
+              <ProtectedRoute allowedRoles={['developer']}>
+                <DeveloperTests />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/recruiter/results/:assignmentId" 
+            element={
+              <ProtectedRoute allowedRoles={['recruiter']}>
+                <TestResultsPage />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Navigation Redirects (if any) */}
           <Route path="/dashboard/jobs" element={<Navigate to="/developer?tab=jobs" />} />
