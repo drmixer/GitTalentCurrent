@@ -11,25 +11,32 @@ import { NotificationsDropdownContent } from '../Notifications/NotificationsDrop
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
-  const { unreadCount, fetchUnreadCount } = useNotifications();
+  // MODIFIED: Import markAllAsRead from the hook
+  const { unreadCount, fetchUnreadCount, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
-  // Re-define getDashboardPath here to be passed down
   const getDashboardPath = () => {
     if (!userProfile) return '/login'; // Fallback if profile not loaded
     switch (userProfile.role) {
       case 'admin':
         return '/admin';
       case 'recruiter':
-        return '/recruiter';
+        return '/recruiter-dashboard';
       case 'developer':
         return '/developer';
       default:
         return '/dashboard'; // Generic dashboard
     }
+  };
+
+  // ADDED: New handler to navigate to a dashboard tab from a notification
+  const handleNavigateToTab = (tab: string) => {
+    const dashboardPath = getDashboardPath();
+    navigate(`${dashboardPath}?tab=${tab}`);
+    setShowNotificationsDropdown(false); // Close dropdown after navigation
   };
 
   const handleSignOut = async () => {
@@ -210,25 +217,31 @@ export const Header = () => {
                   
                   {/* NOTIFICATION BELL BUTTON AND DROPDOWN */}
                   <div className="relative"> {/* Container for the bell and its dropdown */}
+                    {/* MODIFIED: onClick handler for bell */}
                     <button
                       id="notification-button" // Added ID for click outside logic
-                      onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                      onClick={() => {
+                        if (!showNotificationsDropdown && unreadCount > 0) {
+                          markAllAsRead();
+                        }
+                        setShowNotificationsDropdown(!showNotificationsDropdown);
+                      }}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                     >
                       <Bell className="w-4 h-4" /> {/* The one and only bell icon */}
                       <NotificationBadge className="absolute -top-1 -right-1" unreadCount={unreadCount} /> {/* Position badge relative to this bell */}
                     </button>
 
-                    {/* Notifications Dropdown (Render the new component here) */}
+                    {/* MODIFIED: Pass new onNavigate prop */}
                     {showNotificationsDropdown && (
                       <div 
                         id="notification-dropdown" // Added ID for click outside logic
                         className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
                       >
                         <NotificationsDropdownContent 
-                            onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
-                            getDashboardPath={getDashboardPath} // Pass the helper function
-                            fetchUnreadCount={fetchUnreadCount}
+                          onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
+                          onNavigate={handleNavigateToTab} // Pass the new handler
+                          fetchUnreadCount={fetchUnreadCount}
                         />
                       </div>
                     )}
@@ -342,7 +355,7 @@ export const Header = () => {
                       onClick={handleSignOut}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-4 h-4 mr-2" />
                       <span>Sign Out</span>
                     </button>
                   </div>
