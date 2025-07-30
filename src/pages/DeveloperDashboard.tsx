@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotifications } from '../contexts/NotificationsContext'; // MODIFIED: Corrected import path
 import { supabase } from '../lib/supabase';
 // CORRECTED: fetchEndorsementsForDeveloper is now a default import
 import fetchEndorsementsForDeveloper, { updateEndorsementVisibility } from '../lib/endorsementUtils';
@@ -324,8 +324,6 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]);
 
-  // REMOVED: This useEffect conflicts with the one below. The URL should be the single source of truth.
-  /*
   useEffect(() => {
     const currentParams = new URLSearchParams(location.search);
     const currentTabInUrl = currentParams.get('tab');
@@ -344,13 +342,11 @@ export const DeveloperDashboard: React.FC = () => {
         state: Object.keys(restOfState).length > 0 ? restOfState : null
       });
     }
-  }, [activeTab, location.pathname, navigate]);
-  */
+  }, [activeTab, location.pathname, navigate, location.search, locationState]); // MODIFIED: Added dependencies for safety
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
-    // MODIFIED: Added explicit type cast for safety
-    const tabFromUrl = queryParams.get('tab') as string | null;
+    const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
 
     if (locationState?.fromGitHubSetup) return;
 
@@ -363,8 +359,7 @@ export const DeveloperDashboard: React.FC = () => {
       console.log(`[Dashboard] URL to State Sync: No tab in URL, setting activeTab to 'overview'.`);
       setActiveTab('overview');
     }
-  // MODIFIED: Added activeTab dependency to prevent stale state issues.
-  }, [location.search, activeTab, locationState]);
+  }, [location.search, activeTab, locationState]); // MODIFIED: Added activeTab and locationState dependencies
 
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
@@ -466,8 +461,7 @@ export const DeveloperDashboard: React.FC = () => {
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
-            // MODIFIED: onClick handler now uses navigate to change the URL
-            <button key={tabName} onClick={() => navigate(`/developer?tab=${tabName}`)}
+            <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
               className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
               {tabName === 'tests' && tabCounts.tests > 0 && (
