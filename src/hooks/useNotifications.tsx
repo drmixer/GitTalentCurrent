@@ -45,12 +45,39 @@ export const useNotifications = () => {
 
       setTabCounts(newTabCounts);
       setUnreadCount(data.length);
+
+      // ADDED: Update document title based on new count
+      if (data.length > 0) {
+        document.title = `(${data.length}) GitTalent`;
+      } else {
+        document.title = 'GitTalent';
+      }
+
       return { unreadCount: data.length, tabCounts: newTabCounts };
     } catch (error) {
       console.error('Error fetching unread notification count:', error);
       return { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0 } };
     }
   }, [userProfile]);
+
+  // ADDED: New function to mark all notifications as read
+  const markAllAsRead = useCallback(async () => {
+    if (!userProfile?.id || unreadCount === 0) return;
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userProfile.id)
+        .eq('is_read', false);
+
+      // After updating the backend, refetch the count which will set it to 0
+      fetchUnreadCount();
+      
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  }, [userProfile, unreadCount, fetchUnreadCount]);
+
 
   useEffect(() => {
     if (userProfile) {
@@ -91,13 +118,13 @@ export const useNotifications = () => {
 
       if (error) throw error;
 
-      const { unreadCount, tabCounts } = await fetchUnreadCount();
-      setUnreadCount(unreadCount);
-      setTabCounts(tabCounts);
+      // Refetch counts after marking as read
+      fetchUnreadCount();
     } catch (error) {
       console.error('Error marking notification as read by entity:', error);
     }
   }, [userProfile, fetchUnreadCount]);
 
-  return { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity };
+  // MODIFIED: Return the new function
+  return { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAllAsRead };
 };
