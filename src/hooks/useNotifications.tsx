@@ -14,7 +14,7 @@ export const useNotifications = () => {
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      if (!userProfile?.id) return;
+      if (!userProfile?.id) return { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0 } };
 
       const { data, error } = await supabase
         .from('notifications')
@@ -45,8 +45,10 @@ export const useNotifications = () => {
 
       setTabCounts(newTabCounts);
       setUnreadCount(data.length);
+      return { unreadCount: data.length, tabCounts: newTabCounts };
     } catch (error) {
       console.error('Error fetching unread notification count:', error);
+      return { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0 } };
     }
   }, [userProfile]);
 
@@ -89,7 +91,9 @@ export const useNotifications = () => {
 
       if (error) throw error;
 
-      await fetchUnreadCount();
+      const { unreadCount, tabCounts } = await fetchUnreadCount();
+      setUnreadCount(unreadCount);
+      setTabCounts(tabCounts);
     } catch (error) {
       console.error('Error marking notification as read by entity:', error);
     }

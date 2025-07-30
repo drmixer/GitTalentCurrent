@@ -825,22 +825,6 @@ const RecruiterDashboard: React.FC = () => {
                                 Hires
                             </button>
                             <button
-                                onClick={() => setActiveTab('notifications')}
-                                className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                    activeTab === 'notifications'
-                                        ? 'border-blue-500 text-blue-600 bg-gray-100'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Bell className="w-5 h-5 mr-2" />
-                                Notifications
-                                {unreadNotifications > 0 && (
-                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {unreadNotifications}
-                                    </span>
-                                )}
-                            </button>
-                            <button
                                 onClick={() => setActiveTab('profile')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'profile'
@@ -869,14 +853,6 @@ const RecruiterDashboard: React.FC = () => {
                     {activeTab === 'search-devs' && renderSearchDevelopers()}
                     {activeTab === 'messages' && renderMessages()}
                     {activeTab === 'hires' && renderHires()}
-                    {activeTab === 'notifications' && (
-                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Notifications</h2>
-                            <p className="text-gray-600">
-                            Your notifications will appear here. You can view them by clicking the bell icon in the header.
-                            </p>
-                        </div>
-                    )}
                     {activeTab === 'tracker' && (
                         <HiringPipeline
                             onSendMessage={handleMessageDeveloper}
