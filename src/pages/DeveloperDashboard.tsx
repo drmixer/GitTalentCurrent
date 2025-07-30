@@ -90,24 +90,11 @@ export const DeveloperDashboard: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as DashboardLocationState | null;
 
-  const getInitialActiveTab = useCallback(() => {
-      const currentLocState = location.state as DashboardLocationState | null;
-      if (currentLocState?.fromGitHubSetup && currentLocState?.isFreshGitHubSetup) {
-          console.log("[Dashboard] Initializing activeTab to 'github-activity' due to fresh setup state.");
-          return 'github-activity';
-      }
-      const params = new URLSearchParams(location.search);
-      const tabFromUrl = params.get('tab');
-      if (tabFromUrl && validTabs.includes(tabFromUrl)) {
-          console.log(`[Dashboard] Initializing activeTab to '${tabFromUrl}' from URL.`);
-          return tabFromUrl;
-      }
-      console.log("[Dashboard] Initializing activeTab to 'overview' by default.");
-      return 'overview';
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, location.search]);
+  // MODIFIED: All state and effects for managing activeTab are removed.
+  // The activeTab is now derived directly from the URL on every render, making it the single source of truth.
+  const params = new URLSearchParams(location.search);
+  const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
 
-  const [activeTab, setActiveTab] = useState(getInitialActiveTab);
 
   const [developerData, setDeveloperData] = useState<Developer | null>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
@@ -311,78 +298,9 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);
   }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
-
-  useEffect(() => {
-    const state = location.state as DashboardLocationState | null;
-    if (state?.fromGitHubSetup) {
-      console.log("[Dashboard] Initial Setup Effect: Clearing fromGitHubSetup flag from location.state.");
-      const { fromGitHubSetup, ...restOfState } = state;
-      navigate(location.pathname + location.search, {
-        replace: true,
-        state: Object.keys(restOfState).length > 0 ? restOfState : null
-      });
-    }
-  }, [locationState?.fromGitHubSetup, navigate, location.pathname, location.search]);
-
-  useEffect(() => {
-    const currentParams = new URLSearchParams(location.search);
-    const currentTabInUrl = currentParams.get('tab');
-    const targetTabForUrl = activeTab === 'overview' ? null : activeTab;
-
-    if (currentTabInUrl !== targetTabForUrl) {
-      if (targetTabForUrl) {
-        currentParams.set('tab', targetTabForUrl);
-      } else {
-        currentParams.delete('tab');
-      }
-      const newSearchString = currentParams.toString() ? `?${currentParams.toString()}` : '';
-      const { fromGitHubSetup, ...restOfState } = locationState || {};
-      navigate(`${location.pathname}${newSearchString}`, {
-        replace: true,
-        state: Object.keys(restOfState).length > 0 ? restOfState : null
-      });
-    }
-  }, [activeTab, location.pathname, navigate, location.search, locationState]); // MODIFIED: Added dependencies for safety
-
-  useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const tabFromUrl = queryParams.get('tab') as typeof activeTab | null;
-
-    if (locationState?.fromGitHubSetup) return;
-
-    if (tabFromUrl && validTabs.includes(tabFromUrl)) {
-      if (activeTab !== tabFromUrl) {
-        console.log(`[Dashboard] URL to State Sync: Setting activeTab to '${tabFromUrl}' from URL.`);
-        setActiveTab(tabFromUrl);
-      }
-    } else if (!tabFromUrl && activeTab !== 'overview') {
-      console.log(`[Dashboard] URL to State Sync: No tab in URL, setting activeTab to 'overview'.`);
-      setActiveTab('overview');
-    }
-  }, [location.search, activeTab, locationState]); // MODIFIED: Added activeTab and locationState dependencies
-
-  useEffect(() => {
-    if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubDataFromHook?.user && !hasFreshDataBeenProcessed) {
-      setLatchedSuccessfullyFetchedFreshData(freshGitHubDataFromHook);
-      setHasFreshDataBeenProcessed(true);
-    } else if (shouldUseFreshDataSource && !freshGitHubLoading && freshGitHubError && !hasFreshDataBeenProcessed) {
-      setHasFreshDataBeenProcessed(true);
-    }
-  }, [shouldUseFreshDataSource, freshGitHubLoading, freshGitHubDataFromHook, freshGitHubError, hasFreshDataBeenProcessed]);
-
-  useEffect(() => {
-    if (locationState?.isFreshGitHubSetup && hasFreshDataBeenProcessed) {
-      console.log('[Dashboard] Clearing isFreshGitHubSetup flag from location.state.');
-      const { freshGitHubHandle, freshGitHubInstallationId, isFreshGitHubSetup, fromGitHubSetup, ...restOfState } = locationState;
-      navigate(location.pathname + location.search, { replace: true, state: Object.keys(restOfState).length > 0 ? restOfState : null });
-    }
-  }, [locationState?.isFreshGitHubSetup, hasFreshDataBeenProcessed, navigate, location.pathname, location.search]);
-
-  useEffect(() => {
-    const show = activeTab === 'github-activity' && !!contextDeveloperProfile?.github_handle && !contextDeveloperProfile?.github_installation_id;
-    if (showGitHubConnectModal !== show) setShowGitHubConnectModal(show);
-  }, [contextDeveloperProfile?.github_handle, contextDeveloperProfile?.github_installation_id, activeTab, showGitHubConnectModal]);
-
+  
+  // REMOVED: All conflicting useEffects that managed tab state have been removed to prevent infinite loops.
+  
   useEffect(() => {
     if (finalGitHubDataToShow?.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
       const formattedCommits = finalGitHubDataToShow.contributions.slice(0, 3).map((contrib: any) => ({
@@ -393,7 +311,6 @@ export const DeveloperDashboard: React.FC = () => {
         url: contrib.commitUrl || contrib.url || '#',
       }));
       setRecentCommits(formattedCommits);
-      console.log('[Dashboard] Recent commits extracted and formatted:', formattedCommits);
     }
   }, [finalGitHubDataToShow]);
 
@@ -424,12 +341,10 @@ export const DeveloperDashboard: React.FC = () => {
         recentCommits={recentCommits}
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}
         loading={dashboardPageLoading || authContextLoading || gitHubDataLoadingToShow}
-        onNavigateToTab={(tab) => setActiveTab(tab as typeof activeTab)}
+        onNavigateToTab={(tab) => navigate(`/developer?tab=${tab}`)}
       />
     );
   };
-
-  console.log('[Dashboard RENDER]', { activeTab, dashboardPageLoading, authContextLoading, authUser, userProfile, developerData, contextDeveloperProfile, endorsements, isLoadingEndorsements, endorsementError });
 
   if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) {
     return (
@@ -461,7 +376,8 @@ export const DeveloperDashboard: React.FC = () => {
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
-            <button key={tabName} onClick={() => setActiveTab(tabName as typeof activeTab)}
+            // MODIFIED: onClick handler now uses navigate to change the URL
+            <button key={tabName} onClick={() => navigate(`/developer?tab=${tabName}`)}
               className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
               {tabName === 'tests' && tabCounts.tests > 0 && (
@@ -497,7 +413,7 @@ export const DeveloperDashboard: React.FC = () => {
               {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (<div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg"><Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" /><h3 className="text-lg font-semibold">No GitHub Data Available</h3><p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p><button onClick={async () => { setLatchedSuccessfullyFetchedFreshData(null); setHasFreshDataBeenProcessed(false); if(refreshProfile) await refreshProfile();}} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh</button></div>)}
             </div>
           </div>
-        ) : (<div className="text-center p-8"><Github className="w-16 h-16 text-gray-300 mx-auto mb-6" /><h3 className="text-2xl font-semibold">Connect GitHub Account</h3><button onClick={() => { if (!currentDeveloperProfile?.github_handle) { setActiveTab('profile'); navigate('/developer?tab=profile', { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg"> {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'} </button></div>)
+        ) : (<div className="text-center p-8"><Github className="w-16 h-16 text-gray-300 mx-auto mb-6" /><h3 className="text-2xl font-semibold">Connect GitHub Account</h3><button onClick={() => { if (!currentDeveloperProfile?.github_handle) { navigate(`/developer?tab=profile`, { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg"> {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'} </button></div>)
       )}
       {activeTab === 'messages' && (
         <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]">
