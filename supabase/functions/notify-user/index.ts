@@ -1,105 +1,90 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
 
-serve(async (req) => {
+serve(async (req)=>{
   console.log("notify-user function invoked");
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', {
+      headers: corsHeaders
+    });
   }
-
   try {
     const { type, record } = await req.json();
-    console.log("Request body:", { type, record });
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    console.log("Request body:", {
+      type,
+      record
+    });
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    
+    let message = '';
+    let userId = '';
+    let notificationType = '';
+    let entityId = record.id; // Default entity_id to the record's id
+    let link = '';
+    let title = '';
 
-    let message = ''
-    let userId = ''
-
-    let notificationType = ''
-
-    switch (`${type}:${record.table}`) {
+    switch(`${type}:${record.table}`){
       case 'INSERT:test_assignments':
+        title = `New Coding Test Assigned`;
         message = `You have been assigned a new coding test.`;
         userId = record.developer_id;
         notificationType = 'test_assignment';
+        link = '?tab=tests';
         break;
       case 'UPDATE:test_assignments':
         if (record.status === 'Completed') {
-          const { data: assignment, error } = await supabase
-            .from('assignments')
-            .select('recruiter_id')
-            .eq('test_assignment_id', record.id)
-            .single();
+          const { data: assignment, error } = await supabase.from('assignments').select('recruiter_id').eq('test_assignment_id', record.id).single();
           if (error) throw error;
+          title = `Test Completed`;
           message = `A developer has completed a coding test.`;
           userId = assignment.recruiter_id;
           notificationType = 'test_completion';
+          link = '?tab=pipeline';
         }
         break;
       case 'INSERT:messages':
+        title = `New Message`;
         message = `You have a new message.`;
         userId = record.receiver_id;
         notificationType = 'message';
+        link = '?tab=messages';
+        // FIXED: Set entity_id to the sender's ID for correct "mark as read" grouping.
+        entityId = record.sender_id; 
         break;
       case 'INSERT:applied_jobs':
-        const { data: job, error } = await supabase
-          .from('job_roles')
-          .select('recruiter_id')
-          .eq('id', record.job_id)
-          .single();
+        const { data: job, error } = await supabase.from('job_roles').select('recruiter_id').eq('id', record.job_id).single();
         if (error) throw error;
+        title = `New Job Application`;
         message = `A developer has applied for one of your jobs.`;
         userId = job.recruiter_id;
         notificationType = 'job_application';
+        link = '?tab=jobs';
         break;
       case 'UPDATE:applied_jobs':
         if (record.status === 'viewed') {
-            // Notify developer that their application has been viewed
-            message = `Your application for a job has been viewed.`;
-            userId = record.developer_id;
-            notificationType = 'application_viewed';
+          title = `Application Viewed`;
+          message = `Your application for a job has been viewed.`;
+          userId = record.developer_id;
+          notificationType = 'application_viewed';
+          link = '?tab=jobs';
         }
         break;
     }
 
-    if (message && userId) {
-      let link = '';
-      if (notificationType === 'message') {
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .single();
-        if (user?.role === 'developer') {
-          link = '?tab=messages';
-        } else {
-          link = '?tab=messages';
-        }
-      } else if (notificationType === 'job_application') {
-        link = '?tab=jobs';
-      } else if (notificationType === 'test_assignment') {
-        link = '?tab=tests';
-      } else if (notificationType === 'test_completion') {
-        link = '?tab=pipeline';
-      } else if (notificationType === 'application_viewed') {
-        link = '?tab=jobs';
-      }
+    if (message && userId && notificationType) {
       const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,
         message,
         type: notificationType,
-        entity_id: record.id,
+        entity_id: entityId,
         link,
-        title: message,
-      })
+        title: title || message, // Use specific title, fallback to message
+      });
+
       if (error) {
         console.error("Error inserting notification:", error);
         throw error;
@@ -107,13 +92,23 @@ serve(async (req) => {
       console.log("Notification inserted:", data);
     }
 
-    return new Response(JSON.stringify({ message: 'Notification processed' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify({
+      message: 'Notification processed'
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    })
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 500
+    });
   }
-})
+});
