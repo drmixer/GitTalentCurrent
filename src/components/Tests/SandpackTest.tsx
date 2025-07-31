@@ -109,6 +109,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       return;
     }
     const stopListening = sandpack.listen((message) => {
+      console.log('[Sandpack] Received message:', message);
       if (message.type === 'test:end') {
         console.log('[Sandpack] Test run finished. Payload:', message.payload);
         setTestResults(message.payload);
