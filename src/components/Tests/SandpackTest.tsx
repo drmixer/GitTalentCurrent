@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -108,7 +108,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   };
 
   const handleTestComplete = (payload: SandpackTestsProps) => {
-    console.log('[Sandpack] onComplete payload:', JSON.stringify(payload, null, 2));
     setTestResults(payload);
   };
 
@@ -144,7 +143,24 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     }
   };
 
-  const allTestsPassed = testResults && testResults.tests.every((t) => t.status === 'pass');
+  const allTestsPassed = useMemo(() => {
+    if (!testResults || typeof testResults !== 'object') return false;
+
+    // Iterate over each test file in the results
+    for (const fileName in testResults) {
+      const fileResults = testResults[fileName];
+      if (fileResults && fileResults.tests) {
+        // Iterate over each test case in the file
+        for (const testName in fileResults.tests) {
+          if (fileResults.tests[testName].status !== 'pass') {
+            return false; // If any test has not passed, return false
+          }
+        }
+      }
+    }
+    // If all tests in all files have passed
+    return Object.keys(testResults).length > 0;
+  }, [testResults]);
 
   return (
     <>
