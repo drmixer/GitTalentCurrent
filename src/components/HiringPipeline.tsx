@@ -128,7 +128,10 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     ),
                     job_role:job_roles!fk_assignments_job_role_id!inner (
                         id,
-                        title
+                        title,
+                        recruiter:recruiters!fk_job_roles_recruiter_user_id (
+                            company_name
+                        )
                     ),
                     test_assignment:test_assignments (
                         id,

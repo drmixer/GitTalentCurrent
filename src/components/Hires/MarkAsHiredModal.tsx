@@ -189,9 +189,9 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
           <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
             <h3 className="font-bold text-gray-900 mb-2">Assignment Details</h3>
             <div className="text-sm text-gray-600 space-y-1">
-              <div><strong>Developer:</strong> {assignment.developer.user.name}</div>
+              <div><strong>Developer:</strong> {assignment.developer.user?.name}</div>
               <div><strong>Job:</strong> {assignment.job_role.title}</div>
-              <div><strong>Company:</strong> {assignment.recruiter.user.company_name}</div>
+              <div><strong>Company:</strong> {assignment.job_role.recruiter?.company_name}</div>
             </div>
           </div>
 
