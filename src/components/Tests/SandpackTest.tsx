@@ -93,10 +93,8 @@ const CustomTestHeader: React.FC<{ onRunTests: () => void }> = ({ onRunTests }) 
     </div>
 );
 
-const SandpackTest: React.FC<SandpackTestProps> = ({
-  starterCode,
-  testCode,
-  framework,
+// Child component that contains the UI and logic which depends on the Sandpack context
+const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   assignmentId,
   questionId,
   onTestComplete,
@@ -107,13 +105,11 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
 
   useEffect(() => {
     if (!sandpack) return;
-
     const stopListening = sandpack.listen((message) => {
       if (message.type === 'test:end') {
         setTestResults(message.payload);
       }
     });
-
     return () => stopListening();
   }, [sandpack]);
 
@@ -142,12 +138,9 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
         passed_test_cases: testResults.tests.length,
         total_test_cases: testResults.tests.length,
       });
-
       if (error) throw error;
-
       console.log('Solution submitted successfully!');
       onTestComplete();
-
     } catch (error) {
       console.error('Failed to submit solution:', error);
       alert('There was an error submitting your solution. Please try again.');
@@ -156,18 +149,56 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
     }
   };
 
+  const allTestsPassed = testResults && testResults.tests.every((t) => t.status === 'pass');
+
+  return (
+    <>
+      <SandpackLayout>
+        <SandpackCodeEditor style={{ height: '60vh' }} />
+        <SandpackTests
+          style={{ height: '60vh' }}
+          headerChildren={<CustomTestHeader onRunTests={runTests} />}
+        />
+      </SandpackLayout>
+      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={submitSolution}
+          disabled={!allTestsPassed || isSubmitting}
+          style={{
+            padding: '10px 20px',
+            background: !allTestsPassed || isSubmitting ? '#ccc' : '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: !allTestsPassed || isSubmitting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Solution'}
+        </button>
+      </div>
+    </>
+  );
+};
+
+
+// Main (Parent) component responsible for setting up the Provider
+const SandpackTest: React.FC<SandpackTestProps> = ({
+  starterCode,
+  testCode,
+  framework,
+  ...rest
+}) => {
   const { setup, mainFile, testFile } = getFrameworkConfig(framework);
+
+  if (!testCode) {
+    return <div>This Sandpack question is missing its test code.</div>;
+  }
 
   const packageJson = JSON.stringify({
     name: `gittalent-${framework}-challenge`,
     dependencies: setup.dependencies,
-    scripts: { "test": "react-scripts test" }
+    scripts: { test: 'react-scripts test' },
   });
-
-  // Use the code from props, not the hardcoded version
-  if (!testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
 
   const files = {
     [mainFile]: { code: starterCode, active: true },
@@ -175,40 +206,10 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
     '/package.json': { code: packageJson, hidden: true },
   };
 
-  const allTestsPassed = testResults && testResults.tests.every(t => t.status === 'pass');
-
   return (
-    <>
-      <SandpackProvider
-        template={framework}
-        files={files}
-        options={{ autorun: false }}
-      >
-        <SandpackLayout>
-          <SandpackCodeEditor style={{ height: '60vh' }} />
-          <SandpackTests
-            style={{ height: '60vh' }}
-            headerChildren={<CustomTestHeader onRunTests={runTests} />}
-          />
-        </SandpackLayout>
-        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            onClick={submitSolution}
-            disabled={!allTestsPassed || isSubmitting}
-            style={{
-              padding: '10px 20px',
-              background: (!allTestsPassed || isSubmitting) ? '#ccc' : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: (!allTestsPassed || isSubmitting) ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Solution'}
-          </button>
-        </div>
-      </SandpackProvider>
-    </>
+    <SandpackProvider template={framework} files={files} options={{ autorun: false }}>
+      <SandpackLayoutManager {...rest} />
+    </SandpackProvider>
   );
 };
 
