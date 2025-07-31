@@ -86,6 +86,7 @@ const SupabaseTestReporter: React.FC<{
   const { sandpack } = useSandpack();
 
   useEffect(() => {
+    console.log('[SupabaseTestReporter] sandpack object:', sandpack);
     // This effect should only run once to set up the listener
     const stopListening = sandpack.listen(async (message) => {
       if (message.type === 'test:end') {
