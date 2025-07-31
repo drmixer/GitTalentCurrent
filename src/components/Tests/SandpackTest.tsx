@@ -142,6 +142,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         results: testResults,
         passed_test_cases: passed_test_cases,
         total_test_cases: total_test_cases,
+        stdout: JSON.stringify(testResults, null, 2), // Add for schema compatibility
+        stderr: '', // Add for schema compatibility
       });
       if (error) throw error;
       console.log('Solution submitted successfully!');
