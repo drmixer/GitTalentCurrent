@@ -103,21 +103,12 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // A robust guard clause to ensure the client and listen method are available
-    if (!sandpack || typeof sandpack.listen !== 'function') {
-      return;
-    }
-    const stopListening = sandpack.listen((message) => {
-      if (message.type === 'test:end') {
-        setTestResults(message.payload);
-      }
-    });
-    return () => stopListening();
-  }, [sandpack]);
-
   const runTests = () => {
     sandpack.runTests();
+  };
+
+  const handleTestComplete = (payload: SandpackTestsProps) => {
+    setTestResults(payload);
   };
 
   const submitSolution = async () => {
@@ -161,6 +152,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         <SandpackTests
           style={{ height: '60vh' }}
           headerChildren={<CustomTestHeader onRunTests={runTests} />}
+          onComplete={handleTestComplete}
         />
       </SandpackLayout>
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
