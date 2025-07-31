@@ -121,13 +121,27 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
 
     setIsSubmitting(true);
     try {
+      let passed_test_cases = 0;
+      let total_test_cases = 0;
+
+      if (testResults && typeof testResults === 'object') {
+        for (const fileName in testResults) {
+          const fileResults = testResults[fileName];
+          if (fileResults && fileResults.tests) {
+            const testCases = Object.values(fileResults.tests);
+            total_test_cases += testCases.length;
+            passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+          }
+        }
+      }
+
       const { error } = await supabase.from('test_results').insert({
         assignment_id: assignmentId,
         question_id: questionId,
-        score: 1,
+        score: 1, // This is based on allTestsPassed, so it's already correct
         results: testResults,
-        passed_test_cases: testResults.tests.length,
-        total_test_cases: testResults.tests.length,
+        passed_test_cases: passed_test_cases,
+        total_test_cases: total_test_cases,
       });
       if (error) throw error;
       console.log('Solution submitted successfully!');
