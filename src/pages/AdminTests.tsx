@@ -57,21 +57,43 @@ const AdminTests: React.FC = () => {
         }
     };
 
+    const sandpackLanguages = ['react', 'vue', 'angular'];
+
     const handleSaveQuestion = async () => {
         if (!editingQuestion || !editingQuestion.test_id) return;
 
-        const questionData = {
-            test_id: editingQuestion.test_id,
-            title: editingQuestion.title,
-            question_text: editingQuestion.question_text,
-            language: editingQuestion.language,
-            starter_code: editingQuestion.starter_code,
-            test_cases: editingQuestion.test_cases,
-        };
+        const isSandpack = sandpackLanguages.includes(editingQuestion.language || '');
+
+        let questionData: Partial<CodingQuestion>;
+
+        if (isSandpack) {
+            questionData = {
+                test_id: editingQuestion.test_id,
+                title: editingQuestion.title,
+                question_text: editingQuestion.question_text,
+                language: editingQuestion.language,
+                starter_code: editingQuestion.starter_code,
+                test_code: editingQuestion.test_code, // Use test_code for Sandpack
+                test_cases: null, // Ensure test_cases is null for Sandpack
+            };
+        } else {
+            questionData = {
+                test_id: editingQuestion.test_id,
+                title: editingQuestion.title,
+                question_text: editingQuestion.question_text,
+                language: editingQuestion.language,
+                starter_code: editingQuestion.starter_code,
+                test_cases: editingQuestion.test_cases, // Use test_cases for Judge0
+                test_code: null, // Ensure test_code is null for Judge0
+            };
+        }
+
+        // Remove id from data to be inserted/updated
+        const { id, ...dataToSave } = questionData;
 
         if (editingQuestion.id) {
             // Update existing question
-            const { error } = await supabase.from('coding_questions').update(questionData).eq('id', editingQuestion.id);
+            const { error } = await supabase.from('coding_questions').update(dataToSave).eq('id', editingQuestion.id);
             if (error) {
                 console.error('Error updating question:', error);
             } else {
@@ -80,7 +102,7 @@ const AdminTests: React.FC = () => {
             }
         } else {
             // Insert new question
-            const { error } = await supabase.from('coding_questions').insert(questionData);
+            const { error } = await supabase.from('coding_questions').insert(dataToSave);
             if (error) {
                 console.error('Error inserting question:', error);
             } else {
@@ -195,42 +217,54 @@ const AdminTests: React.FC = () => {
                                         onChange={(e) => setEditingQuestion({ ...editingQuestion, starter_code: e.target.value })}
                                         className="w-full p-2 mb-2 border rounded-md h-32"
                                     />
-                                    <div>
-                                        <h3 className="font-semibold mb-2">Test Cases</h3>
-                                        {editingQuestion.test_cases?.map((tc, index) => (
-                                            <div key={index} className="flex space-x-2 mb-2">
-                                                <textarea
-                                                    placeholder="Stdin"
-                                                    value={tc.stdin}
-                                                    onChange={(e) => {
+                                    {sandpackLanguages.includes(editingQuestion.language || '') ? (
+                                        <div>
+                                            <h3 className="font-semibold mb-2">Test Code</h3>
+                                            <textarea
+                                                placeholder="Enter the test code (e.g., using Jest and @testing-library/react)"
+                                                value={editingQuestion.test_code || ''}
+                                                onChange={(e) => setEditingQuestion({ ...editingQuestion, test_code: e.target.value })}
+                                                className="w-full p-2 mb-2 border rounded-md h-48 font-mono"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <h3 className="font-semibold mb-2">Test Cases (for Judge0)</h3>
+                                            {editingQuestion.test_cases?.map((tc, index) => (
+                                                <div key={index} className="flex space-x-2 mb-2">
+                                                    <textarea
+                                                        placeholder="Stdin"
+                                                        value={tc.stdin}
+                                                        onChange={(e) => {
+                                                            const newTestCases = [...(editingQuestion.test_cases || [])];
+                                                            newTestCases[index] = { ...newTestCases[index], stdin: e.target.value };
+                                                            setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                                        }}
+                                                        className="w-full p-2 border rounded-md"
+                                                    />
+                                                    <textarea
+                                                        placeholder="Expected Output"
+                                                        value={tc.expected_output}
+                                                        onChange={(e) => {
+                                                            const newTestCases = [...(editingQuestion.test_cases || [])];
+                                                            newTestCases[index] = { ...newTestCases[index], expected_output: e.target.value };
+                                                            setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                                        }}
+                                                        className="w-full p-2 border rounded-md"
+                                                    />
+                                                    <button onClick={() => {
                                                         const newTestCases = [...(editingQuestion.test_cases || [])];
-                                                        newTestCases[index] = { ...newTestCases[index], stdin: e.target.value };
+                                                        newTestCases.splice(index, 1);
                                                         setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
-                                                    }}
-                                                    className="w-full p-2 border rounded-md"
-                                                />
-                                                <textarea
-                                                    placeholder="Expected Output"
-                                                    value={tc.expected_output}
-                                                    onChange={(e) => {
-                                                        const newTestCases = [...(editingQuestion.test_cases || [])];
-                                                        newTestCases[index] = { ...newTestCases[index], expected_output: e.target.value };
-                                                        setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
-                                                    }}
-                                                    className="w-full p-2 border rounded-md"
-                                                />
-                                                <button onClick={() => {
-                                                    const newTestCases = [...(editingQuestion.test_cases || [])];
-                                                    newTestCases.splice(index, 1);
-                                                    setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
-                                                }}><Trash2 size={16} /></button>
-                                            </div>
-                                        ))}
-                                        <button onClick={() => {
-                                            const newTestCases = [...(editingQuestion.test_cases || []), { stdin: '', expected_output: '' }];
-                                            setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
-                                        }} className="text-sm text-blue-600">Add Test Case</button>
-                                    </div>
+                                                    }}><Trash2 size={16} /></button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => {
+                                                const newTestCases = [...(editingQuestion.test_cases || []), { stdin: '', expected_output: '' }];
+                                                setEditingQuestion({ ...editingQuestion, test_cases: newTestCases });
+                                            }} className="text-sm text-blue-600">Add Test Case</button>
+                                        </div>
+                                    )}
                                     <div className="flex justify-end space-x-2">
                                         <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
                                         <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
