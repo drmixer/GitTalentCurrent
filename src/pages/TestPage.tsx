@@ -102,6 +102,7 @@ const TestPage: React.FC = () => {
                 language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
                 assignment_id: assignmentId,
+                question_id: question.id,
             },
         });
 
@@ -124,6 +125,7 @@ const TestPage: React.FC = () => {
                 stdin: question.test_cases?.[0]?.stdin || '',
                 expected_output: question.expected_output,
                 assignment_id: assignmentId,
+                question_id: question.id,
             },
         });
 
