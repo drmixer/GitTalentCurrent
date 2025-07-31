@@ -67,13 +67,18 @@ const AdminTests: React.FC = () => {
         let questionData: Partial<CodingQuestion>;
 
         if (isSandpack) {
+            let finalTestCode = editingQuestion.test_code || '';
+            // For React, automatically add the jest-dom import for convenience
+            if (editingQuestion.language === 'react' && !finalTestCode.includes('@testing-library/jest-dom')) {
+                finalTestCode = `import '@testing-library/jest-dom';\n${finalTestCode}`;
+            }
             questionData = {
                 test_id: editingQuestion.test_id,
                 title: editingQuestion.title,
                 question_text: editingQuestion.question_text,
                 language: editingQuestion.language,
                 starter_code: editingQuestion.starter_code,
-                test_code: editingQuestion.test_code, // Use test_code for Sandpack
+                test_code: finalTestCode, // Use modified test_code
                 test_cases: null, // Ensure test_cases is null for Sandpack
             };
         } else {
