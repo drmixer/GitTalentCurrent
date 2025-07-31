@@ -104,7 +104,10 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!sandpack) return;
+    // A robust guard clause to ensure the client and listen method are available
+    if (!sandpack || typeof sandpack.listen !== 'function') {
+      return;
+    }
     const stopListening = sandpack.listen((message) => {
       if (message.type === 'test:end') {
         setTestResults(message.payload);
