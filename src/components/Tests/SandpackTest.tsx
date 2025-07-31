@@ -86,21 +86,24 @@ const SupabaseTestReporter: React.FC<{
   const { sandpack } = useSandpack();
 
   useEffect(() => {
-    console.log('[SupabaseTestReporter] sandpack object:', sandpack);
-    // This effect should only run once to set up the listener
+    // Guard clause: wait until the sandpack client is fully initialized
+    if (!sandpack || typeof sandpack.listen !== 'function') {
+      return;
+    }
+
     const stopListening = sandpack.listen(async (message) => {
       if (message.type === 'test:end') {
         const testResults = message.payload;
         const allTestsPassed = testResults.tests.every((t) => t.status === 'pass');
 
         try {
+          // Use a single insert call
           const { error } = await supabase.from('test_results').insert({
             assignment_id: assignmentId,
             question_id: questionId,
             score: allTestsPassed ? 1 : 0,
-            // Storing the full Sandpack result object might be useful
             results: testResults,
-            passed_test_cases: testResults.tests.filter(t => t.status === 'pass').length,
+            passed_test_cases: testResults.tests.filter((t) => t.status === 'pass').length,
             total_test_cases: testResults.tests.length,
           });
 
@@ -108,18 +111,19 @@ const SupabaseTestReporter: React.FC<{
             console.error('Error saving test results:', error);
           } else {
             console.log('Sandpack test results saved successfully.');
-            // Notify the parent component that the test is complete
             onTestComplete();
           }
-        } catch (error) {
-          console.error('An unexpected error occurred:', error);
+        } catch (err) {
+          console.error('An unexpected error occurred while saving results:', err);
         }
       }
     });
 
-    return () => stopListening();
-    // Use assignmentId and questionId as dependencies to re-bind if they change
-  }, [sandpack, assignmentId, questionId, onTestComplete]);
+    // Cleanup the listener when the component unmounts or dependencies change
+    return () => {
+      stopListening();
+    };
+  }, [sandpack, assignmentId, questionId, onTestComplete]); // Re-run effect if sandpack client changes
 
   return null;
 };
