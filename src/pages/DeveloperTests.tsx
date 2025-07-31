@@ -19,7 +19,6 @@ const DeveloperTests: React.FC = () => {
     const fetchAssignments = async () => {
         if (!userProfile) return;
         setLoading(true);
-        console.log("The user ID being used for the query is:", userProfile.id);
         const { data, error } = await supabase
             .from('test_assignments')
             .select('*, coding_tests(*)')
