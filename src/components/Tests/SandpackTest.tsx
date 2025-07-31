@@ -108,6 +108,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   };
 
   const handleTestComplete = (payload: SandpackTestsProps) => {
+    console.log('[Sandpack] onComplete payload:', payload);
     setTestResults(payload);
   };
 
