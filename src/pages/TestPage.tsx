@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CodingQuestion, TestAssignment } from '../types';
 import Editor from '@monaco-editor/react';
 import { Play, Send, Loader, CheckCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import SandpackTest from '../components/Tests/SandpackTest'; // Import the Sandpack component
 
 const TestPage: React.FC = () => {
     const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -178,8 +178,44 @@ const TestPage: React.FC = () => {
         );
     }
 
+    const sandpackLanguages = ['react', 'vue', 'angular'];
     const currentQuestion = questions[currentQuestionIndex];
 
+    const handleNextQuestion = () => {
+        if (currentQuestionIndex < questions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+        } else {
+            // Test finished
+            supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId);
+            setIsCompleted(true);
+            setTimeout(() => {
+                navigate('/developer');
+            }, 3000);
+        }
+    }
+
+    // Check if the current question is a Sandpack question
+    if (sandpackLanguages.includes(currentQuestion.language.toLowerCase())) {
+        return (
+            <div className="p-8">
+                <div className="w-full lg:w-2/3 mx-auto">
+                    <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
+                    <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                    <p className="mb-4">{currentQuestion.question_text}</p>
+                    <SandpackTest
+                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular'}
+                        starterCode={currentQuestion.starter_code || ''}
+                        testCode={currentQuestion.test_code}
+                        assignmentId={assignmentId!}
+                        questionId={currentQuestion.id}
+                        onTestComplete={handleNextQuestion}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Fallback to the Judge0 editor for other languages
     return (
         <div className="p-8">
             <div className="flex h-screen">
@@ -191,7 +227,7 @@ const TestPage: React.FC = () => {
                 <div className="w-2/3 flex flex-col">
                     <Editor
                         height="60vh"
-                        language={currentQuestion.language.toLowerCase() === 'react' || currentQuestion.language.toLowerCase() === 'angular' || currentQuestion.language.toLowerCase() === 'vue' ? 'javascript' : currentQuestion.language.toLowerCase()}
+                        language={currentQuestion.language.toLowerCase()}
                         value={code}
                         onChange={(value) => setCode(value || '')}
                         theme="vs-dark"
