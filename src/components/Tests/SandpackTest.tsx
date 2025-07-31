@@ -112,11 +112,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   };
 
   const submitSolution = async () => {
-    if (!testResults) {
-      alert('Please run the tests before submitting.');
-      return;
-    }
-    const allTestsPassed = testResults.tests.every((t) => t.status === 'pass');
+    // The button's disabled state already prevents this from being called
+    // unless allTestsPassed is true. No need to re-check here.
     if (!allTestsPassed) {
       alert('Please ensure all tests are passing before you submit.');
       return;
