@@ -114,6 +114,20 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
 }) => {
   const { setup, mainFile, testFile } = getFrameworkConfig(framework);
 
+  // Explicitly create a package.json file for the sandbox
+  const packageJson = JSON.stringify({
+    name: `gittalent-${framework}-challenge`,
+    version: '1.0.0',
+    main: mainFile,
+    dependencies: setup.dependencies,
+    scripts: {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+    }
+  });
+
   const files: SandpackFiles = {
     [mainFile]: {
       code: starterCode,
@@ -123,12 +137,18 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       code: testCode,
       hidden: true,
     },
+    // Add the package.json to the files object
+    '/package.json': {
+      code: packageJson,
+      hidden: true,
+    }
   };
 
   return (
     <SandpackProvider
       template={framework}
-      customSetup={setup}
+      // customSetup is no longer needed as we provide an explicit package.json
+      // customSetup={setup}
       files={files}
       options={{
         showTabs: true,
