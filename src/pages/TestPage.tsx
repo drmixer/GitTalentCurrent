@@ -96,13 +96,11 @@ const TestPage: React.FC = () => {
         setOutput('');
         setIsSubmitting(true);
         const question = questions[currentQuestionIndex];
-        const { data, error } = await supabase.functions.invoke('grade-submission', {
+        const { data, error } = await supabase.functions.invoke('run-code', {
             body: {
                 code,
                 language_id: getLanguageId(question.language),
                 stdin: question.test_cases?.[0]?.stdin || '',
-                assignment_id: assignmentId,
-                question_id: question.id,
             },
         });
 
