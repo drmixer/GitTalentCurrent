@@ -186,7 +186,14 @@ const TestPage: React.FC = () => {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
             // Test finished
-            supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId);
+            supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId)
+            .then(({ error }) => {
+                if (error) {
+                    console.error('Error updating assignment status:', error);
+                } else {
+                    console.log('Assignment status updated to Completed.');
+                }
+            });
             setIsCompleted(true);
             setTimeout(() => {
                 navigate('/developer');
