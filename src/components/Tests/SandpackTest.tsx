@@ -17,9 +17,11 @@ type SupportedFramework = 'react' | 'vue' | 'angular';
 // Define the shape of the props for the component
 interface SandpackTestProps {
   starterCode: string;
-  testCode: string;
+  testCode: string | undefined | null; // test_code can be nullable
   framework: SupportedFramework;
-  testId: number;
+  assignmentId: string;
+  questionId: string;
+  onTestComplete: () => void; // Callback to notify parent
 }
 
 // --- Framework Configurations ---
@@ -76,24 +78,38 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 
 
 // A helper component to listen for test results and send them to Supabase
-const SupabaseTestReporter: React.FC<{ testId: number }> = ({ testId }) => {
+const SupabaseTestReporter: React.FC<{
+  assignmentId: string;
+  questionId: string;
+  onTestComplete: () => void;
+}> = ({ assignmentId, questionId, onTestComplete }) => {
   const { sandpack } = useSandpack();
 
   useEffect(() => {
+    // This effect should only run once to set up the listener
     const stopListening = sandpack.listen(async (message) => {
       if (message.type === 'test:end') {
         const testResults = message.payload;
-        try {
-          const { data, error } = await supabase
-            .from('coding_tests')
-            .update({
-              results: testResults,
-              status: testResults.tests.every(t => t.status === 'pass') ? 'passed' : 'failed',
-            })
-            .eq('id', testId);
+        const allTestsPassed = testResults.tests.every((t) => t.status === 'pass');
 
-          if (error) console.error('Error saving test results:', error);
-          else console.log('Test results saved successfully.');
+        try {
+          const { error } = await supabase.from('test_results').insert({
+            assignment_id: assignmentId,
+            question_id: questionId,
+            score: allTestsPassed ? 1 : 0,
+            // Storing the full Sandpack result object might be useful
+            results: testResults,
+            passed_test_cases: testResults.tests.filter(t => t.status === 'pass').length,
+            total_test_cases: testResults.tests.length,
+          });
+
+          if (error) {
+            console.error('Error saving test results:', error);
+          } else {
+            console.log('Sandpack test results saved successfully.');
+            // Notify the parent component that the test is complete
+            onTestComplete();
+          }
         } catch (error) {
           console.error('An unexpected error occurred:', error);
         }
@@ -101,7 +117,8 @@ const SupabaseTestReporter: React.FC<{ testId: number }> = ({ testId }) => {
     });
 
     return () => stopListening();
-  }, [sandpack, testId]);
+    // Use assignmentId and questionId as dependencies to re-bind if they change
+  }, [sandpack, assignmentId, questionId, onTestComplete]);
 
   return null;
 };
@@ -110,9 +127,15 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   starterCode,
   testCode,
   framework,
-  testId,
+  assignmentId,
+  questionId,
+  onTestComplete,
 }) => {
   const { setup, mainFile, testFile } = getFrameworkConfig(framework);
+
+  if (!testCode) {
+    return <div>This Sandpack question is missing its test code.</div>;
+  }
 
   // Explicitly create a package.json file for the sandbox
   const packageJson = JSON.stringify({
@@ -137,7 +160,6 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       code: testCode,
       hidden: true,
     },
-    // Add the package.json to the files object
     '/package.json': {
       code: packageJson,
       hidden: true,
@@ -147,16 +169,12 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   return (
     <SandpackProvider
       template={framework.toLowerCase() as SupportedFramework}
-      // customSetup is no longer needed as we provide an explicit package.json
-      // customSetup={setup}
       files={files}
       options={{
         showTabs: true,
         showLineNumbers: true,
         showInlineErrors: true,
         autorun: true,
-        // Re-evaluate the autorun delay if needed
-        // autorun, autorunDelay: 300
       }}
     >
       <SandpackLayout>
@@ -167,7 +185,11 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       <SandpackLayout style={{ marginTop: '1rem' }}>
         <SandpackTests style={{ height: '30vh' }} />
       </SandpackLayout>
-      <SupabaseTestReporter testId={testId} />
+      <SupabaseTestReporter
+        assignmentId={assignmentId}
+        questionId={questionId}
+        onTestComplete={onTestComplete}
+      />
     </SandpackProvider>
   );
 };
