@@ -109,19 +109,12 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       return;
     }
     const stopListening = sandpack.listen((message) => {
-      console.log('[Sandpack] Received message:', message);
       if (message.type === 'test:end') {
-        console.log('[Sandpack] Test run finished. Payload:', message.payload);
         setTestResults(message.payload);
       }
     });
     return () => stopListening();
   }, [sandpack]);
-
-  // Log the state whenever it changes to confirm the update
-  useEffect(() => {
-    console.log('[SandpackTest] testResults state updated:', testResults);
-  }, [testResults]);
 
   const runTests = () => {
     sandpack.runTests();
@@ -217,7 +210,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   };
 
   return (
-    <SandpackProvider template={framework} files={files} options={{ autorun: false }}>
+    <SandpackProvider customSetup={setup} files={files} options={{ autorun: false }}>
       <SandpackLayoutManager {...rest} />
     </SandpackProvider>
   );
