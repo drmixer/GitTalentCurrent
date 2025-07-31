@@ -78,55 +78,20 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 
 
 // A helper component to listen for test results and send them to Supabase
-const SupabaseTestReporter: React.FC<{
-  assignmentId: string;
-  questionId: string;
-  onTestComplete: () => void;
-}> = ({ assignmentId, questionId, onTestComplete }) => {
-  const { sandpack } = useSandpack();
+// This component is no longer needed, logic will be moved into the main component
+// const SupabaseTestReporter: ...
 
-  useEffect(() => {
-    // Guard clause: wait until the sandpack client is fully initialized
-    if (!sandpack || typeof sandpack.listen !== 'function') {
-      return;
-    }
+import { SandpackTestsProps } from '@codesandbox/sandpack-react';
 
-    const stopListening = sandpack.listen(async (message) => {
-      if (message.type === 'test:end') {
-        const testResults = message.payload;
-        const allTestsPassed = testResults.tests.every((t) => t.status === 'pass');
-
-        try {
-          // Use a single insert call
-          const { error } = await supabase.from('test_results').insert({
-            assignment_id: assignmentId,
-            question_id: questionId,
-            score: allTestsPassed ? 1 : 0,
-            results: testResults,
-            passed_test_cases: testResults.tests.filter((t) => t.status === 'pass').length,
-            total_test_cases: testResults.tests.length,
-          });
-
-          if (error) {
-            console.error('Error saving test results:', error);
-          } else {
-            console.log('Sandpack test results saved successfully.');
-            onTestComplete();
-          }
-        } catch (err) {
-          console.error('An unexpected error occurred while saving results:', err);
-        }
-      }
-    });
-
-    // Cleanup the listener when the component unmounts or dependencies change
-    return () => {
-      stopListening();
-    };
-  }, [sandpack, assignmentId, questionId, onTestComplete]); // Re-run effect if sandpack client changes
-
-  return null;
-};
+// A custom test header with a "Run Tests" button
+const CustomTestHeader: React.FC<{ onRunTests: () => void }> = ({ onRunTests }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px' }}>
+        <h4>Tests</h4>
+        <button onClick={onRunTests} style={{ padding: '4px 8px', background: '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>
+            Run Tests
+        </button>
+    </div>
+);
 
 const SandpackTest: React.FC<SandpackTestProps> = ({
   starterCode,
@@ -136,66 +101,114 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   questionId,
   onTestComplete,
 }) => {
+  const { sandpack } = useSandpack();
+  const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!sandpack) return;
+
+    const stopListening = sandpack.listen((message) => {
+      if (message.type === 'test:end') {
+        setTestResults(message.payload);
+      }
+    });
+
+    return () => stopListening();
+  }, [sandpack]);
+
+  const runTests = () => {
+    sandpack.runTests();
+  };
+
+  const submitSolution = async () => {
+    if (!testResults) {
+      alert('Please run the tests before submitting.');
+      return;
+    }
+    const allTestsPassed = testResults.tests.every((t) => t.status === 'pass');
+    if (!allTestsPassed) {
+      alert('Please ensure all tests are passing before you submit.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('test_results').insert({
+        assignment_id: assignmentId,
+        question_id: questionId,
+        score: 1,
+        results: testResults,
+        passed_test_cases: testResults.tests.length,
+        total_test_cases: testResults.tests.length,
+      });
+
+      if (error) throw error;
+
+      console.log('Solution submitted successfully!');
+      onTestComplete();
+
+    } catch (error) {
+      console.error('Failed to submit solution:', error);
+      alert('There was an error submitting your solution. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const { setup, mainFile, testFile } = getFrameworkConfig(framework);
 
+  const packageJson = JSON.stringify({
+    name: `gittalent-${framework}-challenge`,
+    dependencies: setup.dependencies,
+    scripts: { "test": "react-scripts test" }
+  });
+
+  // Use the code from props, not the hardcoded version
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  // Explicitly create a package.json file for the sandbox
-  const packageJson = JSON.stringify({
-    name: `gittalent-${framework}-challenge`,
-    version: '1.0.0',
-    main: mainFile,
-    dependencies: setup.dependencies,
-    scripts: {
-        "start": "react-scripts start",
-        "build": "react-scripts build",
-        "test": "react-scripts test",
-        "eject": "react-scripts eject"
-    }
-  });
-
-  const files: SandpackFiles = {
-    [mainFile]: {
-      code: starterCode,
-      active: true,
-    },
-    [testFile]: {
-      code: testCode,
-      hidden: true,
-    },
-    '/package.json': {
-      code: packageJson,
-      hidden: true,
-    }
+  const files = {
+    [mainFile]: { code: starterCode, active: true },
+    [testFile]: { code: testCode, hidden: true },
+    '/package.json': { code: packageJson, hidden: true },
   };
 
+  const allTestsPassed = testResults && testResults.tests.every(t => t.status === 'pass');
+
   return (
-    <SandpackProvider
-      template={framework.toLowerCase() as SupportedFramework}
-      files={files}
-      options={{
-        showTabs: true,
-        showLineNumbers: true,
-        showInlineErrors: true,
-        autorun: true,
-      }}
-    >
-      <SandpackLayout>
-        <SandpackFileExplorer style={{ height: '70vh' }} />
-        <SandpackCodeEditor style={{ height: '70vh' }} />
-        <SandpackPreview style={{ height: '70vh' }} />
-      </SandpackLayout>
-      <SandpackLayout style={{ marginTop: '1rem' }}>
-        <SandpackTests style={{ height: '30vh' }} />
-      </SandpackLayout>
-      <SupabaseTestReporter
-        assignmentId={assignmentId}
-        questionId={questionId}
-        onTestComplete={onTestComplete}
-      />
-    </SandpackProvider>
+    <>
+      <SandpackProvider
+        template={framework}
+        files={files}
+        options={{ autorun: false }}
+      >
+        <SandpackLayout>
+          <SandpackCodeEditor style={{ height: '60vh' }} />
+          <SandpackTests
+            style={{ height: '60vh' }}
+            headerChildren={<CustomTestHeader onRunTests={runTests} />}
+          />
+        </SandpackLayout>
+        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={submitSolution}
+            disabled={!allTestsPassed || isSubmitting}
+            style={{
+              padding: '10px 20px',
+              background: (!allTestsPassed || isSubmitting) ? '#ccc' : '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: (!allTestsPassed || isSubmitting) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Solution'}
+          </button>
+        </div>
+      </SandpackProvider>
+    </>
   );
 };
 
