@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-// MODIFIED: useNavigate is no longer needed here
-// import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; // No longer needed
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
 
 interface Notification {
@@ -16,7 +15,6 @@ interface Notification {
   link?: string;
 }
 
-// MODIFIED: Updated props interface
 interface NotificationsDropdownContentProps {
   onClose: () => void;
   onNavigate: (tab: string) => void;
@@ -25,7 +23,6 @@ interface NotificationsDropdownContentProps {
 
 export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount }) => {
   const { userProfile } = useAuth();
-  // REMOVED: const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +37,12 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         return;
       }
 
+      // MODIFIED: Added .eq('is_read', false) to only fetch unread notifications. This fixes the incorrect grouping.
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', userProfile.id)
+        .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -160,6 +159,31 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }, {} as Record<string, Notification[]>);
   };
 
+  // ADDED: A centralized and robust click handler to fix navigation
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    
+    if (notification.link) {
+      try {
+        // Using URLSearchParams is safer than substring for parsing
+        const params = new URLSearchParams(notification.link);
+        const tab = params.get('tab');
+        if (tab) {
+          onNavigate(tab);
+        } else {
+          onClose();
+        }
+      } catch (e) {
+        console.error("Could not parse notification link:", e);
+        onClose(); // Close dropdown even if link is bad
+      }
+    } else {
+      onClose(); // Close if there's no link
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b border-gray-200">
@@ -210,18 +234,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   key={notification.id}
                   className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  // MODIFIED: onClick handler to use onNavigate
-                  onClick={async () => {
-                    if (!notification.is_read) {
-                      await markAsRead(notification.id);
-                    }
-                    if (notification.link) {
-                      const tab = notification.link.substring(notification.link.indexOf('=') + 1);
-                      onNavigate(tab);
-                    } else {
-                      onClose();
-                    }
-                  }}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getNotificationIcon(notification.type, notification.is_read)}
@@ -246,18 +259,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                   key={type}
                   className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  // MODIFIED: onClick handler to use onNavigate for grouped notifications
-                  onClick={async () => {
-                    for (const n of groupedNotifications) {
-                      if (!n.is_read) await markAsRead(n.id);
-                    }
-                    if (latestNotification.link) {
-                      const tab = latestNotification.link.substring(latestNotification.link.indexOf('=') + 1);
-                      onNavigate(tab);
-                    } else {
-                      onClose();
-                    }
-                  }}
+                  onClick={() => handleNotificationClick(latestNotification)}
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
