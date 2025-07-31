@@ -146,7 +146,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
 
   return (
     <SandpackProvider
-      template={framework}
+      template={framework.toLowerCase() as SupportedFramework}
       // customSetup is no longer needed as we provide an explicit package.json
       // customSetup={setup}
       files={files}
