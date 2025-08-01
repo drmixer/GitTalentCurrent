@@ -1,13 +1,28 @@
-import jwt from 'npm:jsonwebtoken@9.0.2';
+import { create as createJwt } from "https://deno.land/x/djwt@v2.2/mod.ts";
+import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info",
   "Access-Control-Max-Age": "86400"
 };
-// Correctly read the App ID and Private Key from environment secrets.
 const GITHUB_APP_ID = Deno.env.get("GITHUB_APP_ID");
 const GITHUB_APP_PRIVATE_KEY = Deno.env.get("GITHUB_APP_PRIVATE_KEY")?.replace(/\\n/g, "\n");
+function pemToBinary(pem) {
+  const lines = pem.split('\n');
+  let base64 = '';
+  for (const line of lines){
+    if (line.startsWith('-----BEGIN') || line.startsWith('-----END')) continue;
+    base64 += line.trim();
+  }
+  const binaryDer = atob(base64);
+  const buffer = new ArrayBuffer(binaryDer.length);
+  const view = new Uint8Array(buffer);
+  for(let i = 0; i < binaryDer.length; i++){
+    view[i] = binaryDer.charCodeAt(i);
+  }
+  return buffer;
+}
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -18,20 +33,27 @@ Deno.serve(async (req)=>{
   try {
     const { handle, installationId } = await req.json();
     if (!handle) throw new Error("GitHub handle is required");
-    const headers = {
+    let headers = {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "GitTalent-App"
     };
     if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
       try {
+        const privateKey = await crypto.subtle.importKey("pkcs8", pemToBinary(GITHUB_APP_PRIVATE_KEY), {
+          name: "RSASSA-PKCS1-v1_5",
+          hash: "SHA-256"
+        }, true, [
+          "sign"
+        ]);
         const payload = {
-          iat: Math.floor(Date.now() / 1000) - 60,
+          iat: Math.floor(Date.now() / 1000),
           exp: Math.floor(Date.now() / 1000) + 10 * 60,
           iss: GITHUB_APP_ID
         };
-        const appToken = jwt.sign(payload, GITHUB_APP_PRIVATE_KEY, {
-          algorithm: 'RS256'
-        });
+        const appToken = await createJwt({
+          alg: "RS256",
+          typ: "JWT"
+        }, payload, privateKey);
         const tokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
           method: 'POST',
           headers: {
@@ -59,23 +81,10 @@ Deno.serve(async (req)=>{
     });
     if (!reposResponse.ok) throw new Error(`GitHub repos API error: ${reposResponse.status}`);
     const reposData = await reposResponse.json();
-    const filteredRepos = reposData.filter((repo)=>!repo.fork || repo.stargazers_count > 5);
-    const totalStars = filteredRepos.reduce((sum, repo)=>sum + repo.stargazers_count, 0);
-    let contributionData;
-    if (headers["Authorization"]) {
-      try {
-        contributionData = await fetchContributionData(handle, headers["Authorization"]);
-      } catch (error) {
-        console.error("Error fetching contribution data:", error);
-        contributionData = [];
-      }
-    } else {
-      contributionData = [];
-    }
+    const contributionData = await fetchContributionData(handle, headers["Authorization"]);
     return new Response(JSON.stringify({
       user: userData,
-      repos: filteredRepos,
-      totalStars,
+      repos: reposData,
       contributions: contributionData
     }), {
       headers: {
@@ -97,22 +106,23 @@ Deno.serve(async (req)=>{
   }
 });
 async function fetchContributionData(username, authToken) {
+  if (!authToken) return []; // Return empty if no auth token
   const query = `
-    query($username: String!) {
-      user(login: $username) {
-        contributionsCollection {
-          contributionCalendar {
-            weeks {
-              contributionDays {
-                date
-                contributionCount
+      query($username: String!) {
+        user(login: $username) {
+          contributionsCollection {
+            contributionCalendar {
+              weeks {
+                contributionDays {
+                  date
+                  contributionCount
+                }
               }
             }
           }
         }
       }
-    }
-  `;
+    }`;
   const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
@@ -130,5 +140,5 @@ async function fetchContributionData(username, authToken) {
   if (!response.ok) throw new Error(`GraphQL request failed: ${response.status}`);
   const data = await response.json();
   if (data.errors) throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
-  return data.data.user.contributionsCollection.contributionCalendar.weeks.flatMap((week)=>week.contributionDays);
+  return data.data.user.contributionsCollection.contributionCalendar.weeks.flatMap((w)=>w.contributionDays);
 }
