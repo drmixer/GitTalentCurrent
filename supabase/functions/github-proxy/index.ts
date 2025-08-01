@@ -1,286 +1,111 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
-import { create as createJwt } from "https://deno.land/x/djwt@v2.2/mod.ts";
-import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
-
+import jwt from 'npm:jsonwebtoken@9.0.2';
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info",
   "Access-Control-Max-Age": "86400"
 };
-
-// GitHub App credentials from environment variables
+// Correctly read the App ID and Private Key from environment secrets.
 const GITHUB_APP_ID = Deno.env.get("GITHUB_APP_ID");
 const GITHUB_APP_PRIVATE_KEY = Deno.env.get("GITHUB_APP_PRIVATE_KEY")?.replace(/\\n/g, "\n");
-const GITHUB_APP_CLIENT_ID = Deno.env.get("GITHUB_APP_CLIENT_ID");
-const GITHUB_APP_CLIENT_SECRET = Deno.env.get("GITHUB_APP_CLIENT_SECRET");
-
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight requests
+Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
-      headers: corsHeaders,
+      headers: corsHeaders
     });
   }
-
   try {
-    // Get GitHub handle and installation ID from request
     const { handle, installationId } = await req.json();
-    
-    if (!handle) {
-      return new Response(
-        JSON.stringify({ error: "GitHub handle is required" }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    console.log(`Fetching GitHub data for: ${handle}, Installation ID: ${installationId || 'not provided'}`);
-
-    // Determine if we should use GitHub App authentication or public access
-    const headers: Record<string, string> = {
+    if (!handle) throw new Error("GitHub handle is required");
+    const headers = {
       "Accept": "application/vnd.github.v3+json",
-      "User-Agent": "GitTalent-App", 
+      "User-Agent": "GitTalent-App"
     };
-
-    // If we have GitHub App credentials and an installation ID, use GitHub App authentication
     if (GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY && installationId) {
-      if (!GITHUB_APP_ID || !GITHUB_APP_PRIVATE_KEY) {
-        console.error("GitHub App credentials are not set in the environment.");
-        return new Response(
-          JSON.stringify({ error: "GitHub App credentials are not configured." }),
-          {
-            status: 500,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
-          }
-        );
-      }
-      console.log("Using GitHub App authentication with installation ID:", installationId);
-      
       try {
-        // Generate a JWT for the GitHub App
-        const now = Math.floor(Date.now() / 1000);
         const payload = {
-          iat: now,
-          exp: now + (10 * 60), // JWT expires in 10 minutes
+          iat: Math.floor(Date.now() / 1000) - 60,
+          exp: Math.floor(Date.now() / 1000) + 10 * 60,
           iss: GITHUB_APP_ID
         };
-        
-        const privateKey = await crypto.subtle.importKey(
-          "pkcs8",
-          pemToBinary(GITHUB_APP_PRIVATE_KEY),
-          { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-          true,
-          ["sign"]
-        );
-
-        const jwt = await createJwt({ alg: "RS256", typ: "JWT" }, payload, privateKey);
-        console.log("JWT generated successfully.");
-        
-        // Exchange the JWT for an installation access token
-        const tokenResponse = await fetch(
-          `https://api.github.com/app/installations/${installationId}/access_tokens`,
-          {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/vnd.github.v3+json',
-              'Authorization': `Bearer ${jwt}`,
-              'User-Agent': 'GitTalent-App'
-            }
-          }
-        );
-        
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.text();
-          console.error(`Error getting installation token: ${tokenResponse.status} ${errorData}`);
-          throw new Error(`Failed to get installation token: ${tokenResponse.status}`);
-        }
-        
-        const { token } = await tokenResponse.json();
-        console.log("Installation token received.");
-        
-        // Use the installation token for subsequent requests
-        headers["Authorization"] = `token ${token}`;
-        console.log("Successfully obtained installation access token for installation ID:", installationId);
-      } catch (error) {
-        console.error("Error generating GitHub App token:", error);
-        // Fall back to public access if token generation fails
-        console.log("Falling back to public access due to token error");
-      }
-    } else {
-      console.log("Using public access (no GitHub App credentials or installation ID provided)");
-    }
-
-    // GitHub API URLs
-    const userUrl = `https://api.github.com/users/${handle}`;
-    const reposUrl = `https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`;
-
-    // Fetch user data
-    const userResponse = await fetch(userUrl, { headers });
-    
-    if (!userResponse.ok) {
-      if (userResponse.status === 404) {
-        return new Response(
-          JSON.stringify({ error: `GitHub user '${handle}' not found` }),
-          {
-            status: 404,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
-          }
-        );
-      } else if (userResponse.status === 403) {
-        return new Response(
-          JSON.stringify({ error: "GitHub API rate limit exceeded. Please try again later." }),
-          {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
-          }
-        );
-      } else {
-        return new Response(
-          JSON.stringify({ error: `GitHub API error: ${userResponse.status}` }),
-          {
-            status: userResponse.status,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
-            },
-          }
-        );
-      }
-    }
-
-    const userData = await userResponse.json();
-
-    // Fetch repositories
-    const reposResponse = await fetch(reposUrl, { headers });
-    
-    if (!reposResponse.ok) {
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch repositories: ${reposResponse.status}` }),
-        {
-          status: reposResponse.status,
+        const appToken = jwt.sign(payload, GITHUB_APP_PRIVATE_KEY, {
+          algorithm: 'RS256'
+        });
+        const tokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    const reposData = await reposResponse.json();
-
-    // Filter out forks unless they have significant stars
-    const filteredRepos = reposData.filter((repo: any) => 
-      !repo.fork || repo.stargazers_count > 5
-    );
-
-    // Calculate total stars
-    const totalStars = filteredRepos.reduce((sum: number, repo: any) => sum + repo.stargazers_count, 0);
-
-    // Aggregate languages from repositories
-    const languageStats: Record<string, number> = {};
-    
-    // For each repo with a language, fetch detailed language stats
-    const languagePromises = filteredRepos.slice(0, 10).map(async (repo: any) => {
-      if (repo.language) {
-        try {
-          const langResponse = await fetch(`https://api.github.com/repos/${repo.full_name}/languages`, { headers });
-          
-          if (langResponse.ok) {
-            const langData = await langResponse.json();
-            Object.entries(langData).forEach(([lang, bytes]) => {
-              languageStats[lang] = (languageStats[lang] || 0) + (bytes as number);
-            });
-          } else {
-            // Fallback to just counting repos by primary language
-            languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': `Bearer ${appToken}`,
+            'User-Agent': 'GitTalent-App'
           }
-        } catch (error) {
-          // Fallback to just counting repos by primary language
-          languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
-        }
+        });
+        if (!tokenResponse.ok) throw new Error(`Failed to get installation token: ${tokenResponse.status}`);
+        const { token } = await tokenResponse.json();
+        headers["Authorization"] = `token ${token}`;
+      } catch (error) {
+        console.error("Error generating GitHub App token:", error.message);
       }
+    }
+    const userUrl = `https://api.github.com/users/${handle}`;
+    const userResponse = await fetch(userUrl, {
+      headers
     });
-
-    // Wait for all language requests to complete
-    await Promise.all(languagePromises);
-
-    // Try to fetch real contribution data if we have an installation token
+    if (!userResponse.ok) throw new Error(`GitHub user API error: ${userResponse.status}`);
+    const userData = await userResponse.json();
+    const reposUrl = `https://api.github.com/users/${handle}/repos?sort=updated&per_page=100&type=public`;
+    const reposResponse = await fetch(reposUrl, {
+      headers
+    });
+    if (!reposResponse.ok) throw new Error(`GitHub repos API error: ${reposResponse.status}`);
+    const reposData = await reposResponse.json();
+    const filteredRepos = reposData.filter((repo)=>!repo.fork || repo.stargazers_count > 5);
+    const totalStars = filteredRepos.reduce((sum, repo)=>sum + repo.stargazers_count, 0);
     let contributionData;
     if (headers["Authorization"]) {
       try {
-        // Attempt to fetch contribution data using GraphQL API
         contributionData = await fetchContributionData(handle, headers["Authorization"]);
       } catch (error) {
         console.error("Error fetching contribution data:", error);
-        // Fall back to generated data
-        contributionData = generateContributionsFromRepos(filteredRepos);
+        contributionData = [];
       }
     } else {
-      // Generate contribution data based on repository activity
-      contributionData = generateContributionsFromRepos(filteredRepos);
+      contributionData = [];
     }
-
-    // Return the combined data
-    return new Response(
-      JSON.stringify({
-        user: userData,
-        repos: filteredRepos,
-        languages: languageStats,
-        totalStars,
-        contributions: contributionData
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+    return new Response(JSON.stringify({
+      user: userData,
+      repos: filteredRepos,
+      totalStars,
+      contributions: contributionData
+    }), {
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders
       }
-    );
+    });
   } catch (error) {
     console.error("Error in GitHub proxy:", error);
-    
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch GitHub data" }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders
       }
-    );
+    });
   }
 });
-
-// Helper function to fetch contribution data using GraphQL API
-async function fetchContributionData(username: string, authToken: string) {
+async function fetchContributionData(username, authToken) {
   const query = `
-    query {
-      user(login: "${username}") {
+    query($username: String!) {
+      user(login: $username) {
         contributionsCollection {
           contributionCalendar {
-            totalContributions
             weeks {
               contributionDays {
                 date
                 contributionCount
-                contributionLevel
               }
             }
           }
@@ -288,124 +113,22 @@ async function fetchContributionData(username: string, authToken: string) {
       }
     }
   `;
-
   const response = await fetch('https://api.github.com/graphql', {
-    method: 'POST', 
+    method: 'POST',
     headers: {
       'Authorization': authToken,
       'Content-Type': 'application/json',
       'User-Agent': 'GitTalent-App'
     },
-    body: JSON.stringify({ query })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`GraphQL request failed: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  
-  if (data.errors) {
-    throw new Error(`GraphQL error: ${data.errors[0].message}`);
-  }
-
-  // Process the GraphQL response into our expected format
-  const calendar = data.data.user.contributionsCollection.contributionCalendar;
-  const contributions = [];
-
-  for (const week of calendar.weeks) {
-    for (const day of week.contributionDays) {
-      let level = 0;
-      if (day.contributionLevel === 'FIRST_QUARTILE') level = 1;
-      else if (day.contributionLevel === 'SECOND_QUARTILE') level = 2;
-      else if (day.contributionLevel === 'THIRD_QUARTILE') level = 3;
-      else if (day.contributionLevel === 'FOURTH_QUARTILE') level = 4;
-
-      contributions.push({
-        date: day.date,
-        count: day.contributionCount,
-        level
-      });
-    }
-  }
-
-  return contributions;
-}
-
-// Helper function to generate contribution data based on repository activity
-function generateContributionsFromRepos(repos: any[]): { date: string; count: number; level: number }[] {
-  const today = new Date();
-  const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-  const contributions: { date: string; count: number; level: number }[] = [];
-  
-  // Initialize all days with zero contributions
-  for (let i = 0; i < 365; i++) {
-    const date = new Date(oneYearAgo);
-    date.setDate(date.getDate() + i);
-    contributions.push({
-      date: date.toISOString().split('T')[0],
-      count: 0,
-      level: 0
-    });
-  }
-  
-  // Map of dates to contribution counts
-  const dateMap: Record<string, number> = {};
-  
-  // Process repository events to estimate contributions
-  repos.forEach(repo => {
-    // Use creation date
-    const createdAt = new Date(repo.created_at);
-    if (createdAt >= oneYearAgo && createdAt <= today) {
-      const dateStr = createdAt.toISOString().split('T')[0];
-      dateMap[dateStr] = (dateMap[dateStr] || 0) + 3; // Creating a repo counts as 3 contributions
-    }
-    
-    // Use updated date
-    const updatedAt = new Date(repo.updated_at);
-    if (updatedAt >= oneYearAgo && updatedAt <= today) {
-      const dateStr = updatedAt.toISOString().split('T')[0];
-      dateMap[dateStr] = (dateMap[dateStr] || 0) + 2; // Updating a repo counts as 2 contributions
-    }
-    
-    // Use pushed date if available
-    if (repo.pushed_at) {
-      const pushedAt = new Date(repo.pushed_at);
-      if (pushedAt >= oneYearAgo && pushedAt <= today) {
-        const dateStr = pushedAt.toISOString().split('T')[0];
-        dateMap[dateStr] = (dateMap[dateStr] || 0) + 1; // Pushing to a repo counts as 1 contribution
+    body: JSON.stringify({
+      query,
+      variables: {
+        username
       }
-    }
+    })
   });
-   
-  // Apply the counts to our contributions array
-  contributions.forEach((day, index) => {
-    if (dateMap[day.date]) {
-      day.count = dateMap[day.date];
-      
-      // Set the level based on the count
-      if (day.count >= 10) day.level = 4;
-      else if (day.count >= 7) day.level = 3;
-      else if (day.count >= 4) day.level = 2;
-      else if (day.count >= 1) day.level = 1;
-    }
-  });
-  
-  return contributions;
-}
-
-function pemToBinary(pem: string): ArrayBuffer {
-  const pemContents = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binaryDer = atob(pemContents);
-  const buffer = new ArrayBuffer(binaryDer.length);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < binaryDer.length; i++) {
-    view[i] = binaryDer.charCodeAt(i);
-  }
-  return buffer;
+  if (!response.ok) throw new Error(`GraphQL request failed: ${response.status}`);
+  const data = await response.json();
+  if (data.errors) throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
+  return data.data.user.contributionsCollection.contributionCalendar.weeks.flatMap((week)=>week.contributionDays);
 }
