@@ -16,13 +16,13 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const latestSessionRef = useRef<string | null>(null); // Used to compare incoming sessions
-  const isProcessingAuthEventRef = useRef(false); // Guards the new useEffect processor
+  const latestSessionRef = useRef<string | null>(null);
+  const isProcessingAuthEventRef = useRef(false);
 
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [developerProfile, setDeveloperProfile] = useState<Developer | null | undefined>(null);
-  const [lastProfileUpdateTime, setLastProfileUpdateTime] = useState<number | null>(null); // New state
-  const [loading, setLoading] = useState(true); // Global loading for auth context
+  const [lastProfileUpdateTime, setLastProfileUpdateTime] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -67,12 +67,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
       const userBio = authUser.user_metadata?.bio || '';
       const userLocation = authUser.user_metadata?.location || '';
-      const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id; // Get ID from current React state
+      const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id;
 
       if (existingProfileFromDb) {
-        let profileToSet = { ...existingProfileFromDb }; // Clone to make mutable
+        let profileToSet = { ...existingProfileFromDb };
 
-        // Preserve ghInstId from state if DB is null and state has a valid one
         if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
           console.log(`[AuthContext] ensureDeveloperProfile (existing): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
           profileToSet.github_installation_id = currentGhInstIdInState;
@@ -101,10 +100,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { data: updatedProfileFromDb, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
           if (updateError) {
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
-            // Even if update fails, proceed with profileToSet which has the original existing data + potential ghInstId preservation
           } else if (updatedProfileFromDb) {
-            profileToSet = { ...updatedProfileFromDb }; // Use the updated data from DB
-            // Preserve ghInstId again if the update somehow nulled it and state still has it
+            profileToSet = { ...updatedProfileFromDb };
             if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
               console.log(`[AuthContext] ensureDeveloperProfile (after DB update): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
               profileToSet.github_installation_id = currentGhInstIdInState;
@@ -117,19 +114,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
       }
 
-      // Creating a new profile
       let newDevProfileData: Partial<Developer> = {
         user_id: authUser.id,
         github_handle: githubUsername,
         bio: userBio,
         location: userLocation,
         profile_pic_url: avatarUrl,
-        // github_installation_id: currentGhInstIdInState || null, // Let this be set by GitHubAppSetup or DB default initially
         availability: true
       };
-      // Only include github_installation_id in the insert if it's already available in the context's state.
-      // For a brand new user, this would typically be null/undefined, so it won't be included,
-      // allowing the GitHub app installation callback to set it cleanly.
       if (currentGhInstIdInState) {
           newDevProfileData.github_installation_id = currentGhInstIdInState;
           console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
@@ -141,8 +133,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
       if (!insertedProfile) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
       
-      // The insertedProfile should ideally have the ghInstId if we passed it.
-      // If it's different (e.g. DB default took over), and state had one, re-affirm.
       if (insertedProfile.github_installation_id !== currentGhInstIdInState && currentGhInstIdInState) {
           console.log(`[AuthContext] ensureDeveloperProfile (created new, re-affirming): Preserving ghInstId (${currentGhInstIdInState}) over DB insert result ${insertedProfile.github_installation_id}.`);
           insertedProfile.github_installation_id = currentGhInstIdInState;
@@ -161,14 +151,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) {
         if (error.code === 'PGRST116') {
           console.log('[AuthContext] fetchDeveloperProfile: No record found, setting profile to null.');
-          setDeveloperProfile(null); // Intentionally null, no ID to preserve
+          setDeveloperProfile(null);
           setLastProfileUpdateTime(Date.now());
           return null;
         }
         else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
       }
       if (!devProfileFromDb) {
-        setDeveloperProfile(null); // Intentionally null
+        setDeveloperProfile(null);
         setLastProfileUpdateTime(Date.now());
         return null;
       }
@@ -193,7 +183,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await ensureUserProfileExists();
     console.log(`[AuthContext] fetchUserProfile START for user_id: ${authUser.id}, email: ${authUser.email}`);
     try {
-      const { data: profile, error, status } = await supabase // Added status here
+      const { data: profile, error, status } = await supabase
         .from('users')
         .select('*')
         .eq('id', authUser.id)
@@ -201,8 +191,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       console.log(`[AuthContext] fetchUserProfile: Initial fetch from 'users' table - Status: ${status}, Error Code: ${error?.code}, Error Message: ${error?.message}, Profile Data:`, profile);
 
-      // PGRST116 is the error code when .single() finds no rows, which can result in status 406.
-      if (error && error.code === 'PGRST116') { // This also covers the 406 scenario for .single()
+      if (error && error.code === 'PGRST116') {
         console.log(`[AuthContext] fetchUserProfile: Profile not found for ${authUser.id} (PGRST116 / implies 406 with .single()). Attempting to create via RPC.`);
         
         const userRole = localStorage.getItem('gittalent_signup_role') || authUser.user_metadata?.role || (authUser.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
@@ -244,19 +233,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         console.log(`[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`);
-        setUserProfile(newProfile); // Set the main user profile
+        setUserProfile(newProfile);
         if (newProfile.role === 'developer') {
           console.log(`[AuthContext] fetchUserProfile: User role is 'developer'. Calling ensureDeveloperProfile for ${authUser.id}.`);
           await ensureDeveloperProfile(authUser, developerProfile);
         }
         return newProfile;
 
-      } else if (error) { // Other errors during initial fetch (not PGRST116)
+      } else if (error) {
         console.error(`[AuthContext] fetchUserProfile: Non-PGRST116 error fetching profile for ${authUser.id}: Code: ${error.code}, Message: ${error.message}`);
         setAuthError('Failed to load your profile.'); return null;
       }
 
-      // Profile existed, fetched successfully on the first try
       if (!profile) {
           console.error(`[AuthContext] fetchUserProfile: Initial fetch successful (no error, no PGRST116) but profile data is null/undefined for ${authUser.id}. This is unexpected.`);
           setAuthError('Profile data was unexpectedly empty after fetch.');
@@ -271,16 +259,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return profile;
 
-    } catch (errorCatch) { // Renamed to avoid conflict with 'error' from supabase calls
+    } catch (errorCatch) {
       console.error(`[AuthContext] fetchUserProfile: Unexpected top-level catch error for ${authUser.id}:`, errorCatch);
       setAuthError('An unexpected error occurred while fetching your profile.'); return null;
     } finally {
       setLoading(false);
-      // The log message below might show stale 'loading' state due to closure.
-      // console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading: ${loading}`);
       console.log(`[AuthContext] fetchUserProfile FINISHED for user_id: ${authUser.id}. Loading state will be false.`);
     }
-  }, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]); // Added dependencies based on usage
+  }, [ensureDeveloperProfile, setLoading, setAuthError, setUserProfile]);
 
   const handleGitHubSignIn = useCallback(async (authUser: SupabaseUser) => {
     setAuthError(null);
@@ -373,7 +359,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } else if (['INITIAL_SESSION', 'USER_UPDATED', 'TOKEN_REFRESHED', 'MANUAL_REFRESH'].includes(authProcessingEventType!)) {
             await fetchUserProfile(authUserToProcess);
           } else {
-            // console.warn(`AuthProvider (useEffect): Unhandled event type ${authProcessingEventType} with user, attempting fetchUserProfile as fallback.`);
             await fetchUserProfile(authUserToProcess);
           }
         } catch (e) {
@@ -386,13 +371,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           isProcessingAuthEventRef.current = false;
           if (authProcessingEventType === 'MANUAL_REFRESH' && onRefreshComplete) {
             onRefreshComplete();
-            setOnRefreshComplete(null); // Reset the callback
+            setOnRefreshComplete(null);
           }
         }
       };
       processIt();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUserToProcess, authProcessingEventType, handleGitHubSignIn, fetchUserProfile]);
 
   const signUp = async (email: string, password: string, userData: Partial<User>): Promise<{ data?: any; error: any | null }> => {
@@ -405,7 +389,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
-      // onAuthStateChange will pick this up. setLoading(true) remains until processing completes.
       return { data, error: null };
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -425,38 +408,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // UPDATED: signInWithGitHub now redirects to GitHub App instead of Supabase OAuth
   const signInWithGitHub = async (stateParams?: Record<string, any>) => {
-    setAuthError(null); setLoading(true);
+    setAuthError(null);
+    setLoading(true);
+    
     const name = localStorage.getItem('gittalent_signup_name') || '';
     const role = localStorage.getItem('gittalent_signup_role') || 'developer';
     
-    // Data to be available after OAuth callback
+    // Store intent data for the new GitHub App callback to use
     const intentData = {
       name,
       role: role || 'developer',
-      install_after_auth: true,
       ...(stateParams || {})
     };
-    localStorage.setItem('oauth_intent_data', JSON.stringify(intentData));
-    console.log('[AuthContext] signInWithGitHub: Stored in localStorage oauth_intent_data:', intentData);
+    localStorage.setItem('github_auth_intent', JSON.stringify(intentData));
+    console.log('[AuthContext] signInWithGitHub: Stored github_auth_intent:', intentData);
 
-    const redirectTo = `${window.location.origin}/auth/callback`; // Standard callback URL
-    console.log('[AuthContext] signInWithGitHub: Using redirectTo:', redirectTo);
     try {
-      // We don't need to pass our application state in options.state if using localStorage bridge
-      // Supabase handles its own state for CSRF if needed.
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo,
-          scopes: 'read:user user:email'
-          // Not passing 'state' here, relying on localStorage bridge for app-specific state
-        }
-      });
-      if (error) { throw error; }
+      // Redirect directly to GitHub App instead of Supabase OAuth
+      const baseUrl = window.location.origin;
+      const redirectUri = `${baseUrl}/auth/github-callback`;
+      
+      // GitHub App ID from environment variables
+      const githubAppId = import.meta.env.VITE_GITHUB_APP_ID || process.env.GITHUB_APP_ID;
+      if (!githubAppId) {
+        throw new Error('GitHub App ID not configured');
+      }
+
+      // Construct state parameter with our application data
+      const stateData = {
+        redirect_uri: redirectUri,
+        intent: intentData,
+        timestamp: Date.now()
+      };
+      const stateParam = encodeURIComponent(JSON.stringify(stateData));
+      
+      // Redirect to GitHub App installation/authorization
+      const githubUrl = `https://github.com/apps/gittalentapp/installations/new?state=${stateParam}`;
+      
+      console.log('[AuthContext] signInWithGitHub: Redirecting to GitHub App:', githubUrl);
+      window.location.href = githubUrl;
+      
       return { error: null };
     } catch (error: any) {
-      setAuthError(error.message || 'Failed to sign in with GitHub'); setLoading(false);
+      setAuthError(error.message || 'Failed to sign in with GitHub');
+      setLoading(false);
       return { error };
     }
   };
@@ -556,7 +553,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // MODIFIED: This function no longer inserts a platform_fee
   const createHire = async (hireData: {
     assignment_id: string;
     salary: number;
@@ -686,12 +682,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (developerData && typeof developerData === 'object' && developerData.user_id) {
       console.log(`[AuthContext] setResolvedDeveloperProfile: Setting profile. ghInstId from input data: ${developerData.github_installation_id}`);
       setDeveloperProfile(developerData);
-      setLastProfileUpdateTime(Date.now()); // Update time
+      setLastProfileUpdateTime(Date.now());
     } else {
       console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
     }
   }, [setDeveloperProfile, setLastProfileUpdateTime]);
-
 
   const value: AuthContextType = {
     user, session, userProfile, developerProfile, loading, authError, signingOut,
@@ -700,7 +695,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
     createAssignment,
     createHire,
-    updateAssignmentStatus, // Keep this function for its intended purpose (updating status)
+    updateAssignmentStatus,
     updateUserApprovalStatus, updateProfileStrength,
     refreshProfile,
     refreshUserProfile: refreshProfile,
