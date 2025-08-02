@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
-import { getInstallationAccessToken } from '../_shared/github-auth.ts';
+import jwt from 'npm:jsonwebtoken@9.0.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +8,40 @@ const corsHeaders = {
 };
 
 async function getGithubUserData(installationId: number | string) {
-  const installationToken = await getInstallationAccessToken(installationId);
+  const GITHUB_APP_ID = Deno.env.get('GITHUB_APP_ID');
+  const rawKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY') || '';
+
+  if (!GITHUB_APP_ID || !rawKey) {
+    throw new Error('GitHub App credentials are not configured in environment variables.');
+  }
+
+  // Clean the private key to handle various formats from env variables
+  const GITHUB_APP_PRIVATE_KEY = rawKey.replace(/\\n/g, '\n').trim();
+
+  const payload = {
+    iat: Math.floor(Date.now() / 1000) - 60,
+    exp: Math.floor(Date.now() / 1000) + (10 * 60),
+    iss: GITHUB_APP_ID
+  };
+
+  const appToken = jwt.sign(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
+
+  const installationTokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${appToken}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'GitTalent-App'
+    }
+  });
+
+  if (!installationTokenResponse.ok) {
+    const errorText = await installationTokenResponse.text();
+    throw new Error(`Failed to get installation access token: ${errorText}`);
+  }
+
+  const installationTokenData = await installationTokenResponse.json();
+  const installationToken = installationTokenData.token;
 
   const installationDetailsResponse = await fetch(`https://api.github.com/app/installations/${installationId}`, {
     headers: {
@@ -19,8 +52,6 @@ async function getGithubUserData(installationId: number | string) {
   });
 
   if (!installationDetailsResponse.ok) {
-    const errorText = await installationDetailsResponse.text();
-    console.error(`Failed to get installation details from GitHub: ${errorText}`);
     throw new Error('Failed to get installation details from GitHub');
   }
 
@@ -53,7 +84,7 @@ Deno.serve(async (req) => {
       throw new Error("userId and installationId are required");
     }
 
-    console.log(`Processing: user=${userId}, installation=${installationId}`);
+    console.log(`Processing update-github-installation: user=${userId}, installation=${installationId}`);
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     const { login, avatar_url, bio, location } = await getGithubUserData(installationId);
@@ -74,39 +105,27 @@ Deno.serve(async (req) => {
       location: location || '',
       updated_at: new Date().toISOString()
     };
+
     if (existingDeveloper) {
-      console.log('Updating existing developer profile.');
+      console.log(`Updating existing developer profile for user ${userId}.`);
       const { error } = await supabaseClient.from('developers').update(developerData).eq('user_id', userId);
       if (error) throw error;
     } else {
-      console.log('Creating new developer profile.');
-      const { error } = await supabaseClient.from('developers').insert({
-        user_id: userId,
-        ...developerData
-      });
+      console.log(`Creating new developer profile for user ${userId}.`);
+      const { error } = await supabaseClient.from('developers').insert({ user_id: userId, ...developerData });
       if (error) throw error;
     }
-    return new Response(JSON.stringify({
-      success: true,
-      message: "Installation successful."
-    }), {
+
+    return new Response(JSON.stringify({ success: true, message: "Installation successful." }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders
-      }
+      headers: { "Content-Type": "application/json", ...corsHeaders }
     });
+
   } catch (error) {
     console.error('Unhandled error in update-github-installation:', error.message);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders
-      }
+      headers: { "Content-Type": "application/json", ...corsHeaders }
     });
   }
 });
