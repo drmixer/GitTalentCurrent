@@ -1,5 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
-import jwt from 'npm:jsonwebtoken@9.0.2';
+import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,42 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info"
 };
 
-async function getGithubUserData(installationId: number | string) {
-  const GITHUB_APP_ID = Deno.env.get('GITHUB_APP_ID');
-  const rawKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY') || '';
+// This function now invokes the dedicated token generation function
+async function getGithubUserData(supabaseClient: SupabaseClient, installationId: number | string) {
 
-  if (!GITHUB_APP_ID || !rawKey) {
-    throw new Error('GitHub App credentials are not configured in environment variables.');
-  }
-
-  // Clean the private key to handle various formats from env variables
-  const GITHUB_APP_PRIVATE_KEY = rawKey.replace(/\\n/g, '\n').trim();
-
-  const payload = {
-    iat: Math.floor(Date.now() / 1000) - 60,
-    exp: Math.floor(Date.now() / 1000) + (10 * 60),
-    iss: GITHUB_APP_ID
-  };
-
-  const appToken = jwt.sign(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
-
-  const installationTokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${appToken}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'GitTalent-App'
-    }
+  // Invoke the get-github-token function to get a token
+  const { data: tokenData, error: tokenError } = await supabaseClient.functions.invoke('get-github-token', {
+    body: { installationId },
   });
 
-  if (!installationTokenResponse.ok) {
-    const errorText = await installationTokenResponse.text();
-    throw new Error(`Failed to get installation access token: ${errorText}`);
+  if (tokenError) {
+    console.error(`Error invoking get-github-token function:`, tokenError);
+    throw new Error(`Failed to get installation token: ${tokenError.message}`);
   }
 
-  const installationTokenData = await installationTokenResponse.json();
-  const installationToken = installationTokenData.token;
+  const installationToken = tokenData.accessToken;
+  if (!installationToken) {
+      throw new Error("No access token returned from get-github-token function");
+  }
 
+  // Use the retrieved token to fetch installation details
   const installationDetailsResponse = await fetch(`https://api.github.com/app/installations/${installationId}`, {
     headers: {
       'Authorization': `Bearer ${installationToken}`,
@@ -52,7 +34,8 @@ async function getGithubUserData(installationId: number | string) {
   });
 
   if (!installationDetailsResponse.ok) {
-    throw new Error('Failed to get installation details from GitHub');
+    const errorText = await installationDetailsResponse.text();
+    throw new Error(`Failed to get installation details from GitHub: ${errorText}`);
   }
 
   const installationDetails = await installationDetailsResponse.json();
@@ -70,12 +53,9 @@ async function getGithubUserData(installationId: number | string) {
   };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -84,18 +64,12 @@ Deno.serve(async (req) => {
       throw new Error("userId and installationId are required");
     }
 
-    console.log(`Processing update-github-installation: user=${userId}, installation=${installationId}`);
+    console.log(`[update-github-installation] Processing for user=${userId}, installation=${installationId}`);
+
+    // Create a Supabase client with the service role key to invoke other functions
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    const { login, avatar_url, bio, location } = await getGithubUserData(installationId);
-
-    const { data: existingDeveloper, error: devCheckError } = await supabaseClient
-      .from('developers')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (devCheckError) throw devCheckError;
+    const { login, avatar_url, bio, location } = await getGithubUserData(supabaseClient, installationId);
 
     const developerData = {
       github_installation_id: installationId,
@@ -106,15 +80,17 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString()
     };
 
-    if (existingDeveloper) {
-      console.log(`Updating existing developer profile for user ${userId}.`);
-      const { error } = await supabaseClient.from('developers').update(developerData).eq('user_id', userId);
-      if (error) throw error;
-    } else {
-      console.log(`Creating new developer profile for user ${userId}.`);
-      const { error } = await supabaseClient.from('developers').insert({ user_id: userId, ...developerData });
-      if (error) throw error;
+    // Use upsert for cleaner logic: it will insert or update as needed.
+    const { error } = await supabaseClient
+      .from('developers')
+      .upsert({ user_id: userId, ...developerData }, { onConflict: 'user_id' });
+
+    if (error) {
+        console.error("Supabase upsert error:", error);
+        throw error;
     }
+
+    console.log(`[update-github-installation] Successfully upserted developer profile for user ${userId}`);
 
     return new Response(JSON.stringify({ success: true, message: "Installation successful." }), {
       status: 200,
@@ -122,7 +98,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Unhandled error in update-github-installation:', error.message);
+    console.error('[update-github-installation] Unhandled error:', error.message);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders }

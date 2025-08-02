@@ -1,4 +1,4 @@
-import jwt from 'npm:jsonwebtoken@9.0.2';
+import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,52 +7,33 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400"
 };
 
-async function getInstallationAccessToken(installationId: number | string): Promise<string> {
-  const GITHUB_APP_ID = Deno.env.get('GITHUB_APP_ID');
-  const rawKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY') || '';
+async function getInstallationAccessToken(supabaseClient: SupabaseClient, installationId: number | string): Promise<string | null> {
+  try {
+    const { data: tokenData, error: tokenError } = await supabaseClient.functions.invoke('get-github-token', {
+      body: { installationId },
+    });
 
-  if (!GITHUB_APP_ID || !rawKey) {
-    throw new Error('GitHub App credentials are not configured in environment variables.');
-  }
-
-  const GITHUB_APP_PRIVATE_KEY = rawKey.replace(/\\n/g, '\n').trim();
-
-  const payload = {
-    iat: Math.floor(Date.now() / 1000) - 60,
-    exp: Math.floor(Date.now() / 1000) + (10 * 60),
-    iss: GITHUB_APP_ID
-  };
-
-  const appToken = jwt.sign(payload, GITHUB_APP_PRIVATE_KEY, { algorithm: 'RS256' });
-
-  const tokenResponse = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/vnd.github.v3+json',
-      'Authorization': `Bearer ${appToken}`,
-      'User-Agent': 'GitTalent-App'
+    if (tokenError) {
+      throw tokenError;
     }
-  });
 
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    throw new Error(`Failed to get installation token: ${errorText}`);
+    return tokenData.accessToken;
+  } catch (error) {
+    console.error(`[github-proxy] Error invoking get-github-token for installation ${installationId}:`, error.message);
+    return null; // Return null on failure to allow graceful degradation
   }
-
-  const { token } = await tokenResponse.json();
-  return token;
 }
 
-Deno.serve(async (req)=>{
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
+
   try {
     const { handle, installationId } = await req.json();
-    if (!handle) throw new Error("GitHub handle is required");
+    if (!handle) {
+      throw new Error("GitHub handle is required");
+    }
 
     const headers: { [key: string]: string } = {
       "Accept": "application/vnd.github.v3+json",
@@ -60,11 +41,11 @@ Deno.serve(async (req)=>{
     };
 
     if (installationId) {
-      try {
-        const token = await getInstallationAccessToken(installationId);
+      // Create a client to invoke the token function
+      const supabaseClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const token = await getInstallationAccessToken(supabaseClient, installationId);
+      if (token) {
         headers["Authorization"] = `token ${token}`;
-      } catch (error) {
-        console.error(`Failed to get installation token for installationId ${installationId}:`, error.message);
       }
     }
     const userUrl = `https://api.github.com/users/${handle}`;
