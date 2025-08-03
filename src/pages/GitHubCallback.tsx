@@ -6,7 +6,7 @@ import { Loader, AlertCircle, CheckCircle } from 'lucide-react';
 export const GitHubCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, userProfile, loading: authLoading, setResolvedDeveloperProfile } = useAuth();
+  const { user, userProfile, loading: authLoading, handleGitHubCallbackSuccess } = useAuth();
   
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('Processing GitHub App authorization...');
@@ -119,19 +119,25 @@ export const GitHubCallback: React.FC = () => {
 
         // Handle the response based on whether we got a session
         if (result.session && result.user) {
-          // We have a valid session, set up the user
-          console.log('[GitHubCallback] Session received, setting up user');
+          // We have a valid session, set it up using AuthContext
+          console.log('[GitHubCallback] Session received, establishing session via AuthContext');
           
-          if (result.developer_profile) {
-            setResolvedDeveloperProfile(result.developer_profile);
+          const authResult = await handleGitHubCallbackSuccess(result.session, result.developer_profile);
+
+          if (authResult.error) {
+            console.error('[GitHubCallback] Error establishing session:', authResult.error);
+            throw new Error(`Failed to establish session: ${authResult.error.message}`);
           }
+
+          console.log('[GitHubCallback] Session established successfully via AuthContext');
 
           setStatus('success');
           setMessage('Welcome to GitTalent! Redirecting to your dashboard...');
           
-          // Redirect based on user role
-          const targetPath = result.user.role === 'developer' ? '/developer' : '/dashboard';
+          // Wait a moment for the auth state to update, then redirect
           setTimeout(() => {
+            const targetPath = result.user.role === 'developer' ? '/developer' : '/dashboard';
+            console.log('[GitHubCallback] Redirecting to:', targetPath);
             navigate(targetPath, { replace: true });
           }, 2000);
 
