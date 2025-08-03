@@ -61,8 +61,17 @@ export const GitHubCallback: React.FC = () => {
 
         setMessage('Exchanging authorization code for access token...');
 
+        // Get Supabase URL from environment variables
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) {
+          throw new Error('Supabase URL not configured');
+        }
+
         // Call the new edge function to handle authentication and profile creation
-        const response = await fetch('/functions/v1/github-auth-and-install', {
+        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/github-auth-and-install`;
+        console.log('[GitHubCallback] Calling edge function:', edgeFunctionUrl);
+
+        const response = await fetch(edgeFunctionUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -76,12 +85,16 @@ export const GitHubCallback: React.FC = () => {
           }),
         });
 
+        console.log('[GitHubCallback] Edge function response status:', response.status);
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          console.error('[GitHubCallback] Edge function error:', errorData);
           throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('[GitHubCallback] Edge function result:', result);
         
         if (result.error) {
           throw new Error(result.error);
