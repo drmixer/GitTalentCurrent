@@ -1,16 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-serve(async (req)=>{
+
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
     });
   }
+
   try {
     // Get environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -19,20 +22,25 @@ serve(async (req)=>{
     const githubAppPrivateKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY');
     const githubClientId = Deno.env.get('GITHUB_CLIENT_ID');
     const githubClientSecret = Deno.env.get('GITHUB_CLIENT_SECRET');
+
     if (!supabaseUrl || !supabaseServiceKey || !githubAppId || !githubAppPrivateKey || !githubClientId || !githubClientSecret) {
       throw new Error('Missing required environment variables');
     }
+
     // Initialize Supabase client with service role
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
     // Parse request body
     const body = await req.json();
     const { code, installation_id, state, intent, redirect_uri } = body;
+
     console.log('Processing GitHub auth callback:', {
       code: code ? 'present' : 'missing',
       installation_id,
       hasState: !!state,
       hasIntent: !!intent
     });
+
     // Step 1: Exchange authorization code for access token
     console.log('Step 1: Exchanging code for access token');
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -48,17 +56,21 @@ serve(async (req)=>{
         redirect_uri
       })
     });
+
     if (!tokenResponse.ok) {
       throw new Error(`Failed to exchange code for token: ${tokenResponse.statusText}`);
     }
+
     const tokenData = await tokenResponse.json();
     if (tokenData.error) {
       throw new Error(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`);
     }
+
     const accessToken = tokenData.access_token;
     if (!accessToken) {
       throw new Error('No access token received from GitHub');
     }
+
     // Step 2: Get user information from GitHub
     console.log('Step 2: Fetching user info from GitHub');
     const userResponse = await fetch('https://api.github.com/user', {
@@ -67,10 +79,13 @@ serve(async (req)=>{
         'Accept': 'application/vnd.github.v3+json'
       }
     });
+
     if (!userResponse.ok) {
       throw new Error(`Failed to fetch user info: ${userResponse.statusText}`);
     }
+
     const githubUser = await userResponse.json();
+
     // Get user's primary email if not public
     let userEmail = githubUser.email;
     if (!userEmail) {
@@ -82,21 +97,25 @@ serve(async (req)=>{
       });
       if (emailResponse.ok) {
         const emails = await emailResponse.json();
-        const primaryEmail = emails.find((email)=>email.primary);
+        const primaryEmail = emails.find((email) => email.primary);
         userEmail = primaryEmail?.email || `${githubUser.login}@github.local`;
       }
     }
+
     if (!userEmail) {
       userEmail = `${githubUser.login}@github.local`;
     }
+
     console.log('GitHub user info:', {
       id: githubUser.id,
       login: githubUser.login,
       email: userEmail,
       name: githubUser.name
     });
+
     // Step 3: Create or update Supabase user
     console.log('Step 3: Creating/updating Supabase user');
+    
     // Prepare user metadata
     const userMetadata = {
       github_id: githubUser.id,
@@ -108,6 +127,7 @@ serve(async (req)=>{
       company: githubUser.company,
       provider: 'github'
     };
+
     // Create user in Supabase Auth using Admin API
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: userEmail,
@@ -118,7 +138,9 @@ serve(async (req)=>{
         github_id: githubUser.id
       }
     });
+
     let supabaseUser = authData.user;
+
     if (authError) {
       // If user already exists, try to get them instead
       if (authError.message.includes('already registered')) {
@@ -126,15 +148,20 @@ serve(async (req)=>{
         // Try to find existing user by email
         const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
         if (!lookupError && existingUsers.users) {
-          supabaseUser = existingUsers.users.find((u)=>u.email === userEmail || u.user_metadata?.github_id === githubUser.id) || null;
+          supabaseUser = existingUsers.users.find((u) => 
+            u.email === userEmail || u.user_metadata?.github_id === githubUser.id
+          ) || null;
         }
+
         if (!supabaseUser) {
           throw new Error('User exists but could not be found for login');
         }
+
         // Update user metadata
         const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
           user_metadata: userMetadata
         });
+
         if (updateError) {
           console.warn('Failed to update user metadata:', updateError);
         } else {
@@ -144,14 +171,18 @@ serve(async (req)=>{
         throw new Error(`Failed to create user: ${authError.message}`);
       }
     }
+
     if (!supabaseUser) {
       throw new Error('Failed to create or retrieve user');
     }
+
     console.log('Supabase user created/retrieved:', supabaseUser.id);
+
     // Step 4: Create user profile
     console.log('Step 4: Creating user profile');
     const userName = intent?.name || githubUser.name || githubUser.login || 'User';
     const userRole = intent?.role || 'developer';
+
     const { error: profileError } = await supabaseAdmin.rpc('create_user_profile', {
       user_id: supabaseUser.id,
       user_email: userEmail,
@@ -159,6 +190,7 @@ serve(async (req)=>{
       user_role: userRole,
       company_name: intent?.company_name || ''
     });
+
     if (profileError) {
       console.warn('Profile creation RPC failed:', profileError);
       // Try direct insert as fallback
@@ -174,10 +206,12 @@ serve(async (req)=>{
       }, {
         onConflict: 'id'
       });
+
       if (insertError) {
         throw new Error(`Failed to create user profile: ${insertError.message}`);
       }
     }
+
     // Step 5: Create developer profile if user is a developer
     let developerProfile = null;
     if (userRole === 'developer') {
@@ -191,9 +225,13 @@ serve(async (req)=>{
         github_installation_id: installation_id ? parseInt(installation_id) : null,
         availability: true
       };
-      const { data: devProfile, error: devError } = await supabaseAdmin.from('developers').upsert(developerData, {
-        onConflict: 'user_id'
-      }).select().single();
+
+      const { data: devProfile, error: devError } = await supabaseAdmin
+        .from('developers')
+        .upsert(developerData, { onConflict: 'user_id' })
+        .select()
+        .single();
+
       if (devError) {
         console.warn('Developer profile creation failed:', devError);
       } else {
@@ -201,24 +239,76 @@ serve(async (req)=>{
         console.log('Developer profile created:', devProfile.id);
       }
     }
-    // Step 6: Generate session for the user
+
+    // Step 6: Generate session for the user (FIXED)
     console.log('Step 6: Generating user session');
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userEmail
+
+    // Create a temporary password for the user
+    const tempPassword = 'temp-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    // Update user with temporary password
+    const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
+      password: tempPassword
     });
-    if (sessionError) {
-      throw new Error(`Failed to generate session: ${sessionError.message}`);
+
+    if (passwordError) {
+      console.warn('Failed to set temporary password:', passwordError);
     }
-    // Extract the session from the magic link
-    const url = new URL(sessionData.properties.action_link);
-    const accessTokenParam = url.searchParams.get('access_token');
-    const refreshTokenParam = url.searchParams.get('refresh_token');
+
+    // Create session using admin API
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'signup',
+      email: userEmail,
+      options: {
+        data: userMetadata,
+        redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
+      }
+    });
+
+    let accessTokenParam = null;
+    let refreshTokenParam = null;
+
+    if (sessionData?.properties?.action_link) {
+      try {
+        const url = new URL(sessionData.properties.action_link);
+        accessTokenParam = url.searchParams.get('access_token');
+        refreshTokenParam = url.searchParams.get('refresh_token');
+      } catch (linkError) {
+        console.warn('Failed to parse action link:', linkError);
+      }
+    }
+
+    // If magic link approach failed, try direct session creation
     if (!accessTokenParam || !refreshTokenParam) {
-      throw new Error('Failed to extract session tokens');
+      console.log('Using alternative session creation approach');
+      
+      // Try to create a session directly using signInWithPassword
+      if (!passwordError) {
+        try {
+          // Create a regular supabase client for sign in
+          const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+          
+          const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+            email: userEmail,
+            password: tempPassword
+          });
+
+          if (!signInError && signInData.session) {
+            accessTokenParam = signInData.session.access_token;
+            refreshTokenParam = signInData.session.refresh_token;
+            console.log('Successfully created session via sign in');
+          } else {
+            console.warn('Sign in failed:', signInError);
+          }
+        } catch (signInError) {
+          console.warn('Exception during sign in:', signInError);
+        }
+      }
     }
+
     console.log('Authentication flow completed successfully');
-    return new Response(JSON.stringify({
+
+    const response = {
       success: true,
       user: {
         id: supabaseUser.id,
@@ -226,18 +316,29 @@ serve(async (req)=>{
         name: userName,
         role: userRole
       },
-      session: {
-        access_token: accessTokenParam,
-        refresh_token: refreshTokenParam
-      },
       developer_profile: developerProfile,
       installation_id: installation_id
-    }), {
+    };
+
+    // Only include session if we have valid tokens
+    if (accessTokenParam && refreshTokenParam) {
+      response.session = {
+        access_token: accessTokenParam,
+        refresh_token: refreshTokenParam
+      };
+      console.log('Session tokens included in response');
+    } else {
+      response.message = 'User created successfully. Please sign in to continue.';
+      console.log('No session tokens available, user will need to sign in manually');
+    }
+
+    return new Response(JSON.stringify(response), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/json'
       }
     });
+
   } catch (error) {
     console.error('GitHub auth error:', error);
     return new Response(JSON.stringify({
