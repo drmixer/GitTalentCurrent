@@ -22,7 +22,7 @@ import { DeveloperDashboard } from './pages/DeveloperDashboard';
 import { PublicDeveloperProfile } from './pages/PublicDeveloperProfile';
 import { GitHubAppSetup } from './pages/GitHubAppSetup';
 import { AuthCallback } from './pages/AuthCallback';
-import { GitHubCallback } from './pages/GitHubCallback'; // NEW: GitHub App callback
+import { GitHubCallback } from './pages/GitHubCallback';
 import { ApplyForJob } from './pages/ApplyForJob';
 import TestPage from './pages/TestPage';
 import AdminTests from './pages/AdminTests';
@@ -120,7 +120,8 @@ function App() {
             {/* Authentication & GitHub Setup */}
             <Route path="/github-setup" element={<GitHubAppSetup />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/auth/github-callback" element={<GitHubCallback />} /> {/* NEW: GitHub App callback */}
+            {/* UPDATED: GitHub App callback with better error handling */}
+            <Route path="/auth/github-callback" element={<GitHubCallback />} />
 
             {/* Company & Recruiter Profiles */}
             <Route path="/recruiters/:id" element={<RecruiterProfilePage />} />
