@@ -49,7 +49,8 @@ export const LoginForm = () => {
     setGithubLoading(true);
 
     try {
-      await signInWithGitHub();
+      // FIXED: Pass false for existing user login
+      await signInWithGitHub(false);
       // Navigation will happen via redirect URL
     } catch (error: any) {
       console.error('GitHub login error:', error);
