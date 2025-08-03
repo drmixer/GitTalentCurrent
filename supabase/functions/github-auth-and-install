@@ -1,0 +1,254 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+serve(async (req)=>{
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: corsHeaders
+    });
+  }
+  try {
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const githubAppId = Deno.env.get('GITHUB_APP_ID');
+    const githubAppPrivateKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY');
+    const githubClientId = Deno.env.get('GITHUB_CLIENT_ID');
+    const githubClientSecret = Deno.env.get('GITHUB_CLIENT_SECRET');
+    if (!supabaseUrl || !supabaseServiceKey || !githubAppId || !githubAppPrivateKey || !githubClientId || !githubClientSecret) {
+      throw new Error('Missing required environment variables');
+    }
+    // Initialize Supabase client with service role
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Parse request body
+    const body = await req.json();
+    const { code, installation_id, state, intent, redirect_uri } = body;
+    console.log('Processing GitHub auth callback:', {
+      code: code ? 'present' : 'missing',
+      installation_id,
+      hasState: !!state,
+      hasIntent: !!intent
+    });
+    // Step 1: Exchange authorization code for access token
+    console.log('Step 1: Exchanging code for access token');
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: githubClientId,
+        client_secret: githubClientSecret,
+        code,
+        redirect_uri
+      })
+    });
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to exchange code for token: ${tokenResponse.statusText}`);
+    }
+    const tokenData = await tokenResponse.json();
+    if (tokenData.error) {
+      throw new Error(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`);
+    }
+    const accessToken = tokenData.access_token;
+    if (!accessToken) {
+      throw new Error('No access token received from GitHub');
+    }
+    // Step 2: Get user information from GitHub
+    console.log('Step 2: Fetching user info from GitHub');
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch user info: ${userResponse.statusText}`);
+    }
+    const githubUser = await userResponse.json();
+    // Get user's primary email if not public
+    let userEmail = githubUser.email;
+    if (!userEmail) {
+      const emailResponse = await fetch('https://api.github.com/user/emails', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      if (emailResponse.ok) {
+        const emails = await emailResponse.json();
+        const primaryEmail = emails.find((email)=>email.primary);
+        userEmail = primaryEmail?.email || `${githubUser.login}@github.local`;
+      }
+    }
+    if (!userEmail) {
+      userEmail = `${githubUser.login}@github.local`;
+    }
+    console.log('GitHub user info:', {
+      id: githubUser.id,
+      login: githubUser.login,
+      email: userEmail,
+      name: githubUser.name
+    });
+    // Step 3: Create or update Supabase user
+    console.log('Step 3: Creating/updating Supabase user');
+    // Prepare user metadata
+    const userMetadata = {
+      github_id: githubUser.id,
+      login: githubUser.login,
+      name: githubUser.name || githubUser.login,
+      avatar_url: githubUser.avatar_url,
+      bio: githubUser.bio,
+      location: githubUser.location,
+      company: githubUser.company,
+      provider: 'github'
+    };
+    // Create user in Supabase Auth using Admin API
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: userEmail,
+      email_confirm: true,
+      user_metadata: userMetadata,
+      app_metadata: {
+        provider: 'github',
+        github_id: githubUser.id
+      }
+    });
+    let supabaseUser = authData.user;
+    if (authError) {
+      // If user already exists, try to get them instead
+      if (authError.message.includes('already registered')) {
+        console.log('User already exists, looking up existing user');
+        // Try to find existing user by email
+        const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
+        if (!lookupError && existingUsers.users) {
+          supabaseUser = existingUsers.users.find((u)=>u.email === userEmail || u.user_metadata?.github_id === githubUser.id) || null;
+        }
+        if (!supabaseUser) {
+          throw new Error('User exists but could not be found for login');
+        }
+        // Update user metadata
+        const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
+          user_metadata: userMetadata
+        });
+        if (updateError) {
+          console.warn('Failed to update user metadata:', updateError);
+        } else {
+          supabaseUser = updateData.user;
+        }
+      } else {
+        throw new Error(`Failed to create user: ${authError.message}`);
+      }
+    }
+    if (!supabaseUser) {
+      throw new Error('Failed to create or retrieve user');
+    }
+    console.log('Supabase user created/retrieved:', supabaseUser.id);
+    // Step 4: Create user profile
+    console.log('Step 4: Creating user profile');
+    const userName = intent?.name || githubUser.name || githubUser.login || 'User';
+    const userRole = intent?.role || 'developer';
+    const { error: profileError } = await supabaseAdmin.rpc('create_user_profile', {
+      user_id: supabaseUser.id,
+      user_email: userEmail,
+      user_name: userName,
+      user_role: userRole,
+      company_name: intent?.company_name || ''
+    });
+    if (profileError) {
+      console.warn('Profile creation RPC failed:', profileError);
+      // Try direct insert as fallback
+      const { error: insertError } = await supabaseAdmin.from('users').upsert({
+        id: supabaseUser.id,
+        email: userEmail,
+        name: userName,
+        role: userRole,
+        is_approved: userRole === 'developer',
+        company_name: userRole === 'recruiter' ? intent?.company_name || '' : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
+      });
+      if (insertError) {
+        throw new Error(`Failed to create user profile: ${insertError.message}`);
+      }
+    }
+    // Step 5: Create developer profile if user is a developer
+    let developerProfile = null;
+    if (userRole === 'developer') {
+      console.log('Step 5: Creating developer profile');
+      const developerData = {
+        user_id: supabaseUser.id,
+        github_handle: githubUser.login,
+        bio: githubUser.bio || '',
+        location: githubUser.location || '',
+        profile_pic_url: githubUser.avatar_url,
+        github_installation_id: installation_id ? parseInt(installation_id) : null,
+        availability: true
+      };
+      const { data: devProfile, error: devError } = await supabaseAdmin.from('developers').upsert(developerData, {
+        onConflict: 'user_id'
+      }).select().single();
+      if (devError) {
+        console.warn('Developer profile creation failed:', devError);
+      } else {
+        developerProfile = devProfile;
+        console.log('Developer profile created:', devProfile.id);
+      }
+    }
+    // Step 6: Generate session for the user
+    console.log('Step 6: Generating user session');
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userEmail
+    });
+    if (sessionError) {
+      throw new Error(`Failed to generate session: ${sessionError.message}`);
+    }
+    // Extract the session from the magic link
+    const url = new URL(sessionData.properties.action_link);
+    const accessTokenParam = url.searchParams.get('access_token');
+    const refreshTokenParam = url.searchParams.get('refresh_token');
+    if (!accessTokenParam || !refreshTokenParam) {
+      throw new Error('Failed to extract session tokens');
+    }
+    console.log('Authentication flow completed successfully');
+    return new Response(JSON.stringify({
+      success: true,
+      user: {
+        id: supabaseUser.id,
+        email: userEmail,
+        name: userName,
+        role: userRole
+      },
+      session: {
+        access_token: accessTokenParam,
+        refresh_token: refreshTokenParam
+      },
+      developer_profile: developerProfile,
+      installation_id: installation_id
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('GitHub auth error:', error);
+    return new Response(JSON.stringify({
+      error: error.message || 'Authentication failed',
+      details: error.stack
+    }), {
+      status: 400,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+});
