@@ -108,8 +108,8 @@ export const SignupForm = () => {
       localStorage.setItem('gittalent_signup_name', formData.name);
       localStorage.setItem('gittalent_signup_role', formData.role);
       
-      // Call signInWithGitHub which will handle the redirect to GitHub App installation
-      await signInWithGitHub();
+      // FIXED: Pass true for new user signup
+      await signInWithGitHub(true);
       // Navigation will be handled by the redirect
     } catch (error: any) {
       console.error('GitHub signup error:', error);
