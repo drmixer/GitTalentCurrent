@@ -148,117 +148,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchDeveloperProfile = useCallback(async (userId: string, currentDeveloperProfile: Developer | null | undefined): Promise<Developer | null> => {
     try {
       const { data: devProfileFromDb, error } = await supabase.from('developers').select('*').eq('user_id', userId).single();
+      
       if (error) {
-        console.error("Error updating assignment status:", error.message, error.details);
-        throw error;
-      }
-
-      console.log(`Assignment ${assignmentId} status updated to ${newStatus}.`);
-      return { data, error: null };
-    } catch (error: any) {
-      console.error("Caught error in updateAssignmentStatus:", error.message);
-      return { data: null, error };
-    }
-  };
-
-  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
-    try {
-      if (!user) {
-        throw new Error('User must be authenticated to update approval status');
-      }
-
-      if (isApproved) {
-        const { data, error } = await supabase.functions.invoke('approve-recruiter', {
-          body: { userId },
-        });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
-
-        return data.success;
-      } else {
-        const { error } = await supabase.from('users').delete().eq('id', userId);
-        if (error) {
-          console.error("Error deleting user:", error);
-          return false;
-        }
-        return true;
-      }
-    } catch (error: any) {
-      console.error("Caught error in updateUserApprovalStatus:", error);
-      return false;
-    }
-  };
-
-  const updateProfileStrength = async (userId: string, strength: number): Promise<{ data: any | null; error: any | null }> => {
-    try {
-      if (!user) { throw new Error('User must be authenticated to update profile strength'); }
-      const { data, error } = await supabase.from('users').update({ profile_strength: strength }).eq('id', userId).select().single();
-      if (error) { throw error; }
-      if (userId === user.id) { setUserProfile(data); }
-      return { data, error: null };
-    } catch (error: any) {
-      return { data: null, error };
-    }
-  };
-
-  const refreshProfile = useCallback(async (onComplete?: () => void) => {
-    if (!user) {
-      onComplete?.();
-      return;
-    }
-
-    setLoading(true);
-
-    await supabase.from('users').select('*').eq('id', user.id).then(({ data, error }) => {
-      if (error) console.error("Cache invalidation might not be fully effective:", error);
-    });
-
-    if (onComplete) {
-      setOnRefreshComplete(() => onComplete);
-    }
-
-    setAuthUserToProcess(user);
-    setAuthProcessingEventType('MANUAL_REFRESH');
-  }, [user]);
-
-  const setResolvedDeveloperProfile = useCallback((developerData: Developer) => {
-    console.log('[AuthContext] setResolvedDeveloperProfile called with:', developerData);
-    if (developerData && typeof developerData === 'object' && developerData.user_id) {
-      console.log(`[AuthContext] setResolvedDeveloperProfile: Setting profile. ghInstId from input data: ${developerData.github_installation_id}`);
-      setDeveloperProfile(developerData);
-      setLastProfileUpdateTime(Date.now());
-    } else {
-      console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
-    }
-  }, [setDeveloperProfile, setLastProfileUpdateTime]);
-
-  const value: AuthContextType = {
-    user, session, userProfile, developerProfile, loading, authError, signingOut,
-    lastProfileUpdateTime,
-    signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
-    createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
-    createAssignment,
-    createHire,
-    updateAssignmentStatus,
-    updateUserApprovalStatus, updateProfileStrength,
-    refreshProfile,
-    refreshUserProfile: refreshProfile,
-    setResolvedDeveloperProfile,
-    handleGitHubCallbackSuccess, // Add this new method
-    needsOnboarding: !developerProfile && userProfile?.role === 'developer',
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}; {
         if (error.code === 'PGRST116') {
           console.log('[AuthContext] fetchDeveloperProfile: No record found, setting profile to null.');
           setDeveloperProfile(null);
           setLastProfileUpdateTime(Date.now());
           return null;
         }
-        else { console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
+        else { 
+          console.error(`fetchDeveloperProfile: Error for ${userId}:`, error.message); 
+          setDeveloperProfile(null); 
+          setLastProfileUpdateTime(Date.now()); 
+          return null; 
+        }
       }
+      
       if (!devProfileFromDb) {
         setDeveloperProfile(null);
         setLastProfileUpdateTime(Date.now());
@@ -277,7 +182,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setDeveloperProfile(profileToSet);
       setLastProfileUpdateTime(Date.now());
       return profileToSet;
-    } catch (error) { console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); setDeveloperProfile(null); setLastProfileUpdateTime(Date.now()); return null; }
+    } catch (error) { 
+      console.error(`fetchDeveloperProfile: Unexpected error for ${userId}:`, error); 
+      setDeveloperProfile(null); 
+      setLastProfileUpdateTime(Date.now()); 
+      return null; 
+    }
   }, []);
 
   const fetchUserProfile = useCallback(async (authUser: SupabaseUser): Promise<User | null> => {
@@ -422,6 +332,78 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { error };
     }
   }, []);
+
+  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
+    try {
+      if (!user) {
+        throw new Error('User must be authenticated to update approval status');
+      }
+
+      if (isApproved) {
+        const { data, error } = await supabase.functions.invoke('approve-recruiter', {
+          body: { userId },
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        return data.success;
+      } else {
+        const { error } = await supabase.from('users').delete().eq('id', userId);
+        if (error) {
+          console.error("Error deleting user:", error);
+          return false;
+        }
+        return true;
+      }
+    } catch (error: any) {
+      console.error("Caught error in updateUserApprovalStatus:", error);
+      return false;
+    }
+  };
+
+  const updateProfileStrength = async (userId: string, strength: number): Promise<{ data: any | null; error: any | null }> => {
+    try {
+      if (!user) { throw new Error('User must be authenticated to update profile strength'); }
+      const { data, error } = await supabase.from('users').update({ profile_strength: strength }).eq('id', userId).select().single();
+      if (error) { throw error; }
+      if (userId === user.id) { setUserProfile(data); }
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
+  };
+
+  const refreshProfile = useCallback(async (onComplete?: () => void) => {
+    if (!user) {
+      onComplete?.();
+      return;
+    }
+
+    setLoading(true);
+
+    await supabase.from('users').select('*').eq('id', user.id).then(({ data, error }) => {
+      if (error) console.error("Cache invalidation might not be fully effective:", error);
+    });
+
+    if (onComplete) {
+      setOnRefreshComplete(() => onComplete);
+    }
+
+    setAuthUserToProcess(user);
+    setAuthProcessingEventType('MANUAL_REFRESH');
+  }, [user]);
+
+  const setResolvedDeveloperProfile = useCallback((developerData: Developer) => {
+    console.log('[AuthContext] setResolvedDeveloperProfile called with:', developerData);
+    if (developerData && typeof developerData === 'object' && developerData.user_id) {
+      console.log(`[AuthContext] setResolvedDeveloperProfile: Setting profile. ghInstId from input data: ${developerData.github_installation_id}`);
+      setDeveloperProfile(developerData);
+      setLastProfileUpdateTime(Date.now());
+    } else {
+      console.warn('[AuthContext] setResolvedDeveloperProfile called with invalid data, not setting:', developerData);
+    }
+  }, [setDeveloperProfile, setLastProfileUpdateTime]);
 
   useEffect(() => {
     latestSessionRef.current = JSON.stringify(session);
@@ -737,4 +719,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select()
         .single();
 
-      if (error)
+      if (error) {
+        console.error("Error updating assignment status:", error.message, error.details);
+        throw error;
+      }
+
+      console.log(`Assignment ${assignmentId} status updated to ${newStatus}.`);
+      return { data, error: null };
+    } catch (error: any) {
+      console.error("Caught error in updateAssignmentStatus:", error.message);
+      return { data: null, error };
+    }
+  };
+
+  const value: AuthContextType = {
+    user, session, userProfile, developerProfile, loading, authError, signingOut,
+    lastProfileUpdateTime,
+    signUp, signIn, signInWithGitHub, connectGitHubApp, signOut,
+    createDeveloperProfile, updateDeveloperProfile, createJobRole, updateJobRole,
+    createAssignment,
+    createHire,
+    updateAssignmentStatus,
+    updateUserApprovalStatus, updateProfileStrength,
+    refreshProfile,
+    refreshUserProfile: refreshProfile,
+    setResolvedDeveloperProfile,
+    handleGitHubCallbackSuccess,
+    needsOnboarding: !developerProfile && userProfile?.role === 'developer',
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
