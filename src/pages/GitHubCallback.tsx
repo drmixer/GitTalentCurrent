@@ -10,21 +10,31 @@ export const GitHubCallback: React.FC = () => {
   
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [message, setMessage] = useState('Processing GitHub App authorization...');
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 5;
-  const processingRef = useRef(false);
+  const [hasProcessed, setHasProcessed] = useState(false);
+  const processedRef = useRef(false);
 
   useEffect(() => {
+    // Clean up URL immediately to prevent reprocessing
+    const code = searchParams.get('code');
+    const installationId = searchParams.get('installation_id');
+    const stateParam = searchParams.get('state');
+
+    // Clear URL parameters immediately to prevent re-runs
+    if (code && !hasProcessed) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const processGitHubCallback = async () => {
-      if (processingRef.current) return;
-      processingRef.current = true;
+      // Prevent multiple processing attempts
+      if (processedRef.current || hasProcessed) {
+        console.log('[GitHubCallback] Already processed, skipping');
+        return;
+      }
+
+      processedRef.current = true;
+      setHasProcessed(true);
 
       try {
-        // Extract parameters from URL
-        const code = searchParams.get('code');
-        const installationId = searchParams.get('installation_id');
-        const stateParam = searchParams.get('state');
-        
         console.log('[GitHubCallback] Processing callback with:', {
           code: code ? 'present' : 'missing',
           installationId,
@@ -53,7 +63,7 @@ export const GitHubCallback: React.FC = () => {
         if (intentDataString) {
           try {
             intentData = JSON.parse(intentDataString);
-            localStorage.removeItem('github_auth_intent'); // Clean up
+            localStorage.removeItem('github_auth_intent'); // Clean up immediately
           } catch (e) {
             console.warn('[GitHubCallback] Failed to parse intent data:', e);
           }
@@ -61,19 +71,15 @@ export const GitHubCallback: React.FC = () => {
 
         setMessage('Exchanging authorization code for access token...');
 
-        // Get Supabase URL from environment variables
+        // Get Supabase configuration
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        if (!supabaseUrl) {
-          throw new Error('Supabase URL not configured');
-        }
-
-        // Get Supabase anon key from environment variables
         const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        if (!supabaseAnonKey) {
-          throw new Error('Supabase anon key not configured');
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error('Supabase configuration missing');
         }
 
-        // Call the new edge function to handle authentication and profile creation
+        // Call the edge function
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/github-auth-and-install`;
         console.log('[GitHubCallback] Calling edge function:', edgeFunctionUrl);
 
@@ -111,14 +117,12 @@ export const GitHubCallback: React.FC = () => {
 
         setMessage('Authentication successful! Setting up your profile...');
 
-        // Wait for AuthContext to process the new session
+        // Handle the response based on whether we got a session
         if (result.session && result.user) {
-          // The edge function should have created the Supabase session
-          // Wait a moment for the auth state to propagate
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // We have a valid session, set up the user
+          console.log('[GitHubCallback] Session received, setting up user');
           
           if (result.developer_profile) {
-            // Update the developer profile in AuthContext
             setResolvedDeveloperProfile(result.developer_profile);
           }
 
@@ -130,37 +134,60 @@ export const GitHubCallback: React.FC = () => {
           setTimeout(() => {
             navigate(targetPath, { replace: true });
           }, 2000);
+
+        } else if (result.user && result.message) {
+          // User was created but no session was provided
+          console.log('[GitHubCallback] User created but no session, redirecting to login');
+          
+          setStatus('success');
+          setMessage('Account created successfully! Please sign in with your email to continue.');
+          
+          // Store user info for potential auto-fill on login page
+          sessionStorage.setItem('github_auth_email', result.user.email);
+          
+          setTimeout(() => {
+            navigate('/login?message=Please sign in with your email to complete setup', { replace: true });
+          }, 3000);
+
         } else {
-          throw new Error('Authentication succeeded but session was not created properly');
+          throw new Error('Unexpected response format from authentication service');
         }
 
       } catch (error: any) {
         console.error('[GitHubCallback] Error processing callback:', error);
         setStatus('error');
-        setMessage(error.message || 'An unexpected error occurred during authentication');
         
-        // Offer retry or redirect to login
-        setTimeout(() => {
-          if (retryCount < maxRetries) {
-            setRetryCount(prev => prev + 1);
-            setStatus('processing');
-            setMessage(`Retrying authentication... (Attempt ${retryCount + 1}/${maxRetries})`);
-            processingRef.current = false;
-          } else {
-            setMessage('Authentication failed after multiple attempts. Please try again.');
-          }
-        }, 3000);
+        // Handle specific error cases
+        if (error.message.includes('code passed is incorrect or expired')) {
+          setMessage('The GitHub authorization code has expired. Please try signing in again.');
+        } else if (error.message.includes('already registered')) {
+          setMessage('This GitHub account is already registered. Please sign in with your email.');
+          setTimeout(() => {
+            navigate('/login?message=Account already exists, please sign in', { replace: true });
+          }, 3000);
+          return;
+        } else {
+          setMessage(error.message || 'An unexpected error occurred during authentication');
+        }
       }
     };
 
-    processGitHubCallback();
-  }, [searchParams, navigate, setResolvedDeveloperProfile, retryCount]);
+    // Only process if we have a code and haven't processed yet
+    if (code && !hasProcessed) {
+      processGitHubCallback();
+    }
+  }, []); // Empty dependency array to run only once
 
   const handleRetry = () => {
-    setRetryCount(0);
     setStatus('processing');
-    setMessage('Retrying GitHub authentication...');
-    processingRef.current = false;
+    setMessage('Redirecting to GitHub for authentication...');
+    
+    // Clear any stored state and redirect to start over
+    localStorage.removeItem('github_auth_intent');
+    sessionStorage.removeItem('github_auth_email');
+    
+    // Redirect to login page to start the flow again
+    navigate('/login', { replace: true });
   };
 
   const handleReturnToLogin = () => {
@@ -211,7 +238,7 @@ export const GitHubCallback: React.FC = () => {
             {message}
           </p>
 
-          {status === 'error' && retryCount >= maxRetries && (
+          {status === 'error' && (
             <div className="space-y-4">
               <button
                 onClick={handleRetry}
@@ -225,12 +252,6 @@ export const GitHubCallback: React.FC = () => {
               >
                 Return to Login
               </button>
-            </div>
-          )}
-
-          {status === 'processing' && retryCount > 0 && (
-            <div className="text-sm text-gray-500">
-              Attempt {retryCount} of {maxRetries}
             </div>
           )}
         </div>
