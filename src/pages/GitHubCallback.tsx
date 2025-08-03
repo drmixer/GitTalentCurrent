@@ -67,6 +67,12 @@ export const GitHubCallback: React.FC = () => {
           throw new Error('Supabase URL not configured');
         }
 
+        // Get Supabase anon key from environment variables
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!supabaseAnonKey) {
+          throw new Error('Supabase anon key not configured');
+        }
+
         // Call the new edge function to handle authentication and profile creation
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/github-auth-and-install`;
         console.log('[GitHubCallback] Calling edge function:', edgeFunctionUrl);
@@ -75,6 +81,7 @@ export const GitHubCallback: React.FC = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
           },
           body: JSON.stringify({
             code,
