@@ -238,14 +238,15 @@ serve(async (req) => {
       }
     }
 
-    // Step 6: Generate session for the user (IMPROVED)
+    // Step 6: Generate session for the user (CORRECTED VERSION)
     console.log('Step 6: Generating user session');
 
     let sessionResponse = null;
 
     try {
-      // Method 1: Try creating a session using admin generateLink
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      // Generate magic link using admin client
+      console.log('Generating magic link for session creation');
+      const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: userEmail,
         options: {
@@ -253,54 +254,64 @@ serve(async (req) => {
         }
       });
 
-      if (!linkError && linkData?.properties?.hashed_token) {
-        // Try to exchange the hashed token for a session
+      if (magicLinkError) {
+        console.warn('Magic link generation failed:', magicLinkError);
+      } else if (magicLinkData?.properties?.hashed_token) {
+        console.log('Magic link generated successfully, verifying token');
+        
+        // Verify the OTP token to create a session
         const { data: verifyData, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
-          email: userEmail,
-          token: linkData.properties.hashed_token,
-          type: 'magiclink'
+          token_hash: magicLinkData.properties.hashed_token,
+          type: 'email'
         });
 
-        if (!verifyError && verifyData.session) {
+        if (verifyError) {
+          console.warn('Token verification failed:', verifyError);
+        } else if (verifyData.session) {
           sessionResponse = verifyData.session;
-          console.log('Successfully created session via magic link');
+          console.log('Successfully created session via magic link verification');
+        } else {
+          console.warn('Token verification succeeded but no session returned');
         }
+      } else {
+        console.warn('Magic link generated but no hashed_token received');
       }
-    } catch (linkError) {
-      console.warn('Magic link method failed:', linkError);
+    } catch (error) {
+      console.warn('Magic link session creation failed:', error);
     }
 
-    // Method 2: If magic link failed, try direct token generation
+    // Alternative method: Generate invite link if magic link fails
     if (!sessionResponse) {
-      console.log('Using alternative session creation approach');
+      console.log('Trying alternative session creation with invite link');
       
       try {
-        // Generate tokens manually using admin API
-        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'signup',
-          email: userEmail
+        const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'invite',
+          email: userEmail,
+          options: {
+            redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
+          }
         });
 
-        if (!sessionError && sessionData?.properties?.action_link) {
-          // Extract tokens from the action link
-          const url = new URL(sessionData.properties.action_link);
-          const accessTokenParam = url.searchParams.get('access_token');
-          const refreshTokenParam = url.searchParams.get('refresh_token');
+        if (!inviteError && inviteData?.properties?.hashed_token) {
+          console.log('Invite link generated, verifying token');
+          
+          const { data: verifyInviteData, error: verifyInviteError } = await supabaseAdmin.auth.verifyOtp({
+            token_hash: inviteData.properties.hashed_token,
+            type: 'invite'
+          });
 
-          if (accessTokenParam && refreshTokenParam) {
-            sessionResponse = {
-              access_token: accessTokenParam,
-              refresh_token: refreshTokenParam,
-              expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-              expires_in: 3600,
-              token_type: 'bearer',
-              user: supabaseUser
-            };
-            console.log('Successfully created session via signup link');
+          if (!verifyInviteError && verifyInviteData.session) {
+            sessionResponse = verifyInviteData.session;
+            console.log('Successfully created session via invite verification');
+          } else {
+            console.warn('Invite verification failed:', verifyInviteError);
           }
+        } else {
+          console.warn('Invite link generation failed:', inviteError);
         }
       } catch (altError) {
-        console.warn('Alternative session creation failed:', altError);
+        console.warn('Invite method also failed:', altError);
       }
     }
 
