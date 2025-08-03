@@ -83,6 +83,8 @@ export interface AuthContextType {
   importJobsFromCSV?: (jobsData: Partial<JobRole>[]) => Promise<{success: number, failed: number}>;
   createHire?: (hireData: Partial<Hire>) => Promise<boolean>;
   updateUserApprovalStatus?: (userId: string, isApproved: boolean) => Promise<boolean>;
+  // NEW: Add the GitHub callback success handler
+  handleGitHubCallbackSuccess?: (sessionData: any, developerProfileData?: any) => Promise<{ success?: boolean; error?: any }>;
 }
 
 export interface Developer {
