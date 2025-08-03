@@ -524,46 +524,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // UPDATED: signInWithGitHub now redirects to GitHub App instead of Supabase OAuth
-  const signInWithGitHub = async (stateParams?: Record<string, any>) => {
+  // FIXED: signInWithGitHub now differentiates between signup and login
+  const signInWithGitHub = async (isSignup: boolean = false, stateParams?: Record<string, any>) => {
     setAuthError(null);
     setLoading(true);
     
     const name = localStorage.getItem('gittalent_signup_name') || '';
     const role = localStorage.getItem('gittalent_signup_role') || 'developer';
     
-    // Store intent data for the new GitHub App callback to use
+    // Store intent data for the GitHub callback to use
     const intentData = {
       name,
       role: role || 'developer',
       ...(stateParams || {})
     };
     localStorage.setItem('github_auth_intent', JSON.stringify(intentData));
-    console.log('[AuthContext] signInWithGitHub: Stored github_auth_intent:', intentData);
+    console.log(`[AuthContext] signInWithGitHub: ${isSignup ? 'Signup' : 'Login'} flow - Stored github_auth_intent:`, intentData);
 
     try {
-      // Redirect directly to GitHub App instead of Supabase OAuth
       const baseUrl = window.location.origin;
       const redirectUri = `${baseUrl}/auth/github-callback`;
       
-      // GitHub App ID from environment variables
-      const githubAppId = import.meta.env.VITE_GITHUB_APP_ID || process.env.GITHUB_APP_ID;
-      if (!githubAppId) {
-        throw new Error('GitHub App ID not configured');
-      }
-
       // Construct state parameter with our application data
       const stateData = {
         redirect_uri: redirectUri,
         intent: intentData,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        flow_type: isSignup ? 'signup' : 'login'
       };
       const stateParam = encodeURIComponent(JSON.stringify(stateData));
       
-      // Redirect to GitHub App installation/authorization
-      const githubUrl = `https://github.com/apps/gittalentapp/installations/new?state=${stateParam}`;
+      let githubUrl: string;
       
-      console.log('[AuthContext] signInWithGitHub: Redirecting to GitHub App:', githubUrl);
+      if (isSignup) {
+        // NEW USERS: GitHub App installation (gets repository access + authentication)
+        githubUrl = `https://github.com/apps/gittalentapp/installations/new?state=${stateParam}`;
+        console.log('[AuthContext] signInWithGitHub: SIGNUP flow - Redirecting to GitHub App installation:', githubUrl);
+      } else {
+        // EXISTING USERS: Direct OAuth authorization (ACTUALLY AUTHENTICATES)
+        const githubClientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+        if (!githubClientId) {
+          throw new Error('GitHub Client ID not configured');
+        }
+        githubUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${stateParam}&scope=read:user user:email`;
+        console.log('[AuthContext] signInWithGitHub: LOGIN flow - Redirecting to GitHub OAuth authorization:', githubUrl);
+      }
+      
       window.location.href = githubUrl;
       
       return { error: null };
