@@ -128,48 +128,46 @@ serve(async (req) => {
       provider: 'github'
     };
 
-    // Create user in Supabase Auth using Admin API
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: userEmail,
-      email_confirm: true,
-      user_metadata: userMetadata,
-      app_metadata: {
-        provider: 'github',
-        github_id: githubUser.id
-      }
-    });
+    // First check if user already exists
+    const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
+    let supabaseUser = null;
+    
+    if (!lookupError && existingUsers.users) {
+      supabaseUser = existingUsers.users.find((u) => 
+        u.email === userEmail || u.user_metadata?.github_id === githubUser.id
+      );
+    }
 
-    let supabaseUser = authData.user;
+    if (supabaseUser) {
+      console.log('User already exists, updating metadata:', supabaseUser.id);
+      // Update existing user metadata
+      const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
+        user_metadata: userMetadata
+      });
 
-    if (authError) {
-      // If user already exists, try to get them instead
-      if (authError.message.includes('already registered')) {
-        console.log('User already exists, looking up existing user');
-        // Try to find existing user by email
-        const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
-        if (!lookupError && existingUsers.users) {
-          supabaseUser = existingUsers.users.find((u) => 
-            u.email === userEmail || u.user_metadata?.github_id === githubUser.id
-          ) || null;
-        }
-
-        if (!supabaseUser) {
-          throw new Error('User exists but could not be found for login');
-        }
-
-        // Update user metadata
-        const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
-          user_metadata: userMetadata
-        });
-
-        if (updateError) {
-          console.warn('Failed to update user metadata:', updateError);
-        } else {
-          supabaseUser = updateData.user;
-        }
+      if (updateError) {
+        console.warn('Failed to update user metadata:', updateError);
       } else {
+        supabaseUser = updateData.user;
+      }
+    } else {
+      console.log('Creating new user');
+      // Create new user in Supabase Auth using Admin API
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: userEmail,
+        email_confirm: true,
+        user_metadata: userMetadata,
+        app_metadata: {
+          provider: 'github',
+          github_id: githubUser.id
+        }
+      });
+
+      if (authError) {
         throw new Error(`Failed to create user: ${authError.message}`);
       }
+
+      supabaseUser = authData.user;
     }
 
     if (!supabaseUser) {
@@ -240,69 +238,69 @@ serve(async (req) => {
       }
     }
 
-    // Step 6: Generate session for the user (FIXED)
+    // Step 6: Generate session for the user (IMPROVED)
     console.log('Step 6: Generating user session');
 
-    // Create a temporary password for the user
-    const tempPassword = 'temp-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    let sessionResponse = null;
 
-    // Update user with temporary password
-    const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
-      password: tempPassword
-    });
+    try {
+      // Method 1: Try creating a session using admin generateLink
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: userEmail,
+        options: {
+          redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
+        }
+      });
 
-    if (passwordError) {
-      console.warn('Failed to set temporary password:', passwordError);
+      if (!linkError && linkData?.properties?.hashed_token) {
+        // Try to exchange the hashed token for a session
+        const { data: verifyData, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
+          email: userEmail,
+          token: linkData.properties.hashed_token,
+          type: 'magiclink'
+        });
+
+        if (!verifyError && verifyData.session) {
+          sessionResponse = verifyData.session;
+          console.log('Successfully created session via magic link');
+        }
+      }
+    } catch (linkError) {
+      console.warn('Magic link method failed:', linkError);
     }
 
-    // Create session using admin API
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
-      email: userEmail,
-      options: {
-        data: userMetadata,
-        redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
-      }
-    });
-
-    let accessTokenParam = null;
-    let refreshTokenParam = null;
-
-    if (sessionData?.properties?.action_link) {
-      try {
-        const url = new URL(sessionData.properties.action_link);
-        accessTokenParam = url.searchParams.get('access_token');
-        refreshTokenParam = url.searchParams.get('refresh_token');
-      } catch (linkError) {
-        console.warn('Failed to parse action link:', linkError);
-      }
-    }
-
-    // If magic link approach failed, try direct session creation
-    if (!accessTokenParam || !refreshTokenParam) {
+    // Method 2: If magic link failed, try direct token generation
+    if (!sessionResponse) {
       console.log('Using alternative session creation approach');
       
-      // Try to create a session directly using signInWithPassword
-      if (!passwordError) {
-        try {
-          // Create a regular supabase client for sign in
-          const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
-          
-          const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-            email: userEmail,
-            password: tempPassword
-          });
+      try {
+        // Generate tokens manually using admin API
+        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'signup',
+          email: userEmail
+        });
 
-          if (!signInError && signInData.session) {
-            accessTokenParam = signInData.session.access_token;
-            refreshTokenParam = signInData.session.refresh_token;
-            console.log('Successfully created session via sign in');
-          } else {
-            console.warn('Sign in failed:', signInError);
+        if (!sessionError && sessionData?.properties?.action_link) {
+          // Extract tokens from the action link
+          const url = new URL(sessionData.properties.action_link);
+          const accessTokenParam = url.searchParams.get('access_token');
+          const refreshTokenParam = url.searchParams.get('refresh_token');
+
+          if (accessTokenParam && refreshTokenParam) {
+            sessionResponse = {
+              access_token: accessTokenParam,
+              refresh_token: refreshTokenParam,
+              expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+              expires_in: 3600,
+              token_type: 'bearer',
+              user: supabaseUser
+            };
+            console.log('Successfully created session via signup link');
           }
-        } catch (signInError) {
-          console.warn('Exception during sign in:', signInError);
         }
+      } catch (altError) {
+        console.warn('Alternative session creation failed:', altError);
       }
     }
 
@@ -320,11 +318,14 @@ serve(async (req) => {
       installation_id: installation_id
     };
 
-    // Only include session if we have valid tokens
-    if (accessTokenParam && refreshTokenParam) {
+    // Include session if we have valid tokens
+    if (sessionResponse?.access_token && sessionResponse?.refresh_token) {
       response.session = {
-        access_token: accessTokenParam,
-        refresh_token: refreshTokenParam
+        access_token: sessionResponse.access_token,
+        refresh_token: sessionResponse.refresh_token,
+        expires_at: sessionResponse.expires_at,
+        expires_in: sessionResponse.expires_in,
+        token_type: sessionResponse.token_type || 'bearer'
       };
       console.log('Session tokens included in response');
     } else {
