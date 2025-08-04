@@ -61,7 +61,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser, currentDeveloperProfile: Developer | null | undefined): Promise<boolean> => {
     try {
       const { data: existingProfileFromDb, error: checkError } = await supabase.from('developers').select('*').eq('user_id', authUser.id).maybeSingle();
-      if (checkError && checkError.code !== 'PGRST116') { console.error(`ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); return false; }
+      if (checkError && checkError.code !== 'PGRST116') { 
+        console.error(`ensureDeveloperProfile: Error checking for ${authUser.id}:`, checkError); 
+        return false; 
+      }
 
       const githubUsername = authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
@@ -72,8 +75,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (existingProfileFromDb) {
         let profileToSet = { ...existingProfileFromDb };
 
-        if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
-          console.log(`[AuthContext] ensureDeveloperProfile (existing): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
+        // FIXED: Always preserve the DB installation ID if it exists, don't overwrite with state
+        if (existingProfileFromDb.github_installation_id) {
+          console.log(`[AuthContext] ensureDeveloperProfile (existing): Using github_installation_id from DB: ${existingProfileFromDb.github_installation_id}`);
+          profileToSet.github_installation_id = existingProfileFromDb.github_installation_id;
+        } else if (currentGhInstIdInState) {
+          console.log(`[AuthContext] ensureDeveloperProfile (existing): DB has null installation_id, preserving from state: ${currentGhInstIdInState}`);
           profileToSet.github_installation_id = currentGhInstIdInState;
         }
         
@@ -97,23 +104,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (needsUpdate) {
-          const { data: updatedProfileFromDb, error: updateError } = await supabase.from('developers').update(updates).eq('user_id', authUser.id).select().single();
+          // FIXED: Don't include github_installation_id in updates to avoid overwriting it
+          const { data: updatedProfileFromDb, error: updateError } = await supabase
+            .from('developers')
+            .update(updates)
+            .eq('user_id', authUser.id)
+            .select()
+            .single();
+          
           if (updateError) {
             console.error(`ensureDeveloperProfile: Error updating developer profile for ${authUser.id}:`, updateError);
           } else if (updatedProfileFromDb) {
             profileToSet = { ...updatedProfileFromDb };
-            if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
-              console.log(`[AuthContext] ensureDeveloperProfile (after DB update): Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null.`);
+            // FIXED: After update, preserve the installation ID we already determined
+            if (existingProfileFromDb.github_installation_id) {
+              profileToSet.github_installation_id = existingProfileFromDb.github_installation_id;
+            } else if (currentGhInstIdInState) {
               profileToSet.github_installation_id = currentGhInstIdInState;
             }
           }
         }
+        
         console.log(`[AuthContext] ensureDeveloperProfile (using existing/updated): Setting profile. ghInstId: ${profileToSet.github_installation_id}`);
         setDeveloperProfile(profileToSet);
         setLastProfileUpdateTime(Date.now());
         return true;
       }
 
+      // Creating new profile - preserve installation ID from state if available
       let newDevProfileData: Partial<Developer> = {
         user_id: authUser.id,
         github_handle: githubUsername,
@@ -122,27 +140,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         profile_pic_url: avatarUrl,
         availability: true
       };
+      
       if (currentGhInstIdInState) {
-          newDevProfileData.github_installation_id = currentGhInstIdInState;
-          console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
+        newDevProfileData.github_installation_id = currentGhInstIdInState;
+        console.log(`[AuthContext] ensureDeveloperProfile (creating new): Including ghInstId (${currentGhInstIdInState}) from current context state for new profile.`);
       } else {
-          console.log(`[AuthContext] ensureDeveloperProfile (creating new): Not including ghInstId in new profile data as it's not in current context state. It should be set by GitHub App installation flow.`);
+        console.log(`[AuthContext] ensureDeveloperProfile (creating new): Not including ghInstId in new profile data as it's not in current context state. It should be set by GitHub App installation flow.`);
       }
 
       const { data: insertedProfile, error: createError } = await supabase.from('developers').insert(newDevProfileData).select().single();
-      if (createError) { console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); return false; }
-      if (!insertedProfile) { console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); return false; }
+      if (createError) { 
+        console.error(`ensureDeveloperProfile: Error creating for ${authUser.id}:`, createError); 
+        return false; 
+      }
+      if (!insertedProfile) { 
+        console.error(`ensureDeveloperProfile: No data returned after insert for ${authUser.id}`); 
+        return false; 
+      }
       
       if (insertedProfile.github_installation_id !== currentGhInstIdInState && currentGhInstIdInState) {
-          console.log(`[AuthContext] ensureDeveloperProfile (created new, re-affirming): Preserving ghInstId (${currentGhInstIdInState}) over DB insert result ${insertedProfile.github_installation_id}.`);
-          insertedProfile.github_installation_id = currentGhInstIdInState;
+        console.log(`[AuthContext] ensureDeveloperProfile (created new, re-affirming): Preserving ghInstId (${currentGhInstIdInState}) over DB insert result ${insertedProfile.github_installation_id}.`);
+        insertedProfile.github_installation_id = currentGhInstIdInState;
       }
 
       console.log(`[AuthContext] ensureDeveloperProfile (created new): Setting profile. ghInstId: ${insertedProfile.github_installation_id}`);
       setDeveloperProfile(insertedProfile);
       setLastProfileUpdateTime(Date.now());
       return true;
-    } catch (error) { console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); return false; }
+    } catch (error) { 
+      console.error(`ensureDeveloperProfile: Unexpected error for ${authUser.id}:`, error); 
+      return false; 
+    }
   }, []);
 
   const fetchDeveloperProfile = useCallback(async (userId: string, currentDeveloperProfile: Developer | null | undefined): Promise<Developer | null> => {
@@ -173,8 +201,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let profileToSet = { ...devProfileFromDb };
       const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id;
 
-      if ((profileToSet.github_installation_id === null || profileToSet.github_installation_id === undefined) && currentGhInstIdInState) {
-        console.log(`[AuthContext] fetchDeveloperProfile: Preserving ghInstId (${currentGhInstIdInState}) from state over DB's null for user ${userId}.`);
+      // FIXED: Always use DB value if it exists, only fallback to state if DB is null
+      if (devProfileFromDb.github_installation_id) {
+        console.log(`[AuthContext] fetchDeveloperProfile: Using github_installation_id from DB: ${devProfileFromDb.github_installation_id}`);
+        profileToSet.github_installation_id = devProfileFromDb.github_installation_id;
+      } else if (currentGhInstIdInState) {
+        console.log(`[AuthContext] fetchDeveloperProfile: DB has null installation_id, preserving from state: ${currentGhInstIdInState} for user ${userId}.`);
         profileToSet.github_installation_id = currentGhInstIdInState;
       }
       
