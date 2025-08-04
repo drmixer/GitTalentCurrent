@@ -91,13 +91,32 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   }
 
   const isDashboardSnippet = displayMode === 'dashboardSnippet';
-  // Ensure contributions is an array before slicing or reducing
-  const contributions = Array.isArray(gitHubData.contributions) ? gitHubData.contributions : [];
+  
+  // FIXED: Handle both old array format and new object format for contributions
+  let contributions = [];
+  if (Array.isArray(gitHubData.contributions)) {
+    // Old format: direct array
+    contributions = gitHubData.contributions;
+  } else if (gitHubData.contributions && Array.isArray(gitHubData.contributions.calendar)) {
+    // New format: object with calendar property
+    contributions = gitHubData.contributions.calendar.map(day => ({
+      count: day.contributionCount || day.count || 0,
+      level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4), // Convert count to level (0-4)
+      date: day.date
+    }));
+  }
+  
   const contributionsToDisplay = isDashboardSnippet
     ? contributions.slice(-84)
     : contributions;
 
-  const totalContributionsForDisplay = contributionsToDisplay.reduce((sum, day) => sum + day.count, 0);
+  // Use totalContributions from the new format if available, otherwise calculate
+  let totalContributionsForDisplay;
+  if (gitHubData.contributions && typeof gitHubData.contributions === 'object' && gitHubData.contributions.totalContributions) {
+    totalContributionsForDisplay = gitHubData.contributions.totalContributions;
+  } else {
+    totalContributionsForDisplay = contributionsToDisplay.reduce((sum, day) => sum + (day.count || 0), 0);
+  }
 
   // If we have data, render the GitHub contribution chart
   return (
@@ -139,36 +158,43 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
       </div>
 
       {/* Contribution Graph */}
-      <div className="mb-6">
-        <div className={`grid ${isDashboardSnippet ? 'grid-cols-12' : 'grid-cols-53'} gap-1 mb-3`}>
-          {contributionsToDisplay.map((day, index) => (
-            <div
-              key={index}
-              className={`w-3 h-3 rounded-sm ${getContributionColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
-              title={getContributionTooltipText(day)}
-            />
-          ))}
-        </div>
-        
-        {/* Legend */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="font-medium">Less</span>
-          <div className="flex items-center space-x-1">
-            <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
-            <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+      {contributions.length > 0 ? (
+        <div className="mb-6">
+          <div className={`grid ${isDashboardSnippet ? 'grid-cols-12' : 'grid-cols-53'} gap-1 mb-3`}>
+            {contributionsToDisplay.map((day, index) => (
+              <div
+                key={index}
+                className={`w-3 h-3 rounded-sm ${getContributionColorClass(day.level)} hover:ring-2 hover:ring-emerald-400 cursor-pointer transition-all duration-200 hover:scale-110`}
+                title={getContributionTooltipText(day)}
+              />
+            ))}
           </div>
-          <span className="font-medium">More</span>
+          
+          {/* Legend */}
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span className="font-medium">Less</span>
+            <div className="flex items-center space-x-1">
+              <div className="w-2.5 h-2.5 bg-gray-100 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-200 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-300 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm"></div>
+            </div>
+            <span className="font-medium">More</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mb-6 text-center py-8">
+          <Github className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+          <p className="text-gray-500 text-sm">No contribution data available</p>
+        </div>
+      )}
 
       {/* Stats */}
       {isDashboardSnippet ? (
         <div className="grid grid-cols-3 gap-4 mb-6 text-center">
            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100">
-            <div className="text-2xl font-black text-gray-900">{gitHubData.repos.length}</div>
+            <div className="text-2xl font-black text-gray-900">{gitHubData.repos?.length || 0}</div>
             <div className="text-xs font-semibold text-gray-600" title="Repositories">Repos</div>
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 border border-purple-100">
@@ -178,7 +204,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
           <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-3 border border-yellow-100">
              <div className="flex items-center justify-center">
                 <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                <div className="text-2xl font-black text-gray-900">{gitHubData.totalStars}</div>
+                <div className="text-2xl font-black text-gray-900">{gitHubData.totalStars || 0}</div>
               </div>
             <div className="text-xs font-semibold text-gray-600">Stars Earned</div>
           </div>
@@ -212,11 +238,11 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
             <div className="flex items-center space-x-4 text-xs text-gray-500">
               <div className="flex items-center">
                 <Star className="w-3 h-3 mr-1 text-yellow-500" />
-                <span className="font-medium">{gitHubData.totalStars} stars</span>
+                <span className="font-medium">{gitHubData.totalStars || 0} stars</span>
               </div>
               <div className="flex items-center">
                 <GitFork className="w-3 h-3 mr-1" />
-                <span className="font-medium">{gitHubData.repos.length} repos</span>
+                <span className="font-medium">{gitHubData.repos?.length || 0} repos</span>
               </div>
             </div>
           </div>
