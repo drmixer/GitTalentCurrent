@@ -94,29 +94,39 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   
   // FIXED: Handle both old array format and new object format for contributions
   let contributions = [];
-  if (Array.isArray(gitHubData.contributions)) {
-    // Old format: direct array
-    contributions = gitHubData.contributions;
-  } else if (gitHubData.contributions && Array.isArray(gitHubData.contributions.calendar)) {
-    // New format: object with calendar property
-    contributions = gitHubData.contributions.calendar.map(day => ({
-      count: day.contributionCount || day.count || 0,
-      level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4), // Convert count to level (0-4)
-      date: day.date
-    }));
+  let totalContributionsFromAPI = 0;
+  
+  if (gitHubData.contributions) {
+    if (Array.isArray(gitHubData.contributions)) {
+      // Old format: direct array
+      contributions = gitHubData.contributions;
+      totalContributionsFromAPI = contributions.reduce((sum, day) => sum + (day.count || 0), 0);
+    } else if (typeof gitHubData.contributions === 'object') {
+      // New format: object with calendar property
+      if (Array.isArray(gitHubData.contributions.calendar)) {
+        contributions = gitHubData.contributions.calendar.map(day => ({
+          count: day.contributionCount || day.count || 0,
+          level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4), // Convert count to level (0-4)
+          date: day.date
+        }));
+        totalContributionsFromAPI = gitHubData.contributions.totalContributions || 
+          contributions.reduce((sum, day) => sum + (day.count || 0), 0);
+      } else {
+        // Fallback if calendar is not an array or missing
+        console.warn('gitHubData.contributions.calendar is not an array or missing:', gitHubData.contributions);
+        contributions = [];
+        totalContributionsFromAPI = gitHubData.contributions.totalContributions || 0;
+      }
+    }
   }
   
   const contributionsToDisplay = isDashboardSnippet
     ? contributions.slice(-84)
     : contributions;
 
-  // Use totalContributions from the new format if available, otherwise calculate
-  let totalContributionsForDisplay;
-  if (gitHubData.contributions && typeof gitHubData.contributions === 'object' && gitHubData.contributions.totalContributions) {
-    totalContributionsForDisplay = gitHubData.contributions.totalContributions;
-  } else {
-    totalContributionsForDisplay = contributionsToDisplay.reduce((sum, day) => sum + (day.count || 0), 0);
-  }
+  // Use totalContributions from the API data if available, otherwise calculate
+  const totalContributionsForDisplay = totalContributionsFromAPI || 
+    contributionsToDisplay.reduce((sum, day) => sum + (day.count || 0), 0);
 
   // If we have data, render the GitHub contribution chart
   return (
