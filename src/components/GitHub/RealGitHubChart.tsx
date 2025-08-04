@@ -101,7 +101,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
       // Old format: direct array
       contributions = gitHubData.contributions;
       totalContributionsFromAPI = contributions.reduce((sum, day) => sum + (day.count || 0), 0);
-    } else if (typeof gitHubData.contributions === 'object') {
+    } else if (typeof gitHubData.contributions === 'object' && gitHubData.contributions !== null) {
       // New format: object with calendar property
       if (Array.isArray(gitHubData.contributions.calendar)) {
         contributions = gitHubData.contributions.calendar.map(day => ({
@@ -117,6 +117,11 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
         contributions = [];
         totalContributionsFromAPI = gitHubData.contributions.totalContributions || 0;
       }
+    } else {
+      // Handle case where contributions is neither array nor valid object
+      console.warn('gitHubData.contributions is not in expected format:', gitHubData.contributions);
+      contributions = [];
+      totalContributionsFromAPI = 0;
     }
   }
   
