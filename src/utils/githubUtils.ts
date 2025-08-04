@@ -5,8 +5,31 @@
 /**
  * Calculate statistics from GitHub contribution data
  */
-export const calculateContributionStats = (contributions: { date: string; count: number; level: number }[]) => {
-  if (!contributions || contributions.length === 0) {
+export const calculateContributionStats = (contributions: any) => {
+  // Handle both array format and object format
+  let contributionArray = [];
+  
+  if (Array.isArray(contributions)) {
+    // Old format: direct array
+    contributionArray = contributions;
+  } else if (contributions && typeof contributions === 'object' && Array.isArray(contributions.calendar)) {
+    // New format: object with calendar property
+    contributionArray = contributions.calendar.map(day => ({
+      date: day.date,
+      count: day.contributionCount || day.count || 0,
+      level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4)
+    }));
+  } else {
+    // Invalid or empty data
+    return {
+      totalContributions: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      averagePerDay: 0
+    };
+  }
+
+  if (!contributionArray || contributionArray.length === 0) {
     return {
       totalContributions: 0,
       currentStreak: 0,
@@ -16,12 +39,12 @@ export const calculateContributionStats = (contributions: { date: string; count:
   }
 
   // Calculate total contributions
-  const totalContributions = contributions.reduce((sum, day) => sum + day.count, 0);
+  const totalContributions = contributionArray.reduce((sum, day) => sum + (day.count || 0), 0);
   
   // Calculate current streak (from most recent day backwards)
   let currentStreak = 0;
-  for (let i = contributions.length - 1; i >= 0; i--) {
-    if (contributions[i].count > 0) {
+  for (let i = contributionArray.length - 1; i >= 0; i--) {
+    if (contributionArray[i].count > 0) {
       currentStreak++;
     } else {
       break;
@@ -31,7 +54,7 @@ export const calculateContributionStats = (contributions: { date: string; count:
   // Calculate longest streak
   let longestStreak = 0;
   let tempStreak = 0;
-  for (const day of contributions) {
+  for (const day of contributionArray) {
     if (day.count > 0) {
       tempStreak++;
       longestStreak = Math.max(longestStreak, tempStreak);
@@ -41,7 +64,7 @@ export const calculateContributionStats = (contributions: { date: string; count:
   }
   
   // Calculate average contributions per day
-  const averagePerDay = Math.round((totalContributions / contributions.length) * 10) / 10;
+  const averagePerDay = Math.round((totalContributions / contributionArray.length) * 10) / 10;
   
   return {
     totalContributions,
