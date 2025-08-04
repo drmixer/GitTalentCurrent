@@ -1,19 +1,16 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
     });
   }
-
   try {
     // Get environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -22,25 +19,42 @@ serve(async (req) => {
     const githubAppPrivateKey = Deno.env.get('GITHUB_APP_PRIVATE_KEY');
     const githubClientId = Deno.env.get('GITHUB_CLIENT_ID');
     const githubClientSecret = Deno.env.get('GITHUB_CLIENT_SECRET');
-
     if (!supabaseUrl || !supabaseServiceKey || !githubAppId || !githubAppPrivateKey || !githubClientId || !githubClientSecret) {
       throw new Error('Missing required environment variables');
     }
-
     // Initialize Supabase client with service role
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
     // Parse request body
     const body = await req.json();
     const { code, installation_id, state, intent, redirect_uri } = body;
-
     console.log('Processing GitHub auth callback:', {
       code: code ? 'present' : 'missing',
       installation_id,
       hasState: !!state,
       hasIntent: !!intent
     });
-
+    // ADDED: Parse state to determine flow type
+    let flowType = 'signup'; // default
+    if (state) {
+      try {
+        // Handle both string and object state parameters
+        let parsedState;
+        if (typeof state === 'string') {
+          parsedState = JSON.parse(decodeURIComponent(state));
+        } else {
+          parsedState = state; // Already an object
+        }
+        flowType = parsedState.flow_type || 'signup';
+        console.log('Detected flow type:', flowType);
+      } catch (error) {
+        console.warn('Failed to parse state parameter:', error);
+        // Fallback: check if it's already an object
+        if (typeof state === 'object' && state.flow_type) {
+          flowType = state.flow_type;
+          console.log('Used object state fallback, flow type:', flowType);
+        }
+      }
+    }
     // Step 1: Exchange authorization code for access token
     console.log('Step 1: Exchanging code for access token');
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -56,21 +70,17 @@ serve(async (req) => {
         redirect_uri
       })
     });
-
     if (!tokenResponse.ok) {
       throw new Error(`Failed to exchange code for token: ${tokenResponse.statusText}`);
     }
-
     const tokenData = await tokenResponse.json();
     if (tokenData.error) {
       throw new Error(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`);
     }
-
     const accessToken = tokenData.access_token;
     if (!accessToken) {
       throw new Error('No access token received from GitHub');
     }
-
     // Step 2: Get user information from GitHub
     console.log('Step 2: Fetching user info from GitHub');
     const userResponse = await fetch('https://api.github.com/user', {
@@ -79,13 +89,10 @@ serve(async (req) => {
         'Accept': 'application/vnd.github.v3+json'
       }
     });
-
     if (!userResponse.ok) {
       throw new Error(`Failed to fetch user info: ${userResponse.statusText}`);
     }
-
     const githubUser = await userResponse.json();
-
     // Get user's primary email if not public
     let userEmail = githubUser.email;
     if (!userEmail) {
@@ -97,25 +104,21 @@ serve(async (req) => {
       });
       if (emailResponse.ok) {
         const emails = await emailResponse.json();
-        const primaryEmail = emails.find((email) => email.primary);
+        const primaryEmail = emails.find((email)=>email.primary);
         userEmail = primaryEmail?.email || `${githubUser.login}@github.local`;
       }
     }
-
     if (!userEmail) {
       userEmail = `${githubUser.login}@github.local`;
     }
-
     console.log('GitHub user info:', {
       id: githubUser.id,
       login: githubUser.login,
       email: userEmail,
       name: githubUser.name
     });
-
     // Step 3: Create or update Supabase user
     console.log('Step 3: Creating/updating Supabase user');
-    
     // Prepare user metadata
     const userMetadata = {
       github_id: githubUser.id,
@@ -127,24 +130,18 @@ serve(async (req) => {
       company: githubUser.company,
       provider: 'github'
     };
-
     // First check if user already exists
     const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
     let supabaseUser = null;
-    
     if (!lookupError && existingUsers.users) {
-      supabaseUser = existingUsers.users.find((u) => 
-        u.email === userEmail || u.user_metadata?.github_id === githubUser.id
-      );
+      supabaseUser = existingUsers.users.find((u)=>u.email === userEmail || u.user_metadata?.github_id === githubUser.id);
     }
-
     if (supabaseUser) {
       console.log('User already exists, updating metadata:', supabaseUser.id);
       // Update existing user metadata
       const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supabaseUser.id, {
         user_metadata: userMetadata
       });
-
       if (updateError) {
         console.warn('Failed to update user metadata:', updateError);
       } else {
@@ -162,25 +159,19 @@ serve(async (req) => {
           github_id: githubUser.id
         }
       });
-
       if (authError) {
         throw new Error(`Failed to create user: ${authError.message}`);
       }
-
       supabaseUser = authData.user;
     }
-
     if (!supabaseUser) {
       throw new Error('Failed to create or retrieve user');
     }
-
     console.log('Supabase user created/retrieved:', supabaseUser.id);
-
     // Step 4: Create user profile
     console.log('Step 4: Creating user profile');
     const userName = intent?.name || githubUser.name || githubUser.login || 'User';
     const userRole = intent?.role || 'developer';
-
     const { error: profileError } = await supabaseAdmin.rpc('create_user_profile', {
       user_id: supabaseUser.id,
       user_email: userEmail,
@@ -188,7 +179,6 @@ serve(async (req) => {
       user_role: userRole,
       company_name: intent?.company_name || ''
     });
-
     if (profileError) {
       console.warn('Profile creation RPC failed:', profileError);
       // Try direct insert as fallback
@@ -204,45 +194,52 @@ serve(async (req) => {
       }, {
         onConflict: 'id'
       });
-
       if (insertError) {
         throw new Error(`Failed to create user profile: ${insertError.message}`);
       }
     }
-
-    // Step 5: Create developer profile if user is a developer
+    // Step 5: Create/Update developer profile if user is a developer
     let developerProfile = null;
     if (userRole === 'developer') {
-      console.log('Step 5: Creating developer profile');
+      console.log('Step 5: Creating/updating developer profile');
+      // ADDED: For login flow, fetch existing installation ID
+      let installationIdToUse = installation_id ? parseInt(installation_id) : null;
+      if (flowType === 'login' && !installation_id) {
+        console.log('Login flow detected, fetching existing installation ID');
+        const { data: existingDev, error: fetchError } = await supabaseAdmin.from('developers').select('github_installation_id').eq('user_id', supabaseUser.id).single();
+        if (!fetchError && existingDev?.github_installation_id) {
+          installationIdToUse = parseInt(existingDev.github_installation_id);
+          console.log('Preserved existing installation ID:', installationIdToUse);
+        } else if (fetchError && fetchError.code !== 'PGRST116') {
+          console.warn('Error fetching existing developer profile:', fetchError);
+        }
+      }
       const developerData = {
         user_id: supabaseUser.id,
         github_handle: githubUser.login,
         bio: githubUser.bio || '',
         location: githubUser.location || '',
         profile_pic_url: githubUser.avatar_url,
-        github_installation_id: installation_id ? parseInt(installation_id) : null,
+        github_installation_id: installationIdToUse?.toString() || null,
         availability: true
       };
-
-      const { data: devProfile, error: devError } = await supabaseAdmin
-        .from('developers')
-        .upsert(developerData, { onConflict: 'user_id' })
-        .select()
-        .single();
-
+      console.log('Developer data to upsert:', {
+        ...developerData,
+        github_installation_id: developerData.github_installation_id ? 'preserved/provided' : 'null'
+      });
+      const { data: devProfile, error: devError } = await supabaseAdmin.from('developers').upsert(developerData, {
+        onConflict: 'user_id'
+      }).select().single();
       if (devError) {
         console.warn('Developer profile creation failed:', devError);
       } else {
         developerProfile = devProfile;
-        console.log('Developer profile created:', devProfile.id);
+        console.log('Developer profile created/updated:', devProfile.id);
       }
     }
-
     // Step 6: Generate session for the user (CORRECTED VERSION)
     console.log('Step 6: Generating user session');
-
     let sessionResponse = null;
-
     try {
       // Generate magic link using admin client
       console.log('Generating magic link for session creation');
@@ -253,18 +250,15 @@ serve(async (req) => {
           redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
         }
       });
-
       if (magicLinkError) {
         console.warn('Magic link generation failed:', magicLinkError);
       } else if (magicLinkData?.properties?.hashed_token) {
         console.log('Magic link generated successfully, verifying token');
-        
         // Verify the OTP token to create a session
         const { data: verifyData, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
           token_hash: magicLinkData.properties.hashed_token,
           type: 'email'
         });
-
         if (verifyError) {
           console.warn('Token verification failed:', verifyError);
         } else if (verifyData.session) {
@@ -279,11 +273,9 @@ serve(async (req) => {
     } catch (error) {
       console.warn('Magic link session creation failed:', error);
     }
-
     // Alternative method: Generate invite link if magic link fails
     if (!sessionResponse) {
       console.log('Trying alternative session creation with invite link');
-      
       try {
         const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'invite',
@@ -292,15 +284,12 @@ serve(async (req) => {
             redirectTo: `${new URL(redirect_uri).origin}/auth/github-callback`
           }
         });
-
         if (!inviteError && inviteData?.properties?.hashed_token) {
           console.log('Invite link generated, verifying token');
-          
           const { data: verifyInviteData, error: verifyInviteError } = await supabaseAdmin.auth.verifyOtp({
             token_hash: inviteData.properties.hashed_token,
             type: 'invite'
           });
-
           if (!verifyInviteError && verifyInviteData.session) {
             sessionResponse = verifyInviteData.session;
             console.log('Successfully created session via invite verification');
@@ -314,9 +303,7 @@ serve(async (req) => {
         console.warn('Invite method also failed:', altError);
       }
     }
-
     console.log('Authentication flow completed successfully');
-
     const response = {
       success: true,
       user: {
@@ -328,7 +315,6 @@ serve(async (req) => {
       developer_profile: developerProfile,
       installation_id: installation_id
     };
-
     // Include session if we have valid tokens
     if (sessionResponse?.access_token && sessionResponse?.refresh_token) {
       response.session = {
@@ -343,14 +329,12 @@ serve(async (req) => {
       response.message = 'User created successfully. Please sign in to continue.';
       console.log('No session tokens available, user will need to sign in manually');
     }
-
     return new Response(JSON.stringify(response), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/json'
       }
     });
-
   } catch (error) {
     console.error('GitHub auth error:', error);
     return new Response(JSON.stringify({
