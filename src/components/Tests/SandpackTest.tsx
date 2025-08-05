@@ -52,29 +52,23 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
       return {
         setup: {
           dependencies: {
-            '@angular/animations': '^17.0.0',
-            '@angular/common': '^17.0.0',
-            '@angular/compiler': '^17.0.0',
-            '@angular/core': '^17.0.0',
-            '@angular/forms': '^17.0.0',
-            '@angular/platform-browser': '^17.0.0',
-            '@angular/platform-browser-dynamic': '^17.0.0',
-            '@angular/router': '^17.0.0',
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
             'rxjs': '^7.8.0',
-            'zone.js': '^0.14.0',
-            'tslib': '^2.6.0',
+            'zone.js': '^0.12.0',
+            'tslib': '^2.5.0',
           },
           devDependencies: {
-            '@angular/compiler-cli': '^17.0.0',
-            '@angular/core/testing': '^17.0.0',
-            '@angular/common/testing': '^17.0.0',
-            '@angular/platform-browser/testing': '^17.0.0',
-            '@testing-library/angular': '^14.2.0',
-            'jasmine-core': '^5.1.1',
-            'karma': '^6.4.2',
-            'karma-jasmine': '^5.1.0',
-            'karma-chrome-launcher': '^3.2.0',
-            'typescript': '^5.1.6',
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
+            'jasmine-core': '^4.5.0',
+            'typescript': '^4.9.5',
           },
           template: 'angular',
           entry: '/src/main.ts',
@@ -298,42 +292,31 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Angular polyfills
+      // Angular polyfills - simplified
       baseFiles['/src/polyfills.ts'] = {
-        code: `/***************************************************************************************************
- * APPLICATION POLYFILLS
- * These are needed for Angular to run properly in a browser-like environment.
- */
-
-// Zone JS is required by Angular
-import 'zone.js'  // Included with Angular CLI
-
-// Add more polyfills here if needed`,
+        code: `import 'zone.js';`,
         hidden: true
       };
 
-      // Angular main bootstrap
+      // Simplified Angular main bootstrap
       baseFiles['/src/main.ts'] = {
-        code: `import 'zone.js'
-import { platformBrowserDynamic } from '@angular/platform-browser-dynamic'
-import { AppModule } from './app/app.module'
+        code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
 
 platformBrowserDynamic()
   .bootstrapModule(AppModule)
-  .catch(err => console.error(err))`,
+  .catch(err => console.error(err));`,
         hidden: true
       };
 
-      // Angular app module - this will need to be dynamic based on the component being tested
+      // Simplified Angular app module
       baseFiles['/src/app/app.module.ts'] = {
-        code: `import { NgModule } from '@angular/core'
-import { BrowserModule } from '@angular/platform-browser'
-import { AppComponent } from './app.component'
+        code: `import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppComponent } from './app.component';
 
 @NgModule({
-  declarations: [
-    AppComponent
-  ],
+  declarations: [AppComponent],
   imports: [BrowserModule],
   providers: [],
   bootstrap: [AppComponent]
@@ -342,7 +325,7 @@ export class AppModule {}`,
         hidden: true
       };
 
-      // Angular test setup
+      // Simplified test setup
       baseFiles['/src/test.ts'] = {
         code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
@@ -357,55 +340,16 @@ getTestBed().initTestEnvironment(
 );`,
         hidden: true
       };
-      
-      baseFiles['/angular.json'] = {
-        code: JSON.stringify({
-          "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
-          "version": 1,
-          "newProjectRoot": "projects",
-          "projects": {
-            "app": {
-              "projectType": "application",
-              "schematics": {},
-              "root": "",
-              "sourceRoot": "src",
-              "prefix": "app",
-              "architect": {
-                "build": {
-                  "builder": "@angular-devkit/build-angular:browser",
-                  "options": {
-                    "outputPath": "dist",
-                    "index": "src/index.html",
-                    "main": "src/main.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.app.json"
-                  }
-                },
-                "test": {
-                  "builder": "@angular-devkit/build-angular:karma",
-                  "options": {
-                    "main": "src/test.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.spec.json",
-                    "karmaConfig": "karma.conf.js"
-                  }
-                }
-              }
-            }
-          }
-        }, null, 2),
-        hidden: true
-      };
 
+      // Simplified index.html
       baseFiles['/src/index.html'] = {
         code: `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Angular Sandbox</title>
+    <title>Angular Test</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
     <app-root></app-root>
@@ -414,78 +358,22 @@ getTestBed().initTestEnvironment(
         hidden: true
       };
 
-      // TypeScript configurations
+      // Minimal TypeScript config
       baseFiles['/tsconfig.json'] = {
         code: JSON.stringify({
-          "compileOnSave": false,
           "compilerOptions": {
-            "baseUrl": "./",
-            "outDir": "./dist/out-tsc",
-            "forceConsistentCasingInFileNames": true,
-            "strict": true,
-            "noImplicitOverride": true,
-            "noPropertyAccessFromIndexSignature": true,
-            "noImplicitReturns": true,
-            "noFallthroughCasesInSwitch": true,
-            "sourceMap": true,
-            "declaration": false,
-            "downlevelIteration": true,
-            "experimentalDecorators": true,
+            "target": "ES2020",
+            "lib": ["ES2020", "dom"],
+            "module": "ES2020",
             "moduleResolution": "node",
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
             "importHelpers": true,
-            "target": "ES2022",
-            "module": "ES2022",
-            "useDefineForClassFields": false,
-            "lib": [
-              "ES2022",
-              "dom"
-            ]
-          },
-          "angularCompilerOptions": {
-            "enableI18nLegacyMessageIdFormat": false,
-            "strictInjectionParameters": true,
-            "strictInputAccessModifiers": true,
-            "strictTemplates": true
+            "skipLibCheck": true,
+            "allowSyntheticDefaultImports": true,
+            "strict": false,
+            "esModuleInterop": true
           }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.app.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/app",
-            "types": []
-          },
-          "files": [
-            "src/main.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.d.ts"
-          ]
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.spec.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/spec",
-            "types": [
-              "jasmine"
-            ]
-          },
-          "files": [
-            "src/test.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.spec.ts",
-            "src/**/*.d.ts"
-          ]
         }, null, 2),
         hidden: true
       };
