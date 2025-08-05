@@ -35,8 +35,15 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
           dependencies: {
             'vue': '^3.3.4',
             '@vue/test-utils': '^2.4.1',
+            '@testing-library/vue': '^8.0.1',
             'vitest': '^0.34.6',
+            'jsdom': '^22.1.0',
+            '@vitejs/plugin-vue': '^4.3.4',
           },
+          devDependencies: {
+            '@vue/compiler-sfc': '^3.3.4',
+          },
+          template: 'vue',
         },
         mainFile: '/src/App.vue',
         testFile: '/src/App.spec.js',
@@ -45,14 +52,31 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
       return {
         setup: {
           dependencies: {
-            '@angular/common': '^16.2.0',
-            '@angular/compiler': '^16.2.0',
-            '@angular/core': '^16.2.0',
-            '@angular/platform-browser': '^16.2.0',
+            '@angular/animations': '^17.0.0',
+            '@angular/common': '^17.0.0',
+            '@angular/compiler': '^17.0.0',
+            '@angular/core': '^17.0.0',
+            '@angular/forms': '^17.0.0',
+            '@angular/platform-browser': '^17.0.0',
+            '@angular/platform-browser-dynamic': '^17.0.0',
+            '@angular/router': '^17.0.0',
             'rxjs': '^7.8.0',
-            'zone.js': '^0.13.0',
-            'jasmine-core': '^5.1.1',
+            'zone.js': '^0.14.0',
+            'tslib': '^2.6.0',
           },
+          devDependencies: {
+            '@angular/compiler-cli': '^17.0.0',
+            '@angular/core/testing': '^17.0.0',
+            '@angular/common/testing': '^17.0.0',
+            '@angular/platform-browser/testing': '^17.0.0',
+            '@testing-library/angular': '^14.2.0',
+            'jasmine-core': '^5.1.1',
+            'karma': '^6.4.2',
+            'karma-jasmine': '^5.1.0',
+            'karma-chrome-launcher': '^3.2.0',
+            'typescript': '^5.1.6',
+          },
+          template: 'angular',
           entry: '/src/main.ts',
         },
         mainFile: '/src/app/app.component.ts',
@@ -68,6 +92,11 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'react-scripts': '5.0.1',
             '@testing-library/react': '^13.4.0',
             '@testing-library/jest-dom': '^5.16.5',
+            '@testing-library/user-event': '^14.4.3',
+            'whatwg-fetch': '^3.6.2',
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
           },
         },
         mainFile: '/App.js',
@@ -204,6 +233,311 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   );
 };
 
+// Helper function to create framework-specific setup files
+const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
+  const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
+  
+  switch (framework) {
+    case 'vue':
+      // Vue 3 setup with Vite and Vitest
+      baseFiles['/vite.config.js'] = {
+        code: `import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({
+  plugins: [vue()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.js']
+  }
+})`,
+        hidden: true
+      };
+      
+      baseFiles['/src/test-setup.js'] = {
+        code: `import { vi } from 'vitest'
+import '@testing-library/jest-dom'
+
+// Mock fetch if needed
+global.fetch = vi.fn()
+
+// Setup before each test
+beforeEach(() => {
+  if (global.fetch && global.fetch.mockClear) {
+    global.fetch.mockClear();
+  }
+});`,
+        hidden: true
+      };
+
+      // Vue 3 main entry point
+      baseFiles['/src/main.js'] = {
+        code: `import { createApp } from 'vue'
+import App from './App.vue'
+
+createApp(App).mount('#app')`,
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vue 3 App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
+      break;
+      
+    case 'angular':
+      // Angular polyfills
+      baseFiles['/src/polyfills.ts'] = {
+        code: `/***************************************************************************************************
+ * APPLICATION POLYFILLS
+ * These are needed for Angular to run properly in a browser-like environment.
+ */
+
+// Zone JS is required by Angular
+import 'zone.js'  // Included with Angular CLI
+
+// Add more polyfills here if needed`,
+        hidden: true
+      };
+
+      // Angular main bootstrap
+      baseFiles['/src/main.ts'] = {
+        code: `import 'zone.js'
+import { platformBrowserDynamic } from '@angular/platform-browser-dynamic'
+import { AppModule } from './app/app.module'
+
+platformBrowserDynamic()
+  .bootstrapModule(AppModule)
+  .catch(err => console.error(err))`,
+        hidden: true
+      };
+
+      // Angular app module - this will need to be dynamic based on the component being tested
+      baseFiles['/src/app/app.module.ts'] = {
+        code: `import { NgModule } from '@angular/core'
+import { BrowserModule } from '@angular/platform-browser'
+import { AppComponent } from './app.component'
+
+@NgModule({
+  declarations: [
+    AppComponent
+  ],
+  imports: [BrowserModule],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}`,
+        hidden: true
+      };
+
+      // Angular test setup
+      baseFiles['/src/test.ts'] = {
+        code: `import 'zone.js/testing';
+import { getTestBed } from '@angular/core/testing';
+import {
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting
+} from '@angular/platform-browser-dynamic/testing';
+
+getTestBed().initTestEnvironment(
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting()
+);`,
+        hidden: true
+      };
+      
+      baseFiles['/angular.json'] = {
+        code: JSON.stringify({
+          "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+          "version": 1,
+          "newProjectRoot": "projects",
+          "projects": {
+            "app": {
+              "projectType": "application",
+              "schematics": {},
+              "root": "",
+              "sourceRoot": "src",
+              "prefix": "app",
+              "architect": {
+                "build": {
+                  "builder": "@angular-devkit/build-angular:browser",
+                  "options": {
+                    "outputPath": "dist",
+                    "index": "src/index.html",
+                    "main": "src/main.ts",
+                    "polyfills": "src/polyfills.ts",
+                    "tsConfig": "tsconfig.app.json"
+                  }
+                },
+                "test": {
+                  "builder": "@angular-devkit/build-angular:karma",
+                  "options": {
+                    "main": "src/test.ts",
+                    "polyfills": "src/polyfills.ts",
+                    "tsConfig": "tsconfig.spec.json",
+                    "karmaConfig": "karma.conf.js"
+                  }
+                }
+              }
+            }
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/src/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Angular Sandbox</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  </head>
+  <body>
+    <app-root></app-root>
+  </body>
+</html>`,
+        hidden: true
+      };
+
+      // TypeScript configurations
+      baseFiles['/tsconfig.json'] = {
+        code: JSON.stringify({
+          "compileOnSave": false,
+          "compilerOptions": {
+            "baseUrl": "./",
+            "outDir": "./dist/out-tsc",
+            "forceConsistentCasingInFileNames": true,
+            "strict": true,
+            "noImplicitOverride": true,
+            "noPropertyAccessFromIndexSignature": true,
+            "noImplicitReturns": true,
+            "noFallthroughCasesInSwitch": true,
+            "sourceMap": true,
+            "declaration": false,
+            "downlevelIteration": true,
+            "experimentalDecorators": true,
+            "moduleResolution": "node",
+            "importHelpers": true,
+            "target": "ES2022",
+            "module": "ES2022",
+            "useDefineForClassFields": false,
+            "lib": [
+              "ES2022",
+              "dom"
+            ]
+          },
+          "angularCompilerOptions": {
+            "enableI18nLegacyMessageIdFormat": false,
+            "strictInjectionParameters": true,
+            "strictInputAccessModifiers": true,
+            "strictTemplates": true
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/tsconfig.app.json'] = {
+        code: JSON.stringify({
+          "extends": "./tsconfig.json",
+          "compilerOptions": {
+            "outDir": "./out-tsc/app",
+            "types": []
+          },
+          "files": [
+            "src/main.ts",
+            "src/polyfills.ts"
+          ],
+          "include": [
+            "src/**/*.d.ts"
+          ]
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/tsconfig.spec.json'] = {
+        code: JSON.stringify({
+          "extends": "./tsconfig.json",
+          "compilerOptions": {
+            "outDir": "./out-tsc/spec",
+            "types": [
+              "jasmine"
+            ]
+          },
+          "files": [
+            "src/test.ts",
+            "src/polyfills.ts"
+          ],
+          "include": [
+            "src/**/*.spec.ts",
+            "src/**/*.d.ts"
+          ]
+        }, null, 2),
+        hidden: true
+      };
+      break;
+      
+    case 'react':
+    default:
+      // React setup with additional test utilities
+      baseFiles['/src/setupTests.js'] = {
+        code: `import '@testing-library/jest-dom';
+import 'whatwg-fetch';
+
+// Mock fetch for testing
+global.fetch = jest.fn();
+
+// Setup before each test
+beforeEach(() => {
+  fetch.mockClear();
+});`,
+        hidden: true
+      };
+
+      baseFiles['/public/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`,
+        hidden: true
+      };
+
+      baseFiles['/src/index.js'] = {
+        code: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from '../App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);`,
+        hidden: true
+      };
+      break;
+  }
+  
+  return baseFiles;
+};
+
 // Main (Parent) component responsible for setting up the Provider
 const SandpackTest: React.FC<SandpackTestProps> = ({
   starterCode,
@@ -220,13 +554,21 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   const packageJson = JSON.stringify({
     name: `gittalent-${framework}-challenge`,
     dependencies: setup.dependencies,
-    scripts: { test: 'react-scripts test' },
+    devDependencies: setup.devDependencies || {},
+    scripts: { 
+      test: framework === 'vue' ? 'vitest' : framework === 'angular' ? 'ng test' : 'react-scripts test',
+      build: framework === 'vue' ? 'vite build' : framework === 'angular' ? 'ng build' : 'react-scripts build'
+    },
   });
+
+  // Create framework-specific setup files
+  const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
 
   const files = {
     [mainFile]: { code: starterCode, active: true },
     [testFile]: { code: testCode, hidden: true },
     '/package.json': { code: packageJson, hidden: true },
+    ...frameworkFiles,
   };
 
   return (
