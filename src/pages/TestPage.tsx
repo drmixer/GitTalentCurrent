@@ -115,44 +115,68 @@ const TestPage: React.FC = () => {
     const handleSubmit = async () => {
         if (!assignmentId) return;
         setIsSubmitting(true);
-        const question = questions[currentQuestionIndex];
-        const { data, error } = await supabase.functions.invoke<{ status: { id: number }, stdout: string, stderr: string }>('grade-submission', {
-            body: {
-                code,
-                language_id: getLanguageId(question.language),
-                stdin: question.test_cases?.[0]?.stdin || '',
-                expected_output: question.expected_output,
-                assignment_id: assignmentId,
-                question_id: question.id,
-            },
-        });
-
-        if (error) {
-            setError('Failed to submit code: ' + error.message);
-        } else if (data) {
-            // Store result
-            await supabase.from('test_results').insert({
-                assignment_id: assignmentId,
-                question_id: question.id,
-                score: data.status.id === 3 ? 1 : 0, // 3 is "Accepted"
-                stdout: data.stdout,
-                stderr: data.stderr,
-                passed_test_cases: data.status.id === 3 ? 1 : 0,
-                total_test_cases: 1,
+        
+        try {
+            const question = questions[currentQuestionIndex];
+            const { data, error } = await supabase.functions.invoke<{ 
+                status: { id: number }, 
+                stdout: string, 
+                stderr: string 
+            }>('grade-submission', {
+                body: {
+                    code,
+                    language_id: getLanguageId(question.language),
+                    stdin: question.test_cases?.[0]?.stdin || '',
+                    expected_output: question.expected_output,
+                    assignment_id: assignmentId,
+                    question_id: question.id,
+                },
             });
-        }
 
-        if (currentQuestionIndex < questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1);
-        } else {
-            // Test finished
-            await supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId);
-            setIsCompleted(true);
-            setTimeout(() => {
-                navigate('/developer');
-            }, 3000);
+            if (error) {
+                console.error('Failed to submit code:', error);
+                setOutput(`Error submitting code: ${error.message}`);
+            } else if (data) {
+                // Use upsert to prevent duplicates
+                const { error: insertError } = await supabase.from('test_results').upsert({
+                    assignment_id: assignmentId,
+                    question_id: question.id,
+                    score: data.status.id === 3 ? 1 : 0, // 3 is "Accepted"
+                    stdout: data.stdout,
+                    stderr: data.stderr,
+                    passed_test_cases: data.status.id === 3 ? 1 : 0,
+                    total_test_cases: 1,
+                }, {
+                    onConflict: 'assignment_id,question_id'
+                });
+
+                if (insertError) {
+                    console.error('Error saving test result:', insertError);
+                }
+
+                // Show result to user
+                setOutput(data.stdout || data.stderr || 'Submission completed');
+            }
+
+            // Move to next question or complete test
+            if (currentQuestionIndex < questions.length - 1) {
+                setCurrentQuestionIndex(currentQuestionIndex + 1);
+            } else {
+                // Test finished
+                await supabase.from('test_assignments').update({ 
+                    status: 'Completed' 
+                }).eq('id', assignmentId);
+                setIsCompleted(true);
+                setTimeout(() => {
+                    navigate('/developer');
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Error in handleSubmit:', error);
+            setOutput(`Error: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     if (isLoading) {
