@@ -79,6 +79,7 @@ const AdminTests: React.FC = () => {
                 language: editingQuestion.language,
                 starter_code: editingQuestion.starter_code,
                 test_code: finalTestCode, // Use modified test_code
+                expected_output: editingQuestion.expected_output, // Add expected_output for Sandpack
                 test_cases: null, // Ensure test_cases is null for Sandpack
             };
         } else {
@@ -90,6 +91,7 @@ const AdminTests: React.FC = () => {
                 starter_code: editingQuestion.starter_code,
                 test_cases: editingQuestion.test_cases, // Use test_cases for Judge0
                 test_code: null, // Ensure test_code is null for Judge0
+                expected_output: null, // Ensure expected_output is null for Judge0 (they use test_cases)
             };
         }
 
@@ -187,7 +189,7 @@ const AdminTests: React.FC = () => {
                         </div>
                         {editingQuestion && editingQuestion.test_id === test.id && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
                                     <h2 className="text-xl font-bold mb-4">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h2>
                                     <input
                                         type="text"
@@ -231,6 +233,13 @@ const AdminTests: React.FC = () => {
                                                 onChange={(e) => setEditingQuestion({ ...editingQuestion, test_code: e.target.value })}
                                                 className="w-full p-2 mb-2 border rounded-md h-48 font-mono"
                                             />
+                                            <h3 className="font-semibold mb-2">Expected Output/Behavior (Optional)</h3>
+                                            <textarea
+                                                placeholder="Describe what the component should do, how it should look, or what functionality should work (this helps developers understand the requirements)"
+                                                value={editingQuestion.expected_output || ''}
+                                                onChange={(e) => setEditingQuestion({ ...editingQuestion, expected_output: e.target.value })}
+                                                className="w-full p-2 mb-2 border rounded-md h-24"
+                                            />
                                         </div>
                                     ) : (
                                         <div>
@@ -270,7 +279,7 @@ const AdminTests: React.FC = () => {
                                             }} className="text-sm text-blue-600">Add Test Case</button>
                                         </div>
                                     )}
-                                    <div className="flex justify-end space-x-2">
+                                    <div className="flex justify-end space-x-2 mt-4">
                                         <button onClick={() => setEditingQuestion(null)} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
                                         <button onClick={handleSaveQuestion} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
                                     </div>
