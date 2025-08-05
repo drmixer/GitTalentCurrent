@@ -301,7 +301,7 @@ export const DeveloperDashboard: React.FC = () => {
   
   // REMOVED: All conflicting useEffects that managed tab state have been removed to prevent infinite loops.
   
-  // UPDATED: GitHub data processing useEffect
+  // UPDATED: GitHub data processing useEffect - fixed to avoid circular dependency
   useEffect(() => {
     if (finalGitHubDataToShow) {
       console.log('[Dashboard] Processing GitHub data:', finalGitHubDataToShow);
@@ -333,43 +333,57 @@ export const DeveloperDashboard: React.FC = () => {
         setRecentCommits(commitActivities);
         console.log('[Dashboard] Set commits from recentActivity:', commitActivities);
       }
+      // Legacy fallback: try original contributions array format
+      else if (finalGitHubDataToShow.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
+        const formattedCommits = finalGitHubDataToShow.contributions.slice(0, 3).map((contrib: any) => ({
+          sha: contrib.oid || contrib.id || Math.random().toString(36).substring(7),
+          message: contrib.messageHeadline || contrib.message || 'Commit message unavailable',
+          repoName: contrib.repository?.nameWithOwner || contrib.repo?.name || 'Unknown Repo',
+          date: contrib.occurredAt || contrib.created_at || new Date().toISOString(),
+          url: contrib.commitUrl || contrib.url || '#',
+        }));
+        setRecentCommits(formattedCommits);
+        console.log('[Dashboard] Set commits from legacy contributions:', formattedCommits);
+      }
       else {
         console.log('[Dashboard] No recent commits data found');
         setRecentCommits([]);
       }
+    }
+  }, [finalGitHubDataToShow]);
 
-      // Update developer annual_contributions from GitHub data
-      if (currentDeveloperProfile && finalGitHubDataToShow.contributions) {
-        let totalContributions = 0;
-        
-        // Get total from the new data structure
-        if (finalGitHubDataToShow.contributions.totalContributions) {
-          totalContributions = finalGitHubDataToShow.contributions.totalContributions;
-        }
-        // Fallback: calculate from calendar data
-        else if (finalGitHubDataToShow.contributions.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
-          totalContributions = finalGitHubDataToShow.contributions.calendar.reduce(
-            (sum: number, day: any) => sum + (day.contributionCount || 0), 0
-          );
-        }
-        // Legacy fallback: direct contributions array
-        else if (Array.isArray(finalGitHubDataToShow.contributions)) {
-          totalContributions = finalGitHubDataToShow.contributions.reduce(
-            (sum: number, day: any) => sum + (day.count || 0), 0
-          );
-        }
+  // Separate useEffect for updating annual contributions to avoid circular dependency
+  useEffect(() => {
+    if (finalGitHubDataToShow && developerData && finalGitHubDataToShow.contributions) {
+      let totalContributions = 0;
+      
+      // Get total from the new data structure
+      if (finalGitHubDataToShow.contributions.totalContributions) {
+        totalContributions = finalGitHubDataToShow.contributions.totalContributions;
+      }
+      // Fallback: calculate from calendar data
+      else if (finalGitHubDataToShow.contributions.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
+        totalContributions = finalGitHubDataToShow.contributions.calendar.reduce(
+          (sum: number, day: any) => sum + (day.contributionCount || 0), 0
+        );
+      }
+      // Legacy fallback: direct contributions array
+      else if (Array.isArray(finalGitHubDataToShow.contributions)) {
+        totalContributions = finalGitHubDataToShow.contributions.reduce(
+          (sum: number, day: any) => sum + (day.count || 0), 0
+        );
+      }
 
-        // Update the developer data with annual contributions
-        if (totalContributions > 0 && totalContributions !== currentDeveloperProfile.annual_contributions) {
-          console.log('[Dashboard] Updating annual_contributions:', totalContributions);
-          setDeveloperData(prev => prev ? {
-            ...prev,
-            annual_contributions: totalContributions
-          } : prev);
-        }
+      // Update the developer data with annual contributions
+      if (totalContributions > 0 && totalContributions !== developerData.annual_contributions) {
+        console.log('[Dashboard] Updating annual_contributions:', totalContributions);
+        setDeveloperData(prev => prev ? {
+          ...prev,
+          annual_contributions: totalContributions
+        } : prev);
       }
     }
-  }, [finalGitHubDataToShow, currentDeveloperProfile?.id]);
+  }, [finalGitHubDataToShow, developerData?.id]);
 
   const currentDeveloperProfile = useMemo(() => {
     if (contextDeveloperProfile) {
