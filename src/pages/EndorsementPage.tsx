@@ -41,7 +41,6 @@ const EndorsementPage: React.FC = () => {
         return;
     }
 
-
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(false);
@@ -52,9 +51,12 @@ const EndorsementPage: React.FC = () => {
         .insert({
           developer_id: userId, // The ID of the developer receiving the endorsement
           endorser_id: user?.id || null, // The ID of the person leaving the endorsement (null if not logged in)
-          text: endorsementText.trim(), // The endorsement message
-          endorser_name: user ? null : endorserName.trim() || null, // Only store if not logged in, or if explicitly provided
-          endorser_email: user ? null : endorserEmail.trim() || null, // Only store if not logged in, or if explicitly provided
+          comment: endorsementText.trim(), // FIXED: Changed from 'text' to 'comment'
+          endorser_email: user ? user.email : endorserEmail.trim() || null, // Use logged-in user's email or provided email
+          endorser_name: user ? null : endorserName.trim() || null, // CORRECTED: Using endorser_name for the name
+          endorser_role: null, // You can add a role field to the form if needed
+          is_anonymous: !user, // Set to true if not logged in
+          is_public: true, // Default to public, you can change this logic
         })
         .select(); // Select the inserted row to confirm
 
