@@ -76,11 +76,6 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
   }
 };
 
-
-// A helper component to listen for test results and send them to Supabase
-// This component is no longer needed, logic will be moved into the main component
-// const SupabaseTestReporter: ...
-
 import { SandpackTestsProps } from '@codesandbox/sandpack-react';
 
 // A custom test header with a "Run Tests" button
@@ -107,13 +102,14 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     sandpack.runTests();
   };
 
+  // This function only stores results in state - NO database save
   const handleTestComplete = (payload: SandpackTestsProps) => {
     setTestResults(payload);
+    // Removed database save - only store in component state for UI feedback
   };
 
+  // Only this function saves to database - prevents duplicates
   const submitSolution = async () => {
-    // The button's disabled state already prevents this from being called
-    // unless allTestsPassed is true. No need to re-check here.
     if (!allTestsPassed) {
       alert('Please ensure all tests are passing before you submit.');
       return;
@@ -135,15 +131,19 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         }
       }
 
-      const { error } = await supabase.from('test_results').insert({
+      // Use upsert to prevent duplicates in case of multiple submissions
+      const { error } = await supabase.from('test_results').upsert({
         assignment_id: assignmentId,
-        question_id: questionId,
+        question_id: questionId,  
         score: 1, // This is based on allTestsPassed, so it's already correct
         passed_test_cases: passed_test_cases,
         total_test_cases: total_test_cases,
         stdout: JSON.stringify(testResults, null, 2), // For logging/debugging
         stderr: '', // For schema compatibility
+      }, {
+        onConflict: 'assignment_id,question_id'
       });
+      
       if (error) throw error;
       console.log('Solution submitted successfully!');
       onTestComplete();
@@ -203,7 +203,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     </>
   );
 };
-
 
 // Main (Parent) component responsible for setting up the Provider
 const SandpackTest: React.FC<SandpackTestProps> = ({
