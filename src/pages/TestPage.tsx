@@ -286,7 +286,8 @@ const TestPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-        );
-    }
+        </div>
+    );
+};
 
 export default TestPage;
