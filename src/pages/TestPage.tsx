@@ -233,6 +233,15 @@ const TestPage: React.FC = () => {
                     <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
                     <p className="mb-4">{currentQuestion.question_text}</p>
+                    
+                    {/* Show expected output if it exists */}
+                    {currentQuestion.expected_output && (
+                        <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                            <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
+                            <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
+                        </div>
+                    )}
+                    
                     <SandpackTest
                         framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular'}
                         starterCode={currentQuestion.starter_code || ''}
@@ -277,8 +286,7 @@ const TestPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
-    );
-};
+        );
+    };
 
 export default TestPage;
