@@ -53,26 +53,22 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
       return {
         setup: {
           dependencies: {
-            '@angular/animations': '^15.2.10',
-            '@angular/common': '^15.2.10',
-            '@angular/compiler': '^15.2.10',
-            '@angular/core': '^15.2.10',
-            '@angular/forms': '^15.2.10',
-            '@angular/platform-browser': '^15.2.10',
-            '@angular/platform-browser-dynamic': '^15.2.10',
-            '@angular/router': '^15.2.10',
-            'rxjs': '^7.8.1',
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
+            'rxjs': '^7.8.0',
             'zone.js': '^0.12.0',
             'tslib': '^2.5.0',
           },
           devDependencies: {
-            '@angular/core/testing': '^15.2.10',
-            '@angular/common/testing': '^15.2.10',
-            '@angular/platform-browser/testing': '^15.2.10',
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
             'jasmine-core': '^4.5.0',
-            'karma': '^6.4.2',
-            'karma-chrome-headless': '^3.1.0',
-            'karma-jasmine': '^5.1.0',
             'typescript': '^4.9.5',
             '@types/jasmine': '^4.3.0',
           },
@@ -298,182 +294,37 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Fixed Angular configuration files
-      baseFiles['/angular.json'] = {
-        code: JSON.stringify({
-          "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
-          "version": 1,
-          "newProjectRoot": "projects",
-          "projects": {
-            "demo": {
-              "projectType": "application",
-              "schematics": {},
-              "root": "",
-              "sourceRoot": "src",
-              "prefix": "app",
-              "architect": {
-                "build": {
-                  "builder": "@angular-devkit/build-angular:browser",
-                  "options": {
-                    "outputPath": "dist/demo",
-                    "index": "src/index.html",
-                    "main": "src/main.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.app.json",
-                    "assets": ["src/favicon.ico", "src/assets"],
-                    "styles": ["src/styles.css"],
-                    "scripts": []
-                  }
-                },
-                "test": {
-                  "builder": "@angular-devkit/build-angular:karma",
-                  "options": {
-                    "main": "src/test.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.spec.json",
-                    "karmaConfig": "karma.conf.js",
-                    "assets": ["src/favicon.ico", "src/assets"],
-                    "styles": ["src/styles.css"],
-                    "scripts": []
-                  }
-                }
-              }
-            }
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      // TypeScript configuration for app
-      baseFiles['/tsconfig.app.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/app",
-            "types": []
-          },
-          "files": [
-            "src/main.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.d.ts"
-          ]
-        }, null, 2),
-        hidden: true
-      };
-
-      // TypeScript configuration for tests
-      baseFiles['/tsconfig.spec.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/spec",
-            "types": [
-              "jasmine"
-            ]
-          },
-          "files": [
-            "src/test.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.spec.ts",
-            "src/**/*.d.ts"
-          ]
-        }, null, 2),
-        hidden: true
-      };
-
-      // Main TypeScript config
-      baseFiles['/tsconfig.json'] = {
-        code: JSON.stringify({
-          "compileOnSave": false,
-          "compilerOptions": {
-            "baseUrl": "./",
-            "outDir": "./dist/out-tsc",
-            "forceConsistentCasingInFileNames": true,
-            "strict": false,
-            "noImplicitOverride": true,
-            "noPropertyAccessFromIndexSignature": true,
-            "noImplicitReturns": true,
-            "noFallthroughCasesInSwitch": true,
-            "sourceMap": true,
-            "declaration": false,
-            "downlevelIteration": true,
-            "experimentalDecorators": true,
-            "moduleResolution": "node",
-            "importHelpers": true,
-            "target": "ES2020",
-            "module": "ES2020",
-            "useDefineForClassFields": false,
-            "lib": [
-              "ES2020",
-              "dom"
-            ]
-          },
-          "angularCompilerOptions": {
-            "enableI18nLegacyMessageIdFormat": false,
-            "strictInjectionParameters": true,
-            "strictInputAccessModifiers": true,
-            "strictTemplates": true
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      // Karma configuration
-      baseFiles['/karma.conf.js'] = {
-        code: `module.exports = function (config) {
-  config.set({
-    basePath: '',
-    frameworks: ['jasmine', '@angular-devkit/build-angular'],
-    plugins: [
-      require('karma-jasmine'),
-      require('karma-chrome-headless'),
-      require('@angular-devkit/build-angular/plugins/karma')
-    ],
-    client: {
-      jasmine: {
-        // you can add configuration options for Jasmine here
-        // the possible options are listed at https://jasmine.github.io/api/edge/Configuration.html
-        // for example, you can disable the random execution order
-        // random: false
-      },
-      clearContext: false // leave Jasmine Spec Runner output visible in browser
-    },
-    jasmineHtmlReporter: {
-      suppressAll: true // removes the duplicated traces
-    },
-    coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/demo'),
-      subdir: '.',
-      reporters: [
-        { type: 'html' },
-        { type: 'text-summary' }
-      ]
-    },
-    reporters: ['progress', 'kjhtml'],
-    port: 9876,
-    colors: true,
-    logLevel: config.LOG_INFO,
-    autoWatch: true,
-    browsers: ['ChromeHeadless'],
-    singleRun: false,
-    restartOnFileChange: true
-  });
+      // Simplified Angular setup - no angular.json needed for Sandpack
+      baseFiles['/src/environments/environment.ts'] = {
+        code: `export const environment = {
+  production: false
 };`,
         hidden: true
       };
 
-      // Angular polyfills
-      baseFiles['/src/polyfills.ts'] = {
-        code: `/**
- * This file includes polyfills needed by Angular and is loaded before the app.
- * You can add your own extra polyfills to this file.
- */
+      // Simplified TypeScript config for Sandpack
+      baseFiles['/tsconfig.json'] = {
+        code: JSON.stringify({
+          "compilerOptions": {
+            "target": "ES2020",
+            "lib": ["ES2020", "dom"],
+            "module": "ES2020",
+            "moduleResolution": "node",
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+            "strict": false,
+            "esModuleInterop": true,
+            "skipLibCheck": true,
+            "allowSyntheticDefaultImports": true,
+            "useDefineForClassFields": false
+          }
+        }, null, 2),
+        hidden: true
+      };
 
-import 'zone.js/dist/zone';  // Included with Angular CLI.`,
+      // Simplified Angular polyfills
+      baseFiles['/src/polyfills.ts'] = {
+        code: `import 'zone.js';`,
         hidden: true
       };
 
@@ -488,7 +339,7 @@ platformBrowserDynamic()
         hidden: true
       };
 
-      // Angular app module - CRITICAL: This must declare AppComponent
+      // Simplified Angular app module
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -508,33 +359,23 @@ export class AppModule { }`,
         hidden: true
       };
 
-      // Test setup
+      // Simplified test setup for Sandpack
       baseFiles['/src/test.ts'] = {
-        code: `// This file is required by karma.conf.js and loads recursively all the .spec and framework files
-
-import 'zone.js/dist/zone-testing';
+        code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
 import {
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
 
-declare const window: any;
-
-// First, initialize the Angular testing environment.
 getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting()
-);
-
-// Then we find all the tests.
-const context = (window as any).require.context('./', true, /\.spec\.ts$/);
-// And load the modules.
-context.keys().map(context);`,
+);`,
         hidden: true
       };
 
-      // Index.html
+      // Simplified Index.html
       baseFiles['/src/index.html'] = {
         code: `<!doctype html>
 <html lang="en">
@@ -543,7 +384,6 @@ context.keys().map(context);`,
   <title>Angular Test</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
   <app-root></app-root>
@@ -552,23 +392,7 @@ context.keys().map(context);`,
         hidden: true
       };
 
-      // Global styles
-      baseFiles['/src/styles.css'] = {
-        code: `/* You can add global styles to this file, and also import other style files */`,
-        hidden: true
-      };
-
-      // Favicon placeholder
-      baseFiles['/src/favicon.ico'] = {
-        code: ``,
-        hidden: true
-      };
-
-      // Assets folder placeholder
-      baseFiles['/src/assets/.gitkeep'] = {
-        code: ``,
-        hidden: true
-      };
+      // Remove unnecessary files that might cause conflicts
       break;
       
     case 'react':
