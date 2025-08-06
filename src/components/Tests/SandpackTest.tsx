@@ -174,6 +174,12 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         .limit(1);
       console.log('Auth test result:', { data: authTest, error: authTestError });
 
+      // Test what auth.uid() returns in database context
+      console.log('Testing auth.uid() in database context...');
+      const { data: authUidTest, error: authUidError } = await supabase
+        .rpc('test_auth_uid');
+      console.log('auth.uid() test result:', { data: authUidTest, error: authUidError });
+
       // If no user, stop here
       if (!user) {
         alert('Authentication required! Please log in and try again.');
@@ -231,8 +237,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         console.log('✅ RLS POLICY SHOULD PASS: Found matching test_assignment');
       }
 
-      // Use upsert to prevent duplicates in case of multiple submissions
-      const { error } = await supabase.from('test_results').upsert({
+      // Try regular insert instead of upsert for testing
+      const { error } = await supabase.from('test_results').insert({
         assignment_id: assignmentId,
         question_id: questionId,  
         score: 1, // This is based on allTestsPassed, so it's already correct
@@ -240,8 +246,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         total_test_cases: total_test_cases,
         stdout: JSON.stringify(testResults, null, 2), // For logging/debugging
         stderr: '', // For schema compatibility
-      }, {
-        onConflict: 'assignment_id,question_id'
       });
       
       if (error) {
