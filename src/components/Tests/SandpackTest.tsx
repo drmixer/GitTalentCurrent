@@ -412,6 +412,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
           style={{ height: '60vh' }}
           headerChildren={<CustomTestHeader onRunTests={runTests} />}
           onComplete={handleTestComplete}
+          autorun={false}
         />
       </SandpackLayout>
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
