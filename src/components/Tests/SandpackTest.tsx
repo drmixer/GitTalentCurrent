@@ -205,6 +205,32 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         user_id: user.id, // Add this for debugging
       });
 
+      // Test the RLS policy condition manually
+      console.log('Testing RLS policy condition...');
+      const { data: policyTest, error: policyError } = await supabase
+        .from('test_assignments')
+        .select('*')
+        .eq('id', assignmentId)
+        .eq('developer_id', user.id);
+      
+      console.log('Policy test - looking for test_assignments where:');
+      console.log(`  test_assignments.id = "${assignmentId}"`);
+      console.log(`  test_assignments.developer_id = "${user.id}"`);
+      console.log('Policy test result:', policyTest);
+      console.log('Policy test error:', policyError);
+      
+      if (!policyTest || policyTest.length === 0) {
+        console.error('❌ RLS POLICY WILL FAIL: No matching test_assignment found');
+        console.log('Available test_assignments for this user:');
+        const { data: userAssignments } = await supabase
+          .from('test_assignments')
+          .select('*')
+          .eq('developer_id', user.id);
+        console.log(userAssignments);
+      } else {
+        console.log('✅ RLS POLICY SHOULD PASS: Found matching test_assignment');
+      }
+
       // Use upsert to prevent duplicates in case of multiple submissions
       const { error } = await supabase.from('test_results').upsert({
         assignment_id: assignmentId,
