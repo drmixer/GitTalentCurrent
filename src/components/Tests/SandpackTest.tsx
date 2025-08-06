@@ -143,121 +143,171 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setIsSubmitting(true);
     
     try {
-      // === AUTH DEBUG SECTION ===
-      console.log('=== AUTHENTICATION DEBUG ===');
+      console.log('=== ENHANCED AUTHENTICATION DEBUG ===');
       
-      // Check current user
+      // Get current user and session
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('Current user:', user);
-      console.log('User ID:', user?.id);
-      console.log('Auth error:', authError);
-      console.log('Expected user ID:', 'd6771413-36fb-4907-abf7-f304b255fc34');
-      console.log('IDs match:', user?.id === 'd6771413-36fb-4907-abf7-f304b255fc34');
-      
-      // Check session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      console.log('Current session:', sessionData.session);
-      console.log('Session error:', sessionError);
+      
+      console.log('User:', user?.id);
+      console.log('Session exists:', !!sessionData.session);
       console.log('Access token exists:', !!sessionData.session?.access_token);
       
-      if (sessionData.session?.expires_at) {
-        const expiresAt = new Date(sessionData.session.expires_at * 1000);
-        console.log('Token expires at:', expiresAt);
-        console.log('Token expired?', expiresAt < new Date());
-      }
-
-      // Test auth with a simple query
-      console.log('Testing auth with a simple query...');
-      const { data: authTest, error: authTestError } = await supabase
-        .from('users')
-        .select('id, role')
-        .limit(1);
-      console.log('Auth test result:', { data: authTest, error: authTestError });
-
-      // Test what auth.uid() returns in database context
-      console.log('Testing auth.uid() in database context...');
-      const { data: authUidTest, error: authUidError } = await supabase
-        .rpc('test_auth_uid');
-      console.log('auth.uid() test result:', { data: authUidTest, error: authUidError });
-
-      // If no user, stop here
-      if (!user) {
+      if (!user || !sessionData.session) {
         alert('Authentication required! Please log in and try again.');
         return;
       }
 
-      // === END AUTH DEBUG SECTION ===
+      // Test 1: Check if auth.uid() works via RPC
+      console.log('\n=== TEST 1: auth.uid() via RPC ===');
+      const { data: authUidTest, error: authUidError } = await supabase.rpc('test_auth_uid');
+      console.log('auth.uid() result:', authUidTest);
+      console.log('auth.uid() error:', authUidError);
+      
+      // Test 2: Comprehensive auth context debug
+      console.log('\n=== TEST 2: Comprehensive Auth Debug ===');
+      const { data: debugAuth, error: debugError } = await supabase.rpc('debug_auth_context');
+      console.log('Auth context debug:', debugAuth);
+      console.log('Auth context error:', debugError);
+      
+      // Test 3: Test insert conditions
+      console.log('\n=== TEST 3: Insert Conditions Test ===');
+      const { data: insertTest, error: insertTestError } = await supabase.rpc('test_insert_auth', {
+        p_assignment_id: assignmentId,
+        p_question_id: questionId
+      });
+      console.log('Insert test result:', insertTest);
+      console.log('Insert test error:', insertTestError);
+      
+      // Test 4: Try with explicit auth header (potential fix)
+      console.log('\n=== TEST 4: Explicit Auth Header Test ===');
+      try {
+        // Create a new client instance with explicit headers
+        const { createClient } = await import('@supabase/supabase-js');
+        const explicitAuthClient = createClient(
+          supabase.supabaseUrl,
+          supabase.supabaseKey,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${sessionData.session.access_token}`,
+              },
+            },
+            auth: {
+              persistSession: false, // Don't persist for this test
+            },
+          }
+        );
 
-      let passed_test_cases = 0;
-      let total_test_cases = 0;
+        // Test auth.uid() with explicit client
+        const { data: explicitAuthTest, error: explicitAuthError } = await explicitAuthClient.rpc('test_auth_uid');
+        console.log('Explicit auth test result:', explicitAuthTest);
+        console.log('Explicit auth error:', explicitAuthError);
 
-      if (testResults && typeof testResults === 'object') {
-        for (const fileName in testResults) {
-          const fileResults = testResults[fileName];
-          if (fileResults && fileResults.tests) {
-            const testCases = Object.values(fileResults.tests);
-            total_test_cases += testCases.length;
-            passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+        // If explicit auth works, try the insert with it
+        if (explicitAuthTest && !explicitAuthError) {
+          console.log('✅ Explicit auth works! Trying insert...');
+          
+          let passed_test_cases = 0;
+          let total_test_cases = 0;
+
+          if (testResults && typeof testResults === 'object') {
+            for (const fileName in testResults) {
+              const fileResults = testResults[fileName];
+              if (fileResults && fileResults.tests) {
+                const testCases = Object.values(fileResults.tests);
+                total_test_cases += testCases.length;
+                passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+              }
+            }
+          }
+          
+          const { error: explicitInsertError } = await explicitAuthClient
+            .from('test_results')
+            .insert({
+              assignment_id: assignmentId,
+              question_id: questionId,
+              score: 1,
+              passed_test_cases: passed_test_cases,
+              total_test_cases: total_test_cases,
+              stdout: JSON.stringify(testResults, null, 2),
+              stderr: '',
+            });
+
+          if (explicitInsertError) {
+            console.error('❌ Explicit insert failed:', explicitInsertError);
+          } else {
+            console.log('✅ SUCCESS! Explicit auth insert worked!');
+            alert('Solution submitted successfully!');
+            onTestComplete();
+            return;
           }
         }
+      } catch (explicitError) {
+        console.error('Explicit auth test failed:', explicitError);
       }
 
-      console.log('Submitting data:', {
-        assignment_id: assignmentId,
-        question_id: questionId,  
-        score: 1,
-        passed_test_cases: passed_test_cases,
-        total_test_cases: total_test_cases,
-        user_id: user.id, // Add this for debugging
-      });
+      // Test 5: Force session refresh and retry
+      console.log('\n=== TEST 5: Force Session Refresh ===');
+      try {
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        console.log('Session refresh result:', !!refreshData.session);
+        console.log('Session refresh error:', refreshError);
 
-      // Test the RLS policy condition manually
-      console.log('Testing RLS policy condition...');
-      const { data: policyTest, error: policyError } = await supabase
-        .from('test_assignments')
-        .select('*')
-        .eq('id', assignmentId)
-        .eq('developer_id', user.id);
-      
-      console.log('Policy test - looking for test_assignments where:');
-      console.log(`  test_assignments.id = "${assignmentId}"`);
-      console.log(`  test_assignments.developer_id = "${user.id}"`);
-      console.log('Policy test result:', policyTest);
-      console.log('Policy test error:', policyError);
-      
-      if (!policyTest || policyTest.length === 0) {
-        console.error('❌ RLS POLICY WILL FAIL: No matching test_assignment found');
-        console.log('Available test_assignments for this user:');
-        const { data: userAssignments } = await supabase
-          .from('test_assignments')
-          .select('*')
-          .eq('developer_id', user.id);
-        console.log(userAssignments);
-      } else {
-        console.log('✅ RLS POLICY SHOULD PASS: Found matching test_assignment');
+        if (refreshData.session && !refreshError) {
+          console.log('✅ Session refreshed, trying regular insert...');
+          
+          let passed_test_cases = 0;
+          let total_test_cases = 0;
+
+          if (testResults && typeof testResults === 'object') {
+            for (const fileName in testResults) {
+              const fileResults = testResults[fileName];
+              if (fileResults && fileResults.tests) {
+                const testCases = Object.values(fileResults.tests);
+                total_test_cases += testCases.length;
+                passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+              }
+            }
+          }
+
+          const { error: refreshedInsertError } = await supabase
+            .from('test_results')
+            .insert({
+              assignment_id: assignmentId,
+              question_id: questionId,
+              score: 1,
+              passed_test_cases: passed_test_cases,
+              total_test_cases: total_test_cases,
+              stdout: JSON.stringify(testResults, null, 2),
+              stderr: '',
+            });
+
+          if (refreshedInsertError) {
+            console.error('❌ Insert after refresh failed:', refreshedInsertError);
+          } else {
+            console.log('✅ SUCCESS! Insert after refresh worked!');
+            alert('Solution submitted successfully!');
+            onTestComplete();
+            return;
+          }
+        }
+      } catch (refreshError) {
+        console.error('Session refresh failed:', refreshError);
       }
 
-      // Try regular insert instead of upsert for testing
-      const { error } = await supabase.from('test_results').insert({
-        assignment_id: assignmentId,
-        question_id: questionId,  
-        score: 1, // This is based on allTestsPassed, so it's already correct
-        passed_test_cases: passed_test_cases,
-        total_test_cases: total_test_cases,
-        stdout: JSON.stringify(testResults, null, 2), // For logging/debugging
-        stderr: '', // For schema compatibility
-      });
+      // If we get here, all methods failed
+      console.log('\n=== ALL METHODS FAILED ===');
+      console.log('Summary of auth context issues:');
+      console.log('1. Standard auth.uid():', authUidTest);
+      console.log('2. Auth debug:', debugAuth);
+      console.log('3. Insert test:', insertTest);
       
-      if (error) {
-        console.error('Database error details:', error);
-        throw error;
-      }
+      throw new Error('Authentication context not working - all methods failed');
       
-      console.log('Solution submitted successfully!');
-      onTestComplete();
     } catch (error) {
       console.error('Failed to submit solution:', error);
-      alert('There was an error submitting your solution. Please try again.');
+      alert('There was an error submitting your solution. Please check the console for detailed debugging information.');
     } finally {
       setIsSubmitting(false);
     }
