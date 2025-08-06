@@ -11,6 +11,58 @@ import {
 import type { SandpackSetup, SandpackFiles } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
+// Simple inline toast notification component
+const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ 
+  message, 
+  type, 
+  onClose 
+}) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div 
+      className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 ease-in-out ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+      }`}
+      style={{
+        position: 'fixed',
+        top: '16px',
+        right: '16px',
+        padding: '12px 24px',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 1000,
+        backgroundColor: type === 'success' ? '#10b981' : '#ef4444',
+        color: 'white',
+        fontWeight: '500'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>{message}</span>
+        <button 
+          onClick={onClose}
+          style={{ 
+            marginLeft: '16px', 
+            background: 'none', 
+            border: 'none', 
+            color: 'white', 
+            cursor: 'pointer',
+            fontSize: '18px'
+          }}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Define the frameworks we support
 type SupportedFramework = 'react' | 'vue' | 'angular';
 
@@ -122,6 +174,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const { sandpack } = useSandpack();
   const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  const closeToast = () => {
+    setToast(null);
+  };
 
   const runTests = () => {
     sandpack.runTests();
@@ -136,7 +197,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   // Only this function saves to database - prevents duplicates
   const submitSolution = async () => {
     if (!allTestsPassed) {
-      alert('Please ensure all tests are passing before you submit.');
+      showToast('Please ensure all tests are passing before you submit.', 'error');
       return;
     }
 
@@ -154,7 +215,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       console.log('Access token exists:', !!sessionData.session?.access_token);
       
       if (!user || !sessionData.session) {
-        alert('Authentication required! Please log in and try again.');
+        showToast('Authentication required! Please log in and try again.', 'error');
         return;
       }
 
@@ -224,7 +285,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
           
           const { error: explicitInsertError } = await explicitAuthClient
             .from('test_results')
-            .insert({
+            .upsert({
               assignment_id: assignmentId,
               question_id: questionId,
               score: 1,
@@ -232,13 +293,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
               total_test_cases: total_test_cases,
               stdout: JSON.stringify(testResults, null, 2),
               stderr: '',
+            }, {
+              onConflict: 'assignment_id,question_id'
             });
 
           if (explicitInsertError) {
             console.error('❌ Explicit insert failed:', explicitInsertError);
           } else {
             console.log('✅ SUCCESS! Explicit auth insert worked!');
-            alert('Solution submitted successfully!');
+            showToast('Solution submitted successfully! 🎉', 'success');
             onTestComplete();
             return;
           }
@@ -273,7 +336,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
 
           const { error: refreshedInsertError } = await supabase
             .from('test_results')
-            .insert({
+            .upsert({
               assignment_id: assignmentId,
               question_id: questionId,
               score: 1,
@@ -281,13 +344,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
               total_test_cases: total_test_cases,
               stdout: JSON.stringify(testResults, null, 2),
               stderr: '',
+            }, {
+              onConflict: 'assignment_id,question_id'
             });
 
           if (refreshedInsertError) {
             console.error('❌ Insert after refresh failed:', refreshedInsertError);
           } else {
             console.log('✅ SUCCESS! Insert after refresh worked!');
-            alert('Solution submitted successfully!');
+            showToast('Solution submitted successfully! 🎉', 'success');
             onTestComplete();
             return;
           }
@@ -307,7 +372,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       
     } catch (error) {
       console.error('Failed to submit solution:', error);
-      alert('There was an error submitting your solution. Please check the console for detailed debugging information.');
+      showToast('There was an error submitting your solution. Please check the console for details.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -334,6 +399,13 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
 
   return (
     <>
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={closeToast} 
+        />
+      )}
       <SandpackLayout>
         <SandpackCodeEditor style={{ height: '60vh' }} />
         <SandpackTests
