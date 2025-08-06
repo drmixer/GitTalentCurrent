@@ -141,7 +141,47 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     }
 
     setIsSubmitting(true);
+    
     try {
+      // === AUTH DEBUG SECTION ===
+      console.log('=== AUTHENTICATION DEBUG ===');
+      
+      // Check current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+      console.log('User ID:', user?.id);
+      console.log('Auth error:', authError);
+      console.log('Expected user ID:', 'd6771413-36fb-4907-abf7-f304b255fc34');
+      console.log('IDs match:', user?.id === 'd6771413-36fb-4907-abf7-f304b255fc34');
+      
+      // Check session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current session:', sessionData.session);
+      console.log('Session error:', sessionError);
+      console.log('Access token exists:', !!sessionData.session?.access_token);
+      
+      if (sessionData.session?.expires_at) {
+        const expiresAt = new Date(sessionData.session.expires_at * 1000);
+        console.log('Token expires at:', expiresAt);
+        console.log('Token expired?', expiresAt < new Date());
+      }
+
+      // Test auth with a simple query
+      console.log('Testing auth with a simple query...');
+      const { data: authTest, error: authTestError } = await supabase
+        .from('users')
+        .select('id, role')
+        .limit(1);
+      console.log('Auth test result:', { data: authTest, error: authTestError });
+
+      // If no user, stop here
+      if (!user) {
+        alert('Authentication required! Please log in and try again.');
+        return;
+      }
+
+      // === END AUTH DEBUG SECTION ===
+
       let passed_test_cases = 0;
       let total_test_cases = 0;
 
@@ -156,6 +196,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         }
       }
 
+      console.log('Submitting data:', {
+        assignment_id: assignmentId,
+        question_id: questionId,  
+        score: 1,
+        passed_test_cases: passed_test_cases,
+        total_test_cases: total_test_cases,
+        user_id: user.id, // Add this for debugging
+      });
+
       // Use upsert to prevent duplicates in case of multiple submissions
       const { error } = await supabase.from('test_results').upsert({
         assignment_id: assignmentId,
@@ -169,7 +218,11 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         onConflict: 'assignment_id,question_id'
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Database error details:', error);
+        throw error;
+      }
+      
       console.log('Solution submitted successfully!');
       onTestComplete();
     } catch (error) {
