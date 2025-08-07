@@ -92,7 +92,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
 
   const isDashboardSnippet = displayMode === 'dashboardSnippet';
   
-  // ORIGINAL: Handle both old array format and new object format for contributions
+  // FIXED: Handle both old array format and new object format for contributions
   let contributions = [];
   let totalContributionsFromAPI = 0;
   
@@ -227,7 +227,7 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-            <div className="text-xl font-black text-gray-900 mb-1">{totalContributionsForDisplay}</div>
+            <div className="text-xl font-black text-gray-900 mb-1">{totalContributionsForDisplay}</div> {/* Use total from full data */}
             <div className="text-xs font-semibold text-gray-600">Total Contributions</div>
           </div>
           <div className="text-center p-3 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
