@@ -85,7 +85,7 @@ interface DashboardStats {
 
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
-    const { tabCounts, fetchUnreadCount } = useNotifications();
+    const { tabCounts } = useNotifications();
     // ADDED: Initialize useLocation
     const location = useLocation();
 
@@ -733,20 +733,11 @@ const RecruiterDashboard: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="mb-8 flex justify-between items-center">
-                    <div>
-                        <h1 className="text-3xl font-black text-gray-900 mb-2">
-                            Welcome, {userProfile.name}!
-                        </h1>
-                        <p className="text-gray-600">Manage your job listings and find the perfect developers for your team.</p>
-                    </div>
-                    <button
-                        onClick={() => fetchUnreadCount()}
-                        className="bg-blue-100 text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
-                    >
-                        <RefreshCw className="w-4 h-4 mr-2 inline" />
-                        Refresh Notifications
-                    </button>
+                <div className="mb-8">
+                    <h1 className="text-3xl font-black text-gray-900 mb-2">
+                        Welcome, {userProfile.name}!
+                    </h1>
+                    <p className="text-gray-600">Manage your job listings and find the perfect developers for your team.</p>
                 </div>
 
                 {success && (
