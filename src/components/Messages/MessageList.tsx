@@ -68,9 +68,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
           },
           (payload) => {
             console.log('Change in messages table detected (relevant to user):', payload);
-            // Could be more granular here by checking payload.eventType
-            // For INSERT: new message. For UPDATE: likely is_read change.
-            fetchMessageThreads(); // Refresh threads to update unread counts and last messages
+            fetchMessageThreads();
           }
         )
         .subscribe();
