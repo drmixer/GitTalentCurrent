@@ -156,156 +156,127 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 
 import { SandpackTestsProps } from '@codesandbox/sandpack-react';
 
-// Custom test runner that replaces SandpackTests entirely
-const CustomTestRunner: React.FC<{
-  onTestResults: (results: any) => void;
-  testCode: string;
-  testFile: string;
-}> = ({ onTestResults, testCode, testFile }) => {
-  const { sandpack } = useSandpack();
-  const [isRunning, setIsRunning] = useState(false);
-  const [testResults, setTestResults] = useState<any>(null);
-  const [hasRun, setHasRun] = useState(false);
+// Custom test display that shows results after Sandpack runs tests
+const TestResultsDisplay: React.FC<{
+  testResults: SandpackTestsProps | null;
+  isWaitingForTests: boolean;
+}> = ({ testResults, isWaitingForTests }) => {
+  
+  if (isWaitingForTests) {
+    return (
+      <div style={{ 
+        height: '100%',
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#007bff',
+        fontSize: '14px'
+      }}>
+        Running tests...
+      </div>
+    );
+  }
 
-  const runTests = async () => {
-    setIsRunning(true);
-    setHasRun(true);
-    
-    try {
-      // Add test file if it doesn't exist
-      if (!sandpack.files[testFile]) {
-        sandpack.updateFile(testFile, testCode);
-      }
-      
-      // Wait a bit for file to be added
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Run the sandpack environment
-      sandpack.runSandpack();
-      
-      // Listen for test results from the iframe
-      const handleMessage = (event: MessageEvent) => {
-        if (event.data?.type === 'test-results') {
-          const results = event.data.results;
-          setTestResults(results);
-          onTestResults(results);
-          setIsRunning(false);
-        }
-      };
-      
-      window.addEventListener('message', handleMessage);
-      
-      // Fallback timeout
-      setTimeout(() => {
-        setIsRunning(false);
-        // Create mock successful results for now
-        const mockResults = {
-          [testFile]: {
-            tests: {
-              'Mock Test': { status: 'pass', title: 'Tests completed' }
-            }
+  if (!testResults) {
+    return (
+      <div style={{ 
+        height: '100%',
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#6b7280',
+        fontSize: '14px'
+      }}>
+        Click the ▶️ Run button below the code editor to execute tests
+      </div>
+    );
+  }
+
+  // Parse real test results
+  const allTests: Array<{ name: string; status: string; error?: string }> = [];
+  let totalTests = 0;
+  let passedTests = 0;
+
+  if (typeof testResults === 'object') {
+    for (const fileName in testResults) {
+      const fileResults = testResults[fileName];
+      if (fileResults && fileResults.tests) {
+        for (const testName in fileResults.tests) {
+          const test = fileResults.tests[testName];
+          totalTests++;
+          allTests.push({
+            name: testName,
+            status: test.status,
+            error: test.error
+          });
+          if (test.status === 'pass') {
+            passedTests++;
           }
-        };
-        setTestResults(mockResults);
-        onTestResults(mockResults);
-        window.removeEventListener('message', handleMessage);
-      }, 5000);
-      
-    } catch (error) {
-      console.error('Test execution failed:', error);
-      setIsRunning(false);
-      setTestResults({ error: error.message });
+        }
+      }
     }
-  };
+  }
+
+  const allPassed = totalTests > 0 && passedTests === totalTests;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', padding: '16px', overflow: 'auto' }}>
       <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        padding: '8px 12px',
-        borderBottom: '1px solid #e5e5e5',
-        backgroundColor: '#f8f9fa'
+        marginBottom: '16px', 
+        fontSize: '16px', 
+        fontWeight: '600',
+        color: allPassed ? '#28a745' : '#dc3545'
       }}>
-        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>Tests</h4>
-        <button 
-          onClick={runTests} 
-          disabled={isRunning}
-          style={{ 
-            padding: '6px 12px', 
-            background: isRunning ? '#6c757d' : '#007bff', 
-            color: '#fff', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: isRunning ? 'not-allowed' : 'pointer',
-            fontSize: '13px',
-            fontWeight: '500'
-          }}
-        >
-          {isRunning ? 'Running...' : 'Run Tests'}
-        </button>
+        {allPassed ? '✅' : '❌'} {passedTests}/{totalTests} tests passed
       </div>
-      <div style={{ flex: 1, padding: '16px' }}>
-        {!hasRun ? (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            height: '100%',
-            color: '#6b7280',
-            fontSize: '14px'
-          }}>
-            Click "Run Tests" to execute your tests
-          </div>
-        ) : isRunning ? (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            height: '100%',
-            color: '#007bff',
-            fontSize: '14px'
-          }}>
-            Running tests...
-          </div>
-        ) : testResults ? (
-          <div>
-            <h5 style={{ margin: '0 0 12px 0', color: '#28a745' }}>✅ Tests completed successfully!</h5>
-            <div style={{ 
-              background: '#f8f9fa', 
-              padding: '12px', 
+      
+      <div>
+        {allTests.map((test, index) => (
+          <div 
+            key={index}
+            style={{ 
+              marginBottom: '12px',
+              padding: '8px',
               borderRadius: '4px',
-              fontSize: '12px',
-              fontFamily: 'monospace'
+              backgroundColor: test.status === 'pass' ? '#d4edda' : '#f8d7da',
+              border: `1px solid ${test.status === 'pass' ? '#c3e6cb' : '#f5c6cb'}`
+            }}
+          >
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: '500',
+              color: test.status === 'pass' ? '#155724' : '#721c24'
             }}>
-              <pre>{JSON.stringify(testResults, null, 2)}</pre>
+              {test.status === 'pass' ? '✓' : '✗'} {test.name}
             </div>
+            {test.error && (
+              <div style={{ 
+                fontSize: '12px',
+                color: '#721c24',
+                marginTop: '4px',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {test.error}
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ color: '#dc3545' }}>
-            No test results available
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );
 };
 
 // Child component that contains the UI and logic which depends on the Sandpack context
-const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { 
-  testCode: string;
-  testFile: string;
-}> = ({
+const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   assignmentId,
   questionId,
   onTestComplete,
-  testCode,
-  testFile,
 }) => {
   const { sandpack } = useSandpack();
-  const [testResults, setTestResults] = useState<any>(null);
+  const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isWaitingForTests, setIsWaitingForTests] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -316,9 +287,25 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & {
     setToast(null);
   };
 
-  const handleTestResults = (results: any) => {
-    setTestResults(results);
-  };
+  // Listen for when Sandpack runs tests
+  useEffect(() => {
+    const unsubscribe = sandpack.listen((message) => {
+      if (message.type === 'test') {
+        setIsWaitingForTests(false);
+        setTestResults(message as any);
+      } else if (message.type === 'start' && sandpack.status === 'running') {
+        // Check if tests are being run
+        const hasTestFile = Object.keys(sandpack.files).some(file => 
+          file.includes('.test.') || file.includes('.spec.')
+        );
+        if (hasTestFile) {
+          setIsWaitingForTests(true);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [sandpack]);
 
   const submitSolution = async () => {
     if (!allTestsPassed) {
@@ -394,8 +381,19 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & {
         if (explicitAuthTest && !explicitAuthError) {
           console.log('✅ Explicit auth works! Trying insert...');
           
-          let passed_test_cases = 1; // Mock for now
-          let total_test_cases = 1; // Mock for now
+          let passed_test_cases = 0;
+          let total_test_cases = 0;
+
+          if (testResults && typeof testResults === 'object') {
+            for (const fileName in testResults) {
+              const fileResults = testResults[fileName];
+              if (fileResults && fileResults.tests) {
+                const testCases = Object.values(fileResults.tests);
+                total_test_cases += testCases.length;
+                passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+              }
+            }
+          }
           
           const { error: explicitInsertError } = await explicitAuthClient
             .from('test_results')
@@ -434,8 +432,19 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & {
         if (refreshData.session && !refreshError) {
           console.log('✅ Session refreshed, trying regular insert...');
           
-          let passed_test_cases = 1; // Mock for now
-          let total_test_cases = 1; // Mock for now
+          let passed_test_cases = 0;
+          let total_test_cases = 0;
+
+          if (testResults && typeof testResults === 'object') {
+            for (const fileName in testResults) {
+              const fileResults = testResults[fileName];
+              if (fileResults && fileResults.tests) {
+                const testCases = Object.values(fileResults.tests);
+                total_test_cases += testCases.length;
+                passed_test_cases += testCases.filter(t => t.status === 'pass').length;
+              }
+            }
+          }
 
           const { error: refreshedInsertError } = await supabase
             .from('test_results')
@@ -482,9 +491,22 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & {
   };
 
   const allTestsPassed = useMemo(() => {
-    if (!testResults) return false;
-    // For now, just check if we have any results (will improve this)
-    return Object.keys(testResults).length > 0 && !testResults.error;
+    if (!testResults || typeof testResults !== 'object') return false;
+
+    // Iterate over each test file in the results
+    for (const fileName in testResults) {
+      const fileResults = testResults[fileName];
+      if (fileResults && fileResults.tests) {
+        // Iterate over each test case in the file
+        for (const testName in fileResults.tests) {
+          if (fileResults.tests[testName].status !== 'pass') {
+            return false; // If any test has not passed, return false
+          }
+        }
+      }
+    }
+    // If all tests in all files have passed
+    return Object.keys(testResults).length > 0;
   }, [testResults]);
 
   return (
@@ -496,19 +518,38 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & {
           onClose={closeToast} 
         />
       )}
-      {/* Custom layout to hide Sandpack's default run button */}
+      
+      {/* Custom layout using Sandpack's built-in run button */}
       <div style={{ display: 'flex', height: '60vh' }}>
         <div style={{ flex: 1, border: '1px solid #e5e5e5', borderRadius: '4px 0 0 4px' }}>
           <SandpackCodeEditor style={{ height: '100%' }} />
         </div>
-        <div style={{ flex: 1, border: '1px solid #e5e5e5', borderLeft: 'none', borderRadius: '0 4px 4px 0' }}>
-          <CustomTestRunner 
-            onTestResults={handleTestResults}
-            testCode={testCode}
-            testFile={testFile}
-          />
+        <div style={{ 
+          flex: 1, 
+          border: '1px solid #e5e5e5', 
+          borderLeft: 'none', 
+          borderRadius: '0 4px 4px 0',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{ 
+            padding: '8px 12px',
+            borderBottom: '1px solid #e5e5e5',
+            backgroundColor: '#f8f9fa',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            Test Results
+          </div>
+          <div style={{ flex: 1 }}>
+            <TestResultsDisplay 
+              testResults={testResults}
+              isWaitingForTests={isWaitingForTests}
+            />
+          </div>
         </div>
       </div>
+      
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={submitSolution}
@@ -770,7 +811,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   // Create framework-specific setup files
   const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
 
-  // Include all files but hide the test file
+  // Include test file from the start (but hidden)
   const files = {
     [mainFile]: { code: starterCode, active: true },
     [testFile]: { code: testCode, hidden: true },
@@ -788,11 +829,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
         initMode: 'lazy'
       }}
     >
-      <SandpackLayoutManager 
-        {...rest} 
-        testCode={testCode}
-        testFile={testFile}
-      />
+      <SandpackLayoutManager {...rest} />
     </SandpackProvider>
   );
 };
