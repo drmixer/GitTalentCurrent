@@ -7,6 +7,7 @@ import {
   SandpackTests,
   useSandpack,
   SandpackFileExplorer,
+  useSandpackClient,
 } from '@codesandbox/sandpack-react';
 import type { SandpackSetup, SandpackFiles } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
@@ -169,7 +170,9 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   onTestComplete,
 }) => {
   const { sandpack } = useSandpack();
+  const sandpackClient = useSandpackClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [testResults, setTestResults] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -180,11 +183,46 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setToast(null);
   };
 
-  // Check if all tests are passing by looking at the sandpack status
+  // Listen for test results from the sandpack client
+  useEffect(() => {
+    if (!sandpackClient) return;
+
+    const unsubscribe = sandpackClient.listen((message) => {
+      if (message.type === 'test') {
+        console.log('Test results received:', message);
+        setTestResults(message);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [sandpackClient]);
+
+  // Check if all tests are passing based on the test results
   const allTestsPassed = useMemo(() => {
-    // We'll determine this based on the test output from SandpackTests component
-    // For now, we'll make this always false until tests are run and pass
-    return sandpack.status === 'complete' && !sandpack.error;
+    if (!testResults) return false;
+    
+    console.log('Checking test results:', testResults);
+    
+    // Check if we have test results and they indicate success
+    if (testResults.type === 'test' && testResults.event === 'test_end') {
+      const results = testResults.results;
+      if (results && Array.isArray(results)) {
+        const allPassed = results.every((result: any) => result.status === 'pass');
+        console.log('All tests passed:', allPassed);
+        return allPassed;
+      }
+    }
+    
+    // Alternative check for different test result formats
+    if (testResults.success !== undefined) {
+      console.log('Test success:', testResults.success);
+      return testResults.success;
+    }
+    
+    return false;
+  }, [testResults]); && !sandpack.error;
   }, [sandpack.status, sandpack.error]);
 
   const submitSolution = async () => {
