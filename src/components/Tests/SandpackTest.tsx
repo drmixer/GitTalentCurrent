@@ -222,8 +222,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     }
     
     return false;
-  }, [testResults]); && !sandpack.error;
-  }, [sandpack.status, sandpack.error]);
+  }, [testResults]);
 
   const submitSolution = async () => {
     if (!allTestsPassed) {
