@@ -243,7 +243,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                       {formatSimpleDate(latestNotification.created_at)}
                     </p>
                   </div>
-                </li>
+                </Link>
               );
             }
           })}
