@@ -6,7 +6,9 @@ import {
   getContributionColorClass,
   getContributionTooltipText,
   calculateLanguagePercentage,
-  getLanguageColorClass
+  getLanguageColorClass,
+  normalizeContributionData,
+  calculateContributionStats
 } from '../../utils/githubUtils';
 
 interface RealGitHubChartProps {
@@ -92,23 +94,25 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
 
   const isDashboardSnippet = displayMode === 'dashboardSnippet';
   
-  // FIXED: Handle both old array format and new object format for contributions
+  // FIXED: Handle both old array format and new object format for contributions with improved date handling
   let contributions = [];
   let totalContributionsFromAPI = 0;
   
   if (gitHubData.contributions) {
     if (Array.isArray(gitHubData.contributions)) {
-      // Old format: direct array
-      contributions = gitHubData.contributions;
+      // Old format: direct array - normalize the data
+      contributions = normalizeContributionData(gitHubData.contributions);
       totalContributionsFromAPI = contributions.reduce((sum, day) => sum + (day.count || 0), 0);
     } else if (typeof gitHubData.contributions === 'object' && gitHubData.contributions !== null) {
       // New format: object with calendar property
       if (Array.isArray(gitHubData.contributions.calendar)) {
-        contributions = gitHubData.contributions.calendar.map(day => ({
+        const rawCalendarData = gitHubData.contributions.calendar.map(day => ({
+          date: day.date,
           count: day.contributionCount || day.count || 0,
-          level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4), // Convert count to level (0-4)
-          date: day.date
+          contributionCount: day.contributionCount || day.count || 0,
+          level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4)
         }));
+        contributions = normalizeContributionData(rawCalendarData);
         totalContributionsFromAPI = gitHubData.contributions.totalContributions || 
           contributions.reduce((sum, day) => sum + (day.count || 0), 0);
       } else {
@@ -125,13 +129,19 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
     }
   }
   
+  // Sort contributions by date to ensure proper chronological order
+  contributions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
   const contributionsToDisplay = isDashboardSnippet
-    ? contributions.slice(-84)
+    ? contributions.slice(-84) // Last 12 weeks for dashboard snippet
     : contributions;
 
   // Use totalContributions from the API data if available, otherwise calculate
   const totalContributionsForDisplay = totalContributionsFromAPI || 
     contributionsToDisplay.reduce((sum, day) => sum + (day.count || 0), 0);
+
+  // Calculate contribution stats using the utility function
+  const contributionStats = calculateContributionStats(gitHubData.contributions);
 
   // If we have data, render the GitHub contribution chart
   return (
@@ -227,19 +237,19 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-            <div className="text-xl font-black text-gray-900 mb-1">{totalContributionsForDisplay}</div> {/* Use total from full data */}
+            <div className="text-xl font-black text-gray-900 mb-1">{contributionStats.totalContributions}</div>
             <div className="text-xs font-semibold text-gray-600">Total Contributions</div>
           </div>
           <div className="text-center p-3 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-            <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.currentStreak || 0}</div>
+            <div className="text-xl font-black text-gray-900 mb-1">{contributionStats.currentStreak}</div>
             <div className="text-xs font-semibold text-gray-600">Current Streak</div>
           </div>
           <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-            <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.longestStreak || 0}</div>
+            <div className="text-xl font-black text-gray-900 mb-1">{contributionStats.longestStreak}</div>
             <div className="text-xs font-semibold text-gray-600">Longest Streak</div>
           </div>
           <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-100">
-            <div className="text-xl font-black text-gray-900 mb-1">{gitHubData.averageContributions || 0}</div>
+            <div className="text-xl font-black text-gray-900 mb-1">{contributionStats.averagePerDay}</div>
             <div className="text-xs font-semibold text-gray-600">Avg per Day</div>
           </div>
         </div>
