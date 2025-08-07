@@ -19,6 +19,22 @@ interface RealGitHubChartProps {
   displayMode?: 'full' | 'dashboardSnippet';
 }
 
+// TIMEZONE FIX: Helper function to parse GitHub dates as UTC
+function parseGitHubDateAsUTC(dateString: string): Date {
+  // GitHub returns dates like "2025-08-06" which should be treated as UTC
+  // Adding 'T00:00:00Z' ensures it's parsed as UTC, not local timezone
+  return new Date(`${dateString}T00:00:00Z`);
+}
+
+// TIMEZONE FIX: Helper function to format date consistently
+function formatDateForDisplay(date: Date): string {
+  // Use UTC methods to avoid timezone shifts
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
   githubHandle,
   gitHubData, // Use destructured prop
@@ -92,38 +108,89 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
 
   const isDashboardSnippet = displayMode === 'dashboardSnippet';
   
-  // FIXED: Handle both old array format and new object format for contributions
+  // TIMEZONE FIX: Handle both old array format and new object format for contributions
   let contributions = [];
   let totalContributionsFromAPI = 0;
   
   if (gitHubData.contributions) {
     if (Array.isArray(gitHubData.contributions)) {
-      // Old format: direct array
-      contributions = gitHubData.contributions;
+      // Old format: direct array - apply timezone fix
+      contributions = gitHubData.contributions.map(day => {
+        // DEBUG LOGGING
+        console.log(`[TIMEZONE DEBUG] Processing old format contribution:`, {
+          originalDate: day.date,
+          originalCount: day.count,
+          parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null,
+          formattedDate: day.date ? formatDateForDisplay(parseGitHubDateAsUTC(day.date)) : null
+        });
+        
+        return {
+          count: day.count || 0,
+          level: Math.min(Math.floor((day.count || 0) / 5), 4),
+          date: day.date,
+          // TIMEZONE FIX: Store both original and UTC-parsed date
+          parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null
+        };
+      });
       totalContributionsFromAPI = contributions.reduce((sum, day) => sum + (day.count || 0), 0);
     } else if (typeof gitHubData.contributions === 'object' && gitHubData.contributions !== null) {
-      // New format: object with calendar property
+      // New format: object with calendar property - apply timezone fix
       if (Array.isArray(gitHubData.contributions.calendar)) {
-        contributions = gitHubData.contributions.calendar.map(day => ({
-          count: day.contributionCount || day.count || 0,
-          level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4), // Convert count to level (0-4)
-          date: day.date
-        }));
+        contributions = gitHubData.contributions.calendar.map(day => {
+          const contributionCount = day.contributionCount || day.count || 0;
+          
+          // DEBUG LOGGING
+          console.log(`[TIMEZONE DEBUG] Processing new format contribution:`, {
+            originalDate: day.date,
+            originalContributionCount: contributionCount,
+            parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null,
+            formattedDate: day.date ? formatDateForDisplay(parseGitHubDateAsUTC(day.date)) : null,
+            localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            currentTime: new Date().toISOString()
+          });
+          
+          return {
+            count: contributionCount,
+            level: Math.min(Math.floor(contributionCount / 5), 4), // Convert count to level (0-4)
+            date: day.date,
+            // TIMEZONE FIX: Store both original and UTC-parsed date
+            parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null
+          };
+        });
         totalContributionsFromAPI = gitHubData.contributions.totalContributions || 
           contributions.reduce((sum, day) => sum + (day.count || 0), 0);
       } else {
         // Fallback if calendar is not an array or missing
-        console.warn('gitHubData.contributions.calendar is not an array or missing:', gitHubData.contributions);
+        console.warn('[TIMEZONE DEBUG] gitHubData.contributions.calendar is not an array or missing:', gitHubData.contributions);
         contributions = [];
         totalContributionsFromAPI = gitHubData.contributions.totalContributions || 0;
       }
     } else {
       // Handle case where contributions is neither array nor valid object
-      console.warn('gitHubData.contributions is not in expected format:', gitHubData.contributions);
+      console.warn('[TIMEZONE DEBUG] gitHubData.contributions is not in expected format:', gitHubData.contributions);
       contributions = [];
       totalContributionsFromAPI = 0;
     }
   }
+
+  // DEBUG LOGGING: Log the first few and last few contributions to see the pattern
+  console.log(`[TIMEZONE DEBUG] Final contributions sample:`, {
+    totalContributions: contributions.length,
+    firstFew: contributions.slice(0, 3).map(day => ({
+      originalDate: day.date,
+      parsedDate: day.parsedDate?.toISOString(),
+      count: day.count
+    })),
+    lastFew: contributions.slice(-3).map(day => ({
+      originalDate: day.date,
+      parsedDate: day.parsedDate?.toISOString(),
+      count: day.count
+    })),
+    todayForComparison: {
+      local: new Date().toISOString().split('T')[0],
+      utc: formatDateForDisplay(new Date())
+    }
+  });
   
   const contributionsToDisplay = isDashboardSnippet
     ? contributions.slice(-84)
