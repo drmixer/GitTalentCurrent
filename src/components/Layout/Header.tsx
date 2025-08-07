@@ -219,9 +219,6 @@ export const Header = () => {
                     <button
                       id="notification-button" // Added ID for click outside logic
                       onClick={() => {
-                        if (!showNotificationsDropdown && unreadCount > 0) {
-                          markAllAsRead();
-                        }
                         setShowNotificationsDropdown(!showNotificationsDropdown);
                       }}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
@@ -239,6 +236,7 @@ export const Header = () => {
                           onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
                           onNavigate={handleNavigateToTab} // Pass the new handler
                           fetchUnreadCount={fetchUnreadCount}
+                          markAllAsRead={markAllAsRead}
                         />
                       </div>
                     )}

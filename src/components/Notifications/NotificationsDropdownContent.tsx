@@ -19,9 +19,10 @@ interface NotificationsDropdownContentProps {
   onClose: () => void;
   onNavigate: (tab: string) => void;
   fetchUnreadCount: () => void;
+  markAllAsRead: () => void;
 }
 
-export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount }) => {
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount, markAllAsRead: contextMarkAllAsRead }) => {
   const { userProfile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,24 +100,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }
   };
 
-  const markAllAsRead = async () => {
-    try {
-      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-      if (unreadIds.length === 0) return;
-
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .in('id', unreadIds);
-
-      if (error) throw error;
-
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      fetchUnreadCount();
-    } catch (err: any) {
-      console.error('Error marking all notifications as read:', err.message);
-    }
-  };
 
   const getNotificationIcon = (type: Notification['type'], isRead: boolean) => {
     switch (type) {
@@ -189,7 +172,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       <div className="flex justify-between items-center p-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
         <button
-          onClick={markAllAsRead}
+          onClick={contextMarkAllAsRead}
           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
           disabled={notifications.every(n => n.is_read) || isLoading}
         >
