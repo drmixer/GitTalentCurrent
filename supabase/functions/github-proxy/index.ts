@@ -1,10 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info",
   "Access-Control-Max-Age": "86400"
 };
+
 async function getInstallationAccessToken(supabaseClient, installationId) {
   try {
     const { data: tokenData, error: tokenError } = await supabaseClient.functions.invoke('get-github-token', {
@@ -21,6 +23,7 @@ async function getInstallationAccessToken(supabaseClient, installationId) {
     return null;
   }
 }
+
 // Fallback method to get contribution data without authentication
 async function fetchContributionDataFallback(username) {
   console.log(`[github-proxy] Attempting fallback contribution fetch for ${username}`);
@@ -45,14 +48,27 @@ async function fetchContributionDataFallback(username) {
       // Generate a year's worth of contribution data
       const calendar = [];
       const today = new Date();
+      
+      // TIMEZONE FIX: Generate dates consistently in UTC
       for(let i = 365; i >= 0; i--){
         const date = new Date(today);
-        date.setDate(date.getDate() - i);
+        date.setUTCDate(date.getUTCDate() - i); // Use UTC methods
         // Add some randomness based on the actual data we found
         const randomIndex = Math.floor(Math.random() * contributionMatch.length);
         const count = parseInt(contributionMatch[randomIndex]?.match(/\d+/)?.[0] || '0');
+        
+        // TIMEZONE DEBUG: Log a few sample dates
+        if (i < 3 || i > 362) {
+          console.log(`[TIMEZONE DEBUG - FALLBACK] Generated date:`, {
+            daysBack: i,
+            isoString: date.toISOString(),
+            dateOnly: date.toISOString().split('T')[0],
+            count: Math.floor(count * Math.random() * 0.3)
+          });
+        }
+        
         calendar.push({
-          date: date.toISOString().split('T')[0],
+          date: date.toISOString().split('T')[0], // Always return YYYY-MM-DD format
           contributionCount: Math.floor(count * Math.random() * 0.3) // Scale down and randomize
         });
       }
@@ -69,16 +85,19 @@ async function fetchContributionDataFallback(username) {
     return generateMockContributionData();
   }
 }
+
 // Generate realistic mock contribution data
 function generateMockContributionData() {
   console.log('[github-proxy] Generating mock contribution data');
   const calendar = [];
   const today = new Date();
+  
+  // TIMEZONE FIX: Generate dates consistently in UTC
   for(let i = 365; i >= 0; i--){
     const date = new Date(today);
-    date.setDate(date.getDate() - i);
+    date.setUTCDate(date.getUTCDate() - i); // Use UTC methods
     // Generate realistic contribution patterns
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = date.getUTCDay(); // Use UTC day
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     // Lower activity on weekends, higher on weekdays
     const baseActivity = isWeekend ? 0.3 : 0.8;
@@ -87,8 +106,20 @@ function generateMockContributionData() {
     if (randomFactor < baseActivity) {
       contributionCount = Math.floor(Math.random() * 8) + 1;
     }
+    
+    // TIMEZONE DEBUG: Log a few sample dates
+    if (i < 3 || i > 362) {
+      console.log(`[TIMEZONE DEBUG - MOCK] Generated date:`, {
+        daysBack: i,
+        isoString: date.toISOString(),
+        dateOnly: date.toISOString().split('T')[0],
+        dayOfWeek,
+        contributionCount
+      });
+    }
+    
     calendar.push({
-      date: date.toISOString().split('T')[0],
+      date: date.toISOString().split('T')[0], // Always return YYYY-MM-DD format
       contributionCount
     });
   }
@@ -99,6 +130,7 @@ function generateMockContributionData() {
     totalContributions
   };
 }
+
 async function fetchDetailedContributionData(username, authToken) {
   if (!authToken) {
     console.log('[github-proxy] No auth token, trying fallback method');
@@ -189,7 +221,16 @@ async function fetchDetailedContributionData(username, authToken) {
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
     }
     const data = await response.json();
-    console.log('[github-proxy] GraphQL response:', JSON.stringify(data, null, 2));
+    console.log('[github-proxy] GraphQL response received, processing...');
+    
+    // TIMEZONE DEBUG: Log raw GraphQL response structure
+    console.log('[TIMEZONE DEBUG - GRAPHQL] Raw contribution data structure:', {
+      hasUser: !!data.data?.user,
+      hasContributionsCollection: !!data.data?.user?.contributionsCollection,
+      hasCalendar: !!data.data?.user?.contributionsCollection?.contributionCalendar,
+      weekCount: data.data?.user?.contributionsCollection?.contributionCalendar?.weeks?.length || 0
+    });
+    
     if (data.errors) {
       console.error('[github-proxy] GraphQL errors:', data.errors);
       throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
@@ -199,9 +240,24 @@ async function fetchDetailedContributionData(username, authToken) {
       console.warn('[github-proxy] No contributions collection found for user:', username);
       return await fetchContributionDataFallback(username);
     }
-    // Extract calendar data
+    
+    // Extract calendar data with timezone debugging
     const calendarData = contributionsCollection.contributionCalendar?.weeks?.flatMap((w)=>w.contributionDays) || [];
     console.log(`[github-proxy] Found ${calendarData.length} calendar days for ${username}`);
+    
+    // TIMEZONE DEBUG: Log sample dates from GitHub API
+    const sampleDates = calendarData.slice(0, 5).concat(calendarData.slice(-5));
+    console.log('[TIMEZONE DEBUG - GITHUB API] Sample contribution dates from GraphQL:', 
+      sampleDates.map(day => ({
+        originalDate: day.date,
+        contributionCount: day.contributionCount,
+        // Show how JavaScript would parse this date in different ways
+        jsDateDefault: new Date(day.date).toISOString(),
+        jsDateWithUTC: new Date(`${day.date}T00:00:00Z`).toISOString(),
+        localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }))
+    );
+    
     // Extract recent commit data
     const recentCommits = [];
     if (contributionsCollection.commitContributionsByRepository) {
@@ -260,7 +316,19 @@ async function fetchDetailedContributionData(username, authToken) {
       ...recentIssues
     ].sort((a, b)=>new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).slice(0, 50); // Keep most recent 50 activities
     const totalContributions = calendarData.reduce((sum, day)=>sum + day.contributionCount, 0);
+    
     console.log(`[github-proxy] Fetched ${calendarData.length} calendar days, ${allActivity.length} recent activities for ${username}, total contributions: ${totalContributions}`);
+    
+    // TIMEZONE DEBUG: Log final return structure
+    console.log('[TIMEZONE DEBUG - RETURN DATA] Final calendar data sample:', {
+      totalDays: calendarData.length,
+      firstDay: calendarData[0],
+      lastDay: calendarData[calendarData.length - 1],
+      totalContributions,
+      serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      serverTime: new Date().toISOString()
+    });
+    
     return {
       calendar: calendarData,
       recentActivity: allActivity,
@@ -272,6 +340,7 @@ async function fetchDetailedContributionData(username, authToken) {
     return await fetchContributionDataFallback(username);
   }
 }
+
 async function fetchRecentCommits(username, authToken) {
   if (!authToken) return [];
   try {
@@ -305,6 +374,7 @@ async function fetchRecentCommits(username, authToken) {
     return [];
   }
 }
+
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -318,6 +388,15 @@ Deno.serve(async (req)=>{
       throw new Error("GitHub handle is required");
     }
     console.log(`[github-proxy] Fetching data for ${handle}, installationId: ${installationId}`);
+    
+    // TIMEZONE DEBUG: Log server environment
+    console.log('[TIMEZONE DEBUG - SERVER] Server environment:', {
+      serverTime: new Date().toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezoneOffset: new Date().getTimezoneOffset(),
+      platform: Deno.build.os
+    });
+    
     const headers = {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "GitTalent-App"
@@ -382,6 +461,16 @@ Deno.serve(async (req)=>{
       totalStars,
       authTokenUsed: !!authToken
     });
+    
+    // TIMEZONE DEBUG: Log final response structure
+    console.log('[TIMEZONE DEBUG - FINAL RESPONSE] Response structure:', {
+      contributionsType: typeof contributionData,
+      hasCalendar: !!contributionData?.calendar,
+      calendarLength: contributionData?.calendar?.length || 0,
+      sampleContribution: contributionData?.calendar?.[0],
+      fetchedAt: response.fetchedAt
+    });
+    
     return new Response(JSON.stringify(response), {
       headers: {
         "Content-Type": "application/json",
