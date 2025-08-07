@@ -127,9 +127,8 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
         return {
           count: day.count || 0,
           level: Math.min(Math.floor((day.count || 0) / 5), 4),
-          date: day.date,
-          // TIMEZONE FIX: Store both original and UTC-parsed date
-          parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null
+          date: day.date, // TIMEZONE FIX: Keep original GitHub date string for display
+          // Remove parsedDate since we don't need it for positioning
         };
       });
       totalContributionsFromAPI = contributions.reduce((sum, day) => sum + (day.count || 0), 0);
@@ -146,15 +145,15 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
             parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null,
             formattedDate: day.date ? formatDateForDisplay(parseGitHubDateAsUTC(day.date)) : null,
             localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            currentTime: new Date().toISOString()
+            currentTime: new Date().toISOString(),
+            keepingOriginalDate: day.date // This is what we'll use for chart positioning
           });
           
           return {
             count: contributionCount,
             level: Math.min(Math.floor(contributionCount / 5), 4), // Convert count to level (0-4)
-            date: day.date,
-            // TIMEZONE FIX: Store both original and UTC-parsed date
-            parsedDate: day.date ? parseGitHubDateAsUTC(day.date) : null
+            date: day.date, // TIMEZONE FIX: Keep original GitHub date string for display and positioning
+            // Remove parsedDate since we don't need it for positioning
           };
         });
         totalContributionsFromAPI = gitHubData.contributions.totalContributions || 
@@ -178,13 +177,13 @@ export const RealGitHubChart: React.FC<RealGitHubChartProps> = ({
     totalContributions: contributions.length,
     firstFew: contributions.slice(0, 3).map(day => ({
       originalDate: day.date,
-      parsedDate: day.parsedDate?.toISOString(),
-      count: day.count
+      count: day.count,
+      level: day.level
     })),
     lastFew: contributions.slice(-3).map(day => ({
       originalDate: day.date,
-      parsedDate: day.parsedDate?.toISOString(),
-      count: day.count
+      count: day.count,
+      level: day.level
     })),
     todayForComparison: {
       local: new Date().toISOString().split('T')[0],
