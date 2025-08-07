@@ -1,11 +1,10 @@
 // src/pages/RecruiterDashboard.tsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNotifications } from '../contexts/NotificationsContext'; // MODIFIED: Corrected import path
-import { supabase } from '../lib/supabase';
-// MODIFIED: Import useLocation
-import { Navigate, useLocation } from 'react-router-dom';
+import { useNotifications } from '../contexts/NotificationsContext'; 
+// MODIFIED: Import useNavigate
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
     Users,
     Briefcase,
@@ -83,11 +82,18 @@ interface DashboardStats {
     unreadMessages: number;
 }
 
+const validTabs = ['overview', 'my-jobs', 'tracker', 'search-devs', 'messages', 'hires', 'profile', 'job-details'];
+
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
     const { tabCounts } = useNotifications();
-    // ADDED: Initialize useLocation
+    // MODIFIED: Add useNavigate hook
     const location = useLocation();
+    const navigate = useNavigate();
+
+    // MODIFIED: Replace activeTab state with URL-based approach
+    const params = new URLSearchParams(location.search);
+    const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
 
     // --- State for fetched dashboard data ---
     const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
@@ -107,7 +113,6 @@ const RecruiterDashboard: React.FC = () => {
     const [success, setSuccess] = useState<string | null>(null);
 
     // --- UI-related states ---
-    const [activeTab, setActiveTab] = useState('overview');
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -237,17 +242,7 @@ const RecruiterDashboard: React.FC = () => {
         }
     }, [userProfile?.id]);
     
-    // ADDED: useEffect to sync URL search params with the active tab state
-    useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const tabFromUrl = params.get('tab');
-        
-        const validTabs = ['overview', 'my-jobs', 'tracker', 'search-devs', 'messages', 'hires', 'profile', 'job-details'];
-  
-        if (tabFromUrl && validTabs.includes(tabFromUrl) && activeTab !== tabFromUrl) {
-          setActiveTab(tabFromUrl);
-        }
-      }, [location.search, activeTab]);
+    // REMOVED: The useEffect that tried to sync URL params with activeTab state - this was causing conflicts
 
     // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
     useEffect(() => {
@@ -353,8 +348,9 @@ const RecruiterDashboard: React.FC = () => {
     // --- Handlers ---
     const handleViewApplicants = useCallback((jobId: string) => {
         setSelectedJobId(jobId);
-        setActiveTab('job-details');
-    }, []);
+        // MODIFIED: Use navigate instead of setActiveTab
+        navigate(`/recruiter?tab=job-details`);
+    }, [navigate]);
 
     const handleJobUpdate = useCallback((message: string) => {
         setSuccess(message);
@@ -405,23 +401,26 @@ const RecruiterDashboard: React.FC = () => {
             otherUserProfilePicUrl: otherUserProfilePicUrl,
             jobContext: threadJobContext,
         });
-        setActiveTab('messages');
-    }, [userProfile, jobRoles]);
+        // MODIFIED: Use navigate instead of setActiveTab
+        navigate(`/recruiter?tab=messages`);
+    }, [userProfile, jobRoles, navigate]);
 
     const handleCloseMessageThread = useCallback(() => {
-        setActiveTab('messages');
+        // MODIFIED: Use navigate instead of setActiveTab
+        navigate(`/recruiter?tab=messages`);
         setSelectedThread(null);
-    }, []);
+    }, [navigate]);
 
     const handleViewNotificationJobRole = useCallback((jobRoleId: string) => {
         const job = jobRoles.find(jr => jr.id === jobRoleId);
         if (job) {
             setSelectedJobId(jobRoleId);
-            setActiveTab('job-details');
+            // MODIFIED: Use navigate instead of setActiveTab
+            navigate(`/recruiter?tab=job-details`);
         } else {
             setDashboardError("Job role not found for this notification.");
         }
-    }, [jobRoles]);
+    }, [jobRoles, navigate]);
 
     const filteredHires = hires.filter(hire => {
         const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
@@ -472,7 +471,7 @@ const RecruiterDashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-500">Total Job Listings</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalJobs}</h3>
                 <button
-                    onClick={() => setActiveTab('my-jobs')}
+                    onClick={() => navigate('/recruiter?tab=my-jobs')}
                     className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
                 >
                     Manage Listings &rarr;
@@ -486,7 +485,7 @@ const RecruiterDashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-500">Active Job Listings</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.activeJobs}</h3>
                 <button
-                    onClick={() => setActiveTab('my-jobs')}
+                    onClick={() => navigate('/recruiter?tab=my-jobs')}
                     className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
                 >
                     View Active Jobs &rarr;
@@ -500,7 +499,7 @@ const RecruiterDashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-500">Unread Messages</p>
                 <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.unreadMessages}</h3>
                 <button
-                    onClick={() => setActiveTab('messages')}
+                    onClick={() => navigate('/recruiter?tab=messages')}
                     className="mt-4 text-blue-600 hover:text-blue-800 font-semibold text-sm"
                 >
                     View Messages &rarr;
@@ -533,7 +532,7 @@ const RecruiterDashboard: React.FC = () => {
                     {hires.length > 0 && (
                         <div className="mt-4 text-center">
                             <button
-                                onClick={() => setActiveTab('hires')}
+                                onClick={() => navigate('/recruiter?tab=hires')}
                                 className="text-blue-600 hover:text-blue-800 font-medium"
                             >
                                 View All Hires
@@ -543,7 +542,7 @@ const RecruiterDashboard: React.FC = () => {
                 </div>
             </div>
         </div>
-    ), [stats, hires]);
+    ), [stats, hires, navigate]);
 
     const renderSearchDevelopers = useCallback(() => (
         <div className="space-y-6">
@@ -759,7 +758,7 @@ const RecruiterDashboard: React.FC = () => {
                     <div className="border-b border-gray-200">
                         <nav className="-mb-px flex space-x-8">
                             <button
-                                onClick={() => setActiveTab('overview')}
+                                onClick={() => navigate('/recruiter?tab=overview')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'overview'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -770,7 +769,7 @@ const RecruiterDashboard: React.FC = () => {
                                 Overview
                             </button>
                             <button
-                                onClick={() => setActiveTab('my-jobs')}
+                                onClick={() => navigate('/recruiter?tab=my-jobs')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'my-jobs'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -786,7 +785,7 @@ const RecruiterDashboard: React.FC = () => {
                                 )}
                             </button>
                             <button
-                                onClick={() => setActiveTab('tracker')}
+                                onClick={() => navigate('/recruiter?tab=tracker')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'tracker'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -802,7 +801,7 @@ const RecruiterDashboard: React.FC = () => {
                                 )}
                             </button>
                             <button
-                                onClick={() => setActiveTab('search-devs')}
+                                onClick={() => navigate('/recruiter?tab=search-devs')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'search-devs'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -813,7 +812,7 @@ const RecruiterDashboard: React.FC = () => {
                                 Search Developers
                             </button>
                             <button
-                                onClick={() => setActiveTab('messages')}
+                                onClick={() => navigate('/recruiter?tab=messages')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'messages'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -829,7 +828,7 @@ const RecruiterDashboard: React.FC = () => {
                                 )}
                             </button>
                             <button
-                                onClick={() => setActiveTab('hires')}
+                                onClick={() => navigate('/recruiter?tab=hires')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'hires'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -840,7 +839,7 @@ const RecruiterDashboard: React.FC = () => {
                                 Hires
                             </button>
                             <button
-                                onClick={() => setActiveTab('profile')}
+                                onClick={() => navigate('/recruiter?tab=profile')}
                                 className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                                     activeTab === 'profile'
                                         ? 'border-blue-500 text-blue-600 bg-gray-100'
@@ -861,7 +860,7 @@ const RecruiterDashboard: React.FC = () => {
                     {activeTab === 'job-details' && selectedJobId && selectedJobRole && (
                         <JobDetailView
                             job={selectedJobRole}
-                            onBack={() => setActiveTab('my-jobs')}
+                            onBack={() => navigate('/recruiter?tab=my-jobs')}
                             onMessageDeveloper={handleMessageDeveloper}
                         />
                     )}
