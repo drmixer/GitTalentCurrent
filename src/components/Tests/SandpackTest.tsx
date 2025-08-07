@@ -177,11 +177,22 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 };
 
 // Optimized test results detection component with better detection
-const TestResultsDisplay: React.FC<{ onTestStateChange?: (passed: boolean) => void }> = ({ onTestStateChange }) => {
+const TestResultsDisplay: React.FC<{ 
+  onTestStateChange?: (passed: boolean) => void,
+  questionId: string 
+}> = ({ onTestStateChange, questionId }) => {
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
   const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Reset detection when question changes
+  useEffect(() => {
+    hasDetectedTests.current = false;
+    if (detectionTimeout.current) {
+      clearTimeout(detectionTimeout.current);
+    }
+  }, [questionId]);
   
   useEffect(() => {
     // Clear any existing timeout
@@ -196,8 +207,6 @@ const TestResultsDisplay: React.FC<{ onTestStateChange?: (passed: boolean) => vo
     
     // Only run detection once when status becomes complete/idle and we haven't detected before
     if ((sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
-      hasDetectedTests.current = true;
-      
       // Use a single timeout to detect test completion
       detectionTimeout.current = setTimeout(() => {
         if (onTestStateChange && !hasDetectedTests.current) {
@@ -266,6 +275,13 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const listenerSetup = useRef(false);
   const submissionInProgress = useRef(false);
 
+  // CRITICAL FIX: Reset test results when question changes
+  useEffect(() => {
+    setTestResults(null);
+    setIsSubmitting(false);
+    submissionInProgress.current = false;
+  }, [assignmentId, questionId]);
+
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
   }, []);
@@ -285,9 +301,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       });
     }
   }, [testResults]);
-
-  // Simplified message listener - removed to reduce noise
-  // The TestResultsDisplay component now handles test detection
 
   // Memoized test result evaluation
   const allTestsPassed = useMemo(() => {
@@ -399,7 +412,10 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
             Test Results
           </div>
           <div style={{ flex: 1 }}>
-            <TestResultsDisplay onTestStateChange={handleTestStateChange} />
+            <TestResultsDisplay 
+              onTestStateChange={handleTestStateChange}
+              questionId={questionId}
+            />
           </div>
         </div>
       </SandpackLayout>
