@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
+import { useAuth } from './AuthContext'; // CORRECTED IMPORT PATH
 
 interface TabCounts {
   messages: number;
@@ -32,12 +32,9 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
   const fetchUnreadCount = useCallback(async (): Promise<{ unreadCount: number; tabCounts: TabCounts }> => {
     const defaultReturn = { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0 }};
     try {
-      if (!userProfile?.id) {
-        console.log('NotificationsContext: No user profile, returning defaults');
-        return defaultReturn;
-      }
+      if (!userProfile?.id) return defaultReturn;
 
-      console.log('NotificationsContext: Fetching unread notifications for user:', userProfile.id);
+      console.log('🔄 Fetching unread notification count for user:', userProfile.id);
 
       const { data, error } = await supabase
         .from('notifications')
@@ -45,12 +42,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
         .eq('user_id', userProfile.id)
         .eq('is_read', false);
 
-      if (error) {
-        console.error('NotificationsContext: Error fetching notifications:', error);
-        throw error;
-      }
-
-      console.log('NotificationsContext: Fetched notifications:', data);
+      if (error) throw error;
 
       const newTabCounts: TabCounts = { messages: 0, tests: 0, jobs: 0, pipeline: 0 };
       for (const notification of data) {
@@ -60,129 +52,106 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
         else if (notification.type === 'test_completion') newTabCounts.pipeline++;
       }
 
-      console.log('NotificationsContext: New tab counts:', newTabCounts);
+      console.log('📊 Updated notification counts:', {
+        total: data.length,
+        tabCounts: newTabCounts
+      });
 
       setTabCounts(newTabCounts);
       setUnreadCount(data.length);
 
-      // Update document title
       if (data.length > 0) {
         document.title = `(${data.length}) GitTalent`;
       } else {
         document.title = 'GitTalent';
       }
-
       return { unreadCount: data.length, tabCounts: newTabCounts };
     } catch (error) {
-      console.error('NotificationsContext: Error fetching unread notification count:', error);
+      console.error('Error fetching unread notification count:', error);
       return defaultReturn;
     }
   }, [userProfile]);
 
   const markAllAsRead = useCallback(async () => {
-    if (!userProfile?.id || unreadCount === 0) {
-      console.log('NotificationsContext: No user profile or no unread notifications');
-      return;
-    }
-    
-    console.log('NotificationsContext: Marking all notifications as read');
+    if (!userProfile?.id || unreadCount === 0) return;
     document.title = 'GitTalent'; 
-    
     try {
-      const { error } = await supabase
+      console.log('🔄 Marking all notifications as read for user:', userProfile.id);
+      await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', userProfile.id)
         .eq('is_read', false);
-
-      if (error) throw error;
-
-      console.log('NotificationsContext: Successfully marked all notifications as read');
       
-      // Update local state immediately
-      setUnreadCount(0);
-      setTabCounts({ messages: 0, tests: 0, jobs: 0, pipeline: 0 });
-      
-      // Then refresh from server to ensure consistency
-      await fetchUnreadCount();
+      // Force immediate update
+      setTimeout(() => {
+        fetchUnreadCount();
+      }, 200);
     } catch (error) {
-      console.error('NotificationsContext: Error marking all notifications as read:', error);
+      console.error('Error marking all notifications as read:', error);
     }
   }, [userProfile, unreadCount, fetchUnreadCount]);
 
   const markAsReadByEntity = useCallback(async (entityId: string, type: string) => {
     try {
-      if (!userProfile?.id) {
-        console.log('NotificationsContext: No user profile for markAsReadByEntity');
-        return;
-      }
-
-      console.log('NotificationsContext: Marking notifications as read by entity:', { entityId, type });
-
-      const { error } = await supabase
+      if (!userProfile?.id) return;
+      
+      console.log('🔄 Marking notifications as read by entity:', { entityId, type, userId: userProfile.id });
+      
+      const { data, error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', userProfile.id)
         .eq('entity_id', entityId)
         .eq('type', type)
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .select('id'); // Return the updated records to see if any were actually updated
 
       if (error) throw error;
-
-      console.log('NotificationsContext: Successfully marked notifications as read by entity');
       
-      // Refresh counts after marking as read
-      await fetchUnreadCount();
+      // Only refresh count if notifications were actually marked as read
+      if (data && data.length > 0) {
+        console.log('✅ Successfully marked', data.length, 'notifications as read');
+        setTimeout(() => {
+          fetchUnreadCount();
+        }, 200);
+      } else {
+        console.log('ℹ️ No unread notifications found to mark as read');
+      }
     } catch (error) {
-      console.error('NotificationsContext: Error marking notification as read by entity:', error);
+      console.error('Error marking notification as read by entity:', error);
     }
   }, [userProfile, fetchUnreadCount]);
 
-  // Set up real-time subscription when user profile is available
   useEffect(() => {
     if (userProfile?.id) {
-      console.log('NotificationsContext: Setting up real-time subscription for user:', userProfile.id);
-      
-      // Initial fetch
+      console.log('🔄 User profile loaded, initializing notifications for:', userProfile.id);
       fetchUnreadCount();
       
-      // Set up real-time channel
       const channel = supabase
         .channel(`notification-count-changes-${userProfile.id}`)
-        .on(
-          'postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'notifications', 
-            filter: `user_id=eq.${userProfile.id}` 
-          },
-          (payload) => {
-            console.log('NotificationsContext: Real-time notification change detected:', payload);
-            // Small delay to ensure database consistency
-            setTimeout(() => {
-              fetchUnreadCount();
-            }, 100);
-          }
-        )
-        .subscribe((status) => {
-          console.log('NotificationsContext: Subscription status:', status);
-        });
-
-      return () => {
-        console.log('NotificationsContext: Cleaning up real-time subscription');
-        supabase.removeChannel(channel);
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications', 
+          filter: `user_id=eq.${userProfile.id}` 
+        }, (payload) => {
+          console.log('🔔 Real-time notification change:', payload);
+          // Add a small delay to ensure the database transaction is complete
+          setTimeout(() => {
+            fetchUnreadCount();
+          }, 300);
+        })
+        .subscribe();
+        
+      return () => { 
+        console.log('🔄 Cleaning up notification subscription for user:', userProfile.id);
+        supabase.removeChannel(channel); 
       };
     }
   }, [userProfile, fetchUnreadCount]);
 
-  const value = { 
-    unreadCount, 
-    tabCounts, 
-    fetchUnreadCount, 
-    markAsReadByEntity, 
-    markAllAsRead 
-  };
+  const value = { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAllAsRead };
 
   return (
     <NotificationsContext.Provider value={value}>
@@ -191,6 +160,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
   );
 };
 
+// This is the new useNotifications hook that all components will use
 export const useNotifications = (): NotificationsContextType => {
   const context = useContext(NotificationsContext);
   if (context === undefined) {
