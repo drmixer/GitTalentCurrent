@@ -188,9 +188,47 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     if (!sandpackClient) return;
 
     const unsubscribe = sandpackClient.listen((message) => {
-      if (message.type === 'test') {
-        console.log('Test results received:', message);
-        setTestResults(message);
+      console.log('🔍 All Sandpack messages:', message.type, message);
+      
+      // Check for different possible test-related message types
+      if (message.type === 'test' || 
+          message.type === 'test-result' || 
+          message.type === 'tests' ||
+          message.type === 'console' ||
+          message.type === 'done') {
+        console.log('📝 Potential test message:', message.type, message);
+        
+        // If it's a test-related message, try to extract results
+        if (message.type === 'test') {
+          setTestResults(message);
+        }
+        
+        // Also check console messages for test output
+        if (message.type === 'console' && message.log) {
+          console.log('📋 Console log:', message.log);
+          // Look for Jest test patterns in console output
+          message.log.forEach(log => {
+            if (typeof log.data === 'string') {
+              console.log('📄 Console data:', log.data);
+              // Check if this looks like a test result
+              if (log.data.includes('PASS') || log.data.includes('FAIL') || 
+                  log.data.includes('Tests:') || log.data.includes('test suites')) {
+                console.log('🎯 Found test result in console:', log.data);
+                
+                // Try to parse test success from console output
+                if (log.data.includes('PASS') && !log.data.includes('FAIL')) {
+                  console.log('✅ Detected passing tests from console!');
+                  setTestResults({ 
+                    type: 'test', 
+                    success: true, 
+                    source: 'console-parse',
+                    rawData: log.data 
+                  });
+                }
+              }
+            }
+          });
+        }
       }
     });
 
@@ -203,24 +241,41 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const allTestsPassed = useMemo(() => {
     if (!testResults) return false;
     
-    console.log('Checking test results:', testResults);
+    console.log('🧪 Checking test results:', testResults);
+    
+    // Check if we parsed from console output
+    if (testResults.source === 'console-parse' && testResults.success) {
+      console.log('✅ Tests passed (from console parsing)');
+      return true;
+    }
     
     // Check if we have test results and they indicate success
     if (testResults.type === 'test' && testResults.event === 'test_end') {
       const results = testResults.results;
       if (results && Array.isArray(results)) {
         const allPassed = results.every((result: any) => result.status === 'pass');
-        console.log('All tests passed:', allPassed);
+        console.log('✅ All tests passed (from test_end event):', allPassed);
         return allPassed;
       }
     }
     
     // Alternative check for different test result formats
     if (testResults.success !== undefined) {
-      console.log('Test success:', testResults.success);
+      console.log('✅ Test success (from success property):', testResults.success);
       return testResults.success;
     }
     
+    // Check for Jest test results format
+    if (testResults.type === 'test' && testResults.results) {
+      const results = testResults.results;
+      if (results.numFailedTests !== undefined) {
+        const passed = results.numFailedTests === 0 && results.numPassedTests > 0;
+        console.log('✅ Jest test results - passed:', passed, 'failed:', results.numFailedTests, 'passed:', results.numPassedTests);
+        return passed;
+      }
+    }
+    
+    console.log('❌ No matching test result format found');
     return false;
   }, [testResults]);
 
