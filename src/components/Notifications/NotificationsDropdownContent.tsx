@@ -144,10 +144,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    console.log("Notification clicked:", notification);
     if (!notification.is_read) {
       await markAsRead(notification.id);
     }
+    if (notification.link) {
+      const params = new URLSearchParams(notification.link);
+      const tab = params.get('tab');
+      if (tab) {
+        onNavigate(tab);
+      }
+    }
+    onClose();
   };
 
   return (
@@ -199,6 +206,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 <Link
                   to={`${getDashboardPath()}${notification.link || ''}`}
                   key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
                 >
@@ -216,17 +224,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                       {formatSimpleDate(notification.created_at)}
                     </p>
                   </div>
-                  {!notification.is_read && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleNotificationClick(notification);
-                      }}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      Mark as Read
-                    </button>
-                  )}
                 </Link>
               );
             } else {
@@ -235,6 +232,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 <Link
                   to={`${getDashboardPath()}${latestNotification.link || ''}`}
                   key={type}
+                  onClick={() => handleNotificationClick(latestNotification)}
                   className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
                 >
@@ -252,17 +250,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                       {formatSimpleDate(latestNotification.created_at)}
                     </p>
                   </div>
-                  {!latestNotification.is_read && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleNotificationClick(latestNotification);
-                      }}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      Mark as Read
-                    </button>
-                  )}
                 </Link>
               );
             }

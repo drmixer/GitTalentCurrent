@@ -33,7 +33,6 @@ export const Header = () => {
   };
 
   const handleNavigateToTab = (tab: string) => {
-    console.log("Navigating to tab:", tab);
     const dashboardPath = getDashboardPath();
     navigate(`${dashboardPath}?tab=${tab}`);
     setShowNotificationsDropdown(false); // Close dropdown after navigation
