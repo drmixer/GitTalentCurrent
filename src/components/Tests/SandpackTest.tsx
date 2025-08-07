@@ -156,26 +156,21 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 
 import { SandpackTestsProps } from '@codesandbox/sandpack-react';
 
-// A custom test header with a "Run Tests" button
-const CustomTestHeader: React.FC<{ onRunTests: () => void }> = ({ onRunTests }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px' }}>
-        <h4>Tests</h4>
-        <button onClick={onRunTests} style={{ padding: '4px 8px', background: '#333', color: '#fff', border: 'none', borderRadius: '4px' }}>
-            Run Tests
-        </button>
-    </div>
-);
-
 // Child component that contains the UI and logic which depends on the Sandpack context
-const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
+const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { 
+  testCode: string;
+  testFile: string;
+}> = ({
   assignmentId,
   questionId,
   onTestComplete,
+  testCode,
+  testFile,
 }) => {
   const { sandpack } = useSandpack();
   const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [testsStarted, setTestsStarted] = useState(false);
+  const [testsActive, setTestsActive] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -186,19 +181,29 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setToast(null);
   };
 
-  const runTests = () => {
-    setTestsStarted(true);
-    // Simply restart the sandpack which will trigger tests
-    sandpack.runSandpack();
+  const runTests = async () => {
+    try {
+      // First, add the test file to the sandpack environment
+      sandpack.updateFile(testFile, testCode);
+      
+      // Set tests as active
+      setTestsActive(true);
+      
+      // Add a small delay to ensure the file system is updated
+      setTimeout(() => {
+        // Force a refresh of the sandpack environment to trigger tests
+        sandpack.runSandpack();
+      }, 200);
+    } catch (error) {
+      console.error('Error running tests:', error);
+      showToast('Error running tests', 'error');
+    }
   };
 
-  // This function only stores results in state - NO database save
   const handleTestComplete = (payload: SandpackTestsProps) => {
     setTestResults(payload);
-    // Removed database save - only store in component state for UI feedback
   };
 
-  // Only this function saves to database - prevents duplicates
   const submitSolution = async () => {
     if (!allTestsPassed) {
       showToast('Please ensure all tests are passing before you submit.', 'error');
@@ -412,25 +417,40 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       )}
       <SandpackLayout>
         <SandpackCodeEditor style={{ height: '60vh' }} />
-        {testsStarted ? (
-          <SandpackTests
-            style={{ height: '60vh' }}
-            headerChildren={<CustomTestHeader onRunTests={runTests} />}
-            onComplete={handleTestComplete}
-            autorun={true}
-          />
-        ) : (
-          <div 
-            style={{ 
-              height: '60vh', 
-              display: 'flex', 
-              flexDirection: 'column',
-              border: '1px solid #e5e5e5',
-              borderRadius: '4px',
-              backgroundColor: '#f8f9fa'
-            }}
-          >
-            <CustomTestHeader onRunTests={runTests} />
+        <div style={{ height: '60vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '8px 12px',
+            borderBottom: '1px solid #e5e5e5',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>Tests</h4>
+            <button 
+              onClick={runTests} 
+              style={{ 
+                padding: '6px 12px', 
+                background: '#007bff', 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500'
+              }}
+            >
+              Run Tests
+            </button>
+          </div>
+          {testsActive ? (
+            <div style={{ flex: 1 }}>
+              <SandpackTests
+                style={{ height: '100%', border: 'none' }}
+                onComplete={handleTestComplete}
+              />
+            </div>
+          ) : (
             <div 
               style={{ 
                 flex: 1, 
@@ -438,13 +458,14 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
                 alignItems: 'center', 
                 justifyContent: 'center',
                 color: '#6b7280',
-                fontSize: '14px'
+                fontSize: '14px',
+                backgroundColor: '#fafafa'
               }}
             >
               Click "Run Tests" to execute your tests
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </SandpackLayout>
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
         <button
@@ -452,11 +473,13 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
           disabled={!allTestsPassed || isSubmitting}
           style={{
             padding: '10px 20px',
-            background: !allTestsPassed || isSubmitting ? '#ccc' : '#007bff',
+            background: !allTestsPassed || isSubmitting ? '#ccc' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
             cursor: !allTestsPassed || isSubmitting ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
           }}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Solution'}
@@ -628,8 +651,6 @@ getTestBed().initTestEnvironment(
 </html>`,
         hidden: true
       };
-
-      // Remove unnecessary files that might cause conflicts
       break;
       
     case 'react':
@@ -707,11 +728,12 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
   // Create framework-specific setup files
   const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
 
+  // Initially exclude the test file - it will be added dynamically when tests are run
   const files = {
     [mainFile]: { code: starterCode, active: true },
-    [testFile]: { code: testCode, hidden: true },
     '/package.json': { code: packageJson, hidden: true },
     ...frameworkFiles,
+    // Test file is NOT included initially
   };
 
   return (
@@ -719,10 +741,16 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       customSetup={setup} 
       files={files} 
       options={{ 
-        autorun: false
+        autorun: false,
+        autoReload: false,
+        initMode: 'lazy'
       }}
     >
-      <SandpackLayoutManager {...rest} />
+      <SandpackLayoutManager 
+        {...rest} 
+        testCode={testCode}
+        testFile={testFile}
+      />
     </SandpackProvider>
   );
 };
