@@ -89,16 +89,10 @@ export const getContributionColorClass = (level: number): string => {
 };
 
 /**
- * Get tooltip text for contribution day - FIXED: Handle timezone properly
+ * Get tooltip text for contribution day
  */
-export const getContributionTooltipText = (day: { date: string; count?: number; contributionCount?: number }): string => {
-  const count = day.count || day.contributionCount || 0;
-  
-  // FIXED: Parse date without timezone conversion
-  // GitHub API returns dates in YYYY-MM-DD format, treat as local date
-  const dateParts = day.date.split('-');
-  const date = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-  
+export const getContributionTooltipText = (day: { date: string; count: number }): string => {
+  const date = new Date(day.date);
   const formattedDate = date.toLocaleDateString('en-US', { 
     weekday: 'short', 
     month: 'short', 
@@ -106,12 +100,12 @@ export const getContributionTooltipText = (day: { date: string; count?: number; 
     year: 'numeric' 
   });
   
-  if (count === 0) {
+  if (day.count === 0) {
     return `No contributions on ${formattedDate}`;
-  } else if (count === 1) {
+  } else if (day.count === 1) {
     return `1 contribution on ${formattedDate}`;
   } else {
-    return `${count} contributions on ${formattedDate}`;
+    return `${day.count} contributions on ${formattedDate}`;
   }
 };
 
