@@ -375,7 +375,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       onTestComplete();
       
     } catch (error) {
-      console.error('Submission failed:', error);
       showToast('Failed to submit solution. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
@@ -693,7 +692,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
         autoReload: false,
         initMode: 'lazy',
         bundlerURL: 'https://2-19-8-sandpack.codesandbox.io', // Use specific version
-        logLevel: 'error' // Reduce console noise
+        logLevel: 'error'
       }}
     >
       <SandpackLayoutManager assignmentId={assignmentId} questionId={questionId} {...rest} />
