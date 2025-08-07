@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-// import { useNavigate } from 'react-router-dom'; // No longer needed
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
 
 interface Notification {
@@ -20,9 +20,10 @@ interface NotificationsDropdownContentProps {
   onNavigate: (tab: string) => void;
   fetchUnreadCount: () => void;
   markAllAsRead: () => void;
+  getDashboardPath: () => string;
 }
 
-export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount, markAllAsRead: contextMarkAllAsRead }) => {
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount, markAllAsRead: contextMarkAllAsRead, getDashboardPath }) => {
   const { userProfile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,29 +143,11 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }, {} as Record<string, Notification[]>);
   };
 
-  // ADDED: A centralized and robust click handler to fix navigation
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
       await markAsRead(notification.id);
     }
-    
-    if (notification.link) {
-      try {
-        // Using URLSearchParams is safer than substring for parsing
-        const params = new URLSearchParams(notification.link);
-        const tab = params.get('tab');
-        if (tab) {
-          onNavigate(tab);
-        } else {
-          onClose();
-        }
-      } catch (e) {
-        console.error("Could not parse notification link:", e);
-        onClose(); // Close dropdown even if link is bad
-      }
-    } else {
-      onClose(); // Close if there's no link
-    }
+    onClose();
   };
 
   return (
@@ -213,11 +196,12 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
             if (groupedNotifications.length === 1) {
               const notification = groupedNotifications[0];
               return (
-                <li
+                <Link
+                  to={`${getDashboardPath()}${notification.link || ''}`}
                   key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getNotificationIcon(notification.type, notification.is_read)}
@@ -233,16 +217,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                       {formatSimpleDate(notification.created_at)}
                     </p>
                   </div>
-                </li>
+                </Link>
               );
             } else {
               const latestNotification = groupedNotifications[0];
               return (
-                <li
+                <Link
+                  to={`${getDashboardPath()}${latestNotification.link || ''}`}
                   key={type}
+                  onClick={() => handleNotificationClick(latestNotification)}
                   className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
                     } hover:bg-gray-50 transition-colors cursor-pointer`}
-                  onClick={() => handleNotificationClick(latestNotification)}
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
