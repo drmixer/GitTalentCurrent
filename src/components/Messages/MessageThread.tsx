@@ -39,7 +39,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   onNewMessage
 }) => {
   const { userProfile } = useAuth();
-  const { markAsReadByEntity } = useNotifications();
+  const { markAsReadByEntity, fetchUnreadCount } = useNotifications();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -150,6 +150,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .from('messages')
           .update({ is_read: true, read_at: new Date().toISOString() })
           .eq('id', messageId);
+
+        fetchUnreadCount();
           
         // If this is the first message from the recruiter, update canSendMessage
         if (data.sender_id === otherUserId && userProfile?.role === 'developer' && otherUserRole === 'recruiter') {

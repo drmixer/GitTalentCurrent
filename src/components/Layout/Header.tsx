@@ -237,6 +237,7 @@ export const Header = () => {
                           onNavigate={handleNavigateToTab} // Pass the new handler
                           fetchUnreadCount={fetchUnreadCount}
                           markAllAsRead={markAllAsRead}
+                          getDashboardPath={getDashboardPath}
                         />
                       </div>
                     )}
