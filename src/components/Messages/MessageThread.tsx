@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNotifications } from '../../contexts/NotificationsContext'; // MODIFIED: Corrected import path
+import { useNotifications } from '../../contexts/NotificationsContext';
 import { supabase } from '../../lib/supabase';
 import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
 import { 
@@ -49,16 +49,20 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [canSendMessage, setCanSendMessage] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // MODIFIED: Re-introduced the ref for the scroll target
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     if (userProfile && otherUserId) {
       fetchMessages();
       checkCanSendMessage();
+      
+      // Mark messages from this user as read
       markAsReadByEntity(otherUserId, 'message');
       
+      // Set up real-time subscription
       const channel = supabase.channel(`messaging:${userProfile.id}`);
+      channelRef.current = channel;
 
       channel
         .on(
@@ -70,6 +74,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             filter: `receiver_id=eq.${userProfile.id},sender_id=eq.${otherUserId}`
           },
           (payload) => {
+            console.log('New message received:', payload);
             fetchNewMessage(payload.new.id);
           }
         )
@@ -84,10 +89,15 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             }, 3000);
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Message subscription status:', status);
+        });
 
       return () => {
-        supabase.removeChannel(channel);
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
@@ -95,14 +105,13 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   }, [userProfile, otherUserId, jobContext]);
 
-  // MODIFIED: Re-introduced the standard useEffect for scrolling to the bottom
   useEffect(() => {
-  const timer = setTimeout(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, 0);
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 0);
 
-  return () => clearTimeout(timer);
-}, [messages]);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   const checkCanSendMessage = async () => {
     if (!userProfile?.id || !otherUserId) return;
@@ -120,7 +129,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         setCanSendMessage(count ? count > 0 : false);
       } catch (error) {
         console.error('Error checking recruiter contact status:', error);
-        setCanSendMessage(false); // Default to false on error
+        setCanSendMessage(false);
       }
     } else {
       setCanSendMessage(true);
@@ -145,13 +154,16 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         // Add the new message to the state
         setMessages(prev => [...prev, data]);
         
-        // Mark the message as read
+        // Mark the message as read immediately
         await supabase
           .from('messages')
           .update({ is_read: true, read_at: new Date().toISOString() })
           .eq('id', messageId);
 
-        fetchUnreadCount();
+        // Update unread count with a slight delay to ensure database is updated
+        setTimeout(async () => {
+          await fetchUnreadCount();
+        }, 100);
           
         // If this is the first message from the recruiter, update canSendMessage
         if (data.sender_id === otherUserId && userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
@@ -233,7 +245,16 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         query = query.is('job_role_id', null);
       }
 
-      await query;
+      const { error } = await query;
+      
+      if (error) {
+        console.error('Error marking messages as read:', error);
+      } else {
+        // Force refresh of unread count after marking messages as read
+        setTimeout(async () => {
+          await fetchUnreadCount();
+        }, 100);
+      }
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -255,7 +276,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         is_read: false
       };
 
-      // Ask Supabase to return the newly created message
       const { data: newMsgData, error } = await supabase
         .from('messages')
         .insert(messageData)
@@ -268,7 +288,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
       if (error) throw error;
 
-      // Add just the new message to our state, instead of re-fetching everything
+      // Add the new message to our state
       if (newMsgData) {
         setMessages(prev => [...prev, newMsgData]);
       }
@@ -276,7 +296,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       setNewMessage('');
       setSubject('');
       setHasInitiatedContact(true);
-      // We no longer call fetchMessages() here
+      
       if (onNewMessage) {
         onNewMessage();
       }
@@ -332,20 +352,14 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const broadcastTyping = () => {
-    if (!userProfile) return;
-    const channel = supabase.channel(`messaging:${otherUserId}`);
-    channel.send({
+    if (!userProfile || !channelRef.current) return;
+    const targetChannel = supabase.channel(`messaging:${otherUserId}`);
+    targetChannel.send({
       type: 'broadcast',
       event: 'typing',
       payload: { senderId: userProfile.id },
     });
   };
-
-  const shouldShowLimitedInfo = () => {
-    return false;
-  };
-
-  const showLimitedInfo = shouldShowLimitedInfo();
 
   if (loading) {
     return (
@@ -355,105 +369,105 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     );
   }
 
-return (
+  return (
     <div className="flex flex-col h-full bg-white">
-        {/* Header (Fixed Height) */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
-            <div className="flex items-center space-x-4">
-                {onBack && (
-                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-gray-600" />
-                    </button>
-                )}
-                {otherUserProfilePicUrl ? (
-                    <img 
-                        src={otherUserProfilePicUrl} 
-                        alt={otherUserName}
-                        className="w-12 h-12 rounded-xl object-cover shadow-lg"
-                    />
-                ) : (
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                        {otherUserName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                )}
-                <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                        <h2 className="text-xl font-black text-gray-900">{otherUserName}</h2>
-                        <div className="flex items-center text-gray-500">
-                            {getRoleIcon(otherUserRole)}
-                            <span className="ml-1 text-sm capitalize">{otherUserRole}</span>
-                        </div>
-                    </div>
-                    {jobContext && (<p className="text-sm text-blue-600 font-medium">Re: {jobContext.title}</p>)}
-                </div>
+      {/* Header (Fixed Height) */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
+        <div className="flex items-center space-x-4">
+          {onBack && (
+            <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+          )}
+          {otherUserProfilePicUrl ? (
+            <img 
+              src={otherUserProfilePicUrl} 
+              alt={otherUserName}
+              className="w-12 h-12 rounded-xl object-cover shadow-lg"
+            />
+          ) : (
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+              {otherUserName.split(' ').map(n => n[0]).join('')}
             </div>
-        </div>
-
-        {/* Message List (Takes all remaining space and scrolls) */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-            {messages.map((message) => {
-                const isFromCurrentUser = message.sender_id === userProfile?.id;
-                return (
-                    <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${isFromCurrentUser ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
-                            <p className="text-sm leading-relaxed">{message.body}</p>
-                            <div className={`flex items-center justify-end mt-2 text-xs ${isFromCurrentUser ? 'text-blue-100' : 'text-gray-500'}`}>
-                                <span>{formatTime(message.sent_at)}</span>
-                                {isFromCurrentUser && message.is_read && (<CheckCircle className="w-3 h-3 ml-2" />)}
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
-            {isTyping && (
-                <div className="flex justify-start">
-                    <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
-                        <p className="text-sm leading-relaxed italic">Typing...</p>
-                    </div>
-                </div>
-            )}
-            <div ref={messagesEndRef} />
-        </div>
-
-        {/* Message Input (Fixed Height) */}
-        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-6">
-            {messages.length === 0 && (
-                <div className="mb-4">
-                    <input
-                        type="text"
-                        placeholder="Subject (optional)"
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        disabled={!canSendMessage}
-                    />
-                </div>
-            )}
-            <div className="flex space-x-4">
-                <textarea
-                    placeholder={canSendMessage ? "Type your message..." : "You can reply after the recruiter contacts you first"}
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
-                    rows={3}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={sending || !canSendMessage}
-                />
-                <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || sending || !canSendMessage}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
-                >
-                    {sending ? <Loader className="animate-spin w-5 h-5" /> : <Send className="w-5 h-5" />}
-                </button>
+          )}
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-black text-gray-900">{otherUserName}</h2>
+              <div className="flex items-center text-gray-500">
+                {getRoleIcon(otherUserRole)}
+                <span className="ml-1 text-sm capitalize">{otherUserRole}</span>
+              </div>
             </div>
-            {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
-                <div className="mt-2 text-xs text-amber-600 font-medium">
-                    <Lock className="w-3 h-3 inline mr-1" />
-                    You can only reply after the recruiter contacts you first
-                </div>
-            )}
+            {jobContext && (<p className="text-sm text-blue-600 font-medium">Re: {jobContext.title}</p>)}
+          </div>
         </div>
+      </div>
+
+      {/* Message List (Takes all remaining space and scrolls) */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+        {messages.map((message) => {
+          const isFromCurrentUser = message.sender_id === userProfile?.id;
+          return (
+            <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${isFromCurrentUser ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                <p className="text-sm leading-relaxed">{message.body}</p>
+                <div className={`flex items-center justify-end mt-2 text-xs ${isFromCurrentUser ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <span>{formatTime(message.sent_at)}</span>
+                  {isFromCurrentUser && message.is_read && (<CheckCircle className="w-3 h-3 ml-2" />)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-gray-100 text-gray-900">
+              <p className="text-sm leading-relaxed italic">Typing...</p>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Message Input (Fixed Height) */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-200 p-6">
+        {messages.length === 0 && (
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Subject (optional)"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={!canSendMessage}
+            />
+          </div>
+        )}
+        <div className="flex space-x-4">
+          <textarea
+            placeholder={canSendMessage ? "Type your message..." : "You can reply after the recruiter contacts you first"}
+            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+            rows={3}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={sending || !canSendMessage}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={!newMessage.trim() || sending || !canSendMessage}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+          >
+            {sending ? <Loader className="animate-spin w-5 h-5" /> : <Send className="w-5 h-5" />}
+          </button>
+        </div>
+        {!canSendMessage && userProfile?.role === 'developer' && otherUserRole === 'recruiter' && (
+          <div className="mt-2 text-xs text-amber-600 font-medium">
+            <Lock className="w-3 h-3 inline mr-1" />
+            You can only reply after the recruiter contacts you first
+          </div>
+        )}
+      </div>
     </div>
-);
+  );
 };
