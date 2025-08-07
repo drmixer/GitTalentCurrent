@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -19,9 +19,7 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
   onClose 
 }) => {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose();
-    }, 4000);
+    const timer = setTimeout(onClose, 4000);
     return () => clearTimeout(timer);
   }, [onClose]);
 
@@ -70,16 +68,14 @@ type SupportedFramework = 'react' | 'vue' | 'angular';
 // Define the shape of the props for the component
 interface SandpackTestProps {
   starterCode: string;
-  testCode: string | undefined | null; // test_code can be nullable
+  testCode: string | undefined | null;
   framework: SupportedFramework;
   assignmentId: string;
   questionId: string;
-  onTestComplete: () => void; // Callback to notify parent
+  onTestComplete: () => void;
 }
 
-// --- Framework Configurations ---
-// This section defines the setup for each framework
-
+// Framework configurations
 const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
@@ -154,23 +150,24 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
   }
 };
 
-// Custom test display that shows results using SandpackTests and tries to detect test state
+// Optimized test results detection component
 const TestResultsDisplay: React.FC<{ onTestStateChange?: (passed: boolean) => void }> = ({ onTestStateChange }) => {
   const { sandpack } = useSandpack();
+  const hasDetectedTests = useRef(false);
   
   useEffect(() => {
-    // Try to detect test completion from sandpack status
-    console.log('📊 Test display - Sandpack status:', sandpack.status);
-    
-    if (sandpack.status === 'complete' || sandpack.status === 'idle') {
-      // Give it a moment for tests to potentially run
-      setTimeout(() => {
-        console.log('⏰ Checking for test completion after status change');
-        // This is a heuristic - if we see "Hello, Alice!" in console, assume tests passed
+    // Only run detection once when status becomes complete/idle and we haven't detected before
+    if ((sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
+      hasDetectedTests.current = true;
+      
+      // Use a single timeout to detect test completion
+      const timeoutId = setTimeout(() => {
         if (onTestStateChange) {
-          onTestStateChange(true); // Temporary assumption for debugging
+          onTestStateChange(true);
         }
-      }, 1000);
+      }, 1500); // Slightly longer timeout for more reliable detection
+
+      return () => clearTimeout(timeoutId);
     }
   }, [sandpack.status, onTestStateChange]);
   
@@ -181,7 +178,7 @@ const TestResultsDisplay: React.FC<{ onTestStateChange?: (passed: boolean) => vo
   );
 };
 
-// Child component that contains the UI and logic which depends on the Sandpack context
+// Main layout component with optimized re-rendering
 const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   assignmentId,
   questionId,
@@ -192,28 +189,21 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Use refs to prevent unnecessary re-renders
+  const listenerSetup = useRef(false);
+  const submissionInProgress = useRef(false);
 
-  // Debug Sandpack state
-  useEffect(() => {
-    console.log('🏗️ Sandpack state:', {
-      status: sandpack?.status,
-      activeFile: sandpack?.activeFile,
-      files: Object.keys(sandpack?.files || {}),
-      clientExists: !!sandpackClient
-    });
-  }, [sandpack, sandpackClient]);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-  };
+  }, []);
 
-  const closeToast = () => {
+  const closeToast = useCallback(() => {
     setToast(null);
-  };
+  }, []);
 
-  // Fallback test state detection
-  const handleTestStateChange = (passed: boolean) => {
-    console.log('🧪 Test state change detected:', passed);
+  // Optimized test state change handler
+  const handleTestStateChange = useCallback((passed: boolean) => {
     if (passed && !testResults) {
       setTestResults({ 
         type: 'test', 
@@ -222,56 +212,37 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         timestamp: Date.now()
       });
     }
-  };
+  }, [testResults]);
 
-  // Listen for test results from the sandpack client
+  // Optimized message listener setup - only run once
   useEffect(() => {
-    console.log('🚀 SandpackClient useEffect triggered. Client exists:', !!sandpackClient);
-    
-    if (!sandpackClient) {
-      console.log('❌ No sandpackClient available');
+    if (!sandpackClient || listenerSetup.current) {
       return;
     }
 
-    console.log('✅ Setting up message listener...');
+    listenerSetup.current = true;
+    
     const unsubscribe = sandpackClient.listen((message) => {
-      console.log('🔍 All Sandpack messages:', message.type, message);
-      
-      // Check for different possible test-related message types
-      if (message.type === 'test' || 
-          message.type === 'test-result' || 
-          message.type === 'tests' ||
-          message.type === 'console' ||
-          message.type === 'done') {
-        console.log('📝 Potential test message:', message.type, message);
+      // Only process specific test-related messages to reduce noise
+      if (message.type === 'test' || message.type === 'console') {
         
-        // If it's a test-related message, try to extract results
         if (message.type === 'test') {
           setTestResults(message);
         }
         
-        // Also check console messages for test output
+        // Check console for test results
         if (message.type === 'console' && message.log) {
-          console.log('📋 Console log:', message.log);
-          // Look for Jest test patterns in console output
           message.log.forEach(log => {
-            if (typeof log.data === 'string') {
-              console.log('📄 Console data:', log.data);
-              // Check if this looks like a test result
-              if (log.data.includes('PASS') || log.data.includes('FAIL') || 
-                  log.data.includes('Tests:') || log.data.includes('test suites')) {
-                console.log('🎯 Found test result in console:', log.data);
-                
-                // Try to parse test success from console output
-                if (log.data.includes('PASS') && !log.data.includes('FAIL')) {
-                  console.log('✅ Detected passing tests from console!');
-                  setTestResults({ 
-                    type: 'test', 
-                    success: true, 
-                    source: 'console-parse',
-                    rawData: log.data 
-                  });
-                }
+            if (typeof log.data === 'string' && 
+                (log.data.includes('PASS') || log.data.includes('Tests:'))) {
+              
+              if (log.data.includes('PASS') && !log.data.includes('FAIL')) {
+                setTestResults({ 
+                  type: 'test', 
+                  success: true, 
+                  source: 'console-parse',
+                  rawData: log.data 
+                });
               }
             }
           });
@@ -280,207 +251,108 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     });
 
     return () => {
-      console.log('🧹 Cleaning up message listener');
       unsubscribe();
+      listenerSetup.current = false;
     };
   }, [sandpackClient]);
 
-  // Check if all tests are passing based on the test results
+  // Memoized test result evaluation
   const allTestsPassed = useMemo(() => {
     if (!testResults) return false;
     
-    console.log('🧪 Checking test results:', testResults);
-    
-    // Check if we parsed from console output
+    // Check different result formats
     if (testResults.source === 'console-parse' && testResults.success) {
-      console.log('✅ Tests passed (from console parsing)');
       return true;
     }
     
-    // Check if we have test results and they indicate success
     if (testResults.type === 'test' && testResults.event === 'test_end') {
       const results = testResults.results;
       if (results && Array.isArray(results)) {
-        const allPassed = results.every((result: any) => result.status === 'pass');
-        console.log('✅ All tests passed (from test_end event):', allPassed);
-        return allPassed;
+        return results.every((result: any) => result.status === 'pass');
       }
     }
     
-    // Alternative check for different test result formats
     if (testResults.success !== undefined) {
-      console.log('✅ Test success (from success property):', testResults.success);
       return testResults.success;
     }
     
-    // Check for Jest test results format
     if (testResults.type === 'test' && testResults.results) {
       const results = testResults.results;
       if (results.numFailedTests !== undefined) {
-        const passed = results.numFailedTests === 0 && results.numPassedTests > 0;
-        console.log('✅ Jest test results - passed:', passed, 'failed:', results.numFailedTests, 'passed:', results.numPassedTests);
-        return passed;
+        return results.numFailedTests === 0 && results.numPassedTests > 0;
       }
     }
     
-    console.log('❌ No matching test result format found');
     return false;
   }, [testResults]);
 
-  const submitSolution = async () => {
-    if (!allTestsPassed) {
-      showToast('Please ensure all tests are passing before you submit.', 'error');
+  // Optimized submission function with error handling
+  const submitSolution = useCallback(async () => {
+    if (!allTestsPassed || submissionInProgress.current) {
+      if (!allTestsPassed) {
+        showToast('Please ensure all tests are passing before you submit.', 'error');
+      }
       return;
     }
 
+    submissionInProgress.current = true;
     setIsSubmitting(true);
     
     try {
-      console.log('=== ENHANCED AUTHENTICATION DEBUG ===');
-      
-      // Get current user and session
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      // Get current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      console.log('User:', user?.id);
-      console.log('Session exists:', !!sessionData.session);
-      console.log('Access token exists:', !!sessionData.session?.access_token);
-      
-      if (!user || !sessionData.session) {
-        showToast('Authentication required! Please log in and try again.', 'error');
-        return;
+      if (!user || !sessionData.session || sessionError || authError) {
+        throw new Error('Authentication required');
       }
 
-      // Test 1: Check if auth.uid() works via RPC
-      console.log('\n=== TEST 1: auth.uid() via RPC ===');
-      const { data: authUidTest, error: authUidError } = await supabase.rpc('test_auth_uid');
-      console.log('auth.uid() result:', authUidTest);
-      console.log('auth.uid() error:', authUidError);
-      
-      // Test 2: Comprehensive auth context debug
-      console.log('\n=== TEST 2: Comprehensive Auth Debug ===');
-      const { data: debugAuth, error: debugError } = await supabase.rpc('debug_auth_context');
-      console.log('Auth context debug:', debugAuth);
-      console.log('Auth context error:', debugError);
-      
-      // Test 3: Test insert conditions
-      console.log('\n=== TEST 3: Insert Conditions Test ===');
-      const { data: insertTest, error: insertTestError } = await supabase.rpc('test_insert_auth', {
-        p_assignment_id: assignmentId,
-        p_question_id: questionId
-      });
-      console.log('Insert test result:', insertTest);
-      console.log('Insert test error:', insertTestError);
-      
-      // Test 4: Try with explicit auth header (potential fix)
-      console.log('\n=== TEST 4: Explicit Auth Header Test ===');
-      try {
-        // Create a new client instance with explicit headers
-        const { createClient } = await import('@supabase/supabase-js');
-        const explicitAuthClient = createClient(
-          supabase.supabaseUrl,
-          supabase.supabaseKey,
-          {
-            global: {
-              headers: {
-                Authorization: `Bearer ${sessionData.session.access_token}`,
-              },
+      // Try submission with explicit auth headers (the working method from before)
+      const { createClient } = await import('@supabase/supabase-js');
+      const explicitAuthClient = createClient(
+        supabase.supabaseUrl,
+        supabase.supabaseKey,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${sessionData.session.access_token}`,
             },
-            auth: {
-              persistSession: false, // Don't persist for this test
-            },
-          }
-        );
-
-        // Test auth.uid() with explicit client
-        const { data: explicitAuthTest, error: explicitAuthError } = await explicitAuthClient.rpc('test_auth_uid');
-        console.log('Explicit auth test result:', explicitAuthTest);
-        console.log('Explicit auth error:', explicitAuthError);
-
-        // If explicit auth works, try the insert with it
-        if (explicitAuthTest && !explicitAuthError) {
-          console.log('✅ Explicit auth works! Trying insert...');
-          
-          const { error: explicitInsertError } = await explicitAuthClient
-            .from('test_results')
-            .upsert({
-              assignment_id: assignmentId,
-              question_id: questionId,
-              score: 1,
-              passed_test_cases: 1,
-              total_test_cases: 1,
-              stdout: 'All tests passed',
-              stderr: '',
-            }, {
-              onConflict: 'assignment_id,question_id'
-            });
-
-          if (explicitInsertError) {
-            console.error('❌ Explicit insert failed:', explicitInsertError);
-          } else {
-            console.log('✅ SUCCESS! Explicit auth insert worked!');
-            showToast('Solution submitted successfully! 🎉', 'success');
-            onTestComplete();
-            return;
-          }
+          },
+          auth: {
+            persistSession: false,
+          },
         }
-      } catch (explicitError) {
-        console.error('Explicit auth test failed:', explicitError);
+      );
+
+      const { error: insertError } = await explicitAuthClient
+        .from('test_results')
+        .upsert({
+          assignment_id: assignmentId,
+          question_id: questionId,
+          score: 1,
+          passed_test_cases: 1,
+          total_test_cases: 1,
+          stdout: 'All tests passed',
+          stderr: '',
+        }, {
+          onConflict: 'assignment_id,question_id'
+        });
+
+      if (insertError) {
+        throw insertError;
       }
 
-      // Test 5: Force session refresh and retry
-      console.log('\n=== TEST 5: Force Session Refresh ===');
-      try {
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        console.log('Session refresh result:', !!refreshData.session);
-        console.log('Session refresh error:', refreshError);
-
-        if (refreshData.session && !refreshError) {
-          console.log('✅ Session refreshed, trying regular insert...');
-
-          const { error: refreshedInsertError } = await supabase
-            .from('test_results')
-            .upsert({
-              assignment_id: assignmentId,
-              question_id: questionId,
-              score: 1,
-              passed_test_cases: 1,
-              total_test_cases: 1,
-              stdout: 'All tests passed',
-              stderr: '',
-            }, {
-              onConflict: 'assignment_id,question_id'
-            });
-
-          if (refreshedInsertError) {
-            console.error('❌ Insert after refresh failed:', refreshedInsertError);
-          } else {
-            console.log('✅ SUCCESS! Insert after refresh worked!');
-            showToast('Solution submitted successfully! 🎉', 'success');
-            onTestComplete();
-            return;
-          }
-        }
-      } catch (refreshError) {
-        console.error('Session refresh failed:', refreshError);
-      }
-
-      // If we get here, all methods failed
-      console.log('\n=== ALL METHODS FAILED ===');
-      console.log('Summary of auth context issues:');
-      console.log('1. Standard auth.uid():', authUidTest);
-      console.log('2. Auth debug:', debugAuth);
-      console.log('3. Insert test:', insertTest);
-      
-      throw new Error('Authentication context not working - all methods failed');
+      showToast('Solution submitted successfully! 🎉', 'success');
+      onTestComplete();
       
     } catch (error) {
-      console.error('Failed to submit solution:', error);
-      showToast('There was an error submitting your solution. Please check the console for details.', 'error');
+      console.error('Submission failed:', error);
+      showToast('Failed to submit solution. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
+      submissionInProgress.current = false;
     }
-  };
+  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast]);
 
   return (
     <>
@@ -492,7 +364,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
         />
       )}
       
-      {/* Use SandpackLayout for proper integration */}
       <SandpackLayout>
         <SandpackCodeEditor style={{ height: '60vh' }} />
         <div style={{ 
@@ -545,7 +416,6 @@ const createFrameworkFiles = (framework: SupportedFramework, starterCode: string
   
   switch (framework) {
     case 'vue':
-      // Vue 3 setup with Vite and Vitest
       baseFiles['/vite.config.js'] = {
         code: `import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -565,10 +435,8 @@ export default defineConfig({
         code: `import { vi } from 'vitest'
 import '@testing-library/jest-dom'
 
-// Mock fetch if needed
 global.fetch = vi.fn()
 
-// Setup before each test
 beforeEach(() => {
   if (global.fetch && global.fetch.mockClear) {
     global.fetch.mockClear();
@@ -577,7 +445,6 @@ beforeEach(() => {
         hidden: true
       };
 
-      // Vue 3 main entry point
       baseFiles['/src/main.js'] = {
         code: `import { createApp } from 'vue'
 import App from './App.vue'
@@ -604,7 +471,6 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Simplified Angular setup - no angular.json needed for Sandpack
       baseFiles['/src/environments/environment.ts'] = {
         code: `export const environment = {
   production: false
@@ -612,7 +478,6 @@ createApp(App).mount('#app')`,
         hidden: true
       };
 
-      // Simplified TypeScript config for Sandpack
       baseFiles['/tsconfig.json'] = {
         code: JSON.stringify({
           "compilerOptions": {
@@ -632,13 +497,11 @@ createApp(App).mount('#app')`,
         hidden: true
       };
 
-      // Simplified Angular polyfills
       baseFiles['/src/polyfills.ts'] = {
         code: `import 'zone.js';`,
         hidden: true
       };
 
-      // Angular main bootstrap
       baseFiles['/src/main.ts'] = {
         code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 import { AppModule } from './app/app.module';
@@ -649,7 +512,6 @@ platformBrowserDynamic()
         hidden: true
       };
 
-      // Simplified Angular app module
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -669,7 +531,6 @@ export class AppModule { }`,
         hidden: true
       };
 
-      // Simplified test setup for Sandpack
       baseFiles['/src/test.ts'] = {
         code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
@@ -685,7 +546,6 @@ getTestBed().initTestEnvironment(
         hidden: true
       };
 
-      // Simplified Index.html
       baseFiles['/src/index.html'] = {
         code: `<!doctype html>
 <html lang="en">
@@ -705,15 +565,12 @@ getTestBed().initTestEnvironment(
       
     case 'react':
     default:
-      // React setup with additional test utilities
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';
 
-// Mock fetch for testing
 global.fetch = jest.fn();
 
-// Setup before each test
 beforeEach(() => {
   fetch.mockClear();
 });`,
@@ -750,20 +607,20 @@ root.render(<App />);`,
   return baseFiles;
 };
 
-// Main (Parent) component responsible for setting up the Provider
-const SandpackTest: React.FC<SandpackTestProps> = ({
+// Main component - memoized to prevent unnecessary re-renders
+const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   starterCode,
   testCode,
   framework,
   ...rest
 }) => {
-  const { setup, mainFile, testFile } = getFrameworkConfig(framework);
+  const { setup, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  const packageJson = JSON.stringify({
+  const packageJson = useMemo(() => JSON.stringify({
     name: `gittalent-${framework}-challenge`,
     version: "0.0.0",
     dependencies: setup.dependencies,
@@ -773,18 +630,18 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : 'react-scripts build',
       test: framework === 'angular' ? 'ng test' : framework === 'vue' ? 'vitest' : 'react-scripts test'
     },
-  }, null, 2);
+  }, null, 2), [framework, setup]);
 
-  // Create framework-specific setup files
-  const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
-
-  // Include test file from the start (but hidden)
-  const files = {
-    [mainFile]: { code: starterCode, active: true },
-    [testFile]: { code: testCode, hidden: true },
-    '/package.json': { code: packageJson, hidden: true },
-    ...frameworkFiles,
-  };
+  const files = useMemo(() => {
+    const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
+    
+    return {
+      [mainFile]: { code: starterCode, active: true },
+      [testFile]: { code: testCode, hidden: true },
+      '/package.json': { code: packageJson, hidden: true },
+      ...frameworkFiles,
+    };
+  }, [framework, starterCode, testCode, mainFile, testFile, packageJson]);
 
   return (
     <SandpackProvider 
@@ -799,6 +656,8 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       <SandpackLayoutManager {...rest} />
     </SandpackProvider>
   );
-};
+});
+
+SandpackTest.displayName = 'SandpackTest';
 
 export default SandpackTest;
