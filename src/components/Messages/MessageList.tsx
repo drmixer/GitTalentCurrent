@@ -67,7 +67,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
             filter: `receiver_id=eq.${userProfile.id}` // More specific for updates relevant to this user's unread counts
           },
           (payload) => {
-            console.log('Change in messages table detected (relevant to user):', payload);
             fetchMessageThreads();
           }
         )
