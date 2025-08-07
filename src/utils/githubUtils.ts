@@ -3,36 +3,6 @@
  */
 
 /**
- * Helper function to normalize contribution data dates and ensure consistency
- */
-export function normalizeContributionData(contributions: any[]): any[] {
-  if (!Array.isArray(contributions)) return [];
-  
-  return contributions.map(day => {
-    // Ensure we have a consistent date format
-    let normalizedDate = day.date;
-    
-    // If the date includes time information, strip it to get just YYYY-MM-DD
-    if (normalizedDate && normalizedDate.includes('T')) {
-      normalizedDate = normalizedDate.split('T')[0];
-    }
-    
-    // Ensure we have a consistent count field
-    const count = day.contributionCount || day.count || 0;
-    
-    // Calculate level based on count (GitHub uses 0-4 scale)
-    const level = Math.min(Math.floor(count / 5), 4);
-    
-    return {
-      date: normalizedDate,
-      count: count,
-      contributionCount: count, // Keep both for compatibility
-      level: level
-    };
-  });
-}
-
-/**
  * Calculate statistics from GitHub contribution data
  */
 export const calculateContributionStats = (contributions: any) => {
@@ -40,16 +10,15 @@ export const calculateContributionStats = (contributions: any) => {
   let contributionArray = [];
   
   if (Array.isArray(contributions)) {
-    // Old format: direct array - normalize the data
-    contributionArray = normalizeContributionData(contributions);
+    // Old format: direct array
+    contributionArray = contributions;
   } else if (contributions && typeof contributions === 'object' && Array.isArray(contributions.calendar)) {
     // New format: object with calendar property
-    contributionArray = normalizeContributionData(contributions.calendar.map(day => ({
+    contributionArray = contributions.calendar.map(day => ({
       date: day.date,
       count: day.contributionCount || day.count || 0,
-      contributionCount: day.contributionCount || day.count || 0,
       level: Math.min(Math.floor((day.contributionCount || day.count || 0) / 5), 4)
-    })));
+    }));
   } else {
     // Invalid or empty data
     return {
@@ -69,22 +38,13 @@ export const calculateContributionStats = (contributions: any) => {
     };
   }
 
-  // Sort contributions by date to ensure proper chronological order
-  contributionArray.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
   // Calculate total contributions
   const totalContributions = contributionArray.reduce((sum, day) => sum + (day.count || 0), 0);
   
   // Calculate current streak (from most recent day backwards)
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  
-  // Filter to only include days up to today
-  const validDays = contributionArray.filter(day => day.date <= todayStr);
-  
   let currentStreak = 0;
-  for (let i = validDays.length - 1; i >= 0; i--) {
-    if (validDays[i].count > 0) {
+  for (let i = contributionArray.length - 1; i >= 0; i--) {
+    if (contributionArray[i].count > 0) {
       currentStreak++;
     } else {
       break;
@@ -94,7 +54,7 @@ export const calculateContributionStats = (contributions: any) => {
   // Calculate longest streak
   let longestStreak = 0;
   let tempStreak = 0;
-  for (const day of validDays) {
+  for (const day of contributionArray) {
     if (day.count > 0) {
       tempStreak++;
       longestStreak = Math.max(longestStreak, tempStreak);
@@ -104,9 +64,7 @@ export const calculateContributionStats = (contributions: any) => {
   }
   
   // Calculate average contributions per day
-  const averagePerDay = validDays.length > 0 
-    ? Math.round((totalContributions / validDays.length) * 10) / 10 
-    : 0;
+  const averagePerDay = Math.round((totalContributions / contributionArray.length) * 10) / 10;
   
   return {
     totalContributions,
@@ -131,13 +89,16 @@ export const getContributionColorClass = (level: number): string => {
 };
 
 /**
- * Get tooltip text for contribution day
+ * Get tooltip text for contribution day - FIXED: Handle timezone properly
  */
 export const getContributionTooltipText = (day: { date: string; count?: number; contributionCount?: number }): string => {
   const count = day.count || day.contributionCount || 0;
   
-  // Parse the date and format it properly, ensuring we don't add timezone offset
-  const date = new Date(day.date + 'T00:00:00');
+  // FIXED: Parse date without timezone conversion
+  // GitHub API returns dates in YYYY-MM-DD format, treat as local date
+  const dateParts = day.date.split('-');
+  const date = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+  
   const formattedDate = date.toLocaleDateString('en-US', { 
     weekday: 'short', 
     month: 'short', 
@@ -161,8 +122,6 @@ export const calculateLanguagePercentage = (languages: Record<string, number>, l
   if (!languages || Object.keys(languages).length === 0) return 0;
   
   const total = Object.values(languages).reduce((sum, bytes) => sum + (bytes as number), 0);
-  if (total === 0) return 0;
-  
   const percentage = ((languages[language] as number) / total) * 100;
   return Math.round(percentage);
 };
@@ -171,16 +130,6 @@ export const calculateLanguagePercentage = (languages: Record<string, number>, l
  * Get color class for language based on index
  */
 export const getLanguageColorClass = (index: number): string => {
-  const colors = [
-    'bg-blue-500',
-    'bg-yellow-500', 
-    'bg-green-500',
-    'bg-red-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-indigo-500',
-    'bg-teal-500'
-  ];
-  
-  return colors[index % colors.length] || 'bg-gray-500';
+  const colors = ['bg-blue-500', 'bg-yellow-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500'];
+  return colors[index % colors.length];
 };
