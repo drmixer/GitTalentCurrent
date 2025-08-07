@@ -89,15 +89,27 @@ export const getContributionColorClass = (level: number): string => {
 };
 
 /**
+ * TIMEZONE FIX: Helper function to parse GitHub dates as UTC
+ */
+function parseGitHubDateAsUTC(dateString: string): Date {
+  // GitHub returns dates like "2024-08-06" which should be treated as UTC
+  // Adding 'T00:00:00Z' ensures it's parsed as UTC, not local timezone
+  return new Date(`${dateString}T00:00:00Z`);
+}
+
+/**
  * Get tooltip text for contribution day
+ * TIMEZONE FIX: Parse date as UTC to avoid timezone offset issues
  */
 export const getContributionTooltipText = (day: { date: string; count: number }): string => {
-  const date = new Date(day.date);
+  // TIMEZONE FIX: Parse as UTC instead of local timezone
+  const date = parseGitHubDateAsUTC(day.date);
   const formattedDate = date.toLocaleDateString('en-US', { 
     weekday: 'short', 
     month: 'short', 
     day: 'numeric', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'UTC' // TIMEZONE FIX: Format in UTC to match the parsed date
   });
   
   if (day.count === 0) {
