@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
@@ -8,7 +8,7 @@ interface Notification {
   id: string;
   created_at: string;
   user_id: string;
-  type: string; // Loosened for the custom types you have
+  type: string;
   title: string;
   message: string;
   is_read: boolean;
@@ -23,8 +23,15 @@ interface NotificationsDropdownContentProps {
   getDashboardPath: () => string;
 }
 
-export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ onClose, onNavigate, fetchUnreadCount, markAllAsRead: contextMarkAllAsRead, getDashboardPath }) => {
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({ 
+  onClose, 
+  onNavigate, 
+  fetchUnreadCount, 
+  markAllAsRead: contextMarkAllAsRead, 
+  getDashboardPath 
+}) => {
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +46,6 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         return;
       }
 
-      // MODIFIED: Added .eq('is_read', false) to only fetch unread notifications. This fixes the incorrect grouping.
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -95,12 +101,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
       );
-      fetchUnreadCount();
+      
+      // Refresh unread count after marking as read
+      await fetchUnreadCount();
     } catch (err: any) {
       console.error('Error marking notification as read:', err.message);
     }
   };
-
 
   const getNotificationIcon = (type: Notification['type'], isRead: boolean) => {
     switch (type) {
@@ -144,33 +151,67 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-    if (notification.link) {
-      const params = new URLSearchParams(notification.link);
-      const tab = params.get('tab');
-      if (tab) {
-        onNavigate(tab);
+    try {
+      // Mark as read first
+      if (!notification.is_read) {
+        await markAsRead(notification.id);
+      }
+
+      // Close the dropdown immediately
+      onClose();
+
+      // Handle navigation based on the notification link
+      if (notification.link) {
+        const dashboardPath = getDashboardPath();
+        
+        // Parse the link to extract the tab parameter
+        const url = new URL(`${window.location.origin}${notification.link}`);
+        const tab = url.searchParams.get('tab');
+        
+        if (tab) {
+          // Navigate to dashboard with tab parameter
+          const targetUrl = `${dashboardPath}?tab=${tab}`;
+          console.log('Navigating to:', targetUrl);
+          navigate(targetUrl);
+        } else {
+          // Navigate to the full link if no tab parameter
+          navigate(`${dashboardPath}${notification.link}`);
+        }
+      } else {
+        // Fallback to dashboard if no link
+        navigate(getDashboardPath());
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
+      // Still close dropdown and attempt navigation even if mark as read fails
+      onClose();
+      if (notification.link) {
+        const dashboardPath = getDashboardPath();
+        navigate(`${dashboardPath}${notification.link}`);
       }
     }
-    onClose();
   };
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-        <button
-          onClick={contextMarkAllAsRead}
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          disabled={notifications.every(n => n.is_read) || isLoading}
-        >
-          Mark all as read
-        </button>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-          <XCircle className="w-5 h-5" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={async () => {
+              await contextMarkAllAsRead();
+              // Refresh the notifications list after marking all as read
+              await fetchNotifications();
+            }}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            disabled={notifications.every(n => n.is_read) || isLoading}
+          >
+            Mark all as read
+          </button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -203,54 +244,54 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
             if (groupedNotifications.length === 1) {
               const notification = groupedNotifications[0];
               return (
-                <Link
-                  to={`${getDashboardPath()}${notification.link || ''}`}
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
-                    } hover:bg-gray-50 transition-colors cursor-pointer`}
-                >
-                  <div className="flex-shrink-0 mt-0.5">
-                    {getNotificationIcon(notification.type, notification.is_read)}
-                  </div>
-                  <div className="flex-grow">
-                    <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
-                      {notification.title}
-                    </p>
-                    <p className={`text-sm ${notification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
-                      {notification.message}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatSimpleDate(notification.created_at)}
-                    </p>
-                  </div>
-                </Link>
+                <li key={notification.id}>
+                  <button
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`w-full p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
+                      } hover:bg-gray-50 transition-colors cursor-pointer text-left`}
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(notification.type, notification.is_read)}
+                    </div>
+                    <div className="flex-grow">
+                      <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
+                        {notification.title}
+                      </p>
+                      <p className={`text-sm ${notification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatSimpleDate(notification.created_at)}
+                      </p>
+                    </div>
+                  </button>
+                </li>
               );
             } else {
               const latestNotification = groupedNotifications[0];
               return (
-                <Link
-                  to={`${getDashboardPath()}${latestNotification.link || ''}`}
-                  key={type}
-                  onClick={() => handleNotificationClick(latestNotification)}
-                  className={`p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
-                    } hover:bg-gray-50 transition-colors cursor-pointer`}
-                >
-                  <div className="flex-shrink-0 mt-0.5">
-                    {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
-                  </div>
-                  <div className="flex-grow">
-                    <p className={`text-sm font-medium ${latestNotification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
-                      {groupedNotifications.length} new {type.replace(/_/g, ' ')}s
-                    </p>
-                    <p className={`text-sm ${latestNotification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
-                      {latestNotification.message}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatSimpleDate(latestNotification.created_at)}
-                    </p>
-                  </div>
-                </Link>
+                <li key={type}>
+                  <button
+                    onClick={() => handleNotificationClick(latestNotification)}
+                    className={`w-full p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
+                      } hover:bg-gray-50 transition-colors cursor-pointer text-left`}
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
+                    </div>
+                    <div className="flex-grow">
+                      <p className={`text-sm font-medium ${latestNotification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
+                        {groupedNotifications.length} new {type.replace(/_/g, ' ')}s
+                      </p>
+                      <p className={`text-sm ${latestNotification.is_read ? 'text-gray-500' : 'text-gray-700'}`}>
+                        {latestNotification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatSimpleDate(latestNotification.created_at)}
+                      </p>
+                    </div>
+                  </button>
+                </li>
               );
             }
           })}
