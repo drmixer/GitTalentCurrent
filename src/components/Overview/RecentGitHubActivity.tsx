@@ -17,6 +17,15 @@ interface RecentGitHubActivityProps {
   githubProfileUrl?: string;
 }
 
+/**
+ * TIMEZONE FIX: Helper function to parse GitHub dates as UTC
+ */
+function parseGitHubDateAsUTC(dateString: string): Date {
+  // GitHub returns dates like "2024-08-06" which should be treated as UTC
+  // Adding 'T00:00:00Z' ensures it's parsed as UTC, not local timezone
+  return new Date(`${dateString}T00:00:00Z`);
+}
+
 export const RecentGitHubActivity: React.FC<RecentGitHubActivityProps> = ({
   commits,
   loading,
@@ -65,7 +74,12 @@ export const RecentGitHubActivity: React.FC<RecentGitHubActivityProps> = ({
                     {commit.message.length > 80 ? `${commit.message.substring(0, 80)}...` : commit.message}
                   </a>
                   <p className="text-xs text-gray-500">
-                    Committed to <span className="font-medium">{commit.repoName}</span> on {new Date(commit.date).toLocaleDateString()}
+                    Committed to <span className="font-medium">{commit.repoName}</span> on {
+                      // TIMEZONE FIX: Parse GitHub date as UTC and format in UTC to avoid timezone shift
+                      parseGitHubDateAsUTC(commit.date).toLocaleDateString('en-US', { 
+                        timeZone: 'UTC' 
+                      })
+                    }
                   </p>
                 </div>
               </div>
