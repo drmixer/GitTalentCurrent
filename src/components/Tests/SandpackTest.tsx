@@ -7,6 +7,7 @@ import {
   SandpackTests,
   useSandpack,
   SandpackFileExplorer,
+  useSandpackClient,
 } from '@codesandbox/sandpack-react';
 import type { SandpackSetup, SandpackFiles } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
@@ -174,6 +175,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   const { sandpack } = useSandpack();
   const [testResults, setTestResults] = useState<SandpackTestsProps | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [testsStarted, setTestsStarted] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -185,15 +187,9 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   };
 
   const runTests = () => {
-    // Try different methods to run tests
-    if (sandpack.runTests) {
-      sandpack.runTests();
-    } else if (sandpack.dispatch) {
-      sandpack.dispatch({ type: 'run-tests' });
-    } else {
-      // Fallback: restart the sandpack environment which should trigger tests
-      sandpack.restartSandpack();
-    }
+    setTestsStarted(true);
+    // Simply restart the sandpack which will trigger tests
+    sandpack.runSandpack();
   };
 
   // This function only stores results in state - NO database save
@@ -416,13 +412,39 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       )}
       <SandpackLayout>
         <SandpackCodeEditor style={{ height: '60vh' }} />
-        <SandpackTests
-          style={{ height: '60vh' }}
-          headerChildren={<CustomTestHeader onRunTests={runTests} />}
-          onComplete={handleTestComplete}
-          autorun={false}
-          watchMode={false}
-        />
+        {testsStarted ? (
+          <SandpackTests
+            style={{ height: '60vh' }}
+            headerChildren={<CustomTestHeader onRunTests={runTests} />}
+            onComplete={handleTestComplete}
+            autorun={true}
+          />
+        ) : (
+          <div 
+            style={{ 
+              height: '60vh', 
+              display: 'flex', 
+              flexDirection: 'column',
+              border: '1px solid #e5e5e5',
+              borderRadius: '4px',
+              backgroundColor: '#f8f9fa'
+            }}
+          >
+            <CustomTestHeader onRunTests={runTests} />
+            <div 
+              style={{ 
+                flex: 1, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                color: '#6b7280',
+                fontSize: '14px'
+              }}
+            >
+              Click "Run Tests" to execute your tests
+            </div>
+          </div>
+        )}
       </SandpackLayout>
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
         <button
@@ -697,9 +719,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({
       customSetup={setup} 
       files={files} 
       options={{ 
-        autorun: false,
-        autoReload: false,
-        initMode: 'lazy'
+        autorun: false
       }}
     >
       <SandpackLayoutManager {...rest} />
