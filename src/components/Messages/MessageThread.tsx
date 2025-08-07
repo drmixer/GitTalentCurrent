@@ -128,6 +128,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const fetchNewMessage = async (messageId: string) => {
+    console.log("Fetching new message:", messageId);
     try {
       const { data, error } = await supabase
         .from('messages')
