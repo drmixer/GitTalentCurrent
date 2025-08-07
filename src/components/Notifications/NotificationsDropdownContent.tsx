@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Loader, XCircle, BellOff, CheckCircle } from 'lucide-react';
@@ -32,9 +32,11 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
 }) => {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processingNotificationId, setProcessingNotificationId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -98,12 +100,15 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
 
       if (error) throw error;
 
+      // Immediately update local state
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
       );
       
-      // Refresh unread count after marking as read
-      await fetchUnreadCount();
+      // Refresh unread count after marking as read with delay
+      setTimeout(() => {
+        fetchUnreadCount();
+      }, 100);
     } catch (err: any) {
       console.error('Error marking notification as read:', err.message);
     }
@@ -150,45 +155,128 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }, {} as Record<string, Notification[]>);
   };
 
+  // ENHANCED: Much more robust notification click handler
   const handleNotificationClick = async (notification: Notification) => {
+    if (processingNotificationId === notification.id) return;
+    
+    console.log('[NotificationDropdown] Handling notification click:', {
+      id: notification.id,
+      type: notification.type,
+      link: notification.link,
+      currentPath: location.pathname,
+      currentSearch: location.search
+    });
+
+    setProcessingNotificationId(notification.id);
+
     try {
-      // Mark as read first
+      // Mark as read first with immediate UI update
       if (!notification.is_read) {
+        console.log('[NotificationDropdown] Marking notification as read:', notification.id);
         await markAsRead(notification.id);
       }
 
-      // Close the dropdown immediately
+      // Close dropdown immediately
       onClose();
+      
+      // Small delay to ensure dropdown closes
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Handle navigation based on the notification link
+      // ENHANCED: Better URL parsing and navigation logic
+      let targetUrl = '';
+      let targetTab = '';
+
       if (notification.link) {
-        const dashboardPath = getDashboardPath();
-        
-        // Parse the link to extract the tab parameter
-        const url = new URL(`${window.location.origin}${notification.link}`);
-        const tab = url.searchParams.get('tab');
-        
-        if (tab) {
-          // Navigate to dashboard with tab parameter
-          const targetUrl = `${dashboardPath}?tab=${tab}`;
-          console.log('Navigating to:', targetUrl);
-          navigate(targetUrl);
-        } else {
-          // Navigate to the full link if no tab parameter
-          navigate(`${dashboardPath}${notification.link}`);
+        try {
+          // Parse the link to extract tab parameter
+          const url = new URL(`${window.location.origin}${notification.link}`);
+          targetTab = url.searchParams.get('tab') || '';
+          
+          console.log('[NotificationDropdown] Extracted tab from link:', targetTab);
+        } catch (urlError) {
+          console.warn('[NotificationDropdown] Error parsing notification link:', urlError);
         }
+      }
+
+      // Fallback: determine tab from notification type
+      if (!targetTab) {
+        switch (notification.type) {
+          case 'message':
+            targetTab = 'messages';
+            break;
+          case 'job_application':
+            targetTab = userProfile?.role === 'recruiter' ? 'tracker' : 'jobs';
+            break;
+          case 'test_assignment':
+            targetTab = 'tests';
+            break;
+          case 'test_completion':
+            targetTab = userProfile?.role === 'recruiter' ? 'tracker' : 'tests';
+            break;
+          case 'job_posted':
+            targetTab = 'jobs';
+            break;
+          default:
+            targetTab = 'overview';
+        }
+        
+        console.log('[NotificationDropdown] Determined tab from type:', targetTab);
+      }
+
+      // Build target URL based on current dashboard path
+      const dashboardPath = getDashboardPath();
+      targetUrl = `${dashboardPath}?tab=${targetTab}`;
+      
+      console.log('[NotificationDropdown] Target URL:', targetUrl);
+      console.log('[NotificationDropdown] Current URL:', `${location.pathname}${location.search}`);
+
+      // ENHANCED: Multiple navigation strategies
+      const currentFullUrl = `${location.pathname}${location.search}`;
+      
+      if (currentFullUrl === targetUrl) {
+        console.log('[NotificationDropdown] Already on target page, forcing page reload');
+        // Force reload if we're already on the target page to ensure state updates
+        window.location.href = targetUrl;
       } else {
-        // Fallback to dashboard if no link
-        navigate(getDashboardPath());
+        console.log('[NotificationDropdown] Navigating with replace: true');
+        
+        // Strategy 1: Try React Router navigation with replace
+        navigate(targetUrl, { replace: true });
+        
+        // Strategy 2: Fallback to window.location if React Router navigation doesn't work
+        setTimeout(() => {
+          const newCurrentUrl = `${window.location.pathname}${window.location.search}`;
+          if (newCurrentUrl !== targetUrl) {
+            console.log('[NotificationDropdown] React Router navigation failed, using window.location');
+            window.location.href = targetUrl;
+          } else {
+            console.log('[NotificationDropdown] React Router navigation successful');
+          }
+        }, 500);
       }
+
+      // Refresh counts after navigation
+      setTimeout(() => {
+        fetchUnreadCount();
+        fetchNotifications();
+      }, 1000);
+
     } catch (error) {
-      console.error('Error handling notification click:', error);
-      // Still close dropdown and attempt navigation even if mark as read fails
+      console.error('[NotificationDropdown] Error handling notification click:', error);
+      
+      // Fallback navigation on error
       onClose();
-      if (notification.link) {
-        const dashboardPath = getDashboardPath();
-        navigate(`${dashboardPath}${notification.link}`);
+      const dashboardPath = getDashboardPath();
+      const fallbackUrl = `${dashboardPath}?tab=overview`;
+      
+      try {
+        navigate(fallbackUrl, { replace: true });
+      } catch (navError) {
+        console.error('[NotificationDropdown] Fallback navigation also failed:', navError);
+        window.location.href = fallbackUrl;
       }
+    } finally {
+      setProcessingNotificationId(null);
     }
   };
 
@@ -199,9 +287,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         <div className="flex items-center space-x-2">
           <button
             onClick={async () => {
+              console.log('[NotificationDropdown] Marking all notifications as read');
               await contextMarkAllAsRead();
               // Refresh the notifications list after marking all as read
-              await fetchNotifications();
+              setTimeout(async () => {
+                await fetchNotifications();
+                fetchUnreadCount();
+              }, 200);
             }}
             className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             disabled={notifications.every(n => n.is_read) || isLoading}
@@ -247,11 +339,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 <li key={notification.id}>
                   <button
                     onClick={() => handleNotificationClick(notification)}
-                    className={`w-full p-4 flex items-start space-x-3 ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
-                      } hover:bg-gray-50 transition-colors cursor-pointer text-left`}
+                    disabled={processingNotificationId === notification.id}
+                    className={`w-full p-4 flex items-start space-x-3 ${
+                      !notification.is_read ? 'bg-blue-50' : 'bg-white'
+                    } hover:bg-gray-50 transition-colors cursor-pointer text-left disabled:opacity-50`}
                   >
                     <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(notification.type, notification.is_read)}
+                      {processingNotificationId === notification.id ? (
+                        <Loader className="animate-spin h-5 w-5 text-blue-500" />
+                      ) : (
+                        getNotificationIcon(notification.type, notification.is_read)
+                      )}
                     </div>
                     <div className="flex-grow">
                       <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
@@ -273,11 +371,17 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 <li key={type}>
                   <button
                     onClick={() => handleNotificationClick(latestNotification)}
-                    className={`w-full p-4 flex items-start space-x-3 ${!latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
-                      } hover:bg-gray-50 transition-colors cursor-pointer text-left`}
+                    disabled={processingNotificationId === latestNotification.id}
+                    className={`w-full p-4 flex items-start space-x-3 ${
+                      !latestNotification.is_read ? 'bg-blue-50' : 'bg-white'
+                    } hover:bg-gray-50 transition-colors cursor-pointer text-left disabled:opacity-50`}
                   >
                     <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(latestNotification.type, latestNotification.is_read)}
+                      {processingNotificationId === latestNotification.id ? (
+                        <Loader className="animate-spin h-5 w-5 text-blue-500" />
+                      ) : (
+                        getNotificationIcon(latestNotification.type, latestNotification.is_read)
+                      )}
                     </div>
                     <div className="flex-grow">
                       <p className={`text-sm font-medium ${latestNotification.is_read ? 'text-gray-600' : 'text-gray-800'}`}>
