@@ -2,13 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GitBranch, LogOut, User, Briefcase, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-// MODIFIED: Corrected the import path to point to the new Context file
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { supabase } from '../../lib/supabase';
-// CORRECTED PATHS BELOW:
 import { NotificationBadge } from '../Notifications/NotificationBadge';
 import { NotificationsDropdownContent } from '../Notifications/NotificationsDropdownContent';
-
 
 export const Header = () => {
   const { user, userProfile, developerProfile, signOut } = useAuth();
@@ -18,8 +15,8 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
-  const getDashboardPath = () => {
-    if (!userProfile) return '/login'; // Fallback if profile not loaded
+  const getDashboardPath = useCallback(() => {
+    if (!userProfile) return '/login';
     switch (userProfile.role) {
       case 'admin':
         return '/admin';
@@ -28,15 +25,25 @@ export const Header = () => {
       case 'developer':
         return '/developer';
       default:
-        return '/dashboard'; // Generic dashboard
+        return '/dashboard';
     }
-  };
+  }, [userProfile]);
 
-  const handleNavigateToTab = (tab: string) => {
+  const handleNavigateToTab = useCallback((tab: string) => {
+    console.log('Header: Navigating to tab:', tab);
     const dashboardPath = getDashboardPath();
-    navigate(`${dashboardPath}?tab=${tab}`);
-    setShowNotificationsDropdown(false); // Close dropdown after navigation
-  };
+    const targetUrl = `${dashboardPath}?tab=${tab}`;
+    console.log('Header: Target URL:', targetUrl);
+    
+    // Force navigation by replacing current state
+    navigate(targetUrl, { replace: true });
+    setShowNotificationsDropdown(false);
+    
+    // Small delay to ensure navigation completes before any other actions
+    setTimeout(() => {
+      console.log('Header: Navigation completed');
+    }, 100);
+  }, [navigate, getDashboardPath]);
 
   const handleSignOut = async () => {
     try {
@@ -46,7 +53,7 @@ export const Header = () => {
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error signing out:', error);
-      navigate('/login', { replace: true }); // Force navigation
+      navigate('/login', { replace: true });
     }
   };
 
@@ -93,7 +100,6 @@ export const Header = () => {
   // Close dropdown if clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Check if the click is outside the notification button and dropdown
       const notificationButton = document.getElementById('notification-button');
       const notificationDropdown = document.getElementById('notification-dropdown');
 
@@ -109,7 +115,12 @@ export const Header = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
+  }, []);
+
+  // Log navigation changes
+  useEffect(() => {
+    console.log('Header: Location changed to:', location.pathname, location.search);
+  }, [location.pathname, location.search]);
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
@@ -215,26 +226,30 @@ export const Header = () => {
                   </Link>
                   
                   {/* NOTIFICATION BELL BUTTON AND DROPDOWN */}
-                  <div className="relative"> {/* Container for the bell and its dropdown */}
+                  <div className="relative">
                     <button
-                      id="notification-button" // Added ID for click outside logic
+                      id="notification-button"
                       onClick={() => {
+                        console.log('Header: Notification button clicked');
                         setShowNotificationsDropdown(!showNotificationsDropdown);
                       }}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-100 relative"
                     >
-                      <Bell className="w-4 h-4" /> {/* The one and only bell icon */}
-                      <NotificationBadge className="absolute -top-1 -right-1" unreadCount={unreadCount} /> {/* Position badge relative to this bell */}
+                      <Bell className="w-4 h-4" />
+                      <NotificationBadge className="absolute -top-1 -right-1" unreadCount={unreadCount} />
                     </button>
 
                     {showNotificationsDropdown && (
                       <div 
-                        id="notification-dropdown" // Added ID for click outside logic
-                        className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+                        id="notification-dropdown"
+                        className="absolute right-0 mt-2 w-80 max-h-96 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
                       >
                         <NotificationsDropdownContent 
-                          onClose={() => setShowNotificationsDropdown(false)} // Pass a simple closer
-                          onNavigate={handleNavigateToTab} // Pass the new handler
+                          onClose={() => {
+                            console.log('Header: Closing notification dropdown');
+                            setShowNotificationsDropdown(false);
+                          }}
+                          onNavigate={handleNavigateToTab}
                           fetchUnreadCount={fetchUnreadCount}
                           markAllAsRead={markAllAsRead}
                           getDashboardPath={getDashboardPath}
@@ -345,8 +360,13 @@ export const Header = () => {
                       <User className="w-4 h-4" />
                       <span>{getDisplayName()}</span>
                     </Link>
-                    {/* MOBILE BELL - Consider adding a similar bell/notification setup for mobile if desired */}
-                    {/* For now, leaving mobile bell out to keep changes focused, but you can replicate the desktop bell logic here */}
+                    <div className="flex items-center space-x-2 text-gray-600 py-2">
+                      <Bell className="w-4 h-4" />
+                      <span>Notifications</span>
+                      {unreadCount > 0 && (
+                        <NotificationBadge className="ml-2" unreadCount={unreadCount} />
+                      )}
+                    </div>
                     <button
                       onClick={handleSignOut}
                       className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 py-2"
