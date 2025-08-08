@@ -24,11 +24,11 @@ export const Hero = () => {
               </div>
 
               {/* Main Headings */}
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-6">
+              <h2 className="text-3xl lg:text-4xl font-bold text-gray-600 mb-6 font-heading">
                 Connecting Devs & Recruiters
               </h2>
               
-              <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-gray-900 leading-none mb-8">
+              <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-gray-900 leading-none mb-8 font-heading">
                 One <span className="relative inline-block mx-1">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 font-black">
                     Commit
@@ -38,10 +38,10 @@ export const Hero = () => {
               </h1>
 
               {/* Subtitle */}
-              <p className="text-xl lg:text-2xl text-gray-600 mb-8 leading-relaxed font-medium">
+              <p className="text-xl lg:text-2xl text-gray-600 mb-8 leading-relaxed font-medium font-sans">
                 We match developers based on <span className="text-gray-900 font-semibold">real GitHub work</span> — not resumes.
               </p>
-              <p className="text-lg text-gray-500 mb-12">
+              <p className="text-lg text-gray-500 mb-12 font-sans">
                 Quality connections. Proven results. Zero upfront costs.
               </p>
 
@@ -49,14 +49,14 @@ export const Hero = () => {
               <div className="flex flex-col sm:flex-row gap-4 mb-16">
                 <Link
                   to="/signup?role=recruiter"
-                  className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300"
+                  className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 font-heading"
                 >
                   Start Hiring Today
                   <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link
                   to="/signup?role=developer"
-                  className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300"
+                  className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 font-heading"
                 >
                   Devs - Start Now
                   <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -81,9 +81,9 @@ export const Hero = () => {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-black text-gray-900">sarah_codes</h3>
-                      <p className="text-sm font-medium text-gray-600">Senior Full-Stack Engineer</p>
-                      <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+                      <h3 className="text-xl font-black text-gray-900 font-heading">sarah_codes</h3>
+                      <p className="text-sm font-medium text-gray-600 font-sans">Senior Full-Stack Engineer</p>
+                      <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500 font-sans">
                         <div className="flex items-center">
                           <Eye className="w-3 h-3 mr-1" />
                           <span className="font-medium">2.1k followers</span>

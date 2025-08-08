@@ -26,8 +26,8 @@ export const Contact = () => {
     <div id="contact" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Get in Touch</h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4 font-heading">Get in Touch</h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto font-sans">
             Have questions about GitTalent? We'd love to hear from you. 
             Send us a message and we'll respond as soon as possible.
           </p>
@@ -36,7 +36,7 @@ export const Contact = () => {
         <div className="grid lg:grid-cols-2 gap-16">
           {/* Contact Information */}
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-8">Contact Information</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-8 font-heading">Contact Information</h3>
             
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
@@ -44,9 +44,9 @@ export const Contact = () => {
                   <Mail className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Email</h4>
-                  <p className="text-gray-600">hello@gittalent.dev</p>
-                  <p className="text-sm text-gray-500">We'll get back to you within 24 hours</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1 font-heading">Email</h4>
+                  <p className="text-gray-600 font-sans">hello@gittalent.dev</p>
+                  <p className="text-sm text-gray-500 font-sans">We'll get back to you within 24 hours</p>
                 </div>
               </div>
 
@@ -55,9 +55,9 @@ export const Contact = () => {
                   <Phone className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Phone</h4>
-                  <p className="text-gray-600">+1 (555) 123-4567</p>
-                  <p className="text-sm text-gray-500">Mon-Fri from 8am to 5pm PST</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1 font-heading">Phone</h4>
+                  <p className="text-gray-600 font-sans">+1 (555) 123-4567</p>
+                  <p className="text-sm text-gray-500 font-sans">Mon-Fri from 8am to 5pm PST</p>
                 </div>
               </div>
 
@@ -66,19 +66,19 @@ export const Contact = () => {
                   <MapPin className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Office</h4>
-                  <p className="text-gray-600">San Francisco, CA</p>
-                  <p className="text-sm text-gray-500">Remote-first company</p>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-1 font-heading">Office</h4>
+                  <p className="text-gray-600 font-sans">San Francisco, CA</p>
+                  <p className="text-sm text-gray-500 font-sans">Remote-first company</p>
                 </div>
               </div>
             </div>
 
             <div className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl">
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Our Commitment</h4>
-              <p className="text-gray-600 mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 font-heading">Our Commitment</h4>
+              <p className="text-gray-600 mb-4 font-sans">
                 We're dedicated to transforming the tech hiring process with:
               </p>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm font-sans">
                 <div className="flex justify-between">
                   <span className="text-gray-600">AI-Powered Matching</span>
                   <span className="font-medium text-gray-900">95% accuracy</span>
@@ -168,9 +168,9 @@ export const Contact = () => {
                 />
               </div>
 
-              <button
+                <button
                 type="submit"
-                className="w-full flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl font-heading"
               >
                 Send Message
                 <Send className="ml-2 w-5 h-5" />

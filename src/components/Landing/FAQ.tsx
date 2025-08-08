@@ -55,8 +55,8 @@ export const FAQ = () => {
     <div id="faq" className="py-20 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-          <p className="text-xl text-gray-600">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4 font-heading">Frequently Asked Questions</h2>
+          <p className="text-xl text-gray-600 font-sans">
             Everything you need to know about GitTalent
           </p>
         </div>
@@ -71,7 +71,7 @@ export const FAQ = () => {
                 className="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
                 onClick={() => toggleFAQ(index)}
               >
-                <span className="text-lg font-semibold text-gray-900 pr-4">
+                <span className="text-lg font-semibold text-gray-900 pr-4 font-heading">
                   {faq.question}
                 </span>
                 {openIndex === index ? (
@@ -82,7 +82,7 @@ export const FAQ = () => {
               </button>
               {openIndex === index && (
                 <div className="px-6 pb-5">
-                  <p className="text-gray-600 leading-relaxed">
+                  <p className="text-gray-600 leading-relaxed font-sans">
                     {faq.answer}
                   </p>
                 </div>
@@ -92,11 +92,11 @@ export const FAQ = () => {
         </div>
 
         <div className="mt-16 text-center">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Still have questions?</h3>
-          <p className="text-gray-600 mb-8">
+          <h3 className="text-2xl font-bold text-gray-900 mb-4 font-heading">Still have questions?</h3>
+          <p className="text-gray-600 mb-8 font-sans">
             Can't find the answer you're looking for? Please chat with our friendly team.
           </p>
-          <Link to="/contact" className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+          <Link to="/contact" className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold font-heading">
             Contact Support
           </Link>
         </div>
