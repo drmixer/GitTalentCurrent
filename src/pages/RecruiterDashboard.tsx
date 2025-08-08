@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../contexts/NotificationsContext'; 
+import { supabase } from '../lib/supabase';
 // MODIFIED: Import useNavigate
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
