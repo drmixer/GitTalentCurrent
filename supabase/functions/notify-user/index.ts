@@ -43,7 +43,7 @@ serve(async (req)=>{
           message = `A developer has completed a coding test.`;
           userId = assignment.recruiter_id;
           notificationType = 'test_completion';
-          link = '?tab=pipeline';
+          link = '?tab=tracker';
         }
         break;
       case 'INSERT:messages':

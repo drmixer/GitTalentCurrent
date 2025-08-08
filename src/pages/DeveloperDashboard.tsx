@@ -461,6 +461,11 @@ export const DeveloperDashboard: React.FC = () => {
                   {tabCounts.messages}
                 </span>
               )}
+              {tabName === 'jobs' && tabCounts.jobs > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {tabCounts.jobs}
+                </span>
+              )}
             </button>
           ))}
         </nav>
