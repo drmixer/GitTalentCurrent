@@ -84,7 +84,7 @@ export const DeveloperDashboard: React.FC = () => {
     loading: authContextLoading,
     refreshProfile,
   } = useAuth();
-  const { tabCounts } = useNotifications();
+  const { tabCounts, markAsReadByType } = useNotifications();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -298,6 +298,26 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);
   }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
+
+  // Clear notifications when accessing relevant tabs
+  useEffect(() => {
+    if (userProfile?.id && activeTab) {
+      console.log('🔄 DeveloperDashboard: Clearing notifications for tab:', activeTab);
+      
+      // Clear notifications based on the active tab
+      if (activeTab === 'tests') {
+        // Clear test assignment notifications
+        markAsReadByType('test_assignment');
+      } else if (activeTab === 'messages') {
+        // Messages notifications will be cleared when specific message threads are opened
+      } else if (activeTab === 'jobs') {
+        // Clear job-related notifications for developers
+        markAsReadByType('job_application');
+        markAsReadByType('application_viewed'); 
+        markAsReadByType('hired');
+      }
+    }
+  }, [activeTab, userProfile, markAsReadByType]);
   
   // REMOVED: All conflicting useEffects that managed tab state have been removed to prevent infinite loops.
   

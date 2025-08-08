@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../contexts/NotificationsContext';
 import { supabase } from '../lib/supabase';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Users, 
   Briefcase, 
@@ -48,7 +49,13 @@ interface PendingRecruiter {
 
 export const AdminDashboard = () => {
   const { user, userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const { tabCounts, markAsReadByType } = useNotifications();
+  const location = useLocation();
+  
+  // URL-based tab management (similar to other dashboards)
+  const params = new URLSearchParams(location.search);
+  const validTabs = ['overview', 'recruiters', 'developers', 'jobs', 'hires', 'messages'];
+  const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
   const [developers, setDevelopers] = useState<(Developer & { user: any })[]>([]);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
@@ -71,6 +78,19 @@ export const AdminDashboard = () => {
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const navigate = useNavigate();
+
+  // Clear notifications when accessing relevant tabs
+  useEffect(() => {
+    if (userProfile?.id && activeTab) {
+      // Clear notifications when visiting specific tabs
+      if (activeTab === 'messages') {
+        // Messages notifications will be cleared when specific message threads are opened
+      } else if (activeTab === 'recruiters') {
+        // Clear pending recruiter notifications
+        markAsReadByType('pending_recruiter');
+      }
+    }
+  }, [activeTab, userProfile, markAsReadByType]);
 
   useEffect(() => {
     if (userProfile?.role === 'admin') {
@@ -770,15 +790,15 @@ export const AdminDashboard = () => {
             <nav className="-mb-px flex flex-wrap space-x-6">
               {[
                 { id: 'overview', label: 'Overview', icon: TrendingUp, badge: null },
-                { id: 'recruiters', label: 'Recruiters', icon: Building, badge: pendingRecruiters.length > 0 ? pendingRecruiters.length : null },
+                { id: 'recruiters', label: 'Recruiters', icon: Building, badge: tabCounts.recruiters > 0 ? tabCounts.recruiters : (pendingRecruiters.length > 0 ? pendingRecruiters.length : null) },
                 { id: 'developers', label: 'Developers', icon: Code, badge: null },
                 { id: 'jobs', label: 'Job Listings', icon: Briefcase, badge: null },
                 { id: 'hires', label: 'Hires Report', icon: DollarSign, badge: null },
-                { id: 'messages', label: 'Messages', icon: MessageSquare, badge: null }
+                { id: 'messages', label: 'Messages', icon: MessageSquare, badge: tabCounts.messages > 0 ? tabCounts.messages : null }
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => navigate(`/admin?tab=${tab.id}`)}
                   className={`flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all ${
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600 bg-gray-100'

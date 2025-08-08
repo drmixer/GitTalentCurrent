@@ -222,6 +222,9 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
           case 'job_posted':
             targetTab = 'jobs';
             break;
+          case 'pending_recruiter':
+            targetTab = userProfile?.role === 'admin' ? 'recruiters' : 'overview';
+            break;
           default:
             targetTab = 'overview';
         }
