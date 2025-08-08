@@ -87,7 +87,7 @@ const validTabs = ['overview', 'my-jobs', 'tracker', 'search-devs', 'messages', 
 
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
-    const { tabCounts } = useNotifications();
+    const { tabCounts, markAsReadByType } = useNotifications();
     // MODIFIED: Add useNavigate hook
     const location = useLocation();
     const navigate = useNavigate();
@@ -345,6 +345,26 @@ const RecruiterDashboard: React.FC = () => {
             };
         }
     }, [user?.id, fetchDashboardData]);
+
+    // Clear notifications when accessing relevant tabs
+    useEffect(() => {
+        if (userProfile?.id && activeTab) {
+            console.log('🔄 RecruiterDashboard: Clearing notifications for tab:', activeTab);
+            
+            // Clear notifications based on the active tab
+            if (activeTab === 'my-jobs') {
+                // Clear job application notifications
+                markAsReadByType('job_application');
+                markAsReadByType('application_viewed');
+                markAsReadByType('hired');
+            } else if (activeTab === 'tracker') {
+                // Clear test completion notifications 
+                markAsReadByType('test_completion');
+            } else if (activeTab === 'messages') {
+                // Messages notifications will be cleared when specific message threads are opened
+            }
+        }
+    }, [activeTab, userProfile, markAsReadByType]);
 
     // --- Handlers ---
     const handleViewApplicants = useCallback((jobId: string) => {

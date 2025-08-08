@@ -7,6 +7,7 @@ interface TabCounts {
   tests: number;
   jobs: number;
   pipeline: number;
+  recruiters: number; // Add recruiters tab count for admin
 }
 
 interface NotificationsContextType {
@@ -14,6 +15,7 @@ interface NotificationsContextType {
   tabCounts: TabCounts;
   fetchUnreadCount: () => Promise<{ unreadCount: number; tabCounts: TabCounts }>;
   markAsReadByEntity: (entityId: string, type: string) => Promise<void>;
+  markAsReadByType: (type: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
 }
 
@@ -27,10 +29,11 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     tests: 0,
     jobs: 0,
     pipeline: 0,
+    recruiters: 0,
   });
 
   const fetchUnreadCount = useCallback(async (): Promise<{ unreadCount: number; tabCounts: TabCounts }> => {
-    const defaultReturn = { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0 }};
+    const defaultReturn = { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0, recruiters: 0 }};
     try {
       if (!userProfile?.id) return defaultReturn;
 
@@ -44,7 +47,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
 
       if (error) throw error;
 
-      const newTabCounts: TabCounts = { messages: 0, tests: 0, jobs: 0, pipeline: 0 };
+      const newTabCounts: TabCounts = { messages: 0, tests: 0, jobs: 0, pipeline: 0, recruiters: 0 };
       for (const notification of data) {
         if (notification.type === 'message') newTabCounts.messages++;
         else if (notification.type === 'test_assignment') newTabCounts.tests++;
@@ -52,6 +55,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
         else if (notification.type === 'application_viewed') newTabCounts.jobs++;
         else if (notification.type === 'hired') newTabCounts.jobs++;
         else if (notification.type === 'test_completion') newTabCounts.pipeline++;
+        else if (notification.type === 'pending_recruiter') newTabCounts.recruiters++;
       }
 
       console.log('📊 Updated notification counts:', {
@@ -125,6 +129,36 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     }
   }, [userProfile, fetchUnreadCount]);
 
+  const markAsReadByType = useCallback(async (type: string) => {
+    try {
+      if (!userProfile?.id) return;
+      
+      console.log('🔄 Marking notifications as read by type:', { type, userId: userProfile.id });
+      
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userProfile.id)
+        .eq('type', type)
+        .eq('is_read', false)
+        .select('id'); // Return the updated records to see if any were actually updated
+
+      if (error) throw error;
+      
+      // Only refresh count if notifications were actually marked as read
+      if (data && data.length > 0) {
+        console.log('✅ Successfully marked', data.length, 'notifications as read by type');
+        setTimeout(() => {
+          fetchUnreadCount();
+        }, 200);
+      } else {
+        console.log('ℹ️ No unread notifications found to mark as read for type:', type);
+      }
+    } catch (error) {
+      console.error('Error marking notification as read by type:', error);
+    }
+  }, [userProfile, fetchUnreadCount]);
+
   useEffect(() => {
     if (userProfile?.id) {
       console.log('🔄 User profile loaded, initializing notifications for:', userProfile.id);
@@ -153,7 +187,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     }
   }, [userProfile, fetchUnreadCount]);
 
-  const value = { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAllAsRead };
+  const value = { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAsReadByType, markAllAsRead };
 
   return (
     <NotificationsContext.Provider value={value}>
