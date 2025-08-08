@@ -205,7 +205,13 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
             targetTab = 'messages';
             break;
           case 'job_application':
-            targetTab = userProfile?.role === 'recruiter' ? 'tracker' : 'jobs';
+            targetTab = 'jobs';
+            break;
+          case 'application_viewed':
+            targetTab = 'jobs';
+            break;
+          case 'hired':
+            targetTab = 'jobs';
             break;
           case 'test_assignment':
             targetTab = 'tests';

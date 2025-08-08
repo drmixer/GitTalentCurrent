@@ -49,6 +49,8 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
         if (notification.type === 'message') newTabCounts.messages++;
         else if (notification.type === 'test_assignment') newTabCounts.tests++;
         else if (notification.type === 'job_application') newTabCounts.jobs++;
+        else if (notification.type === 'application_viewed') newTabCounts.jobs++;
+        else if (notification.type === 'hired') newTabCounts.jobs++;
         else if (notification.type === 'test_completion') newTabCounts.pipeline++;
       }
 
