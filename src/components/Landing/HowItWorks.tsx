@@ -2,19 +2,19 @@ import React from 'react';
 
 const steps = [
   {
-    illustration: '/src/assets/illustrations/github-profile.svg',
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_github-profile_abde%20(1).svg',
     title: 'Developers Join with GitHub',
   },
   {
-    illustration: '/src/assets/illustrations/developer-activity.svg',
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_developer-activity_4zqd.svg',
     title: 'Recruiters Post Open Roles',
   },
   {
-    illustration: '/src/assets/illustrations/avatars.svg',
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_avatars_xsfb.svg',
     title: 'AI-Powered Matching Begins',
   },
   {
-    illustration: '/src/assets/illustrations/ship-it.svg',
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_ship-it_vn4g.svg',
     title: 'Chat, Hire, Repeat – Free During Early Access',
   },
 ];

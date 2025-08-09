@@ -25,7 +25,7 @@ export const About = () => {
             </p>
           </div>
           <div className="flex justify-center">
-            <img src="/src/assets/illustrations/pair-programming.svg" alt="Pair Programming Illustration" className="w-full max-w-lg" />
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_pair-programming_9jyg.svg" alt="Pair Programming Illustration" className="w-full max-w-lg" />
           </div>
         </div>
       </div>

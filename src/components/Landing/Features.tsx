@@ -18,8 +18,8 @@ export const Features = () => {
         {/* Benefits Section */}
         <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
           <div className="flex justify-around items-center mb-12">
-            <img src="/src/assets/illustrations/dev-environment.svg" alt="Developer Environment Illustration" className="w-1/3" />
-            <img src="/src/assets/illustrations/portfolio-website.svg" alt="Portfolio Website Illustration" className="w-1/3" />
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_dev-environment_n5by.svg" alt="Developer Environment Illustration" className="w-1/3" />
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_portfolio-website_838t.svg" alt="Portfolio Website Illustration" className="w-1/3" />
           </div>
 
           <div className="text-center">
