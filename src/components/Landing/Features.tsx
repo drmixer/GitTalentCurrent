@@ -1,24 +1,5 @@
 import React from 'react';
-import { Brain, Code, Sparkles, CheckCircle, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const benefits = [
-  {
-    icon: CheckCircle,
-    title: 'AI Matching Based on Real Work',
-    description: 'We analyze real GitHub contributions, not resumes, to match you with developers who have proven their skills in public. No fluff, just signal.',
-  },
-  {
-    icon: Code,
-    title: 'Profiles That Actually Mean Something',
-    description: 'Get visibility into how candidates code, contribute, and collaborate beyond job titles or buzzwords.',
-  },
-  {
-    icon: Award,
-    title: 'Free While We Grow',
-    description: 'No subscriptions. No upfront costs. During Early Access, recruiters pay nothing to post or hire. Devs are free forever.',
-  },
-];
 
 export const Features = () => {
   return (
@@ -36,16 +17,9 @@ export const Features = () => {
 
         {/* Benefits Section */}
         <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            {benefits.map((benefit, index) => (
-              <div key={benefit.title} className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <benefit.icon className="w-8 h-8 text-white" />
-                </div>
-                <h4 className="text-xl font-black text-gray-900 mb-3">{benefit.title}</h4>
-                <p className="text-gray-600 leading-relaxed font-medium">{benefit.description}</p>
-              </div>
-            ))}
+          <div className="flex justify-around items-center mb-12">
+            <img src="/src/assets/illustrations/dev-environment.svg" alt="Developer Environment Illustration" className="w-1/3" />
+            <img src="/src/assets/illustrations/portfolio-website.svg" alt="Portfolio Website Illustration" className="w-1/3" />
           </div>
 
           <div className="text-center">
