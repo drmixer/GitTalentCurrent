@@ -1,21 +1,20 @@
 import React from 'react';
-import { Github, Briefcase, Bot, MessageSquare, Repeat } from 'lucide-react';
 
 const steps = [
   {
-    icon: Github,
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_github-profile_abde%20(1).svg',
     title: 'Developers Join with GitHub',
   },
   {
-    icon: Briefcase,
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_developer-activity_4zqd.svg',
     title: 'Recruiters Post Open Roles',
   },
   {
-    icon: Bot,
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_avatars_xsfb.svg',
     title: 'AI-Powered Matching Begins',
   },
   {
-    icon: MessageSquare,
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_ship-it_vn4g.svg',
     title: 'Chat, Hire, Repeat – Free During Early Access',
   },
 ];
@@ -33,9 +32,7 @@ export const HowItWorks = () => {
         <div className="grid md:grid-cols-4 gap-8">
           {steps.map((step, index) => (
             <div key={index} className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <step.icon className="w-12 h-12 text-white" />
-              </div>
+              <img src={step.illustration} alt={`${step.title} illustration`} className="h-40 mx-auto mb-6" />
               <h4 className="text-xl font-black text-gray-900">{step.title}</h4>
             </div>
           ))}

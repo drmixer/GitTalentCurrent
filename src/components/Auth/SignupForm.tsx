@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, User, Building, AlertCircle, Eye, EyeOff, GitBranch, Code, Users, Github, CheckCircle, RefreshCw } from 'lucide-react';
 
@@ -18,6 +18,15 @@ export const SignupForm = () => {
   const [success, setSuccess] = useState('');
   const { signUp, signInWithGitHub, user, userProfile, loading: authLoading, authError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const roleFromUrl = params.get('role');
+    if (roleFromUrl === 'recruiter') {
+      setFormData(prev => ({ ...prev, role: 'recruiter' }));
+    }
+  }, [location.search]);
 
   useEffect(() => {
     // If there's an auth error from the context, show it
