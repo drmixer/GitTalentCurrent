@@ -161,6 +161,7 @@ export const Header = () => {
                 { label: 'How It Works', id: 'how-it-works' },
                 { label: 'About', id: 'about' },
                 { label: 'Contact', id: 'contact' },
+                { label: 'FAQ', id: 'faq' },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -303,6 +304,7 @@ export const Header = () => {
                     { label: 'Pricing', id: 'pricing' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
+                    { label: 'FAQ', id: 'faq' },
                   ].map((item) => (
                     <button
                       key={item.id}
