@@ -9,6 +9,9 @@ export default {
         sans: ['Rubik', ...defaultTheme.fontFamily.sans],
         heading: ['"Space Grotesk"', ...defaultTheme.fontFamily.sans],
       },
+      colors: {
+        'brand-cta': '#6c63ff',
+      },
     },
   },
   plugins: [],

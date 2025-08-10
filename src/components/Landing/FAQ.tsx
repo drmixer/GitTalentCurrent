@@ -96,7 +96,7 @@ export const FAQ = () => {
           <p className="text-gray-600 mb-8">
             Can't find the answer you're looking for? Please chat with our friendly team.
           </p>
-          <Link to="/contact" className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+          <Link to="/contact" className="px-8 py-3 bg-brand-cta text-white rounded-lg hover:brightness-90 transition-all font-semibold">
             Contact Support
           </Link>
         </div>

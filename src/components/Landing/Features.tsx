@@ -17,10 +17,9 @@ export const Features = () => {
 
         {/* Benefits Section */}
         <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-3xl p-12 border border-gray-200">
-          <div className="flex justify-around items-center mb-12 gap-8">
-            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_dev-environment_n5by.svg" alt="Developer Environment Illustration" className="w-1/3" />
-            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_portfolio-website_838t.svg" alt="Portfolio Website Illustration" className="w-1/3" />
-            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_innovative_9l1b.svg" alt="Innovative Solutions Illustration" className="w-1/3" />
+          <div className="flex justify-around items-center mb-12">
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_dev-environment_n5by.svg" alt="Developer Environment Illustration" className="w-2/5" />
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_portfolio-website_838t.svg" alt="Portfolio Website Illustration" className="w-2/5" />
           </div>
 
           <div className="text-center">

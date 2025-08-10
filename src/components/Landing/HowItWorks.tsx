@@ -6,7 +6,7 @@ const steps = [
     title: 'Developers Join with GitHub',
   },
   {
-    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_developer-activity_4zqd.svg',
+    illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_live-collaboration_i8an.svg',
     title: 'Recruiters Post Open Roles',
   },
   {
