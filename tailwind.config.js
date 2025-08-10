@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"IBM Plex Sans"', ...defaultTheme.fontFamily.sans],
-        heading: ['Inter', ...defaultTheme.fontFamily.sans],
+        sans: ['Rubik', ...defaultTheme.fontFamily.sans],
+        heading: ['"Space Grotesk"', ...defaultTheme.fontFamily.sans],
       },
     },
   },
