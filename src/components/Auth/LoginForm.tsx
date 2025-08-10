@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, AlertCircle, Eye, EyeOff, Github, Loader, GitBranch, RefreshCw } from 'lucide-react';
 
@@ -74,8 +75,12 @@ export const LoginForm = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
+    <>
+      <Helmet>
+        <title>Login | GitTalent</title>
+      </Helmet>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-3 mb-8">
@@ -278,5 +283,6 @@ export const LoginForm = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
