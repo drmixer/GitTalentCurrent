@@ -301,7 +301,6 @@ export const Header = () => {
                   {[
                     { label: 'Features', id: 'features' },
                     { label: 'How It Works', id: 'how-it-works' },
-                    { label: 'Pricing', id: 'pricing' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
                     { label: 'FAQ', id: 'faq' },
