@@ -10,18 +10,18 @@ export const About = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <p className="text-lg text-gray-600 mb-6">
-              We started GitTalent because hiring devs should not be about buzzwords and resumes. It should be about work – real code, real projects, real proof.
+          <div className="space-y-6 text-lg text-gray-600">
+            <p>
+              We started GitTalent because hiring developers should be about proven work — real code, real projects, and real results.
             </p>
-            <p className="text-lg text-gray-600 mb-8">
-              We believe developers deserve to be discovered for what they actually do, not how they talk about it. And recruiters deserve better tools to surface great talent faster.
+            <p>
+              We believe developers should be recognized for what they build, not just what’s on a résumé. And recruiters deserve better tools to find great talent quickly and confidently.
             </p>
-            <p className="text-lg text-gray-600 mb-8">
-              GitTalent connects both sides through a transparent, AI-assisted hiring experience built on GitHub activity, not fluff.
+            <p>
+              GitTalent connects both sides through a transparent hiring experience built on genuine developer contributions and meaningful opportunities.
             </p>
-            <p className="text-lg text-gray-600">
-              We are just getting started. Join us while we grow and help shape the future of developer hiring.
+            <p>
+              We’re just getting started. Join us as we grow and help shape the future of developer hiring.
             </p>
           </div>
           <div className="flex justify-center">
