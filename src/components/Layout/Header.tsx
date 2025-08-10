@@ -158,6 +158,7 @@ export const Header = () => {
             <nav className="hidden md:flex items-center space-x-8">
               {[
                 { label: 'Features', id: 'features' },
+                { label: 'How It Works', id: 'how-it-works' },
                 { label: 'About', id: 'about' },
                 { label: 'Contact', id: 'contact' },
               ].map((item) => (
@@ -298,6 +299,7 @@ export const Header = () => {
                 <>
                   {[
                     { label: 'Features', id: 'features' },
+                    { label: 'How It Works', id: 'how-it-works' },
                     { label: 'Pricing', id: 'pricing' },
                     { label: 'About', id: 'about' },
                     { label: 'Contact', id: 'contact' },
