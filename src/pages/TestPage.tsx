@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { CodingQuestion, TestAssignment } from '../types';
 import Editor from '@monaco-editor/react';
 import { Play, Send, Loader, CheckCircle } from 'lucide-react';
-import SandpackTest from '../components/Tests/SandpackTest'; // Import the Sandpack component
+import SandpackTest from '../components/Tests/SandpackTest';
 
 const TestPage: React.FC = () => {
     const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -96,6 +96,12 @@ const TestPage: React.FC = () => {
         setOutput('');
         setIsSubmitting(true);
         const question = questions[currentQuestionIndex];
+        
+        console.log('=== RUN CODE DEBUG ===');
+        console.log('Question:', question.title);
+        console.log('Language:', question.language);
+        console.log('Language ID:', getLanguageId(question.language));
+        
         const { data, error } = await supabase.functions.invoke('run-code', {
             body: {
                 code,
@@ -105,8 +111,10 @@ const TestPage: React.FC = () => {
         });
 
         if (error) {
+            console.error('Run code error:', error);
             setOutput(`Error running code: ${error.message}`);
         } else {
+            console.log('Run code response:', data);
             setOutput(data.stdout || data.stderr || 'No output');
         }
         setIsSubmitting(false);
@@ -118,10 +126,22 @@ const TestPage: React.FC = () => {
         
         try {
             const question = questions[currentQuestionIndex];
+            
+            console.log('=== SUBMISSION DEBUG START ===');
+            console.log('Question:', question.title);
+            console.log('Language:', question.language);
+            console.log('Language ID:', getLanguageId(question.language));
+            console.log('Assignment ID:', assignmentId);
+            console.log('Question ID:', question.id);
+            
             const { data, error } = await supabase.functions.invoke<{ 
-                status: { id: number }, 
-                stdout: string, 
-                stderr: string 
+                status: { id: number; description: string },
+                stdout: string,
+                stderr: string,
+                passed?: boolean,
+                execution_successful?: boolean,
+                test_summary?: any,
+                compile_output?: string
             }>('grade-submission', {
                 body: {
                     code,
@@ -137,35 +157,61 @@ const TestPage: React.FC = () => {
                 console.error('Failed to submit code:', error);
                 setOutput(`Error submitting code: ${error.message}`);
             } else if (data) {
-                // Use upsert to prevent duplicates
-                const { error: insertError } = await supabase.from('test_results').upsert({
-                    assignment_id: assignmentId,
-                    question_id: question.id,
-                    score: data.status.id === 3 ? 1 : 0, // 3 is "Accepted"
-                    stdout: data.stdout,
-                    stderr: data.stderr,
-                    passed_test_cases: data.status.id === 3 ? 1 : 0,
-                    total_test_cases: 1,
-                }, {
-                    onConflict: 'assignment_id,question_id'
-                });
+                console.log('=== FULL RESPONSE FROM GRADE-SUBMISSION ===');
+                console.log('Raw data:', JSON.stringify(data, null, 2));
+                console.log('Status ID:', data.status?.id);
+                console.log('Status Description:', data.status?.description);
+                console.log('Passed field:', data.passed);
+                console.log('Execution successful field:', data.execution_successful);
+                console.log('Stdout:', data.stdout);
+                console.log('Stderr:', data.stderr);
+                console.log('Test summary:', data.test_summary);
+                
+                // Enhanced score calculation using multiple indicators
+                const isAccepted = data.status?.id === 3;
+                const isPassedField = data.passed === true;
+                const hasPassInOutput = data.stdout?.toLowerCase().includes('pass');
+                const hasNoCompileErrors = !data.stderr?.toLowerCase().includes('error') && !data.compile_output?.toLowerCase().includes('error');
+                
+                console.log('Score calculation:');
+                console.log('- Status ID === 3 (Accepted):', isAccepted);
+                console.log('- Passed field === true:', isPassedField);
+                console.log('- Output contains "pass":', hasPassInOutput);
+                console.log('- No compile errors:', hasNoCompileErrors);
+                
+                // Determine final result
+                const finalPassed = isAccepted && isPassedField;
+                console.log('Final result: PASSED =', finalPassed);
 
-                if (insertError) {
-                    console.error('Error saving test result:', insertError);
+                // Show detailed result to user
+                let userOutput = '';
+                if (data.stdout) {
+                    userOutput += `Output:\n${data.stdout}\n`;
                 }
+                if (data.stderr && data.stderr.trim() !== '') {
+                    userOutput += `\nErrors:\n${data.stderr}\n`;
+                }
+                if (data.compile_output && data.compile_output.trim() !== '') {
+                    userOutput += `\nCompile Output:\n${data.compile_output}\n`;
+                }
+                userOutput += `\nStatus: ${data.status?.description || 'Unknown'}`;
+                userOutput += `\nResult: ${finalPassed ? 'PASSED ✅' : 'FAILED ❌'}`;
+                
+                setOutput(userOutput);
 
-                // Show result to user
-                setOutput(data.stdout || data.stderr || 'Submission completed');
+                // Note: The database update is handled by the grade-submission function
+                console.log('Test result saved by grade-submission function');
             }
 
             // Move to next question or complete test
             if (currentQuestionIndex < questions.length - 1) {
-                setCurrentQuestionIndex(currentQuestionIndex + 1);
+                setTimeout(() => {
+                    setCurrentQuestionIndex(currentQuestionIndex + 1);
+                    setOutput(''); // Clear output for next question
+                }, 2000); // Give user time to see result
             } else {
-                // Test finished
-                await supabase.from('test_assignments').update({ 
-                    status: 'Completed' 
-                }).eq('id', assignmentId);
+                // Test finished - the grade-submission function already updated the status
+                console.log('All questions completed - test finished');
                 setIsCompleted(true);
                 setTimeout(() => {
                     navigate('/developer');
@@ -173,7 +219,7 @@ const TestPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Error in handleSubmit:', error);
-            setOutput(`Error: ${error.message}`);
+            setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -262,7 +308,17 @@ const TestPage: React.FC = () => {
                 <div className="w-1/3 p-4 overflow-y-auto">
                     <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                    <p>{currentQuestion.question_text}</p>
+                    <p className="mb-4">{currentQuestion.question_text}</p>
+                    
+                    {/* Show current question progress */}
+                    <div className="mt-4 p-3 bg-gray-100 rounded-md">
+                        <p className="text-sm text-gray-600">
+                            Question {currentQuestionIndex + 1} of {questions.length}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Language: {currentQuestion.language}
+                        </p>
+                    </div>
                 </div>
                 <div className="w-2/3 flex flex-col">
                     <Editor
@@ -274,15 +330,35 @@ const TestPage: React.FC = () => {
                     />
                     <div className="p-4 bg-gray-800 text-white flex-grow">
                         <h3 className="text-lg font-semibold">Output</h3>
-                        <pre className="whitespace-pre-wrap">{output}</pre>
+                        <pre className="whitespace-pre-wrap text-sm mt-2 font-mono">{output}</pre>
                     </div>
-                    <div className="p-4 border-t border-gray-200 flex justify-end space-x-4">
-                        <button onClick={handleRunCode} disabled={isSubmitting} className="px-4 py-2 bg-gray-200 rounded-md flex items-center">
-                            <Play size={16} className="mr-2" /> Run
-                        </button>
-                        <button onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center">
-                            <Send size={16} className="mr-2" /> Submit
-                        </button>
+                    <div className="p-4 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-sm text-gray-600">
+                            {isSubmitting && (
+                                <span className="flex items-center">
+                                    <Loader className="w-4 h-4 mr-2 animate-spin" />
+                                    Processing...
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex space-x-4">
+                            <button 
+                                onClick={handleRunCode} 
+                                disabled={isSubmitting} 
+                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md flex items-center hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Play size={16} className="mr-2" /> 
+                                {isSubmitting ? 'Running...' : 'Run'}
+                            </button>
+                            <button 
+                                onClick={handleSubmit} 
+                                disabled={isSubmitting} 
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Send size={16} className="mr-2" /> 
+                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
