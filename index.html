@@ -21,6 +21,12 @@
     <meta name="twitter:image" content="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/sign/logo/GitTalentGLogo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzQ0ZjQ0OC0yOTg1LTQyNmYtYWVmMy1lYmVmMTRlZGRmNWIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvL0dpdFRhbGVudEdMb2dvLnBuZyIsImlhdCI6MTc1MzU4NjQ3MSwiZXhwIjoxODQ4MTk0NDcxfQ.0DE11RMuQyDqTnSf9hSoEOl9VIUoyM9KGK0FeBYCwUQ" />
   </head>
   <body>
+    <form name="contact" netlify netlify-honeypot="bot-field" hidden>
+      <input type="text" name="name" />
+      <input type="email" name="email" />
+      <select name="subject"></select>
+      <textarea name="message"></textarea>
+    </form>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

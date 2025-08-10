@@ -87,15 +87,6 @@ export const FAQ = () => {
           ))}
         </div>
 
-        <div className="mt-16 text-center">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Still have questions?</h3>
-          <p className="text-gray-600 mb-8">
-            Can't find the answer you're looking for? Please chat with our friendly team.
-          </p>
-          <Link to="/contact" className="px-8 py-3 bg-brand-cta text-white rounded-lg hover:brightness-90 transition-all font-semibold">
-            Contact Support
-          </Link>
-        </div>
       </div>
     </div>
   );

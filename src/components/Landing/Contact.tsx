@@ -8,6 +8,7 @@ export const Contact = () => {
     subject: '',
     message: ''
   });
+  const [formStatus, setFormStatus] = useState({ submitting: false, success: false, error: '' });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -16,10 +17,28 @@ export const Contact = () => {
     }));
   };
 
+  const encode = (data: { [key: string]: string }) => {
+    return Object.keys(data)
+      .map(key => encodeURIComponent(key) + "=" + encodeURIComponent(data[key]))
+      .join("&");
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
+    setFormStatus({ submitting: true, success: false, error: '' });
+
+    fetch("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: encode({ "form-name": "contact", ...formData })
+    })
+      .then(() => {
+        setFormStatus({ submitting: false, success: true, error: '' });
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      })
+      .catch(error => {
+        setFormStatus({ submitting: false, success: false, error: error.message });
+      });
   };
 
   return (
@@ -62,7 +81,20 @@ export const Contact = () => {
 
           {/* Contact Form */}
           <div>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form name="contact" onSubmit={handleSubmit} data-netlify="true" className="space-y-6">
+              <input type="hidden" name="form-name" value="contact" />
+              {formStatus.success && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative" role="alert">
+                  <strong className="font-bold">Success!</strong>
+                  <span className="block sm:inline"> Your message has been sent.</span>
+                </div>
+              )}
+              {formStatus.error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+                  <strong className="font-bold">Error!</strong>
+                  <span className="block sm:inline"> {formStatus.error}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
