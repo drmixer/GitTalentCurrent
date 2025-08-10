@@ -4,16 +4,19 @@ import App from './App.tsx';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import ScrollToTop from './components/ScrollToTop.tsx';
+import { HelmetProvider } from 'react-helmet-async';
 import { GitHubProvider } from './hooks/useGitHub.tsx'; // Ensured only one import
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ScrollToTop />
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <HelmetProvider>
+        <ScrollToTop />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </HelmetProvider>
     </BrowserRouter>
   </StrictMode>
 );
