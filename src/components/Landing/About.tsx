@@ -1,10 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { GitBranch } from 'lucide-react';
 
 export const About = () => {
   return (
-    <div id="about" className="py-20 bg-gray-50">
+    <div id="about" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">About GitTalent</h2>
@@ -26,19 +25,7 @@ export const About = () => {
             </p>
           </div>
           <div className="flex justify-center">
-            <svg width="256" height="256" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" style={{stopColor: '#4F46E5', stopOpacity: 1}} />
-                  <stop offset="100%" style={{stopColor: '#A855F7', stopOpacity: 1}} />
-                </linearGradient>
-              </defs>
-              <path d="M6 3v12" stroke="url(#grad1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="url(#grad1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="url(#grad1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="url(#grad1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M6 15l12-6" stroke="url(#grad1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <img src="https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_pair-programming_9jyg.svg" alt="Pair Programming Illustration" className="w-full max-w-lg" />
           </div>
         </div>
       </div>
