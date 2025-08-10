@@ -3,8 +3,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const faqs = [
   {
-    question: "How does GitTalent's AI matching work?",
-    answer: "Our AI analyzes GitHub activity, contribution patterns, project involvement, and technical skills to create meaningful matches. The system recommends developers to recruiters based on job requirements and technical compatibility, ensuring quality matches without manual intervention."
+    question: "How do recruiters find developers?",
+    answer: "Recruiters can search our developer network, view project contributions, and connect directly with candidates who match their hiring needs."
   },
   {
     question: "Is GitTalent free for developers?",

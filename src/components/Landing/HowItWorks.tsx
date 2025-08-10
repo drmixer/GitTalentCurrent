@@ -11,7 +11,7 @@ const steps = [
   },
   {
     illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_avatars_xsfb.svg',
-    title: 'AI-Powered Matching Begins',
+    title: 'Discover Your Perfect Match',
   },
   {
     illustration: 'https://rsfebnaixdwkqxzadvub.supabase.co/storage/v1/object/public/illustrations/undraw_ship-it_vn4g.svg',
