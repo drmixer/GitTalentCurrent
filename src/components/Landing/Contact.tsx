@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, Send } from 'lucide-react';
 
 export const Contact = () => {
   const [formData, setFormData] = useState({
@@ -50,48 +50,13 @@ export const Contact = () => {
                 </div>
               </div>
 
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Phone</h4>
-                  <p className="text-gray-600">+1 (555) 123-4567</p>
-                  <p className="text-sm text-gray-500">Mon-Fri from 8am to 5pm PST</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-1">Office</h4>
-                  <p className="text-gray-600">San Francisco, CA</p>
-                  <p className="text-sm text-gray-500">Remote-first company</p>
-                </div>
-              </div>
             </div>
 
             <div className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl">
               <h4 className="text-lg font-semibold text-gray-900 mb-3">Our Commitment</h4>
-              <p className="text-gray-600 mb-4">
-                We're dedicated to transforming the tech hiring process with:
+              <p className="text-gray-600">
+                GitTalent is the all-in-one platform where companies hire top software developers and developers find their next big opportunity. Built for both recruiters and developers, GitTalent combines powerful search, GitHub profile integration, and direct messaging with built-in coding tests that recruiters can send and developers can complete — all without leaving the platform. Recruiters can post jobs, track applicants, and assess skills in real time, while developers can showcase their work, apply for roles, and prove their expertise. With its open platform and intuitive design, GitTalent makes hiring and getting hired in tech faster, smarter, and more transparent.
               </p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">AI-Powered Matching</span>
-                  <span className="font-medium text-gray-900">95% accuracy</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Open Access Platform</span>
-                  <span className="font-medium text-gray-900">No gatekeeping</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Pay-Per-Hire Model</span>
-                  <span className="font-medium text-gray-900">Zero upfront cost</span>
-                </div>
-              </div>
             </div>
           </div>
 
