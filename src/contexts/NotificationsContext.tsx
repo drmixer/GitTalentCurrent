@@ -17,6 +17,7 @@ interface NotificationsContextType {
   markAsReadByEntity: (entityId: string, type: string) => Promise<void>;
   markAsReadByType: (type: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  markMessageNotificationsAsRead: (senderId: string) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -37,7 +38,7 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     try {
       if (!userProfile?.id) return defaultReturn;
 
-      console.log('🔄 Fetching unread notification count for user:', userProfile.id);
+      console.log('🔄 Fetching unread notification count for user:', userProfile.id, 'role:', userProfile.role);
 
       const { data, error } = await supabase
         .from('notifications')
@@ -48,19 +49,58 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
       if (error) throw error;
 
       const newTabCounts: TabCounts = { messages: 0, tests: 0, jobs: 0, pipeline: 0, recruiters: 0 };
+      
+      // Count notifications by type, considering user role
       for (const notification of data) {
-        if (notification.type === 'message') newTabCounts.messages++;
-        else if (notification.type === 'test_assignment') newTabCounts.tests++;
-        else if (notification.type === 'job_application') newTabCounts.jobs++;
-        else if (notification.type === 'application_viewed') newTabCounts.jobs++;
-        else if (notification.type === 'hired') newTabCounts.jobs++;
-        else if (notification.type === 'test_completion') newTabCounts.pipeline++;
-        else if (notification.type === 'pending_recruiter') newTabCounts.recruiters++;
+        switch (notification.type) {
+          case 'message':
+          case 'admin_message':
+            newTabCounts.messages++;
+            break;
+            
+          case 'test_assignment':
+            // Only count for developers
+            if (userProfile.role === 'developer') {
+              newTabCounts.tests++;
+            }
+            break;
+            
+          case 'test_completion':
+            // Only count for recruiters in their pipeline tab
+            if (userProfile.role === 'recruiter') {
+              newTabCounts.pipeline++;
+            }
+            break;
+            
+          case 'job_application':
+            // Only count for recruiters in their jobs tab
+            if (userProfile.role === 'recruiter') {
+              newTabCounts.jobs++;
+            }
+            break;
+            
+          case 'application_viewed':
+          case 'hired':
+            // Only count for developers in their jobs tab
+            if (userProfile.role === 'developer') {
+              newTabCounts.jobs++;
+            }
+            break;
+            
+          case 'pending_recruiter':
+          case 'recruiter_pending':
+            // Only count for admin in their recruiters tab
+            if (userProfile.role === 'admin') {
+              newTabCounts.recruiters++;
+            }
+            break;
+        }
       }
 
       console.log('📊 Updated notification counts:', {
         total: data.length,
-        tabCounts: newTabCounts
+        tabCounts: newTabCounts,
+        userRole: userProfile.role
       });
 
       setTabCounts(newTabCounts);
@@ -159,6 +199,35 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     }
   }, [userProfile, fetchUnreadCount]);
 
+  // NEW: Function specifically for marking message notifications as read when opening a thread
+  const markMessageNotificationsAsRead = useCallback(async (senderId: string) => {
+    try {
+      if (!userProfile?.id) return;
+      
+      console.log('🔄 Marking message notifications as read for sender:', { senderId, userId: userProfile.id });
+      
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userProfile.id)
+        .eq('entity_id', senderId)
+        .eq('type', 'message')
+        .eq('is_read', false)
+        .select('id');
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        console.log('✅ Successfully marked', data.length, 'message notifications as read');
+        setTimeout(() => {
+          fetchUnreadCount();
+        }, 200);
+      }
+    } catch (error) {
+      console.error('Error marking message notifications as read:', error);
+    }
+  }, [userProfile, fetchUnreadCount]);
+
   useEffect(() => {
     if (userProfile?.id) {
       console.log('🔄 User profile loaded, initializing notifications for:', userProfile.id);
@@ -187,7 +256,15 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
     }
   }, [userProfile, fetchUnreadCount]);
 
-  const value = { unreadCount, tabCounts, fetchUnreadCount, markAsReadByEntity, markAsReadByType, markAllAsRead };
+  const value = { 
+    unreadCount, 
+    tabCounts, 
+    fetchUnreadCount, 
+    markAsReadByEntity, 
+    markAsReadByType, 
+    markAllAsRead,
+    markMessageNotificationsAsRead 
+  };
 
   return (
     <NotificationsContext.Provider value={value}>
