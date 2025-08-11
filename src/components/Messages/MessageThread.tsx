@@ -39,7 +39,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   onNewMessage
 }) => {
   const { userProfile } = useAuth();
-  const { markAsReadByEntity, fetchUnreadCount } = useNotifications();
+  const { markAsReadByEntity, fetchUnreadCount, markMessageNotificationsAsRead } = useNotifications();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -55,7 +55,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     if (userProfile && otherUserId) {
       fetchMessages();
       checkCanSendMessage();
-      markAsReadByEntity(otherUserId, 'message');
+      
+      // UPDATED: Use the new markMessageNotificationsAsRead function
+      console.log('🔄 MessageThread: Clearing notifications for sender:', otherUserId);
+      markMessageNotificationsAsRead(otherUserId);
       
       const channel = supabase.channel(`messaging:${userProfile.id}`);
 
@@ -92,7 +95,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         }
       };
     }
-  }, [userProfile, otherUserId, jobContext]);
+  }, [userProfile, otherUserId, jobContext, markMessageNotificationsAsRead]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -146,6 +149,11 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .from('messages')
           .update({ is_read: true, read_at: new Date().toISOString() })
           .eq('id', messageId);
+
+        // UPDATED: Also clear notifications when new messages arrive
+        if (data.sender_id === otherUserId) {
+          markMessageNotificationsAsRead(otherUserId);
+        }
 
         setTimeout(() => {
           fetchUnreadCount();
@@ -228,6 +236,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       if (error) throw error;
 
       if (data && data.length > 0) {
+        // UPDATED: Also clear notifications when marking messages as read
+        markMessageNotificationsAsRead(otherUserId);
+        
         setTimeout(() => {
           console.log('🔄 Refreshing notification count after marking messages as read');
           fetchUnreadCount();
