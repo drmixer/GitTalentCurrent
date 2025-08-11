@@ -126,6 +126,12 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
         return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-file-check ${isRead ? 'text-gray-400' : 'text-indigo-500'}`}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>;
       case 'job_application':
         return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-briefcase ${isRead ? 'text-gray-400' : 'text-yellow-500'}`}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
+      case 'application_viewed':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-eye ${isRead ? 'text-gray-400' : 'text-blue-500'}`}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
+      case 'hired':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-check-circle ${isRead ? 'text-gray-400' : 'text-green-500'}`}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+      case 'pending_recruiter':
+        return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-user-check ${isRead ? 'text-gray-400' : 'text-orange-500'}`}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>;
       case 'system':
       default:
         return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-bell ${isRead ? 'text-gray-400' : 'text-purple-500'}`}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
@@ -155,7 +161,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }, {} as Record<string, Notification[]>);
   };
 
-  // ENHANCED: Much more robust notification click handler
+  // ENHANCED: Completely rewritten notification click handler with proper tab mapping
   const handleNotificationClick = async (notification: Notification) => {
     if (processingNotificationId === notification.id) return;
     
@@ -164,7 +170,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       type: notification.type,
       link: notification.link,
       currentPath: location.pathname,
-      currentSearch: location.search
+      currentSearch: location.search,
+      userRole: userProfile?.role
     });
 
     setProcessingNotificationId(notification.id);
@@ -182,64 +189,101 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       // Small delay to ensure dropdown closes
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // ENHANCED: Better URL parsing and navigation logic
-      let targetUrl = '';
+      // Determine the correct tab and dashboard path based on user role and notification type
       let targetTab = '';
+      let dashboardPath = '';
 
+      // Set dashboard path based on user role
+      if (userProfile?.role === 'developer') {
+        dashboardPath = '/developer';
+      } else if (userProfile?.role === 'recruiter') {
+        dashboardPath = '/recruiter';
+      } else if (userProfile?.role === 'admin') {
+        dashboardPath = '/admin';
+      } else {
+        dashboardPath = getDashboardPath();
+      }
+
+      // Map notification types to appropriate tabs based on user role
+      switch (notification.type) {
+        case 'message':
+          targetTab = 'messages';
+          break;
+          
+        case 'test_assignment':
+          // Developer receives test assignments - goes to tests tab
+          targetTab = 'tests';
+          break;
+          
+        case 'test_completion':
+          // Recruiter receives test completion notifications - goes to tracker tab
+          if (userProfile?.role === 'recruiter') {
+            targetTab = 'tracker';
+          } else {
+            targetTab = 'tests'; // Fallback for developers
+          }
+          break;
+          
+        case 'job_application':
+          // Recruiter receives job applications - goes to my-jobs tab
+          if (userProfile?.role === 'recruiter') {
+            targetTab = 'my-jobs';
+          } else {
+            targetTab = 'jobs'; // Developer fallback
+          }
+          break;
+          
+        case 'application_viewed':
+        case 'hired':
+          // Developer receives these notifications - goes to jobs tab
+          targetTab = 'jobs';
+          break;
+          
+        case 'pending_recruiter':
+        case 'recruiter_pending':
+          // Admin receives recruiter pending notifications
+          if (userProfile?.role === 'admin') {
+            targetTab = 'recruiters';
+          } else {
+            targetTab = 'overview';
+          }
+          break;
+          
+        case 'job_posted':
+          targetTab = 'jobs';
+          break;
+          
+        default:
+          targetTab = 'overview';
+          break;
+      }
+
+      // Parse any specific link if provided
       if (notification.link) {
         try {
-          // Parse the link to extract tab parameter
           const url = new URL(`${window.location.origin}${notification.link}`);
-          targetTab = url.searchParams.get('tab') || '';
-          
-          console.log('[NotificationDropdown] Extracted tab from link:', targetTab);
+          const linkTab = url.searchParams.get('tab');
+          if (linkTab) {
+            targetTab = linkTab; // Override with specific tab from link
+          }
         } catch (urlError) {
           console.warn('[NotificationDropdown] Error parsing notification link:', urlError);
         }
       }
 
-      // Fallback: determine tab from notification type
-      if (!targetTab) {
-        switch (notification.type) {
-          case 'message':
-            targetTab = 'messages';
-            break;
-          case 'job_application':
-            targetTab = 'jobs';
-            break;
-          case 'application_viewed':
-            targetTab = 'jobs';
-            break;
-          case 'hired':
-            targetTab = 'jobs';
-            break;
-          case 'test_assignment':
-            targetTab = 'tests';
-            break;
-          case 'test_completion':
-            targetTab = userProfile?.role === 'recruiter' ? 'tracker' : 'tests';
-            break;
-          case 'job_posted':
-            targetTab = 'jobs';
-            break;
-          case 'pending_recruiter':
-            targetTab = userProfile?.role === 'admin' ? 'recruiters' : 'overview';
-            break;
-          default:
-            targetTab = 'overview';
-        }
-        
-        console.log('[NotificationDropdown] Determined tab from type:', targetTab);
-      }
-
-      // Build target URL based on current dashboard path
-      const dashboardPath = getDashboardPath();
-      targetUrl = `${dashboardPath}?tab=${targetTab}`;
+      // Build target URL
+      const targetUrl = `${dashboardPath}?tab=${targetTab}`;
       
-      console.log('[NotificationDropdown] Target URL:', targetUrl);
-      console.log('[NotificationDropdown] Current URL:', `${location.pathname}${location.search}`);
+      console.log('[NotificationDropdown] Navigation details:', {
+        userRole: userProfile?.role,
+        notificationType: notification.type,
+        targetTab,
+        dashboardPath,
+        targetUrl,
+        currentUrl: `${location.pathname}${location.search}`
+      });
 
-      // ENHANCED: Multiple navigation strategies
+      // Navigate to the target URL
       const currentFullUrl = `${location.pathname}${location.search}`;
       
       if (currentFullUrl === targetUrl) {
@@ -249,10 +293,10 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       } else {
         console.log('[NotificationDropdown] Navigating with replace: true');
         
-        // Strategy 1: Try React Router navigation with replace
+        // Use React Router navigation
         navigate(targetUrl, { replace: true });
         
-        // Strategy 2: Fallback to window.location if React Router navigation doesn't work
+        // Fallback verification - if navigation doesn't work, use window.location
         setTimeout(() => {
           const newCurrentUrl = `${window.location.pathname}${window.location.search}`;
           if (newCurrentUrl !== targetUrl) {
@@ -275,8 +319,8 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
       
       // Fallback navigation on error
       onClose();
-      const dashboardPath = getDashboardPath();
-      const fallbackUrl = `${dashboardPath}?tab=overview`;
+      const fallbackDashboardPath = getDashboardPath();
+      const fallbackUrl = `${fallbackDashboardPath}?tab=overview`;
       
       try {
         navigate(fallbackUrl, { replace: true });
