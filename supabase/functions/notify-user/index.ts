@@ -3,7 +3,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
 serve(async (req)=>{
   console.log("notify-user function invoked");
   if (req.method === 'OPTIONS') {
@@ -19,14 +18,12 @@ serve(async (req)=>{
     });
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-    
     let message = '';
     let userId = '';
     let notificationType = '';
     let entityId = record.id; // Default entity_id to the record's id
     let link = '';
     let title = '';
-
     switch(`${type}:${record.table}`){
       case 'INSERT:test_assignments':
         title = `New Coding Test Assigned`;
@@ -54,23 +51,22 @@ serve(async (req)=>{
         link = '?tab=messages';
         // FIXED: Set entity_id to the sender's ID for correct "mark as read" grouping.
         entityId = record.sender_id;
-
         // Also notify admin
         const { data: admins, error } = await supabase.from('user_profiles').select('id').eq('role', 'admin');
         if (error) console.error("Error fetching admins:", error);
         if (admins && admins.length > 0) {
-            for (const admin of admins) {
-                if (admin.id !== userId) { // Don't notify admin if they are the receiver
-                    await supabase.from('notifications').insert({
-                        user_id: admin.id,
-                        message: `New message between users.`,
-                        type: 'admin_message',
-                        entity_id: record.id,
-                        link: '?tab=messages',
-                        title: 'New Message',
-                    });
-                }
+          for (const admin of admins){
+            if (admin.id !== userId) {
+              await supabase.from('notifications').insert({
+                user_id: admin.id,
+                message: `New message between users.`,
+                type: 'admin_message',
+                entity_id: record.id,
+                link: '?tab=messages',
+                title: 'New Message'
+              });
             }
+          }
         }
         break;
       case 'INSERT:applied_jobs':
@@ -80,7 +76,7 @@ serve(async (req)=>{
         message = `A developer has applied for one of your jobs.`;
         userId = job.recruiter_id;
         notificationType = 'job_application';
-        link = '?tab=jobs';
+        link = '?tab=my-jobs';
         break;
       case 'UPDATE:applied_jobs':
         if (record.status === 'viewed') {
@@ -102,21 +98,39 @@ serve(async (req)=>{
           const { data: admins, error } = await supabase.from('user_profiles').select('id').eq('role', 'admin');
           if (error) throw error;
           if (admins && admins.length > 0) {
-            for (const admin of admins) {
+            for (const admin of admins){
               await supabase.from('notifications').insert({
                 user_id: admin.id,
                 message: 'A new recruiter is pending approval.',
-                type: 'recruiter_pending',
+                type: 'pending_recruiter',
                 entity_id: record.id,
                 link: '?tab=recruiters',
-                title: 'Recruiter Pending Approval',
+                title: 'Recruiter Pending Approval'
               });
             }
           }
         }
         break;
+      // NEW: Handle developer completing tests (when test status changes to completed)
+      case 'UPDATE:assignments':
+        if (record.status === 'completed' && record.test_assignment_id) {
+          // Find the recruiter who should be notified
+          const { data: testAssignment, error: testError } = await supabase.from('test_assignments').select('*, job_role:job_roles!fk_test_assignments_job_role_id(recruiter_id)').eq('id', record.test_assignment_id).single();
+          if (testError) {
+            console.error("Error fetching test assignment for notification:", testError);
+            break;
+          }
+          if (testAssignment?.job_role?.recruiter_id) {
+            title = `Test Completed`;
+            message = `A developer has completed a coding test you assigned.`;
+            userId = testAssignment.job_role.recruiter_id;
+            notificationType = 'test_completion';
+            entityId = record.id; // Use assignment ID as entity_id
+            link = '?tab=tracker';
+          }
+        }
+        break;
     }
-
     if (message && userId && notificationType) {
       const { data, error } = await supabase.from('notifications').insert({
         user_id: userId,
@@ -124,16 +138,14 @@ serve(async (req)=>{
         type: notificationType,
         entity_id: entityId,
         link,
-        title: title || message, // Use specific title, fallback to message
+        title: title || message
       });
-
       if (error) {
         console.error("Error inserting notification:", error);
         throw error;
       }
       console.log("Notification inserted:", data);
     }
-
     return new Response(JSON.stringify({
       message: 'Notification processed'
     }), {
