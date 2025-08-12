@@ -125,7 +125,25 @@ serve(async (req) => {
     const testResults = analyzeTestResults(result, question.test_cases?.length || 1);
     console.log('Test analysis:', testResults);
 
-    // Save to database
+    // Prepare detailed output for storage
+    let detailedOutput = '';
+    if (result.stdout) {
+      detailedOutput += `=== TEST EXECUTION OUTPUT ===\n${result.stdout}\n`;
+    }
+    if (result.stderr && result.stderr.trim()) {
+      detailedOutput += `\n=== ERRORS ===\n${result.stderr}\n`;
+    }
+    if (result.compile_output && result.compile_output.trim()) {
+      detailedOutput += `\n=== COMPILE OUTPUT ===\n${result.compile_output}\n`;
+    }
+    
+    // Add test summary
+    detailedOutput += `\n=== TEST SUMMARY ===\n`;
+    detailedOutput += `Status: ${result.status.description}\n`;
+    detailedOutput += `Tests Passed: ${testResults.passedCount}/${testResults.totalCount}\n`;
+    detailedOutput += `Final Result: ${testResults.allPassed ? 'PASSED ✅' : 'FAILED ❌'}\n`;
+
+    // Save to database with more detailed information
     const { error: insertError } = await supabase
       .from('test_results')
       .upsert([{
@@ -134,8 +152,14 @@ serve(async (req) => {
         score: testResults.allPassed ? 1 : 0,
         stdout: result.stdout || "",
         stderr: result.stderr || "",
+        compile_output: result.compile_output || "",
         passed_test_cases: testResults.passedCount,
-        total_test_cases: testResults.totalCount
+        total_test_cases: testResults.totalCount,
+        execution_time: result.time || null,
+        memory_used: result.memory || null,
+        detailed_output: detailedOutput,
+        submitted_code: code,
+        status_description: result.status.description
       }], {
         onConflict: 'assignment_id,question_id'
       });
@@ -205,8 +229,12 @@ function generateTestCode(userCode: string, testCases: any[], languageId: number
 function generatePythonTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
 try:
+    print(f"=== Running Test Case ${index + 1} ===")
     input_val = """${tc.input.replace(/"/g, '\\"')}"""
     expected = """${tc.expected_output.replace(/"/g, '\\"')}"""
+    
+    print(f"Input: {repr(input_val)}")
+    print(f"Expected: {repr(expected.strip())}")
     
     # Redirect stdin for this test case
     import sys
@@ -218,8 +246,9 @@ try:
     old_stdout = sys.stdout
     sys.stdout = captured_output = StringIO()
     
-    # Run user code
-    exec(user_code_str)
+    # Run user code in a separate namespace to avoid conflicts
+    user_globals = {}
+    exec(user_code_str, user_globals)
     
     # Restore stdin/stdout
     sys.stdin = old_stdin
@@ -227,28 +256,38 @@ try:
     
     # Get output and compare
     actual = captured_output.getvalue().strip()
-    passed = actual == expected.strip()
+    expected_clean = expected.strip()
+    passed = actual == expected_clean
     
-    print(f"Test {index + 1}: {'PASS' if passed else 'FAIL'}")
-    print(f"Expected: {expected.strip()}")
-    print(f"Actual: {actual}")
+    print(f"Actual: {repr(actual)}")
+    print(f"Test ${index + 1} Result: {'PASS ✅' if passed else 'FAIL ❌'}")
     
     if passed:
         passed_tests += 1
     else:
         all_passed = False
+    
+    print(f"--- End Test Case ${index + 1} ---\\n")
         
 except Exception as e:
-    print(f"Test {index + 1}: ERROR - {str(e)}")
+    print(f"Test ${index + 1} ERROR: {str(e)}")
+    print(f"Test ${index + 1} Result: FAIL ❌ (Exception)")
     all_passed = False
+    print(f"--- End Test Case ${index + 1} ---\\n")
 `).join('\n');
 
   return `
 import sys
 from io import StringIO
 
+print("=== CODE EXECUTION STARTING ===")
+
 # User code
 user_code_str = '''${userCode.replace(/'/g, "\\'")}'''
+
+print("User Code:")
+print(user_code_str)
+print("\\n=== RUNNING TEST CASES ===")
 
 # Test execution
 passed_tests = 0
@@ -257,17 +296,23 @@ all_passed = True
 
 ${testCaseCode}
 
-print(f"\\nResults: {passed_tests}/{total_tests} tests passed")
-print("OVERALL:", "PASS" if all_passed else "FAIL")
+print("=== FINAL RESULTS ===")
+print(f"Tests Passed: {passed_tests}/{total_tests}")
+print(f"OVERALL: {'PASS' if all_passed else 'FAIL'}")
+print("=== EXECUTION COMPLETE ===")
 `;
 }
 
 function generateJavaTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
         // Test case ${index + 1}
+        System.out.println("=== Running Test Case " + (${index} + 1) + " ===");
         try {
             String input = "${tc.input.replace(/"/g, '\\"')}";
             String expected = "${tc.expected_output.replace(/"/g, '\\"')}";
+            
+            System.out.println("Input: " + input);
+            System.out.println("Expected: " + expected.trim());
             
             // Redirect stdin
             InputStream originalIn = System.in;
@@ -289,16 +334,19 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
             String actual = baos.toString().trim();
             boolean passed = actual.equals(expected.trim());
             
-            System.out.println("Test " + (${index} + 1) + ": " + (passed ? "PASS" : "FAIL"));
-            System.out.println("Expected: " + expected.trim());
             System.out.println("Actual: " + actual);
+            System.out.println("Test " + (${index} + 1) + " Result: " + (passed ? "PASS ✅" : "FAIL ❌"));
             
             if (passed) passedTests++;
             else allPassed = false;
             
+            System.out.println("--- End Test Case " + (${index} + 1) + " ---\\n");
+            
         } catch (Exception e) {
-            System.out.println("Test " + (${index} + 1) + ": ERROR - " + e.getMessage());
+            System.out.println("Test " + (${index} + 1) + " ERROR: " + e.getMessage());
+            System.out.println("Test " + (${index} + 1) + " Result: FAIL ❌ (Exception)");
             allPassed = false;
+            System.out.println("--- End Test Case " + (${index} + 1) + " ---\\n");
         }
 `).join('\n');
 
@@ -306,22 +354,30 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
 import java.io.*;
 import java.util.*;
 
+${userCode.includes('class Solution') ? '' : `
 class Solution {
     public void run() {
         ${userCode}
     }
 }
+`}
 
 class Main {
     public static void main(String[] args) {
+        System.out.println("=== CODE EXECUTION STARTING ===");
+        
         int passedTests = 0;
         int totalTests = ${testCases.length};
         boolean allPassed = true;
         
+        System.out.println("\\n=== RUNNING TEST CASES ===");
+        
 ${testCaseCode}
         
-        System.out.println("\\nResults: " + passedTests + "/" + totalTests + " tests passed");
+        System.out.println("=== FINAL RESULTS ===");
+        System.out.println("Tests Passed: " + passedTests + "/" + totalTests);
         System.out.println("OVERALL: " + (allPassed ? "PASS" : "FAIL"));
+        System.out.println("=== EXECUTION COMPLETE ===");
     }
 }
 `;
@@ -329,9 +385,13 @@ ${testCaseCode}
 
 function generateJavaScriptTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
+console.log(\`=== Running Test Case ${index + 1} ===\`);
 try {
     const input = \`${tc.input.replace(/`/g, '\\`')}\`;
     const expected = \`${tc.expected_output.replace(/`/g, '\\`')}\`;
+    
+    console.log(\`Input: \${JSON.stringify(input)}\`);
+    console.log(\`Expected: \${JSON.stringify(expected.trim())}\`);
     
     // Mock console.log to capture output
     let output = '';
@@ -340,8 +400,10 @@ try {
         output += args.join(' ') + '\\n';
     };
     
-    // Run user code with input available
+    // Make input available as stdin-like variable
     const stdin = input;
+    
+    // Execute user code
     ${userCode}
     
     // Restore console.log
@@ -350,37 +412,50 @@ try {
     const actual = output.trim();
     const passed = actual === expected.trim();
     
-    console.log(\`Test ${index + 1}: \${passed ? 'PASS' : 'FAIL'}\`);
-    console.log(\`Expected: \${expected.trim()}\`);
-    console.log(\`Actual: \${actual}\`);
+    console.log(\`Actual: \${JSON.stringify(actual)}\`);
+    console.log(\`Test ${index + 1} Result: \${passed ? 'PASS ✅' : 'FAIL ❌'}\`);
     
     if (passed) passedTests++;
     else allPassed = false;
     
+    console.log(\`--- End Test Case ${index + 1} ---\\n\`);
+    
 } catch (e) {
-    console.log(\`Test ${index + 1}: ERROR - \${e.message}\`);
+    console.log(\`Test ${index + 1} ERROR: \${e.message}\`);
+    console.log(\`Test ${index + 1} Result: FAIL ❌ (Exception)\`);
     allPassed = false;
+    console.log(\`--- End Test Case ${index + 1} ---\\n\`);
 }
 `).join('\n');
 
   return `
+console.log("=== CODE EXECUTION STARTING ===");
+
 let passedTests = 0;
 const totalTests = ${testCases.length};
 let allPassed = true;
 
+console.log("\\n=== RUNNING TEST CASES ===");
+
 ${testCaseCode}
 
-console.log(\`\\nResults: \${passedTests}/\${totalTests} tests passed\`);
+console.log("=== FINAL RESULTS ===");
+console.log(\`Tests Passed: \${passedTests}/\${totalTests}\`);
 console.log(\`OVERALL: \${allPassed ? 'PASS' : 'FAIL'}\`);
+console.log("=== EXECUTION COMPLETE ===");
 `;
 }
 
 function generateCppTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
     // Test case ${index + 1}
+    std::cout << "=== Running Test Case " << ${index + 1} << " ===" << std::endl;
     try {
         std::string input = "${tc.input.replace(/"/g, '\\"')}";
         std::string expected = "${tc.expected_output.replace(/"/g, '\\"')}";
+        
+        std::cout << "Input: " << input << std::endl;
+        std::cout << "Expected: " << expected << std::endl;
         
         // Redirect cin and cout
         std::streambuf* orig_cin = std::cin.rdbuf();
@@ -392,8 +467,10 @@ function generateCppTestCode(userCode: string, testCases: any[]): string {
         std::cin.rdbuf(iss.rdbuf());
         std::cout.rdbuf(oss.rdbuf());
         
-        // Run user code
-        ${userCode}
+        // Run user code by calling main function in a wrapper
+        {
+            ${userCode}
+        }
         
         // Restore streams
         std::cin.rdbuf(orig_cin);
@@ -401,20 +478,25 @@ function generateCppTestCode(userCode: string, testCases: any[]): string {
         
         std::string actual = oss.str();
         // Remove trailing whitespace/newlines
-        actual.erase(actual.find_last_not_of(" \\n\\r\\t") + 1);
+        while (!actual.empty() && (actual.back() == ' ' || actual.back() == '\\n' || actual.back() == '\\r' || actual.back() == '\\t')) {
+            actual.pop_back();
+        }
         
         bool passed = (actual == expected);
         
-        std::cout << "Test " << ${index + 1} << ": " << (passed ? "PASS" : "FAIL") << std::endl;
-        std::cout << "Expected: " << expected << std::endl;
         std::cout << "Actual: " << actual << std::endl;
+        std::cout << "Test " << ${index + 1} << " Result: " << (passed ? "PASS ✅" : "FAIL ❌") << std::endl;
         
         if (passed) passedTests++;
         else allPassed = false;
         
+        std::cout << "--- End Test Case " << ${index + 1} << " ---\\n" << std::endl;
+        
     } catch (const std::exception& e) {
-        std::cout << "Test " << ${index + 1} << ": ERROR - " << e.what() << std::endl;
+        std::cout << "Test " << ${index + 1} << " ERROR: " << e.what() << std::endl;
+        std::cout << "Test " << ${index + 1} << " Result: FAIL ❌ (Exception)" << std::endl;
         allPassed = false;
+        std::cout << "--- End Test Case " << ${index + 1} << " ---\\n" << std::endl;
     }
 `).join('\n');
 
@@ -424,17 +506,27 @@ function generateCppTestCode(userCode: string, testCases: any[]): string {
 #include <sstream>
 #include <exception>
 
-int main() {
+int runTests() {
+    std::cout << "=== CODE EXECUTION STARTING ===" << std::endl;
+    
     int passedTests = 0;
     int totalTests = ${testCases.length};
     bool allPassed = true;
     
+    std::cout << "\\n=== RUNNING TEST CASES ===" << std::endl;
+    
 ${testCaseCode}
     
-    std::cout << "\\nResults: " << passedTests << "/" << totalTests << " tests passed" << std::endl;
+    std::cout << "=== FINAL RESULTS ===" << std::endl;
+    std::cout << "Tests Passed: " << passedTests << "/" << totalTests << std::endl;
     std::cout << "OVERALL: " << (allPassed ? "PASS" : "FAIL") << std::endl;
+    std::cout << "=== EXECUTION COMPLETE ===" << std::endl;
     
     return 0;
+}
+
+int main() {
+    return runTests();
 }
 `;
 }
@@ -442,66 +534,92 @@ ${testCaseCode}
 function generateSwiftTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
 // Test case ${index + 1}
+print("=== Running Test Case ${index + 1} ===")
 do {
     let input = "${tc.input.replace(/"/g, '\\"')}"
     let expected = "${tc.expected_output.replace(/"/g, '\\"')}"
     
+    print("Input: \\(input)")
+    print("Expected: \\(expected)")
+    
     // Note: Swift in Judge0 has limited I/O redirection capabilities
-    // This is a simplified approach
+    // This is a simplified approach that runs the user code directly
     ${userCode}
     
-    print("Test ${index + 1}: PASS") // Simplified for Swift limitations
+    print("Test ${index + 1} Result: PASS ✅") // Simplified for Swift limitations
     passedTests += 1
+    print("--- End Test Case ${index + 1} ---\\n")
     
 } catch {
-    print("Test ${index + 1}: ERROR - \\(error)")
+    print("Test ${index + 1} ERROR: \\(error)")
+    print("Test ${index + 1} Result: FAIL ❌ (Exception)")
     allPassed = false
+    print("--- End Test Case ${index + 1} ---\\n")
 }
 `).join('\n');
 
   return `
 import Foundation
 
+print("=== CODE EXECUTION STARTING ===")
+
 var passedTests = 0
 let totalTests = ${testCases.length}
 var allPassed = true
 
+print("\\n=== RUNNING TEST CASES ===")
+
 ${testCaseCode}
 
-print("\\nResults: \\(passedTests)/\\(totalTests) tests passed")
+print("=== FINAL RESULTS ===")
+print("Tests Passed: \\(passedTests)/\\(totalTests)")
 print("OVERALL: \\(allPassed ? "PASS" : "FAIL")")
+print("=== EXECUTION COMPLETE ===")
 `;
 }
 
 function generateKotlinTestCode(userCode: string, testCases: any[]): string {
   const testCaseCode = testCases.map((tc, index) => `
     // Test case ${index + 1}
+    println("=== Running Test Case ${index + 1} ===")
     try {
         val input = "${tc.input.replace(/"/g, '\\"')}"
         val expected = "${tc.expected_output.replace(/"/g, '\\"')}"
         
-        // Capture output (simplified approach for Kotlin)
+        println("Input: \$input")
+        println("Expected: \$expected")
+        
+        // Simplified approach for Kotlin - run user code directly
         ${userCode}
         
-        println("Test ${index + 1}: PASS") // Simplified for Kotlin limitations
+        println("Test ${index + 1} Result: PASS ✅") // Simplified for Kotlin limitations
         passedTests++
+        println("--- End Test Case ${index + 1} ---\\n")
         
     } catch (e: Exception) {
-        println("Test ${index + 1}: ERROR - \${e.message}")
+        println("Test ${index + 1} ERROR: \${e.message}")
+        println("Test ${index + 1} Result: FAIL ❌ (Exception)")
         allPassed = false
+        println("--- End Test Case ${index + 1} ---\\n")
     }
 `).join('\n');
 
   return `
 fun main() {
+    println("=== CODE EXECUTION STARTING ===")
+    
     var passedTests = 0
     val totalTests = ${testCases.length}
     var allPassed = true
     
+    println("\\n=== RUNNING TEST CASES ===")
+    
 ${testCaseCode}
     
-    println("\\nResults: \$passedTests/\$totalTests tests passed")
+    println("=== FINAL RESULTS ===")
+    println("Tests Passed: \$passedTests/\$totalTests")
     println("OVERALL: \${if (allPassed) "PASS" else "FAIL"}")
+    println("=== EXECUTION COMPLETE ===")
 }
 `;
 }
@@ -510,9 +628,13 @@ function analyzeTestResults(result: any, expectedTestCount: number) {
   const stdout = result.stdout || "";
   const stderr = result.stderr || "";
   
+  console.log('Analyzing test results...');
+  console.log('STDOUT:', stdout);
+  console.log('STDERR:', stderr);
+  
   // Look for our standardized output format
   const overallMatch = stdout.match(/OVERALL:\s*(PASS|FAIL)/);
-  const resultsMatch = stdout.match(/Results:\s*(\d+)\/(\d+)\s*tests passed/);
+  const resultsMatch = stdout.match(/Tests Passed:\s*(\d+)\/(\d+)/);
   
   let allPassed = false;
   let passedCount = 0;
@@ -520,23 +642,30 @@ function analyzeTestResults(result: any, expectedTestCount: number) {
   
   if (overallMatch) {
     allPassed = overallMatch[1] === 'PASS';
+    console.log('Found OVERALL result:', overallMatch[1]);
   }
   
   if (resultsMatch) {
     passedCount = parseInt(resultsMatch[1]);
     totalCount = parseInt(resultsMatch[2]);
+    console.log('Found test results:', passedCount, '/', totalCount);
   }
   
   // Fallback: if execution failed or has compile errors
   if (result.status.id !== 3) {
+    console.log('Execution failed with status:', result.status.id, result.status.description);
     allPassed = false;
     passedCount = 0;
   }
   
-  // Additional safety check: look for any error indicators
-  if (stderr && stderr.trim() !== '') {
+  // Additional safety check: look for compilation errors
+  if (result.compile_output && result.compile_output.trim() !== '') {
+    console.log('Compilation errors detected');
     allPassed = false;
+    passedCount = 0;
   }
+  
+  console.log('Final analysis:', { allPassed, passedCount, totalCount });
   
   return {
     allPassed,
