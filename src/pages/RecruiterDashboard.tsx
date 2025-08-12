@@ -242,8 +242,6 @@ const RecruiterDashboard: React.FC = () => {
             setDashboardLoading(false);
         }
     }, [userProfile?.id]);
-    
-    // REMOVED: The useEffect that tried to sync URL params with activeTab state - this was causing conflicts
 
     // --- useEffect to call fetchDashboardData on initial load and setup specific Realtime subscriptions ---
     useEffect(() => {
@@ -355,13 +353,12 @@ const RecruiterDashboard: React.FC = () => {
             if (activeTab === 'my-jobs') {
                 // Clear job application notifications
                 markAsReadByType('job_application');
-                markAsReadByType('application_viewed');
-                markAsReadByType('hired');
             } else if (activeTab === 'tracker') {
                 // Clear test completion notifications 
                 markAsReadByType('test_completion');
             } else if (activeTab === 'messages') {
                 // Messages notifications will be cleared when specific message threads are opened
+                // Don't clear here as it's handled by MessageThread component
             }
         }
     }, [activeTab, userProfile, markAsReadByType]);
@@ -799,6 +796,7 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
+                                {/* FIXED: Show notification badge for job applications */}
                                 {tabCounts.jobs > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                         {tabCounts.jobs}
@@ -815,6 +813,7 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Users className="w-5 h-5 mr-2" />
                                 Hiring Pipeline
+                                {/* FIXED: Show notification badge for test completions */}
                                 {tabCounts.pipeline > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                         {tabCounts.pipeline}
