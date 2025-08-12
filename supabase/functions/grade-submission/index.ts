@@ -532,22 +532,63 @@ int main() {
 }
 
 function generateSwiftTestCode(userCode: string, testCases: any[]): string {
+  // Extract imports from user code and move them to file scope
+  const imports = userCode.match(/import\s+\w+/g) || [];
+  const codeWithoutImports = userCode.replace(/import\s+\w+\s*\n?/g, '').trim();
+  
   const testCaseCode = testCases.map((tc, index) => `
 // Test case ${index + 1}
 print("=== Running Test Case ${index + 1} ===")
 do {
-    let input = "${tc.input.replace(/"/g, '\\"')}"
-    let expected = "${tc.expected_output.replace(/"/g, '\\"')}"
+    let inputData = "${tc.input.replace(/"/g, '\\"')}"
+    let expected = "${tc.expected_output.replace(/"/g, '\\"').trim()}"
     
-    print("Input: \\(input)")
+    print("Input: \\(inputData)")
     print("Expected: \\(expected)")
     
-    // Note: Swift in Judge0 has limited I/O redirection capabilities
-    // This is a simplified approach that runs the user code directly
-    ${userCode}
+    // Simulate input for readLine by creating a test environment
+    var inputLines = inputData.components(separatedBy: "\\n")
+    var currentInputIndex = 0
     
-    print("Test ${index + 1} Result: PASS ✅") // Simplified for Swift limitations
-    passedTests += 1
+    // Mock readLine function
+    func testReadLine() -> String? {
+        if currentInputIndex < inputLines.count {
+            let line = inputLines[currentInputIndex]
+            currentInputIndex += 1
+            return line
+        }
+        return nil
+    }
+    
+    // Capture output by redirecting print
+    var capturedOutput = ""
+    func testPrint<T>(_ items: T..., separator: String = " ", terminator: String = "\\n") {
+        let output = items.map { "\\($0)" }.joined(separator: separator)
+        capturedOutput += output + terminator
+    }
+    
+    // Create a test environment by replacing readLine() and print() calls
+    // This is a simplified approach for Judge0's Swift environment
+    let testCode = """
+${codeWithoutImports.replace(/readLine\(\)/g, 'testReadLine()').replace(/print\(/g, 'testPrint(')}
+"""
+    
+    // Execute the modified user code
+    // Note: This is a simplified execution approach
+    ${codeWithoutImports.replace(/readLine\(\)/g, 'testReadLine()').replace(/print\(/g, 'testPrint(')}
+    
+    let actual = capturedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+    let passed = actual == expected
+    
+    print("Actual: \\(actual)")
+    print("Test ${index + 1} Result: \\(passed ? "PASS ✅" : "FAIL ❌")")
+    
+    if passed {
+        passedTests += 1
+    } else {
+        allPassed = false
+    }
+    
     print("--- End Test Case ${index + 1} ---\\n")
     
 } catch {
@@ -559,7 +600,7 @@ do {
 `).join('\n');
 
   return `
-import Foundation
+${imports.join('\n')}
 
 print("=== CODE EXECUTION STARTING ===")
 
@@ -579,21 +620,52 @@ print("=== EXECUTION COMPLETE ===")
 }
 
 function generateKotlinTestCode(userCode: string, testCases: any[]): string {
+  // Extract imports from user code and move them to file scope
+  const imports = userCode.match(/import\s+[\w.]+/g) || [];
+  const codeWithoutImports = userCode.replace(/import\s+[\w.]+\s*\n?/g, '').trim();
+  
   const testCaseCode = testCases.map((tc, index) => `
     // Test case ${index + 1}
     println("=== Running Test Case ${index + 1} ===")
     try {
-        val input = "${tc.input.replace(/"/g, '\\"')}"
-        val expected = "${tc.expected_output.replace(/"/g, '\\"')}"
+        val inputData = "${tc.input.replace(/"/g, '\\"')}"
+        val expected = "${tc.expected_output.replace(/"/g, '\\"').trim()}"
         
-        println("Input: \$input")
+        println("Input: \$inputData")
         println("Expected: \$expected")
         
-        // Simplified approach for Kotlin - run user code directly
-        ${userCode}
+        // Simulate input by providing it as a string
+        val inputLines = inputData.split("\\n")
+        var currentInputIndex = 0
         
-        println("Test ${index + 1} Result: PASS ✅") // Simplified for Kotlin limitations
-        passedTests++
+        // Mock readLine function
+        fun testReadLine(): String? {
+            return if (currentInputIndex < inputLines.size) {
+                inputLines[currentInputIndex++]
+            } else null
+        }
+        
+        // Capture output
+        var capturedOutput = ""
+        fun testPrint(vararg items: Any?) {
+            capturedOutput += items.joinToString(" ") + "\\n"
+        }
+        
+        // Execute user code with mocked functions
+        ${codeWithoutImports.replace(/readLine\(\)/g, 'testReadLine()').replace(/println\(/g, 'testPrint(')}
+        
+        val actual = capturedOutput.trim()
+        val passed = actual == expected
+        
+        println("Actual: \$actual")
+        println("Test ${index + 1} Result: \${if (passed) "PASS ✅" else "FAIL ❌"}")
+        
+        if (passed) {
+            passedTests++
+        } else {
+            allPassed = false
+        }
+        
         println("--- End Test Case ${index + 1} ---\\n")
         
     } catch (e: Exception) {
@@ -605,6 +677,8 @@ function generateKotlinTestCode(userCode: string, testCases: any[]): string {
 `).join('\n');
 
   return `
+${imports.join('\n')}
+
 fun main() {
     println("=== CODE EXECUTION STARTING ===")
     
