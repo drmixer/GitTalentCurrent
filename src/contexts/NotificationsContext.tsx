@@ -1,269 +1,253 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+// src/contexts/NotificationsContext.tsx - UPDATED WITH FIXES
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext'; // CORRECTED IMPORT PATH
+import { Notification } from '../types';
 
 interface TabCounts {
+  jobs: number;
+  pipeline: number; 
   messages: number;
   tests: number;
-  jobs: number;
-  pipeline: number;
-  recruiters: number; // Add recruiters tab count for admin
 }
 
 interface NotificationsContextType {
+  notifications: Notification[];
   unreadCount: number;
   tabCounts: TabCounts;
-  fetchUnreadCount: () => Promise<{ unreadCount: number; tabCounts: TabCounts }>;
-  markAsReadByEntity: (entityId: string, type: string) => Promise<void>;
+  fetchNotifications: () => Promise<void>;
+  markAsRead: (notificationId: string) => Promise<void>;
   markAsReadByType: (type: string) => Promise<void>;
-  markAllAsRead: () => Promise<void>;
-  markMessageNotificationsAsRead: (senderId: string) => Promise<void>;
+  markMessageNotificationsAsRead: (senderId: string) => Promise<void>; // NEW
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
-export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { userProfile } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
+export const useNotifications = () => {
+  const context = useContext(NotificationsContext);
+  if (!context) {
+    throw new Error('useNotifications must be used within a NotificationsProvider');
+  }
+  return context;
+};
+
+export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, userProfile } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [tabCounts, setTabCounts] = useState<TabCounts>({
-    messages: 0,
-    tests: 0,
     jobs: 0,
     pipeline: 0,
-    recruiters: 0,
+    messages: 0,
+    tests: 0,
   });
 
-  const fetchUnreadCount = useCallback(async (): Promise<{ unreadCount: number; tabCounts: TabCounts }> => {
-    const defaultReturn = { unreadCount: 0, tabCounts: { messages: 0, tests: 0, jobs: 0, pipeline: 0, recruiters: 0 }};
-    try {
-      if (!userProfile?.id) return defaultReturn;
-
-      console.log('🔄 Fetching unread notification count for user:', userProfile.id, 'role:', userProfile.role);
-
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('type')
-        .eq('user_id', userProfile.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      const newTabCounts: TabCounts = { messages: 0, tests: 0, jobs: 0, pipeline: 0, recruiters: 0 };
-      
-      // Count notifications by type, considering user role
-      for (const notification of data) {
-        switch (notification.type) {
-          case 'message':
-          case 'admin_message':
-            newTabCounts.messages++;
-            break;
-            
-          case 'test_assignment':
-            // Only count for developers
-            if (userProfile.role === 'developer') {
-              newTabCounts.tests++;
-            }
-            break;
-            
-          case 'test_completion':
-            // Only count for recruiters in their pipeline tab
-            if (userProfile.role === 'recruiter') {
-              newTabCounts.pipeline++;
-            }
-            break;
-            
-          case 'job_application':
-            // Only count for recruiters in their jobs tab
-            if (userProfile.role === 'recruiter') {
-              newTabCounts.jobs++;
-            }
-            break;
-            
-          case 'application_viewed':
-          case 'hired':
-            // Only count for developers in their jobs tab
-            if (userProfile.role === 'developer') {
-              newTabCounts.jobs++;
-            }
-            break;
-            
-          case 'pending_recruiter':
-          case 'recruiter_pending':
-            // Only count for admin in their recruiters tab
-            if (userProfile.role === 'admin') {
-              newTabCounts.recruiters++;
-            }
-            break;
-        }
-      }
-
-      console.log('📊 Updated notification counts:', {
-        total: data.length,
-        tabCounts: newTabCounts,
-        userRole: userProfile.role
-      });
-
-      setTabCounts(newTabCounts);
-      setUnreadCount(data.length);
-
-      if (data.length > 0) {
-        document.title = `(${data.length}) GitTalent`;
-      } else {
-        document.title = 'GitTalent';
-      }
-      return { unreadCount: data.length, tabCounts: newTabCounts };
-    } catch (error) {
-      console.error('Error fetching unread notification count:', error);
-      return defaultReturn;
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id) {
+      setNotifications([]);
+      return;
     }
-  }, [userProfile]);
 
-  const markAllAsRead = useCallback(async () => {
-    if (!userProfile?.id || unreadCount === 0) return;
-    document.title = 'GitTalent'; 
     try {
-      console.log('🔄 Marking all notifications as read for user:', userProfile.id);
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', userProfile.id)
-        .eq('is_read', false);
-      
-      // Force immediate update
-      setTimeout(() => {
-        fetchUnreadCount();
-      }, 200);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  }, [userProfile, unreadCount, fetchUnreadCount]);
-
-  const markAsReadByEntity = useCallback(async (entityId: string, type: string) => {
-    try {
-      if (!userProfile?.id) return;
-      
-      console.log('🔄 Marking notifications as read by entity:', { entityId, type, userId: userProfile.id });
+      console.log('🔔 Fetching notifications for user:', user.id);
       
       const { data, error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', userProfile.id)
-        .eq('entity_id', entityId)
-        .eq('type', type)
-        .eq('is_read', false)
-        .select('id'); // Return the updated records to see if any were actually updated
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      // Only refresh count if notifications were actually marked as read
-      if (data && data.length > 0) {
-        console.log('✅ Successfully marked', data.length, 'notifications as read');
-        setTimeout(() => {
-          fetchUnreadCount();
-        }, 200);
-      } else {
-        console.log('ℹ️ No unread notifications found to mark as read');
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        return;
       }
+
+      console.log('📬 Fetched notifications:', data?.length || 0);
+      setNotifications(data || []);
     } catch (error) {
-      console.error('Error marking notification as read by entity:', error);
+      console.error('Error in fetchNotifications:', error);
     }
-  }, [userProfile, fetchUnreadCount]);
+  }, [user?.id]);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
+    if (!user?.id) return;
+
+    try {
+      console.log('📖 Marking notification as read:', notificationId);
+      
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return;
+      }
+
+      // Update local state immediately
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      );
+      
+      console.log('✅ Notification marked as read');
+    } catch (error) {
+      console.error('Error in markAsRead:', error);
+    }
+  }, [user?.id]);
 
   const markAsReadByType = useCallback(async (type: string) => {
+    if (!user?.id) return;
+
     try {
-      if (!userProfile?.id) return;
+      console.log('📖 Marking notifications as read by type:', type);
       
-      console.log('🔄 Marking notifications as read by type:', { type, userId: userProfile.id });
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('user_id', userProfile.id)
+        .eq('user_id', user.id)
         .eq('type', type)
-        .eq('is_read', false)
-        .select('id'); // Return the updated records to see if any were actually updated
+        .eq('is_read', false);
 
-      if (error) throw error;
-      
-      // Only refresh count if notifications were actually marked as read
-      if (data && data.length > 0) {
-        console.log('✅ Successfully marked', data.length, 'notifications as read by type');
-        setTimeout(() => {
-          fetchUnreadCount();
-        }, 200);
-      } else {
-        console.log('ℹ️ No unread notifications found to mark as read for type:', type);
+      if (error) {
+        console.error('Error marking notifications as read by type:', error);
+        return;
       }
-    } catch (error) {
-      console.error('Error marking notification as read by type:', error);
-    }
-  }, [userProfile, fetchUnreadCount]);
 
-  // NEW: Function specifically for marking message notifications as read when opening a thread
+      // Update local state immediately
+      setNotifications(prev => 
+        prev.map(n => n.type === type && !n.is_read ? { ...n, is_read: true } : n)
+      );
+      
+      console.log('✅ Notifications marked as read by type:', type);
+    } catch (error) {
+      console.error('Error in markAsReadByType:', error);
+    }
+  }, [user?.id]);
+
+  // NEW: Mark message notifications as read from specific sender
   const markMessageNotificationsAsRead = useCallback(async (senderId: string) => {
+    if (!user?.id) return;
+
     try {
-      if (!userProfile?.id) return;
+      console.log('💬 Marking message notifications as read from sender:', senderId);
       
-      console.log('🔄 Marking message notifications as read for sender:', { senderId, userId: userProfile.id });
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('user_id', userProfile.id)
-        .eq('entity_id', senderId)
+        .eq('user_id', user.id)
         .eq('type', 'message')
-        .eq('is_read', false)
-        .select('id');
+        .contains('metadata', { sender_id: senderId })
+        .eq('is_read', false);
 
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        console.log('✅ Successfully marked', data.length, 'message notifications as read');
-        setTimeout(() => {
-          fetchUnreadCount();
-        }, 200);
+      if (error) {
+        console.error('Error marking message notifications as read:', error);
+        return;
       }
-    } catch (error) {
-      console.error('Error marking message notifications as read:', error);
-    }
-  }, [userProfile, fetchUnreadCount]);
 
-  useEffect(() => {
-    if (userProfile?.id) {
-      console.log('🔄 User profile loaded, initializing notifications for:', userProfile.id);
-      fetchUnreadCount();
+      // Update local state immediately
+      setNotifications(prev => 
+        prev.map(n => 
+          n.type === 'message' && 
+          !n.is_read && 
+          n.metadata?.sender_id === senderId 
+            ? { ...n, is_read: true } 
+            : n
+        )
+      );
       
+      console.log('✅ Message notifications marked as read from sender:', senderId);
+    } catch (error) {
+      console.error('Error in markMessageNotificationsAsRead:', error);
+    }
+  }, [user?.id]);
+
+  // Calculate unread count
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  // ENHANCED: Calculate tab counts based on user role
+  useEffect(() => {
+    if (!user?.id || !userProfile) {
+      setTabCounts({ jobs: 0, pipeline: 0, messages: 0, tests: 0 });
+      return;
+    }
+
+    const unreadNotifications = notifications.filter(n => !n.is_read);
+    console.log('🔢 Calculating tab counts for role:', userProfile.role, 'unread:', unreadNotifications.length);
+
+    if (userProfile.role === 'recruiter') {
+      const jobApplications = unreadNotifications.filter(n => n.type === 'job_application').length;
+      const testCompletions = unreadNotifications.filter(n => n.type === 'test_completion').length;
+      const messages = unreadNotifications.filter(n => n.type === 'message').length;
+      
+      console.log('📊 Recruiter tab counts:', {
+        jobs: jobApplications,
+        pipeline: testCompletions,
+        messages: messages
+      });
+      
+      setTabCounts({
+        jobs: jobApplications,
+        pipeline: testCompletions,
+        messages: messages,
+        tests: 0 // Recruiters don't have tests tab
+      });
+    } else if (userProfile.role === 'developer') {
+      const testAssignments = unreadNotifications.filter(n => n.type === 'test_assignment').length;
+      const messages = unreadNotifications.filter(n => n.type === 'message').length;
+      
+      console.log('📊 Developer tab counts:', {
+        tests: testAssignments,
+        messages: messages
+      });
+      
+      setTabCounts({
+        tests: testAssignments,
+        messages: messages,
+        jobs: 0, // Developers don't have jobs tab
+        pipeline: 0 // Developers don't have pipeline tab
+      });
+    }
+  }, [notifications, user?.id, userProfile]);
+
+  // Initial fetch and real-time subscription
+  useEffect(() => {
+    if (user?.id) {
+      fetchNotifications();
+
+      // Set up real-time subscription
       const channel = supabase
-        .channel(`notification-count-changes-${userProfile.id}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'notifications', 
-          filter: `user_id=eq.${userProfile.id}` 
-        }, (payload) => {
-          console.log('🔔 Real-time notification change:', payload);
-          // Add a small delay to ensure the database transaction is complete
-          setTimeout(() => {
-            fetchUnreadCount();
-          }, 300);
-        })
+        .channel('notifications_channel')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('🔄 Real-time notification update:', payload);
+            fetchNotifications(); // Refetch all notifications
+          }
+        )
         .subscribe();
-        
-      return () => { 
-        console.log('🔄 Cleaning up notification subscription for user:', userProfile.id);
-        supabase.removeChannel(channel); 
+
+      return () => {
+        supabase.removeChannel(channel);
       };
     }
-  }, [userProfile, fetchUnreadCount]);
+  }, [user?.id, fetchNotifications]);
 
-  const value = { 
-    unreadCount, 
-    tabCounts, 
-    fetchUnreadCount, 
-    markAsReadByEntity, 
-    markAsReadByType, 
-    markAllAsRead,
-    markMessageNotificationsAsRead 
+  const value: NotificationsContextType = {
+    notifications,
+    unreadCount,
+    tabCounts,
+    fetchNotifications,
+    markAsRead,
+    markAsReadByType,
+    markMessageNotificationsAsRead,
   };
 
   return (
@@ -271,13 +255,4 @@ export const NotificationsProvider: React.FC<{ children: ReactNode }> = ({ child
       {children}
     </NotificationsContext.Provider>
   );
-};
-
-// This is the new useNotifications hook that all components will use
-export const useNotifications = (): NotificationsContextType => {
-  const context = useContext(NotificationsContext);
-  if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationsProvider');
-  }
-  return context;
 };
