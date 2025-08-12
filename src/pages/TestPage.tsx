@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CodingQuestion, TestAssignment } from '../types';
 import Editor from '@monaco-editor/react';
-import { Play, Send, Loader, CheckCircle } from 'lucide-react';
+import { Play, Send, Loader, CheckCircle, ArrowRight } from 'lucide-react';
 import SandpackTest from '../components/Tests/SandpackTest';
 
 const TestPage: React.FC = () => {
@@ -16,6 +16,7 @@ const TestPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [lastResult, setLastResult] = useState<any>(null);
     const navigate = useNavigate();
 
     const fetchAssignmentAndQuestions = useCallback(async () => {
@@ -68,210 +69,161 @@ const TestPage: React.FC = () => {
     useEffect(() => {
         if (questions.length > 0) {
             setCode(questions[currentQuestionIndex].starter_code || '');
+            setOutput(''); // Clear output when switching questions
+            setLastResult(null); // Clear last result
         }
     }, [questions, currentQuestionIndex]);
 
-    const getLanguageId = (language: string) => {
-        switch (language) {
-            case 'python':
-                return 71;
-            case 'javascript':
-                return 63;
-            case 'java':
-                return 62;
-            case 'c++':
-                return 54;
-            case 'react':
-                return 63; // Use JavaScript for React
-            case 'angular':
-                return 63; // Use JavaScript for Angular
-            case 'vue':
-                return 63; // Use JavaScript for Vue
-            default:
-                return 71; // Default to Python
-        }
-    }
+    const getLanguageId = (language: string): number => {
+        const languageMap: { [key: string]: number } = {
+            'python': 71,
+            'javascript': 63,
+            'java': 62,
+            'c++': 54,
+            'swift': 83,
+            'kotlin': 78,
+            'react': 63,
+            'angular': 63,
+            'vue': 63
+        };
+        return languageMap[language.toLowerCase()] || 71;
+    };
 
     const handleRunCode = async () => {
-        setOutput('');
-        setIsSubmitting(true);
         const question = questions[currentQuestionIndex];
+        setOutput('Running code...');
+        setIsSubmitting(true);
         
-        console.log('=== RUN CODE DEBUG ===');
-        console.log('Question:', question.title);
-        console.log('Language:', question.language);
-        console.log('Language ID:', getLanguageId(question.language));
-        
-        const { data, error } = await supabase.functions.invoke('run-code', {
-            body: {
-                code,
-                language_id: getLanguageId(question.language),
-                stdin: question.test_cases?.[0]?.stdin || '',
-            },
-        });
+        try {
+            // For run-code, we'll just run the first test case to give feedback
+            const firstTestCase = question.test_cases?.[0];
+            const { data, error } = await supabase.functions.invoke('run-code', {
+                body: {
+                    code: code,
+                    language_id: getLanguageId(question.language),
+                    stdin: firstTestCase?.input || '',
+                },
+            });
 
-        if (error) {
-            console.error('Run code error:', error);
-            setOutput(`Error running code: ${error.message}`);
-        } else {
-            console.log('Run code response:', data);
-            setOutput(data.stdout || data.stderr || 'No output');
+            if (error) {
+                setOutput(`Error running code: ${error.message}`);
+            } else {
+                let displayOutput = '';
+                if (data.stdout) displayOutput += `Output:\n${data.stdout}\n`;
+                if (data.stderr) displayOutput += `\nErrors:\n${data.stderr}\n`;
+                if (!data.stdout && !data.stderr) displayOutput = 'No output generated';
+                
+                displayOutput += `\nStatus: ${data.status?.description || 'Unknown'}`;
+                setOutput(displayOutput);
+            }
+        } catch (error) {
+            setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     const handleSubmit = async () => {
         if (!assignmentId) return;
         setIsSubmitting(true);
+        setOutput('Submitting and running all test cases...');
         
         try {
             const question = questions[currentQuestionIndex];
             
-            console.log('=== SUBMISSION DEBUG START ===');
-            console.log('Question:', question.title);
-            console.log('Language:', question.language);
-            console.log('Language ID:', getLanguageId(question.language));
-            console.log('Assignment ID:', assignmentId);
-            console.log('Question ID:', question.id);
-            
-            const { data, error } = await supabase.functions.invoke<{ 
-                status: { id: number; description: string },
-                stdout: string,
-                stderr: string,
-                passed?: boolean,
-                execution_successful?: boolean,
-                test_summary?: any,
-                compile_output?: string
-            }>('grade-submission', {
+            const { data, error } = await supabase.functions.invoke('grade-submission', {
                 body: {
-                    code,
+                    code: code,
                     language_id: getLanguageId(question.language),
-                    stdin: question.test_cases?.[0]?.stdin || '',
-                    expected_output: question.expected_output,
                     assignment_id: assignmentId,
                     question_id: question.id,
                 },
             });
 
             if (error) {
-                console.error('Failed to submit code:', error);
                 setOutput(`Error submitting code: ${error.message}`);
             } else if (data) {
-                console.log('=== FULL RESPONSE FROM GRADE-SUBMISSION ===');
-                console.log('Raw data:', JSON.stringify(data, null, 2));
-                console.log('Status ID:', data.status?.id);
-                console.log('Status Description:', data.status?.description);
-                console.log('Passed field:', data.passed);
-                console.log('Execution successful field:', data.execution_successful);
-                console.log('Stdout:', data.stdout);
-                console.log('Stderr:', data.stderr);
-                console.log('Test summary:', data.test_summary);
+                setLastResult(data);
                 
-                // Enhanced score calculation using multiple indicators
-                const isAccepted = data.status?.id === 3;
-                const isPassedField = data.passed === true;
-                const hasPassInOutput = data.stdout?.toLowerCase().includes('pass');
-                const hasNoCompileErrors = !data.stderr?.toLowerCase().includes('error') && !data.compile_output?.toLowerCase().includes('error');
-                
-                console.log('Score calculation:');
-                console.log('- Status ID === 3 (Accepted):', isAccepted);
-                console.log('- Passed field === true:', isPassedField);
-                console.log('- Output contains "pass":', hasPassInOutput);
-                console.log('- No compile errors:', hasNoCompileErrors);
-                
-                // Determine final result
-                const finalPassed = isAccepted && isPassedField;
-                console.log('Final result: PASSED =', finalPassed);
-
-                // Show detailed result to user
-                let userOutput = '';
+                // Display detailed results
+                let resultOutput = '';
                 if (data.stdout) {
-                    userOutput += `Output:\n${data.stdout}\n`;
+                    resultOutput += `Test Output:\n${data.stdout}\n`;
                 }
-                if (data.stderr && data.stderr.trim() !== '') {
-                    userOutput += `\nErrors:\n${data.stderr}\n`;
+                if (data.stderr && data.stderr.trim()) {
+                    resultOutput += `\nErrors:\n${data.stderr}\n`;
                 }
-                if (data.compile_output && data.compile_output.trim() !== '') {
-                    userOutput += `\nCompile Output:\n${data.compile_output}\n`;
+                if (data.compile_output && data.compile_output.trim()) {
+                    resultOutput += `\nCompile Output:\n${data.compile_output}\n`;
                 }
-                userOutput += `\nStatus: ${data.status?.description || 'Unknown'}`;
-                userOutput += `\nResult: ${finalPassed ? 'PASSED ✅' : 'FAILED ❌'}`;
                 
-                setOutput(userOutput);
-
-                // Note: The database update is handled by the grade-submission function
-                console.log('Test result saved by grade-submission function');
-            }
-
-            // Move to next question or complete test
-            if (currentQuestionIndex < questions.length - 1) {
+                resultOutput += `\n=== FINAL RESULT ===`;
+                resultOutput += `\nStatus: ${data.status?.description || 'Unknown'}`;
+                resultOutput += `\nTests Passed: ${data.test_summary?.passed_tests || 0}/${data.test_summary?.total_tests || 1}`;
+                resultOutput += `\nOverall Result: ${data.passed ? 'PASSED ✅' : 'FAILED ❌'}`;
+                
+                setOutput(resultOutput);
+                
+                // Auto-advance after showing results
                 setTimeout(() => {
-                    setCurrentQuestionIndex(currentQuestionIndex + 1);
-                    setOutput(''); // Clear output for next question
-                }, 2000); // Give user time to see result
-            } else {
-                // Test finished - the grade-submission function already updated the status
-                console.log('All questions completed - test finished');
-                setIsCompleted(true);
-                setTimeout(() => {
-                    navigate('/developer');
+                    handleNextQuestion();
                 }, 3000);
             }
         } catch (error) {
-            console.error('Error in handleSubmit:', error);
-            setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+            setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    const handleNextQuestion = () => {
+        if (currentQuestionIndex < questions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+        } else {
+            // Test completed
+            setIsCompleted(true);
+            setTimeout(() => {
+                navigate('/developer');
+            }, 3000);
+        }
+    };
+
     if (isLoading) {
-        return <div className="flex justify-center items-center h-screen"><Loader className="animate-spin" /></div>;
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <Loader className="animate-spin w-8 h-8" />
+                <span className="ml-2">Loading test...</span>
+            </div>
+        );
     }
 
     if (!assignment) {
-        return <div>Test not found.</div>;
+        return <div className="p-8 text-center">Test not found.</div>;
     }
 
     if (questions.length === 0) {
-        return <div>This test has no questions.</div>;
+        return <div className="p-8 text-center">This test has no questions.</div>;
     }
 
     if (isCompleted) {
         return (
             <div className="flex flex-col items-center justify-center h-screen">
                 <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
-                <h1 className="text-2xl font-bold mb-2">Test Completed!</h1>
-                <p className="text-gray-600">Your results have been sent to the recruiter.</p>
-                <p className="text-gray-600">You will be redirected to your dashboard shortly.</p>
+                <h1 className="text-2xl font-bold mb-2">Test Completed! 🎉</h1>
+                <p className="text-gray-600 text-center">
+                    Your results have been saved and sent to the recruiter.
+                </p>
+                <p className="text-gray-600 text-center">
+                    You will be redirected to your dashboard shortly.
+                </p>
             </div>
         );
     }
 
-    const sandpackLanguages = ['react', 'vue', 'angular'];
     const currentQuestion = questions[currentQuestionIndex];
+    const sandpackLanguages = ['react', 'vue', 'angular'];
 
-    const handleNextQuestion = () => {
-        if (currentQuestionIndex < questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1);
-        } else {
-            // Test finished
-            supabase.from('test_assignments').update({ status: 'Completed' }).eq('id', assignmentId)
-            .then(({ error }) => {
-                if (error) {
-                    console.error('Error updating assignment status:', error);
-                } else {
-                    console.log('Assignment status updated to Completed.');
-                }
-            });
-            setIsCompleted(true);
-            setTimeout(() => {
-                navigate('/developer');
-            }, 3000);
-        }
-    }
-
-    // Check if the current question is a Sandpack question
+    // Handle Sandpack languages (React, Vue, Angular)
     if (sandpackLanguages.includes(currentQuestion.language.toLowerCase())) {
         return (
             <div className="p-8">
@@ -280,7 +232,6 @@ const TestPage: React.FC = () => {
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
                     <p className="mb-4">{currentQuestion.question_text}</p>
                     
-                    {/* Show expected output if it exists */}
                     {currentQuestion.expected_output && (
                         <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
                             <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
@@ -301,17 +252,16 @@ const TestPage: React.FC = () => {
         );
     }
 
-    // Fallback to the Judge0 editor for other languages
+    // Handle Judge0 languages (Python, Java, C++, JavaScript, Swift, Kotlin)
     return (
         <div className="p-8">
             <div className="flex h-screen">
-                <div className="w-1/3 p-4 overflow-y-auto">
+                {/* Question Panel */}
+                <div className="w-1/3 p-4 overflow-y-auto border-r border-gray-200">
                     <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                    <p className="mb-4">{currentQuestion.question_text}</p>
                     
-                    {/* Show current question progress */}
-                    <div className="mt-4 p-3 bg-gray-100 rounded-md">
+                    <div className="mb-4 p-3 bg-gray-100 rounded-md">
                         <p className="text-sm text-gray-600">
                             Question {currentQuestionIndex + 1} of {questions.length}
                         </p>
@@ -319,25 +269,83 @@ const TestPage: React.FC = () => {
                             Language: {currentQuestion.language}
                         </p>
                     </div>
-                </div>
-                <div className="w-2/3 flex flex-col">
-                    <Editor
-                        height="60vh"
-                        language={currentQuestion.language.toLowerCase()}
-                        value={code}
-                        onChange={(value) => setCode(value || '')}
-                        theme="vs-dark"
-                    />
-                    <div className="p-4 bg-gray-800 text-white flex-grow">
-                        <h3 className="text-lg font-semibold">Output</h3>
-                        <pre className="whitespace-pre-wrap text-sm mt-2 font-mono">{output}</pre>
+                    
+                    <div className="mb-4">
+                        <h3 className="font-semibold mb-2">Problem Description:</h3>
+                        <p className="whitespace-pre-wrap">{currentQuestion.question_text}</p>
                     </div>
-                    <div className="p-4 border-t border-gray-200 flex justify-between items-center">
+                    
+                    {/* Show test cases if available */}
+                    {currentQuestion.test_cases && currentQuestion.test_cases.length > 0 && (
+                        <div className="mb-4">
+                            <h3 className="font-semibold mb-2">Test Cases:</h3>
+                            <div className="space-y-2">
+                                {currentQuestion.test_cases.slice(0, 3).map((tc, index) => (
+                                    <div key={index} className="p-2 bg-gray-50 rounded text-sm">
+                                        <div><strong>Input:</strong> <code>{tc.input || '(empty)'}</code></div>
+                                        <div><strong>Expected:</strong> <code>{tc.expected_output}</code></div>
+                                    </div>
+                                ))}
+                                {currentQuestion.test_cases.length > 3 && (
+                                    <p className="text-sm text-gray-500">
+                                        + {currentQuestion.test_cases.length - 3} more test cases...
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Show last result if available */}
+                    {lastResult && (
+                        <div className={`mb-4 p-3 rounded-md ${lastResult.passed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                            <h3 className="font-semibold mb-2">Last Submission Result:</h3>
+                            <p className={`text-sm ${lastResult.passed ? 'text-green-700' : 'text-red-700'}`}>
+                                {lastResult.passed ? '✅ PASSED' : '❌ FAILED'}
+                            </p>
+                            {lastResult.test_summary && (
+                                <p className="text-sm text-gray-600">
+                                    {lastResult.test_summary.passed_tests}/{lastResult.test_summary.total_tests} tests passed
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Code Editor and Output Panel */}
+                <div className="w-2/3 flex flex-col">
+                    {/* Code Editor */}
+                    <div className="flex-1">
+                        <Editor
+                            height="60vh"
+                            language={getEditorLanguage(currentQuestion.language)}
+                            value={code}
+                            onChange={(value) => setCode(value || '')}
+                            theme="vs-dark"
+                            options={{
+                                fontSize: 14,
+                                minimap: { enabled: false },
+                                scrollBeyondLastLine: false,
+                                wordWrap: 'on',
+                                automaticLayout: true
+                            }}
+                        />
+                    </div>
+                    
+                    {/* Output Panel */}
+                    <div className="p-4 bg-gray-800 text-white flex-1 min-h-[250px]">
+                        <h3 className="text-lg font-semibold mb-2">Output</h3>
+                        <pre className="whitespace-pre-wrap text-sm font-mono overflow-auto h-full">
+                            {output || 'Run your code to see output here...'}
+                        </pre>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="p-4 border-t border-gray-200 flex justify-between items-center bg-white">
                         <div className="text-sm text-gray-600">
                             {isSubmitting && (
                                 <span className="flex items-center">
                                     <Loader className="w-4 h-4 mr-2 animate-spin" />
-                                    Processing...
+                                    {output.includes('Submitting') ? 'Grading submission...' : 'Running code...'}
                                 </span>
                             )}
                         </div>
@@ -345,19 +353,28 @@ const TestPage: React.FC = () => {
                             <button 
                                 onClick={handleRunCode} 
                                 disabled={isSubmitting} 
-                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md flex items-center hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md flex items-center hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 <Play size={16} className="mr-2" /> 
-                                {isSubmitting ? 'Running...' : 'Run'}
+                                {isSubmitting && !output.includes('Submitting') ? 'Running...' : 'Test Run'}
                             </button>
                             <button 
                                 onClick={handleSubmit} 
                                 disabled={isSubmitting} 
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 <Send size={16} className="mr-2" /> 
-                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                                {isSubmitting && output.includes('Submitting') ? 'Submitting...' : 'Submit Solution'}
                             </button>
+                            {lastResult && lastResult.passed && (
+                                <button 
+                                    onClick={handleNextQuestion}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center hover:bg-green-700 transition-colors"
+                                >
+                                    <ArrowRight size={16} className="mr-2" />
+                                    {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Test'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -365,5 +382,18 @@ const TestPage: React.FC = () => {
         </div>
     );
 };
+
+// Helper function to map language names to Monaco editor language IDs
+function getEditorLanguage(language: string): string {
+    const languageMap: { [key: string]: string } = {
+        'python': 'python',
+        'java': 'java',
+        'javascript': 'javascript',
+        'c++': 'cpp',
+        'swift': 'swift',
+        'kotlin': 'kotlin'
+    };
+    return languageMap[language.toLowerCase()] || 'python';
+}
 
 export default TestPage;
