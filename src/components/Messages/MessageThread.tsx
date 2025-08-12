@@ -51,14 +51,40 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // ENHANCED: Clear message notifications when thread opens or changes
+  useEffect(() => {
+    if (otherUserId && userProfile?.id) {
+      console.log('💬 Clearing message notifications from sender:', otherUserId);
+      
+      // Clear message notifications from this specific sender
+      markMessageNotificationsAsRead(otherUserId);
+      
+      // Also mark any existing messages from this sender as read in the messages table
+      const markExistingMessagesAsRead = async () => {
+        try {
+          const { error } = await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .eq('receiver_id', userProfile.id)
+            .eq('sender_id', otherUserId)
+            .eq('is_read', false);
+          if (error) {
+            console.error('Error marking existing messages as read:', error);
+          } else {
+            console.log('✅ Existing messages marked as read');
+          }
+        } catch (error) {
+          console.error('Error in markExistingMessagesAsRead:', error);
+        }
+      };
+      markExistingMessagesAsRead();
+    }
+  }, [otherUserId, userProfile?.id, markMessageNotificationsAsRead]);
+
   useEffect(() => {
     if (userProfile && otherUserId) {
       fetchMessages();
       checkCanSendMessage();
-      
-      // UPDATED: Use the new markMessageNotificationsAsRead function
-      console.log('🔄 MessageThread: Clearing notifications for sender:', otherUserId);
-      markMessageNotificationsAsRead(otherUserId);
       
       const channel = supabase.channel(`messaging:${userProfile.id}`);
 
@@ -96,6 +122,44 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       };
     }
   }, [userProfile, otherUserId, jobContext, markMessageNotificationsAsRead]);
+
+  // ENHANCED: Mark new messages as read when they're received in real-time
+  useEffect(() => {
+    if (!userProfile?.id || !otherUserId) return;
+    
+    const channel = supabase
+      .channel('message_thread_updates')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages',
+        filter: `receiver_id=eq.${userProfile.id}` 
+      }, async (payload) => {
+        console.log('📨 New message received in thread:', payload.new);
+        
+        // If this message is from the current thread's other user, mark it as read immediately
+        if (payload.new.sender_id === otherUserId) {
+          const { error } = await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .eq('id', payload.new.id);
+          if (!error) {
+            console.log('✅ New message marked as read immediately');
+            
+            // Also clear the notification for this message
+            markMessageNotificationsAsRead(otherUserId);
+          }
+        }
+        
+        // Refresh messages list
+        fetchMessages();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id, otherUserId, markMessageNotificationsAsRead]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
