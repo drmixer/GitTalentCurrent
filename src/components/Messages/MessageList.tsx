@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../contexts/NotificationsContext';
 import { supabase } from '../../lib/supabase';
 import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
 import { 
@@ -41,6 +42,7 @@ interface MessageListProps {
 
 export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, searchTerm = '' }) => {
   const { userProfile } = useAuth();
+  const { fetchUnreadCount } = useNotifications();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -67,7 +69,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
             filter: `receiver_id=eq.${userProfile.id}` // More specific for updates relevant to this user's unread counts
           },
           (payload) => {
+            console.log('📨 MessageList: Real-time message change detected, refreshing threads');
             fetchMessageThreads();
+            // Also refresh notification counts when messages change
+            setTimeout(() => {
+              fetchUnreadCount();
+            }, 500);
           }
         )
         .subscribe();
@@ -76,7 +83,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         supabase.removeChannel(subscription);
       };
     }
-  }, [userProfile, onThreadSelect]);
+  }, [userProfile, onThreadSelect, fetchUnreadCount]);
 
   const fetchMessageThreads = async () => {
     try {
