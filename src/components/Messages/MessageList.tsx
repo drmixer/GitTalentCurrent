@@ -42,48 +42,13 @@ interface MessageListProps {
 
 export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, searchTerm = '' }) => {
   const { userProfile } = useAuth();
-  const { fetchUnreadCount } = useNotifications();
+  const { fetchUnreadCount, fetchNotifications } = useNotifications();
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [availableContacts, setAvailableContacts] = useState<UserType[]>([]);
   const [canInitiateContacts, setCanInitiateContacts] = useState<{[key: string]: boolean}>({});
-
-  useEffect(() => {
-    if (userProfile) {
-      fetchMessageThreads();
-      fetchAvailableContacts();
-      
-      // Set up real-time subscription for new messages
-      const subscription = supabase
-        .channel('public-messages-thread-list')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to INSERT and UPDATE
-            schema: 'public',
-            table: 'messages',
-            // Filter for messages where the current user is either sender or receiver,
-            // as changes to 'is_read' status or new messages can affect thread list.
-            filter: `receiver_id=eq.${userProfile.id}` // More specific for updates relevant to this user's unread counts
-          },
-          (payload) => {
-            console.log('📨 MessageList: Real-time message change detected, refreshing threads');
-            fetchMessageThreads();
-            // Also refresh notification counts when messages change
-            setTimeout(() => {
-              fetchUnreadCount();
-            }, 500);
-          }
-        )
-        .subscribe();
-      
-      return () => {
-        supabase.removeChannel(subscription);
-      };
-    }
-  }, [userProfile, onThreadSelect, fetchUnreadCount]);
 
   const fetchMessageThreads = async () => {
     try {
@@ -185,6 +150,35 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
       setLoading(false);
     }
   };
+
+  // ENHANCED: Add real-time subscription with notification refresh
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    
+    fetchMessageThreads();
+    fetchAvailableContacts();
+    
+    const channel = supabase
+      .channel('message_list_updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'messages' 
+      }, async (payload) => {
+        console.log('📬 Message list update:', payload);
+        
+        // Refresh message threads
+        fetchMessageThreads();
+        
+        // ENHANCED: Also refresh notifications to update counts
+        fetchNotifications();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id, fetchNotifications]);
 
   const fetchAvailableContacts = async () => {
     try {
