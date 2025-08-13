@@ -15,7 +15,7 @@ const AdminTests: React.FC = () => {
     }, []);
 
     const fetchTests = async () => {
-        const { data, error } = await supabase.from('coding_tests').select('*');
+        const { data, error } = await supabase.from('coding_tests').select('*').order('created_at', { ascending: true });
         if (error) {
             console.error('Error fetching tests:', error);
         } else {
@@ -24,7 +24,11 @@ const AdminTests: React.FC = () => {
     };
 
     const fetchQuestions = async (testId: string) => {
-        const { data, error } = await supabase.from('coding_questions').select('*').eq('test_id', testId);
+        const { data, error } = await supabase
+            .from('coding_questions')
+            .select('*')
+            .eq('test_id', testId)
+            .order('created_at', { ascending: true });
         if (error) {
             console.error('Error fetching questions:', error);
         } else {
