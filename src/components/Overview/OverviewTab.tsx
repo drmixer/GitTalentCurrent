@@ -30,10 +30,14 @@ interface OverviewTabProps {
   savedJobsCountOverride?: number | null;
   appliedJobsCountOverride?: number | null;
   endorsements: Endorsement[];
+  endorsementsLoading?: boolean;
+  endorsementsError?: string | null;
   recentCommits?: Commit[];
   githubProfileUrl?: string;
   loading?: boolean;
   onNavigateToTab?: (tabName: string) => void;
+  // NEW: Calendar year contributions for true YTD display
+  calendarYearContributions?: number;
 }
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({
@@ -45,10 +49,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   savedJobsCountOverride,
   appliedJobsCountOverride,
   endorsements,
+  endorsementsLoading,
+  endorsementsError,
   recentCommits,
   githubProfileUrl,
   loading,
   onNavigateToTab,
+  calendarYearContributions, // NEW PROP
 }) => {
   const navigate = useNavigate();
   // State to control modal visibility
@@ -74,7 +81,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const portfolioCount = portfolioItems.length;
   // Use optional chaining and nullish coalescing for safety
   const endorsementsCount = developer.endorsements_count ?? endorsements.length;
-  const commitsYTD = developer.annual_contributions ?? 0;
+  
+  // UPDATED: Use calendar year contributions for true YTD, fallback to database value, then 0
+  const commitsYTD = calendarYearContributions ?? developer.annual_contributions ?? 0;
 
   // Use override if available, then developer object, then length of passed array (which might be empty)
   // The props 'savedJobsCountOverride', 'appliedJobsCountOverride', 'savedJobs', 'appliedJobs'
@@ -173,7 +182,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Right Column: Latest Endorsements & CTAs */}
         <div className="lg:col-span-1 space-y-6">
-          <LatestEndorsements endorsements={endorsements} loading={loading} />
+          <LatestEndorsements 
+            endorsements={endorsements} 
+            loading={endorsementsLoading} 
+          />
 
           <div className="bg-white shadow rounded-lg p-6 border border-gray-200/80">
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Profile Status</h3>
