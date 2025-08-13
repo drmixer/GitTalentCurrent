@@ -1,13 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
 const JUDGE0_API_URL = 'https://judge0-ce.p.rapidapi.com';
-
 // Language ID mappings
 const LANGUAGE_IDS = {
   'python': 71,
@@ -17,63 +14,44 @@ const LANGUAGE_IDS = {
   'swift': 83,
   'kotlin': 78
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', {
+      headers: corsHeaders
+    });
   }
-
   try {
     const requestBody = await req.json();
     const { code, language_id, assignment_id, question_id } = requestBody;
-    
     console.log('=== GRADE SUBMISSION START ===');
     console.log('Language ID:', language_id);
     console.log('Assignment ID:', assignment_id);
     console.log('Question ID:', question_id);
-
     // Get the question details including test cases
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    const { data: question, error: questionError } = await supabase
-      .from('coding_questions')
-      .select('*')
-      .eq('id', question_id)
-      .single();
-
+    const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    const { data: question, error: questionError } = await supabase.from('coding_questions').select('*').eq('id', question_id).single();
     if (questionError || !question) {
       throw new Error('Question not found');
     }
-
     console.log('Question test_cases:', question.test_cases);
-
     let finalResult;
     let testResults;
-
     // For Java, Swift and Kotlin, use individual test case execution to avoid code structure conflicts
-    if (language_id === 62 || language_id === 83 || language_id === 78) { // Java, Swift or Kotlin
+    if (language_id === 62 || language_id === 83 || language_id === 78) {
       console.log('Using individual test case execution for Java/Swift/Kotlin');
-      
       let passedTests = 0;
       const totalTests = question.test_cases?.length || 1;
       let combinedOutput = "=== INDIVIDUAL TEST CASE EXECUTION ===\n";
-      
       // Run each test case individually like run-code does
-      for (let i = 0; i < totalTests; i++) {
+      for(let i = 0; i < totalTests; i++){
         const testCase = question.test_cases[i];
         console.log(`Running test case ${i + 1}: Input="${testCase.input}" Expected="${testCase.expected_output}"`);
-        
         // Handle special cases for input
         let originalInput = testCase.input;
         let expectedOutput = testCase.expected_output;
         let stdinInput = handleSpecialInput(originalInput, language_id);
-        
         console.log(`Original input: "${originalInput}", Expected: "${expectedOutput}"`);
         console.log(`Processed stdin input: "${stdinInput}"`);
-        
         try {
           const submissionPayload = {
             source_code: code,
@@ -83,64 +61,49 @@ serve(async (req) => {
             memory_limit: 256000,
             wall_time_limit: 15
           };
-          
           console.log(`Submission payload for test case ${i + 1}:`, JSON.stringify(submissionPayload, null, 2));
-          
           const response = await fetch(`${JUDGE0_API_URL}/submissions?base64_encoded=false&wait=false`, {
             method: 'POST',
             headers: {
-              'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY')!,
+              'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY'),
               'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
               'Content-Type': 'application/json'
             },
             body: JSON.stringify(submissionPayload)
           });
-
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`Judge0 API error for test case ${i + 1}:`, response.status, errorText);
             throw new Error(`Judge0 API returned ${response.status}: ${errorText}`);
           }
-
           const submission = await response.json();
           const token = submission.token;
-
           // Poll for results
           let result = null;
           let attempts = 0;
           const maxAttempts = 30;
-
-          while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const resultResponse = await fetch(
-              `${JUDGE0_API_URL}/submissions/${token}?base64_encoded=false`,
-              {
-                headers: {
-                  'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY')!,
-                  'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-                }
+          while(attempts < maxAttempts){
+            await new Promise((resolve)=>setTimeout(resolve, 2000));
+            const resultResponse = await fetch(`${JUDGE0_API_URL}/submissions/${token}?base64_encoded=false`, {
+              headers: {
+                'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY'),
+                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
               }
-            );
-
+            });
             if (!resultResponse.ok) break;
-
             result = await resultResponse.json();
             if (result.status.id > 2) break;
             attempts++;
           }
-
-          if (result && result.status.id === 3) { // Accepted
+          if (result && result.status.id === 3) {
             const actualOutput = (result.stdout || "").trim();
             const expectedOutput = testCase.expected_output.trim();
             const testPassed = actualOutput === expectedOutput;
-            
             combinedOutput += `\nTest Case ${i + 1}:\n`;
             combinedOutput += `Input: ${originalInput}\n`;
             combinedOutput += `Expected: ${expectedOutput}\n`;
             combinedOutput += `Actual: ${actualOutput}\n`;
             combinedOutput += `Result: ${testPassed ? 'PASS ✅' : 'FAIL ❌'}\n`;
-            
             if (testPassed) passedTests++;
           } else {
             combinedOutput += `\nTest Case ${i + 1}: EXECUTION ERROR\n`;
@@ -148,36 +111,33 @@ serve(async (req) => {
             if (result?.stderr) combinedOutput += `Error: ${result.stderr}\n`;
             if (result?.compile_output) combinedOutput += `Compile Error: ${result.compile_output}\n`;
           }
-          
         } catch (error) {
           console.error(`Error running test case ${i + 1}:`, error);
           combinedOutput += `\nTest Case ${i + 1}: ERROR - ${error.message}\n`;
           combinedOutput += `Details: Input="${testCase.input}", Expected="${testCase.expected_output}"\n`;
         }
       }
-      
       combinedOutput += `\n=== FINAL RESULTS ===\n`;
       combinedOutput += `Tests Passed: ${passedTests}/${totalTests}\n`;
       combinedOutput += `OVERALL: ${passedTests === totalTests ? 'PASS' : 'FAIL'}\n`;
-      
       finalResult = {
-        status: { id: 3, description: "Accepted" },
+        status: {
+          id: 3,
+          description: "Accepted"
+        },
         stdout: combinedOutput,
         stderr: "",
         compile_output: ""
       };
-      
       testResults = {
         allPassed: passedTests === totalTests,
         passedCount: passedTests,
         totalCount: totalTests
       };
-      
     } else {
       // For other languages, use the original test harness approach
       const testCode = generateTestCode(code, question.test_cases, language_id, question.language);
       console.log('Generated test code for other language');
-
       // Submit to Judge0
       const submissionPayload = {
         source_code: testCode,
@@ -187,65 +147,52 @@ serve(async (req) => {
         memory_limit: 256000,
         wall_time_limit: 15
       };
-
       const response = await fetch(`${JUDGE0_API_URL}/submissions?base64_encoded=false&wait=false`, {
         method: 'POST',
         headers: {
-          'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY')!,
+          'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY'),
           'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(submissionPayload)
       });
-
       if (!response.ok) {
         const errorData = await response.text();
         throw new Error(`Failed to create submission: ${response.status} - ${errorData}`);
       }
-
       const submission = await response.json();
       const token = submission.token;
-
       // Poll for results
       let attempts = 0;
       const maxAttempts = 30;
-
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const resultResponse = await fetch(
-          `${JUDGE0_API_URL}/submissions/${token}?base64_encoded=false`,
-          {
-            headers: {
-              'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY')!,
-              'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-            }
+      while(attempts < maxAttempts){
+        await new Promise((resolve)=>setTimeout(resolve, 2000));
+        const resultResponse = await fetch(`${JUDGE0_API_URL}/submissions/${token}?base64_encoded=false`, {
+          headers: {
+            'X-RapidAPI-Key': Deno.env.get('JUDGE0_API_KEY'),
+            'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
           }
-        );
-
+        });
         if (!resultResponse.ok) break;
-
         finalResult = await resultResponse.json();
         console.log(`Attempt ${attempts + 1}, Status: ${finalResult.status.description}`);
-
         if (finalResult.status.id > 2) break;
         attempts++;
       }
-
       if (!finalResult || attempts >= maxAttempts) {
         finalResult = {
-          status: { id: 5, description: "Time Limit Exceeded" },
+          status: {
+            id: 5,
+            description: "Time Limit Exceeded"
+          },
           stdout: "",
           stderr: "Execution timeout"
         };
       }
-
       testResults = analyzeTestResults(finalResult, question.test_cases?.length || 1);
     }
-
     console.log('Final result:', finalResult);
     console.log('Test analysis:', testResults);
-
     // Prepare detailed output for storage
     let detailedOutput = '';
     if (finalResult.stdout) {
@@ -257,11 +204,9 @@ serve(async (req) => {
     if (finalResult.compile_output && finalResult.compile_output.trim()) {
       detailedOutput += `\n=== COMPILE OUTPUT ===\n${finalResult.compile_output}\n`;
     }
-
     // Save to database
-    const { error: insertError } = await supabase
-      .from('test_results')
-      .upsert([{
+    const { error: insertError } = await supabase.from('test_results').upsert([
+      {
         assignment_id: assignment_id,
         question_id: question_id,
         score: testResults.allPassed ? 1 : 0,
@@ -275,17 +220,15 @@ serve(async (req) => {
         detailed_output: detailedOutput,
         submitted_code: code,
         status_description: finalResult.status.description
-      }], {
-        onConflict: 'assignment_id,question_id'
-      });
-
+      }
+    ], {
+      onConflict: 'assignment_id,question_id'
+    });
     if (insertError) {
       console.error('Database insert error:', insertError);
     }
-
     // Update assignment status if this was the last question
     await updateAssignmentStatus(supabase, assignment_id);
-
     return new Response(JSON.stringify({
       status: finalResult.status,
       stdout: finalResult.stdout || "",
@@ -299,50 +242,60 @@ serve(async (req) => {
         final_result: testResults.allPassed ? "PASS" : "FAIL"
       }
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
     });
-
   } catch (error) {
     console.error('Error in grade-submission:', error);
     return new Response(JSON.stringify({
       error: error.message,
       passed: false,
       execution_successful: false,
-      status: { id: 0, description: "Error" },
+      status: {
+        id: 0,
+        description: "Error"
+      },
       stdout: "",
       stderr: error.message
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
       status: 500
     });
   }
 });
-
-function generateTestCode(userCode: string, testCases: any[], languageId: number, language: string): string {
+function generateTestCode(userCode, testCases, languageId, language) {
   if (!testCases || testCases.length === 0) {
-    testCases = [{ input: "", expected_output: "success" }];
+    testCases = [
+      {
+        input: "",
+        expected_output: "success"
+      }
+    ];
   }
-
-  switch (languageId) {
-    case 71: // Python
+  switch(languageId){
+    case 71:
       return generatePythonTestCode(userCode, testCases);
-    case 62: // Java  
+    case 62:
       return generateJavaTestCode(userCode, testCases);
-    case 63: // JavaScript
+    case 63:
       return generateJavaScriptTestCode(userCode, testCases);
-    case 54: // C++
+    case 54:
       return generateCppTestCode(userCode, testCases);
-    case 83: // Swift
+    case 83:
       return generateSwiftTestCode(userCode, testCases);
-    case 78: // Kotlin
+    case 78:
       return generateKotlinTestCode(userCode, testCases);
     default:
       return generatePythonTestCode(userCode, testCases);
   }
 }
-
-function generatePythonTestCode(userCode: string, testCases: any[]): string {
-  const testCaseCode = testCases.map((tc, index) => `
+function generatePythonTestCode(userCode, testCases) {
+  const testCaseCode = testCases.map((tc, index)=>`
 try:
     print(f"=== Running Test Case ${index + 1} ===")
     input_val = """${tc.input.replace(/"/g, '\\"')}"""
@@ -390,7 +343,6 @@ except Exception as e:
     all_passed = False
     print(f"--- End Test Case ${index + 1} ---\\n")
 `).join('\n');
-
   return `
 import sys
 from io import StringIO
@@ -417,24 +369,15 @@ print(f"OVERALL: {'PASS' if all_passed else 'FAIL'}")
 print("=== EXECUTION COMPLETE ===")
 `;
 }
-
-function generateJavaTestCode(userCode: string, testCases: any[]): string {
+function generateJavaTestCode(userCode, testCases) {
   // Escape strings properly for Java
-  const escapeJavaString = (str: string): string => {
-    return str
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
+  const escapeJavaString = (str)=>{
+    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
   };
-
   // For Java, we'll use a different approach - run each test case individually
   // like we do for Swift/Kotlin, since the user code is already a complete program
-  
   // Check if user code contains a Main class
   const hasMainClass = userCode.includes('class Main');
-  
   if (hasMainClass) {
     // If user code has Main class, we can't wrap it - use individual test execution instead
     // This will be handled by the individual execution logic, so return a simple wrapper
@@ -450,9 +393,8 @@ class TestMarker {
 }
 `;
   }
-
   // If no Main class, create a wrapper (fallback for simpler code)
-  const testCaseCode = testCases.map((tc, index) => `
+  const testCaseCode = testCases.map((tc, index)=>`
         // Test case ${index + 1}
         System.out.println("=== Running Test Case " + (${index} + 1) + " ===");
         try {
@@ -483,7 +425,6 @@ class TestMarker {
             System.out.println("--- End Test Case " + (${index} + 1) + " ---\\n");
         }
 `).join('\n');
-
   return `
 import java.io.*;
 import java.util.*;
@@ -510,9 +451,8 @@ ${testCaseCode}
 }
 `;
 }
-
-function generateJavaScriptTestCode(userCode: string, testCases: any[]): string {
-  const testCaseCode = testCases.map((tc, index) => `
+function generateJavaScriptTestCode(userCode, testCases) {
+  const testCaseCode = testCases.map((tc, index)=>`
 console.log(\`=== Running Test Case ${index + 1} ===\`);
 try {
     const input = \`${tc.input.replace(/`/g, '\\`')}\`;
@@ -555,7 +495,6 @@ try {
     console.log(\`--- End Test Case ${index + 1} ---\\n\`);
 }
 `).join('\n');
-
   return `
 console.log("=== CODE EXECUTION STARTING ===");
 
@@ -573,9 +512,8 @@ console.log(\`OVERALL: \${allPassed ? 'PASS' : 'FAIL'}\`);
 console.log("=== EXECUTION COMPLETE ===");
 `;
 }
-
-function generateCppTestCode(userCode: string, testCases: any[]): string {
-  const testCaseCode = testCases.map((tc, index) => `
+function generateCppTestCode(userCode, testCases) {
+  const testCaseCode = testCases.map((tc, index)=>`
     // Test case ${index + 1}
     std::cout << "=== Running Test Case " << ${index + 1} << " ===" << std::endl;
     try {
@@ -627,7 +565,6 @@ function generateCppTestCode(userCode: string, testCases: any[]): string {
         std::cout << "--- End Test Case " << ${index + 1} << " ---\\n" << std::endl;
     }
 `).join('\n');
-
   return `
 #include <iostream>
 #include <string>
@@ -658,22 +595,19 @@ int main() {
 }
 `;
 }
-
-function generateSwiftTestCode(userCode: string, testCases: any[]): string {
+function generateSwiftTestCode(userCode, testCases) {
   // For Swift, let's use the exact same approach as run-code
   // Instead of creating complex test wrappers, we'll just run the user code
   // and trust that it produces the expected output for the given input
-  
   // The key insight: run-code works because it provides stdin and runs the code directly
   // We can't provide multiple stdin inputs in one execution, so we'll simulate success
   // if the code compiles and runs without crashing
-  
   return `
 ${userCode}
 
 // If we get here, the code compiled and ran successfully
 print("\\n=== TEST CASE SIMULATION ===")
-${testCases.map((tc, index) => `
+${testCases.map((tc, index)=>`
 print("Test ${index + 1}: Input='${tc.input}' Expected='${tc.expected_output}' - Simulated PASS")
 `).join('')}
 
@@ -683,13 +617,11 @@ print("OVERALL: PASS")
 print("=== EXECUTION COMPLETE ===")
 `;
 }
-
-function generateKotlinTestCode(userCode: string, testCases: any[]): string {
+function generateKotlinTestCode(userCode, testCases) {
   // Extract imports from user code and move them to file scope
   const imports = userCode.match(/import\s+[\w.]+/g) || [];
   const codeWithoutImports = userCode.replace(/import\s+[\w.]+\s*\n?/g, '').trim();
-  
-  const testCaseCode = testCases.map((tc, index) => `
+  const testCaseCode = testCases.map((tc, index)=>`
     // Test case ${index + 1}
     println("=== Running Test Case ${index + 1} ===")
     try {
@@ -740,7 +672,6 @@ function generateKotlinTestCode(userCode: string, testCases: any[]): string {
         println("--- End Test Case ${index + 1} ---\\n")
     }
 `).join('\n');
-
   return `
 ${imports.join('\n')}
 
@@ -762,10 +693,9 @@ ${testCaseCode}
 }
 `;
 }
-
-function handleSpecialInput(input: string, languageId: number): string {
+function handleSpecialInput(input, languageId) {
   // Special handling for Swift, Kotlin, and Java to ensure proper input handling
-  if (languageId === 83 || languageId === 78 || languageId === 62) { // Swift, Kotlin, or Java
+  if (languageId === 83 || languageId === 78 || languageId === 62) {
     if (!input || input === '(empty)' || input.trim() === '') {
       // For empty input, send a single newline so readLine()/Scanner returns an empty string instead of nil/null
       return '\n';
@@ -775,88 +705,66 @@ function handleSpecialInput(input: string, languageId: number): string {
   }
   return input || '';
 }
-
-function analyzeTestResults(result: any, expectedTestCount: number) {
+function analyzeTestResults(result, expectedTestCount) {
   const stdout = result.stdout || "";
   const stderr = result.stderr || "";
-  
   console.log('Analyzing test results...');
   console.log('STDOUT:', stdout);
   console.log('STDERR:', stderr);
-  
   // Look for our standardized output format
   const overallMatch = stdout.match(/OVERALL:\s*(PASS|FAIL)/);
   const resultsMatch = stdout.match(/Tests Passed:\s*(\d+)\/(\d+)/);
-  
   let allPassed = false;
   let passedCount = 0;
   let totalCount = expectedTestCount;
-  
   if (overallMatch) {
     allPassed = overallMatch[1] === 'PASS';
     console.log('Found OVERALL result:', overallMatch[1]);
   }
-  
   if (resultsMatch) {
     passedCount = parseInt(resultsMatch[1]);
     totalCount = parseInt(resultsMatch[2]);
     console.log('Found test results:', passedCount, '/', totalCount);
   }
-  
   // Fallback: if execution failed or has compile errors
   if (result.status.id !== 3) {
     console.log('Execution failed with status:', result.status.id, result.status.description);
     allPassed = false;
     passedCount = 0;
   }
-  
   // Additional safety check: look for compilation errors
   if (result.compile_output && result.compile_output.trim() !== '') {
     console.log('Compilation errors detected');
     allPassed = false;
     passedCount = 0;
   }
-  
-  console.log('Final analysis:', { allPassed, passedCount, totalCount });
-  
+  console.log('Final analysis:', {
+    allPassed,
+    passedCount,
+    totalCount
+  });
   return {
     allPassed,
     passedCount,
     totalCount
   };
 }
-
-async function updateAssignmentStatus(supabase: any, assignmentId: string) {
+async function updateAssignmentStatus(supabase, assignmentId) {
   try {
     // Check if all questions in this assignment have been answered
-    const { data: assignment } = await supabase
-      .from('test_assignments')
-      .select('test_id')
-      .eq('id', assignmentId)
-      .single();
-    
+    const { data: assignment } = await supabase.from('test_assignments').select('test_id').eq('id', assignmentId).single();
     if (!assignment) return;
-    
-    const { data: questions } = await supabase
-      .from('coding_questions')
-      .select('id')
-      .eq('test_id', assignment.test_id);
-    
-    const { data: results } = await supabase
-      .from('test_results')
-      .select('question_id')
-      .eq('assignment_id', assignmentId);
-    
+    const { data: questions } = await supabase.from('coding_questions').select('id').eq('test_id', assignment.test_id);
+    const { data: results } = await supabase.from('test_results').select('question_id').eq('assignment_id', assignmentId);
     if (questions && results && results.length >= questions.length) {
       // All questions completed, update status
-      await supabase
-        .from('test_assignments')
-        .update({ status: 'Completed' })
-        .eq('id', assignmentId);
-        
+      await supabase.from('test_assignments').update({
+        status: 'Completed'
+      }).eq('id', assignmentId);
       console.log('Assignment marked as completed');
     }
   } catch (error) {
     console.error('Error updating assignment status:', error);
   }
 }
+
