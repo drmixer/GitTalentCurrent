@@ -51,7 +51,8 @@ const TestResultsPage: React.FC = () => {
                     title,
                     question_text,
                     language,
-                    starter_code
+                    starter_code,
+                    created_at
                 )
             `)
             .eq('assignment_id', assignmentId)
@@ -60,11 +61,18 @@ const TestResultsPage: React.FC = () => {
         if (error) {
             console.error('Error fetching results:', error);
         } else {
-            setResults(data as any);
+            // Sort results by the question's created_at timestamp to maintain order
+            const sortedResults = (data as any)?.sort((a, b) => {
+                const dateA = new Date(a.coding_questions.created_at);
+                const dateB = new Date(b.coding_questions.created_at);
+                return dateA.getTime() - dateB.getTime();
+            }) || [];
+            
+            setResults(sortedResults);
             // Initialize expanded states
             const initialExpanded: { [key: string]: boolean } = {};
             const initialShowCode: { [key: string]: boolean } = {};
-            data?.forEach(result => {
+            sortedResults?.forEach(result => {
                 initialExpanded[result.id] = false;
                 initialShowCode[result.id] = false;
             });
