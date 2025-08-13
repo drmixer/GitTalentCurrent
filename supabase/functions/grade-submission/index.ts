@@ -53,9 +53,9 @@ serve(async (req) => {
     let finalResult;
     let testResults;
 
-    // For Swift and Kotlin, use individual test case execution to avoid stdin issues
-    if (language_id === 83 || language_id === 78) { // Swift or Kotlin
-      console.log('Using individual test case execution for Swift/Kotlin');
+    // For Java, Swift and Kotlin, use individual test case execution to avoid code structure conflicts
+    if (language_id === 62 || language_id === 83 || language_id === 78) { // Java, Swift or Kotlin
+      console.log('Using individual test case execution for Java/Swift/Kotlin');
       
       let passedTests = 0;
       const totalTests = question.test_cases?.length || 1;
@@ -69,7 +69,7 @@ serve(async (req) => {
         // Handle special cases for input
         let originalInput = testCase.input;
         let expectedOutput = testCase.expected_output;
-        let stdinInput = handleSwiftInput(originalInput, language_id);
+        let stdinInput = handleSpecialInput(originalInput, language_id);
         
         console.log(`Original input: "${originalInput}", Expected: "${expectedOutput}"`);
         console.log(`Processed stdin input: "${stdinInput}"`);
@@ -146,6 +146,7 @@ serve(async (req) => {
             combinedOutput += `\nTest Case ${i + 1}: EXECUTION ERROR\n`;
             combinedOutput += `Status: ${result?.status?.description || 'Unknown error'}\n`;
             if (result?.stderr) combinedOutput += `Error: ${result.stderr}\n`;
+            if (result?.compile_output) combinedOutput += `Compile Error: ${result.compile_output}\n`;
           }
           
         } catch (error) {
@@ -418,10 +419,6 @@ print("=== EXECUTION COMPLETE ===")
 }
 
 function generateJavaTestCode(userCode: string, testCases: any[]): string {
-  // Extract any imports from user code
-  const imports = userCode.match(/import\s+[^;]+;/g) || [];
-  const codeWithoutImports = userCode.replace(/import\s+[^;]+;\s*/g, '').trim();
-  
   // Escape strings properly for Java
   const escapeJavaString = (str: string): string => {
     return str
@@ -432,6 +429,29 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
       .replace(/\t/g, '\\t');
   };
 
+  // For Java, we'll use a different approach - run each test case individually
+  // like we do for Swift/Kotlin, since the user code is already a complete program
+  
+  // Check if user code contains a Main class
+  const hasMainClass = userCode.includes('class Main');
+  
+  if (hasMainClass) {
+    // If user code has Main class, we can't wrap it - use individual test execution instead
+    // This will be handled by the individual execution logic, so return a simple wrapper
+    return `
+${userCode}
+
+// Test execution marker - this code compiled successfully
+class TestMarker {
+    public static void printSuccess() {
+        System.out.println("=== JAVA CODE COMPILED SUCCESSFULLY ===");
+        System.out.println("Tests will be executed individually");
+    }
+}
+`;
+  }
+
+  // If no Main class, create a wrapper (fallback for simpler code)
   const testCaseCode = testCases.map((tc, index) => `
         // Test case ${index + 1}
         System.out.println("=== Running Test Case " + (${index} + 1) + " ===");
@@ -442,30 +462,11 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
             System.out.println("Input: " + input);
             System.out.println("Expected: " + expected.trim());
             
-            // Redirect stdin
-            InputStream originalIn = System.in;
-            System.setIn(new ByteArrayInputStream(input.getBytes()));
+            // For simple code without Main class, execute directly
+            // This is a fallback case
             
-            // Capture stdout
-            PrintStream originalOut = System.out;
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            System.setOut(new PrintStream(baos));
-            
-            // Run the main method from user code
-            try {
-                // Parse and execute the main method
-                String[] args = {};
-                Main.runUserCode();
-            } catch (Exception e) {
-                throw e;
-            }
-            
-            // Restore streams
-            System.setIn(originalIn);
-            System.setOut(originalOut);
-            
-            String actual = baos.toString().trim();
-            boolean passed = actual.equals(expected.trim());
+            String actual = "Not implemented";
+            boolean passed = false;
             
             System.out.println("Actual: " + actual);
             System.out.println("Test " + (${index} + 1) + " Result: " + (passed ? "PASS ✅" : "FAIL ❌"));
@@ -483,12 +484,13 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
         }
 `).join('\n');
 
-  // Create a wrapper that includes the user's code properly
   return `
 import java.io.*;
 import java.util.*;
 
-public class Main {
+${userCode}
+
+class TestRunner {
     public static void main(String[] args) {
         System.out.println("=== CODE EXECUTION STARTING ===");
         
@@ -504,11 +506,6 @@ ${testCaseCode}
         System.out.println("Tests Passed: " + passedTests + "/" + totalTests);
         System.out.println("OVERALL: " + (allPassed ? "PASS" : "FAIL"));
         System.out.println("=== EXECUTION COMPLETE ===");
-    }
-    
-    // User's code wrapped in a method
-    public static void runUserCode() throws Exception {
-        ${codeWithoutImports}
     }
 }
 `;
@@ -766,14 +763,14 @@ ${testCaseCode}
 `;
 }
 
-function handleSwiftInput(input: string, languageId: number): string {
-  // Special handling for Swift and Kotlin to avoid readLine() returning nil
-  if (languageId === 83 || languageId === 78) { // Swift or Kotlin
+function handleSpecialInput(input: string, languageId: number): string {
+  // Special handling for Swift, Kotlin, and Java to ensure proper input handling
+  if (languageId === 83 || languageId === 78 || languageId === 62) { // Swift, Kotlin, or Java
     if (!input || input === '(empty)' || input.trim() === '') {
-      // For empty input, send a single newline so readLine() returns an empty string instead of nil
+      // For empty input, send a single newline so readLine()/Scanner returns an empty string instead of nil/null
       return '\n';
     }
-    // Ensure input ends with newline for proper readLine() behavior
+    // Ensure input ends with newline for proper input handling
     return input.endsWith('\n') ? input : input + '\n';
   }
   return input || '';
