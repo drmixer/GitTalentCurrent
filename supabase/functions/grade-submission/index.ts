@@ -66,7 +66,26 @@ serve(async (req) => {
         const testCase = question.test_cases[i];
         console.log(`Running test case ${i + 1}: Input="${testCase.input}" Expected="${testCase.expected_output}"`);
         
+        // Handle special cases for input
+        let stdinInput = testCase.input;
+        if (!stdinInput || stdinInput === '(empty)' || stdinInput.trim() === '') {
+          stdinInput = ''; // Ensure it's an empty string, not undefined or null
+        }
+        
+        console.log(`Processed stdin input: "${stdinInput}"`);
+        
         try {
+          const submissionPayload = {
+            source_code: code,
+            language_id: language_id,
+            stdin: stdinInput,
+            cpu_time_limit: 10,
+            memory_limit: 256000,
+            wall_time_limit: 15
+          };
+          
+          console.log(`Submission payload for test case ${i + 1}:`, JSON.stringify(submissionPayload, null, 2));
+          
           const response = await fetch(`${JUDGE0_API_URL}/submissions?base64_encoded=false&wait=false`, {
             method: 'POST',
             headers: {
@@ -74,18 +93,13 @@ serve(async (req) => {
               'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              source_code: code,
-              language_id: language_id,
-              stdin: testCase.input || '',
-              cpu_time_limit: 10,
-              memory_limit: 256000,
-              wall_time_limit: 15
-            })
+            body: JSON.stringify(submissionPayload)
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to create submission for test case ${i + 1}`);
+            const errorText = await response.text();
+            console.error(`Judge0 API error for test case ${i + 1}:`, response.status, errorText);
+            throw new Error(`Judge0 API returned ${response.status}: ${errorText}`);
           }
 
           const submission = await response.json();
@@ -137,6 +151,7 @@ serve(async (req) => {
         } catch (error) {
           console.error(`Error running test case ${i + 1}:`, error);
           combinedOutput += `\nTest Case ${i + 1}: ERROR - ${error.message}\n`;
+          combinedOutput += `Details: Input="${testCase.input}", Expected="${testCase.expected_output}"\n`;
         }
       }
       
