@@ -15,7 +15,6 @@ import {
   Calendar,
   Loader,
   Briefcase,
-  MessageSquare,
   CheckCircle, // Added for success messages
   AlertCircle // Added for error messages
 } from 'lucide-react';
@@ -37,38 +36,6 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
   const [editingJob, setEditingJob] = useState<JobRole | null>(null);
   const [showJobForm, setShowJobForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [jobInterestCounts, setJobInterestCounts] = useState<{[jobId: string]: number}>({});
-
-  useEffect(() => {
-    if (jobRoles.length > 0) {
-      fetchJobInterestCounts(jobRoles.map(j => j.id));
-    }
-  }, [jobRoles]);
-
-  const fetchJobInterestCounts = async (jobIds: string[]) => {
-    try {
-      if (!userProfile?.id || jobIds.length === 0) return;
-
-      const counts: {[jobId: string]: number} = {};
-
-      for (const jobId of jobIds) {
-        const { count, error } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('receiver_id', userProfile.id)
-          .eq('job_role_id', jobId);
-
-        if (error) throw error;
-        counts[jobId] = count || 0;
-      }
-
-      setJobInterestCounts(counts);
-    } catch (error: any) {
-      console.error('Error fetching job interest counts:', error);
-      setError('Failed to fetch interest counts.');
-      setTimeout(() => setError(''), 3000);
-    }
-  };
 
   /**
    * REFACTOR: This function now handles the completion of the JobRoleForm
@@ -218,13 +185,12 @@ const JobsDashboard: React.FC<JobsDashboardProps> = ({ jobRoles, onViewApplicant
                   <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center"><MapPin className="w-4 h-4 mr-1" />{job.location}</div>
                     <div className="flex items-center"><Clock className="w-4 h-4 mr-1" />{job.job_type}</div>
-                    <div className="flex items-center"><DollarSign className="w-4 h-4 mr-1" />${job.salary}</div> {/* Changed to job.salary as per JobRoleForm */}
+                    <div className="flex items-center"><DollarSign className="w-4 h-4 mr-1" />${job.salary}</div>
                     <div className="flex items-center"><Calendar className="w-4 h-4 mr-1" />Posted {new Date(job.created_at).toLocaleDateString()}</div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="flex flex-wrap gap-2">
                     {job.tech_stack.map((tech, index) => <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">{tech}</span>)}
                   </div>
-                  <div className="flex items-center space-x-2"><span className="text-sm text-gray-600"><MessageSquare className="w-4 h-4 inline mr-1" />{jobInterestCounts[job.id] || 0} interested developers</span></div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button onClick={() => handleToggleFeatureJob(job.id, !!job.is_featured)} className={`p-2 rounded-lg ${job.is_featured ? 'text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'}`} title={job.is_featured ? "Unfeature Job" : "Feature Job"}>
