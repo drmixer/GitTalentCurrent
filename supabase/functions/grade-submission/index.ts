@@ -418,12 +418,26 @@ print("=== EXECUTION COMPLETE ===")
 }
 
 function generateJavaTestCode(userCode: string, testCases: any[]): string {
+  // Extract any imports from user code
+  const imports = userCode.match(/import\s+[^;]+;/g) || [];
+  const codeWithoutImports = userCode.replace(/import\s+[^;]+;\s*/g, '').trim();
+  
+  // Escape strings properly for Java
+  const escapeJavaString = (str: string): string => {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  };
+
   const testCaseCode = testCases.map((tc, index) => `
         // Test case ${index + 1}
         System.out.println("=== Running Test Case " + (${index} + 1) + " ===");
         try {
-            String input = "${tc.input.replace(/"/g, '\\"')}";
-            String expected = "${tc.expected_output.replace(/"/g, '\\"')}";
+            String input = "${escapeJavaString(tc.input)}";
+            String expected = "${escapeJavaString(tc.expected_output)}";
             
             System.out.println("Input: " + input);
             System.out.println("Expected: " + expected.trim());
@@ -437,9 +451,14 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             System.setOut(new PrintStream(baos));
             
-            // Create new instance and run
-            Solution solution = new Solution();
-            solution.run();
+            // Run the main method from user code
+            try {
+                // Parse and execute the main method
+                String[] args = {};
+                Main.runUserCode();
+            } catch (Exception e) {
+                throw e;
+            }
             
             // Restore streams
             System.setIn(originalIn);
@@ -464,19 +483,12 @@ function generateJavaTestCode(userCode: string, testCases: any[]): string {
         }
 `).join('\n');
 
+  // Create a wrapper that includes the user's code properly
   return `
 import java.io.*;
 import java.util.*;
 
-${userCode.includes('class Solution') ? '' : `
-class Solution {
-    public void run() {
-        ${userCode}
-    }
-}
-`}
-
-class Main {
+public class Main {
     public static void main(String[] args) {
         System.out.println("=== CODE EXECUTION STARTING ===");
         
@@ -492,6 +504,11 @@ ${testCaseCode}
         System.out.println("Tests Passed: " + passedTests + "/" + totalTests);
         System.out.println("OVERALL: " + (allPassed ? "PASS" : "FAIL"));
         System.out.println("=== EXECUTION COMPLETE ===");
+    }
+    
+    // User's code wrapped in a method
+    public static void runUserCode() throws Exception {
+        ${codeWithoutImports}
     }
 }
 `;
