@@ -40,6 +40,53 @@ import {
   Message
 } from '../types';
 
+// Helper function to calculate calendar year contributions (YTD)
+const calculateCalendarYearContributions = (gitHubData: any): number => {
+  if (!gitHubData?.contributions) {
+    console.log('[GitHubUtils] No contributions data available for calendar year calculation');
+    return 0;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const yearStart = `${currentYear}-01-01`;
+  
+  console.log('[GitHubUtils] Calculating calendar year contributions for year:', currentYear);
+
+  // Handle the new data structure with contributions.calendar
+  if (gitHubData.contributions.calendar && Array.isArray(gitHubData.contributions.calendar)) {
+    const calendarYearContributions = gitHubData.contributions.calendar
+      .filter((day: any) => {
+        const dayDate = day.date || day.occurredAt;
+        return dayDate && dayDate >= yearStart;
+      })
+      .reduce((sum: number, day: any) => {
+        const count = day.contributionCount || day.count || 0;
+        return sum + count;
+      }, 0);
+    
+    console.log('[GitHubUtils] Calendar year contributions from calendar data:', calendarYearContributions);
+    return calendarYearContributions;
+  }
+  
+  // Handle legacy contributions array format
+  if (Array.isArray(gitHubData.contributions)) {
+    const calendarYearContributions = gitHubData.contributions
+      .filter((day: any) => {
+        const dayDate = day.date || day.occurredAt;
+        return dayDate && dayDate >= yearStart;
+      })
+      .reduce((sum: number, day: any) => {
+        const count = day.contributionCount || day.count || 0;
+        return sum + count;
+      }, 0);
+    
+    console.log('[GitHubUtils] Calendar year contributions from legacy data:', calendarYearContributions);
+    return calendarYearContributions;
+  }
+  
+  console.warn('[GitHubUtils] No valid contribution data structure found for calendar year calculation');
+  return 0;
+};
 
 interface SelectedMessageThreadDetails {
   otherUserId: string;
@@ -119,6 +166,9 @@ export const DeveloperDashboard: React.FC = () => {
   const [dashboardPageLoading, setDashboardPageLoading] = useState(true);
   const [hasFreshDataBeenProcessed, setHasFreshDataBeenProcessed] = useState(false);
   const [latchedSuccessfullyFetchedFreshData, setLatchedSuccessfullyFetchedFreshData] = useState<typeof initialStateForGitHubData | null>(null);
+
+  // NEW: State to track calendar year contributions for YTD display
+  const [calendarYearContributions, setCalendarYearContributions] = useState<number>(0);
 
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
@@ -372,12 +422,22 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow]);
 
-  // FIXED: Updated annual contributions processing with better error handling and database sync
+  // NEW: Calculate calendar year contributions for YTD display (SEPARATE from database sync)
+  useEffect(() => {
+    if (finalGitHubDataToShow) {
+      const ytdContributions = calculateCalendarYearContributions(finalGitHubDataToShow);
+      setCalendarYearContributions(ytdContributions);
+      console.log('[Dashboard] Calendar year (YTD) contributions calculated:', ytdContributions);
+    }
+  }, [finalGitHubDataToShow]);
+
+  // UPDATED: Annual contributions processing - now syncs the ROLLING YEAR total to database
+  // This keeps the database updated but doesn't affect YTD display
   useEffect(() => {
     if (finalGitHubDataToShow && developerData?.id) {
       let totalContributions = 0;
       
-      console.log('[Dashboard] Processing GitHub data for annual contributions:', {
+      console.log('[Dashboard] Processing GitHub data for annual contributions (rolling year for DB sync):', {
         hasContributions: !!finalGitHubDataToShow.contributions,
         contributionsType: typeof finalGitHubDataToShow.contributions,
         hasCalendar: !!finalGitHubDataToShow.contributions?.calendar,
@@ -388,7 +448,7 @@ export const DeveloperDashboard: React.FC = () => {
       // Priority 1: Use the totalContributions from the new data structure
       if (finalGitHubDataToShow.contributions?.totalContributions && typeof finalGitHubDataToShow.contributions.totalContributions === 'number') {
         totalContributions = finalGitHubDataToShow.contributions.totalContributions;
-        console.log('[Dashboard] Using totalContributions from API:', totalContributions);
+        console.log('[Dashboard] Using totalContributions from API (rolling year):', totalContributions);
       }
       // Priority 2: Calculate from calendar data (GraphQL format)
       else if (finalGitHubDataToShow.contributions?.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
@@ -398,7 +458,7 @@ export const DeveloperDashboard: React.FC = () => {
             return sum + count;
           }, 0
         );
-        console.log('[Dashboard] Calculated from calendar data:', totalContributions, 'days:', finalGitHubDataToShow.contributions.calendar.length);
+        console.log('[Dashboard] Calculated from calendar data (rolling year):', totalContributions, 'days:', finalGitHubDataToShow.contributions.calendar.length);
       }
       // Priority 3: Legacy format - direct contributions array
       else if (Array.isArray(finalGitHubDataToShow.contributions)) {
@@ -408,15 +468,15 @@ export const DeveloperDashboard: React.FC = () => {
             return sum + count;
           }, 0
         );
-        console.log('[Dashboard] Calculated from legacy contributions array:', totalContributions);
+        console.log('[Dashboard] Calculated from legacy contributions array (rolling year):', totalContributions);
       }
       else {
         console.warn('[Dashboard] No valid contribution data found for annual contributions calculation');
       }
 
-      // Always update if we have valid contribution data and it differs from current value
+      // Update database with rolling year total if it differs from current value
       if (totalContributions >= 0 && totalContributions !== (developerData.annual_contributions || 0)) {
-        console.log('[Dashboard] Updating annual_contributions from', developerData.annual_contributions, 'to', totalContributions);
+        console.log('[Dashboard] Updating annual_contributions (rolling year) from', developerData.annual_contributions, 'to', totalContributions);
         
         // Update local state immediately
         setDeveloperData(prev => prev ? {
@@ -438,7 +498,7 @@ export const DeveloperDashboard: React.FC = () => {
             if (error) {
               console.error('[Dashboard] Failed to update annual_contributions in database:', error);
             } else {
-              console.log('[Dashboard] Successfully updated annual_contributions in database:', totalContributions);
+              console.log('[Dashboard] Successfully updated annual_contributions (rolling year) in database:', totalContributions);
             }
           } catch (updateError) {
             console.error('[Dashboard] Error updating annual_contributions:', updateError);
@@ -448,7 +508,7 @@ export const DeveloperDashboard: React.FC = () => {
         // Execute the database update
         updateAnnualContributions();
       } else if (totalContributions >= 0) {
-        console.log('[Dashboard] Annual contributions already up to date:', totalContributions);
+        console.log('[Dashboard] Annual contributions (rolling year) already up to date:', totalContributions);
       }
     }
   }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
@@ -481,6 +541,8 @@ export const DeveloperDashboard: React.FC = () => {
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}
         loading={dashboardPageLoading || authContextLoading || gitHubDataLoadingToShow}
         onNavigateToTab={(tab) => navigate(`/developer?tab=${tab}`)}
+        // NEW: Pass the calendar year contributions for YTD display
+        calendarYearContributions={calendarYearContributions}
       />
     );
   };
