@@ -39,7 +39,8 @@ const TestPage: React.FC = () => {
         const { data: questionsData, error: questionsError } = await supabase
             .from('coding_questions')
             .select('*')
-            .eq('test_id', assignmentData.test_id);
+            .eq('test_id', assignmentData.test_id)
+            .order('created_at', { ascending: true });
 
         if (questionsError) {
             console.error('Error fetching questions:', questionsError);
