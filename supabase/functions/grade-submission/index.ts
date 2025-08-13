@@ -67,11 +67,11 @@ serve(async (req) => {
         console.log(`Running test case ${i + 1}: Input="${testCase.input}" Expected="${testCase.expected_output}"`);
         
         // Handle special cases for input
-        let stdinInput = testCase.input;
-        if (!stdinInput || stdinInput === '(empty)' || stdinInput.trim() === '') {
-          stdinInput = ''; // Ensure it's an empty string, not undefined or null
-        }
+        let originalInput = testCase.input;
+        let expectedOutput = testCase.expected_output;
+        let stdinInput = handleSwiftInput(originalInput, language_id);
         
+        console.log(`Original input: "${originalInput}", Expected: "${expectedOutput}"`);
         console.log(`Processed stdin input: "${stdinInput}"`);
         
         try {
@@ -136,7 +136,7 @@ serve(async (req) => {
             const testPassed = actualOutput === expectedOutput;
             
             combinedOutput += `\nTest Case ${i + 1}:\n`;
-            combinedOutput += `Input: ${testCase.input}\n`;
+            combinedOutput += `Input: ${originalInput}\n`;
             combinedOutput += `Expected: ${expectedOutput}\n`;
             combinedOutput += `Actual: ${actualOutput}\n`;
             combinedOutput += `Result: ${testPassed ? 'PASS ✅' : 'FAIL ❌'}\n`;
@@ -747,6 +747,19 @@ ${testCaseCode}
     println("=== EXECUTION COMPLETE ===")
 }
 `;
+}
+
+function handleSwiftInput(input: string, languageId: number): string {
+  // Special handling for Swift and Kotlin to avoid readLine() returning nil
+  if (languageId === 83 || languageId === 78) { // Swift or Kotlin
+    if (!input || input === '(empty)' || input.trim() === '') {
+      // For empty input, send a single newline so readLine() returns an empty string instead of nil
+      return '\n';
+    }
+    // Ensure input ends with newline for proper readLine() behavior
+    return input.endsWith('\n') ? input : input + '\n';
+  }
+  return input || '';
 }
 
 function analyzeTestResults(result: any, expectedTestCount: number) {
