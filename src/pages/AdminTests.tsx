@@ -145,12 +145,15 @@ def solve():
 if __name__ == "__main__":
     result = solve()
     print(result)`,
-            java: `public class Solution {
-    public void run() {
-        // Your code here
+            java: `import java.util.Scanner;
+
+class Main {
+    public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
+        // Your code here
         // Read input and process
         // Print your answer
+        scanner.close();
     }
 }`,
             javascript: `// Write your solution here
