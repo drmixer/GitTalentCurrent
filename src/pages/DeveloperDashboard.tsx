@@ -130,7 +130,7 @@ export const DeveloperDashboard: React.FC = () => {
 
   const {
     gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
-  } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId, active: !!freshLoadParams });
+  } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId });
 
   const {
     gitHubData: standardGitHubData, loading: standardGitHubLoading, error: standardGitHubError
@@ -372,38 +372,86 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow]);
 
-  // Separate useEffect for updating annual contributions to avoid circular dependency
+  // FIXED: Updated annual contributions processing with better error handling and database sync
   useEffect(() => {
-    if (finalGitHubDataToShow && developerData && finalGitHubDataToShow.contributions) {
+    if (finalGitHubDataToShow && developerData?.id) {
       let totalContributions = 0;
       
-      // Get total from the new data structure
-      if (finalGitHubDataToShow.contributions.totalContributions) {
+      console.log('[Dashboard] Processing GitHub data for annual contributions:', {
+        hasContributions: !!finalGitHubDataToShow.contributions,
+        contributionsType: typeof finalGitHubDataToShow.contributions,
+        hasCalendar: !!finalGitHubDataToShow.contributions?.calendar,
+        hasTotalContributions: !!finalGitHubDataToShow.contributions?.totalContributions,
+        currentAnnualContributions: developerData.annual_contributions
+      });
+      
+      // Priority 1: Use the totalContributions from the new data structure
+      if (finalGitHubDataToShow.contributions?.totalContributions && typeof finalGitHubDataToShow.contributions.totalContributions === 'number') {
         totalContributions = finalGitHubDataToShow.contributions.totalContributions;
+        console.log('[Dashboard] Using totalContributions from API:', totalContributions);
       }
-      // Fallback: calculate from calendar data
-      else if (finalGitHubDataToShow.contributions.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
+      // Priority 2: Calculate from calendar data (GraphQL format)
+      else if (finalGitHubDataToShow.contributions?.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
         totalContributions = finalGitHubDataToShow.contributions.calendar.reduce(
-          (sum: number, day: any) => sum + (day.contributionCount || 0), 0
+          (sum: number, day: any) => {
+            const count = day.contributionCount || day.count || 0;
+            return sum + count;
+          }, 0
         );
+        console.log('[Dashboard] Calculated from calendar data:', totalContributions, 'days:', finalGitHubDataToShow.contributions.calendar.length);
       }
-      // Legacy fallback: direct contributions array
+      // Priority 3: Legacy format - direct contributions array
       else if (Array.isArray(finalGitHubDataToShow.contributions)) {
         totalContributions = finalGitHubDataToShow.contributions.reduce(
-          (sum: number, day: any) => sum + (day.count || 0), 0
+          (sum: number, day: any) => {
+            const count = day.contributionCount || day.count || 0;
+            return sum + count;
+          }, 0
         );
+        console.log('[Dashboard] Calculated from legacy contributions array:', totalContributions);
+      }
+      else {
+        console.warn('[Dashboard] No valid contribution data found for annual contributions calculation');
       }
 
-      // Update the developer data with annual contributions
-      if (totalContributions > 0 && totalContributions !== developerData.annual_contributions) {
-        console.log('[Dashboard] Updating annual_contributions:', totalContributions);
+      // Always update if we have valid contribution data and it differs from current value
+      if (totalContributions >= 0 && totalContributions !== (developerData.annual_contributions || 0)) {
+        console.log('[Dashboard] Updating annual_contributions from', developerData.annual_contributions, 'to', totalContributions);
+        
+        // Update local state immediately
         setDeveloperData(prev => prev ? {
           ...prev,
           annual_contributions: totalContributions
         } : prev);
+
+        // Also update the database to persist the change
+        const updateAnnualContributions = async () => {
+          try {
+            const { error } = await supabase
+              .from('developers')
+              .update({ 
+                annual_contributions: totalContributions,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', developerData.user_id || authUser?.id);
+            
+            if (error) {
+              console.error('[Dashboard] Failed to update annual_contributions in database:', error);
+            } else {
+              console.log('[Dashboard] Successfully updated annual_contributions in database:', totalContributions);
+            }
+          } catch (updateError) {
+            console.error('[Dashboard] Error updating annual_contributions:', updateError);
+          }
+        };
+
+        // Execute the database update
+        updateAnnualContributions();
+      } else if (totalContributions >= 0) {
+        console.log('[Dashboard] Annual contributions already up to date:', totalContributions);
       }
     }
-  }, [finalGitHubDataToShow, developerData?.id]);
+  }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
 
   const currentDeveloperProfile = useMemo(() => {
     if (contextDeveloperProfile) {
