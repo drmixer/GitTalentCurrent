@@ -78,14 +78,10 @@ const TestPage: React.FC = () => {
     const getLanguageId = (language: string): number => {
         const languageMap: { [key: string]: number } = {
             'python': 71,
-            'javascript': 63,
             'java': 62,
             'c++': 54,
             'swift': 83,
             'kotlin': 78,
-            'react': 63,
-            'angular': 63,
-            'vue': 63
         };
         return languageMap[language.toLowerCase()] || 71;
     };
@@ -222,9 +218,9 @@ const TestPage: React.FC = () => {
     }
 
     const currentQuestion = questions[currentQuestionIndex];
-    const sandpackLanguages = ['react', 'vue', 'angular'];
+    const sandpackLanguages = ['react', 'vue', 'angular', 'javascript'];
 
-    // Handle Sandpack languages (React, Vue, Angular)
+    // Handle Sandpack languages (React, Vue, Angular, JavaScript)
     if (sandpackLanguages.includes(currentQuestion.language.toLowerCase())) {
         return (
             <div className="p-8">
@@ -241,7 +237,7 @@ const TestPage: React.FC = () => {
                     )}
                     
                     <SandpackTest
-                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular'}
+                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
                         starterCode={currentQuestion.starter_code || ''}
                         testCode={currentQuestion.test_code}
                         assignmentId={assignmentId!}
@@ -253,7 +249,7 @@ const TestPage: React.FC = () => {
         );
     }
 
-    // Handle Judge0 languages (Python, Java, C++, JavaScript, Swift, Kotlin)
+    // Handle Judge0 languages (Python, Java, C++, Swift, Kotlin)
     return (
         <div className="p-8">
             <div className="flex h-screen">
@@ -389,7 +385,6 @@ function getEditorLanguage(language: string): string {
     const languageMap: { [key: string]: string } = {
         'python': 'python',
         'java': 'java',
-        'javascript': 'javascript',
         'c++': 'cpp',
         'swift': 'swift',
         'kotlin': 'kotlin'
