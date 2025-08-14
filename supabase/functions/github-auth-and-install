@@ -202,34 +202,65 @@ serve(async (req)=>{
     let developerProfile = null;
     if (userRole === 'developer') {
       console.log('Step 5: Creating/updating developer profile');
+      
+      // FIXED: Fetch existing developer profile to preserve bio/location
+      let existingDeveloper = null;
+      const { data: existingDev, error: fetchError } = await supabaseAdmin
+        .from('developers')
+        .select('*')
+        .eq('user_id', supabaseUser.id)
+        .single();
+        
+      if (!fetchError && existingDev) {
+        existingDeveloper = existingDev;
+        console.log('Found existing developer profile, preserving bio/location:', {
+          bio: existingDeveloper.bio,
+          location: existingDeveloper.location
+        });
+      } else if (fetchError && fetchError.code !== 'PGRST116') {
+        console.warn('Error fetching existing developer profile:', fetchError);
+      }
+      
       // ADDED: For login flow, fetch existing installation ID
       let installationIdToUse = installation_id ? parseInt(installation_id) : null;
-      if (flowType === 'login' && !installation_id) {
-        console.log('Login flow detected, fetching existing installation ID');
-        const { data: existingDev, error: fetchError } = await supabaseAdmin.from('developers').select('github_installation_id').eq('user_id', supabaseUser.id).single();
-        if (!fetchError && existingDev?.github_installation_id) {
-          installationIdToUse = parseInt(existingDev.github_installation_id);
-          console.log('Preserved existing installation ID:', installationIdToUse);
-        } else if (fetchError && fetchError.code !== 'PGRST116') {
-          console.warn('Error fetching existing developer profile:', fetchError);
-        }
+      if (flowType === 'login' && !installation_id && existingDeveloper?.github_installation_id) {
+        installationIdToUse = parseInt(existingDeveloper.github_installation_id);
+        console.log('Preserved existing installation ID:', installationIdToUse);
       }
+      
+      // FIXED: Preserve existing bio/location data, only update with GitHub data if:
+      // 1. No existing data exists, OR
+      // 2. GitHub has data and user hasn't customized their profile
+      const shouldUpdateBio = !existingDeveloper?.bio || 
+        (githubUser.bio && existingDeveloper?.bio === githubUser.bio);
+      const shouldUpdateLocation = !existingDeveloper?.location || 
+        (githubUser.location && existingDeveloper?.location === githubUser.location);
+      
       const developerData = {
         user_id: supabaseUser.id,
         github_handle: githubUser.login,
-        bio: githubUser.bio || '',
-        location: githubUser.location || '',
+        bio: shouldUpdateBio ? (githubUser.bio || existingDeveloper?.bio || '') : existingDeveloper.bio,
+        location: shouldUpdateLocation ? (githubUser.location || existingDeveloper?.location || '') : existingDeveloper.location,
         profile_pic_url: githubUser.avatar_url,
-        github_installation_id: installationIdToUse?.toString() || null,
-        availability: true
+        github_installation_id: installationIdToUse?.toString() || existingDeveloper?.github_installation_id || null,
+        availability: existingDeveloper?.availability !== undefined ? existingDeveloper.availability : true
       };
+      
       console.log('Developer data to upsert:', {
-        ...developerData,
-        github_installation_id: developerData.github_installation_id ? 'preserved/provided' : 'null'
+        user_id: developerData.user_id,
+        github_handle: developerData.github_handle,
+        bio: developerData.bio,
+        location: developerData.location,
+        github_installation_id: developerData.github_installation_id ? 'present' : 'null',
+        availability: developerData.availability,
+        bioPreserved: !shouldUpdateBio,
+        locationPreserved: !shouldUpdateLocation
       });
+      
       const { data: devProfile, error: devError } = await supabaseAdmin.from('developers').upsert(developerData, {
         onConflict: 'user_id'
       }).select().single();
+      
       if (devError) {
         console.warn('Developer profile creation failed:', devError);
       } else {
