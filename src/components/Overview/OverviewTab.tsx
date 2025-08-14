@@ -5,10 +5,9 @@ import { SnapshotCard } from './SnapshotCard';
 import { FeaturedProject } from './FeaturedProject';
 import { RecentGitHubActivity } from './RecentGitHubActivity';
 import { LatestEndorsements } from './LatestEndorsements';
-import { ProfileStrengthIndicator } from '../Profile/ProfileStrengthIndicator';
 import { useNavigate } from 'react-router-dom';
-import { InviteEndorsementsModal } from '../InviteEndorsementsModal'; // <--- CORRECTED IMPORT PATH
-
+import { InviteEndorsementsModal } from '../InviteEndorsementsModal';
+import { calculateProfileStrength, getProfileStrengthColor } from '../../utils/profileStrengthUtils';
 
 // Define a simple type for a commit for now. This should ideally come from your GitHub data types.
 interface Commit {
@@ -77,7 +76,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     thread.messages[thread.messages.length -1].sender_id !== developer.user_id
   ).length;
 
-
   const portfolioCount = portfolioItems.length;
   // Use optional chaining and nullish coalescing for safety
   const endorsementsCount = developer.endorsements_count ?? endorsements.length;
@@ -90,6 +88,24 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   // are destructured in the function signature, so we use them directly.
   const savedJobsCount = savedJobsCountOverride ?? developer.saved_jobs_count ?? savedJobs.length;
   const appliedJobsCount = appliedJobsCountOverride ?? developer.applied_jobs_count ?? appliedJobs.length;
+
+  // FIXED: Calculate profile strength using centralized utility
+  const profileStrengthData = {
+    bio: developer.bio,
+    location: developer.location,
+    preferred_title: developer.preferred_title,
+    experience_years: developer.experience_years,
+    github_handle: developer.github_handle,
+    github_installation_id: developer.github_installation_id,
+    resume_url: developer.resume_url,
+    profile_pic_url: developer.profile_pic_url || developer.user?.avatar_url,
+    skills_categories: developer.skills_categories,
+    linked_projects: developer.linked_projects,
+    desired_salary: developer.desired_salary
+  };
+  
+  const { strength: currentProfileStrength, suggestions } = calculateProfileStrength(profileStrengthData);
+  const strengthColors = getProfileStrengthColor(currentProfileStrength);
 
   const handleNavigation = (tab: string) => {
     if (onNavigateToTab) {
@@ -144,7 +160,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           value={endorsementsCount}
           icon={Star}
           iconColor="text-amber-600" bgColor="bg-amber-50"
-          // action={{ label: "View", onClick: () => {} }} // TODO: Link to endorsements section if one exists
+          action={{ label: "View", onClick: () => handleNavigation('endorsements') }}
         />
         <SnapshotCard
           title="Commits (YTD)"
@@ -187,28 +203,45 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             loading={endorsementsLoading} 
           />
 
+          {/* FIXED: Simplified profile strength section without duplication */}
           <div className="bg-white shadow rounded-lg p-6 border border-gray-200/80">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Profile Status</h3>
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>Profile Strength</span>
-                <span className="font-semibold text-blue-600">{developer.profile_strength || 0}%</span>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Actions</h3>
+            
+            {/* Compact profile strength display */}
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600">Profile Strength</span>
+                <span className={`text-lg font-bold ${strengthColors.text}`}>{currentProfileStrength}%</span>
               </div>
-              <ProfileStrengthIndicator strength={developer.profile_strength || 0} />
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${strengthColors.bg}`}
+                  style={{ width: `${currentProfileStrength}%` }}
+                />
+              </div>
+              {suggestions.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {suggestions.length} improvement{suggestions.length !== 1 ? 's' : ''} available
+                </p>
+              )}
             </div>
-            <button
-              onClick={() => handleNavigation('profile')}
-              className="w-full text-sm bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
-            >
-              <User size={16} className="mr-2"/> Complete Your Profile
-            </button>
-            {/* TODO: Implement endorsement invitation functionality */}
-            <button
-              onClick={() => setShowInviteEndorsementsModal(true)} // <--- UPDATED onClick HANDLER
-              className="mt-3 w-full text-sm bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
-            >
-              <Users size={16} className="mr-2"/> Invite Endorsements
-            </button>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handleNavigation('profile')}
+                className="w-full text-sm bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
+              >
+                <User size={16} className="mr-2"/> 
+                {currentProfileStrength < 80 ? 'Complete Profile' : 'Edit Profile'}
+              </button>
+              
+              <button
+                onClick={() => setShowInviteEndorsementsModal(true)}
+                className="w-full text-sm bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-md transition-colors duration-150 font-medium flex items-center justify-center"
+              >
+                <Users size={16} className="mr-2"/> Invite Endorsements
+              </button>
+            </div>
           </div>
         </div>
       </div>
