@@ -31,32 +31,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [onRefreshComplete, setOnRefreshComplete] = useState<(() => void) | null>(null);
 
   async function ensureUserProfileExists() {
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
 
-    if (sessionError || !session) {
-      console.error('Failed to get session:', sessionError);
-      return;
-    }
-
-    const user = session.user;
-
-    const { error: rpcError } = await supabase.rpc('create_user_profile', {
-      user_id: user.id,
-      user_email: user.email,
-      user_name: user.user_metadata?.name || user.email,
-      user_role: localStorage.getItem('gittalent_signup_role') || 'developer',
-      company_name: localStorage.getItem('gittalent_signup_company_name') || ''
-    });
-
-    if (rpcError) {
-      console.error('Failed to call create_user_profile RPC:', rpcError.message);
-    } else {
-      console.log('User profile created or already exists.');
-    }
+  if (sessionError || !session) {
+    console.error('Failed to get session:', sessionError);
+    return;
   }
+
+  const user = session.user;
+
+  // CRITICAL DEBUG: Check bio/location BEFORE calling RPC
+  console.log('=== BEFORE RPC CALL ===');
+  const { data: beforeData, error: beforeError } = await supabase
+    .from('developers')
+    .select('bio, location, updated_at')
+    .eq('user_id', user.id)
+    .single();
+  
+  console.log('Bio BEFORE RPC:', beforeData?.bio, 'Location BEFORE RPC:', beforeData?.location);
+  console.log('Updated_at BEFORE RPC:', beforeData?.updated_at);
+
+  const rpcParams = {
+    user_id: user.id,
+    user_email: user.email,
+    user_name: user.user_metadata?.name || user.email,
+    user_role: localStorage.getItem('gittalent_signup_role') || 'developer',
+    company_name: localStorage.getItem('gittalent_signup_company_name') || ''
+  };
+  
+  console.log('=== RPC CALL PARAMS ===', rpcParams);
+
+  const { error: rpcError } = await supabase.rpc('create_user_profile', rpcParams);
+
+  // CRITICAL DEBUG: Check bio/location AFTER calling RPC
+  console.log('=== AFTER RPC CALL ===');
+  const { data: afterData, error: afterError } = await supabase
+    .from('developers')
+    .select('bio, location, updated_at')
+    .eq('user_id', user.id)
+    .single();
+    
+  console.log('Bio AFTER RPC:', afterData?.bio, 'Location AFTER RPC:', afterData?.location);
+  console.log('Updated_at AFTER RPC:', afterData?.updated_at);
+  console.log('DID RPC CHANGE DATA?', beforeData?.bio !== afterData?.bio || beforeData?.location !== afterData?.location);
+
+  if (rpcError) {
+    console.error('Failed to call create_user_profile RPC:', rpcError.message);
+  } else {
+    console.log('User profile created or already exists.');
+  }
+}
 
   const ensureDeveloperProfile = useCallback(async (authUser: SupabaseUser, currentDeveloperProfile: Developer | null | undefined): Promise<boolean> => {
     try {
