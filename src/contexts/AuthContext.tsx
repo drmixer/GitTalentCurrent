@@ -68,8 +68,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const githubUsername = authUser.user_metadata?.login || authUser.user_metadata?.user_name || authUser.user_metadata?.preferred_username || '';
       const avatarUrl = authUser.user_metadata?.avatar_url || null;
-      const userBio = authUser.user_metadata?.bio || '';
-      const userLocation = authUser.user_metadata?.location || '';
+      // FIXED: Get GitHub metadata but don't use it to overwrite existing data
+      const githubBio = authUser.user_metadata?.bio || '';
+      const githubLocation = authUser.user_metadata?.location || '';
       const currentGhInstIdInState = currentDeveloperProfile?.github_installation_id;
 
       if (existingProfileFromDb) {
@@ -86,21 +87,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         let needsUpdate = false;
         const updates: Partial<Developer> = {};
+        
+        // Update GitHub username if it's available and different
         if (githubUsername && profileToSet.github_handle !== githubUsername) {
           updates.github_handle = githubUsername;
           needsUpdate = true;
         }
+        
+        // Update avatar if GitHub has one and we don't have one stored
         if (avatarUrl && !profileToSet.profile_pic_url) {
           updates.profile_pic_url = avatarUrl;
           needsUpdate = true;
         }
-        if (userBio && profileToSet.bio !== userBio) {
-          updates.bio = userBio;
+        
+        // CRITICAL FIX: Only update bio/location from GitHub if our DB fields are EMPTY
+        // This prevents overwriting user-entered data with empty/outdated GitHub data
+        if (githubBio && (!profileToSet.bio || profileToSet.bio.trim() === '')) {
+          updates.bio = githubBio;
           needsUpdate = true;
+          console.log('[AuthContext] ensureDeveloperProfile: Updating empty bio from GitHub metadata');
+        } else if (profileToSet.bio && profileToSet.bio.trim() !== '') {
+          console.log('[AuthContext] ensureDeveloperProfile: Preserving existing bio, ignoring GitHub metadata');
         }
-        if (userLocation && profileToSet.location !== userLocation) {
-          updates.location = userLocation;
+        
+        if (githubLocation && (!profileToSet.location || profileToSet.location.trim() === '')) {
+          updates.location = githubLocation;
           needsUpdate = true;
+          console.log('[AuthContext] ensureDeveloperProfile: Updating empty location from GitHub metadata');
+        } else if (profileToSet.location && profileToSet.location.trim() !== '') {
+          console.log('[AuthContext] ensureDeveloperProfile: Preserving existing location, ignoring GitHub metadata');
         }
 
         if (needsUpdate) {
@@ -131,12 +146,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
       }
 
-      // Creating new profile - preserve installation ID from state if available
+      // Creating new profile - use GitHub data as defaults for new profiles
       let newDevProfileData: Partial<Developer> = {
         user_id: authUser.id,
         github_handle: githubUsername,
-        bio: userBio,
-        location: userLocation,
+        bio: githubBio,
+        location: githubLocation,
         profile_pic_url: avatarUrl,
         availability: true
       };
