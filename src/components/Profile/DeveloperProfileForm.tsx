@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, MapPin, Github, ExternalLink, Plus, X, Search, Upload, Loader, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { calculateProfileStrength, getProfileStrengthStatus } from '../../utils/profileStrengthUtils';
 
 interface DeveloperProfile {
   user_id: string;
@@ -45,63 +46,8 @@ const SKILL_CATEGORIES = {
   'Tools & Others': ['Git', 'Webpack', 'Vite', 'Babel', 'ESLint', 'Prettier', 'Jest', 'Cypress', 'Selenium', 'Figma', 'Adobe XD', 'Sketch']
 };
 
-// FIXED: Comprehensive profile strength calculation
-export const calculateProfileStrength = (data: DeveloperProfile): number => {
-  let strength = 0;
-  
-  // Basic Information (40 points total)
-  if (data.bio && data.bio.trim().length >= 50) strength += 15; // Good bio with sufficient detail
-  else if (data.bio && data.bio.trim()) strength += 8; // Any bio gets partial credit
-  
-  if (data.location && data.location.trim()) strength += 10;
-  if (data.preferred_title && data.preferred_title.trim()) strength += 5;
-  if (data.experience_years > 0) strength += 10;
-  
-  // GitHub & Professional Info (25 points total)
-  if (data.github_handle && data.github_handle.trim()) strength += 10;
-  if (data.github_installation_id && data.github_installation_id.trim()) strength += 8; // GitHub app connected
-  if (data.resume_url && data.resume_url.trim()) strength += 7;
-  
-  // Skills & Technical (20 points total)
-  const totalSkills = Object.values(data.skills_categories || {}).flat().length;
-  if (totalSkills >= 8) strength += 12; // 8+ skills gets full points
-  else if (totalSkills >= 5) strength += 8; // 5-7 skills gets good points
-  else if (totalSkills >= 3) strength += 5; // 3-4 skills gets partial points
-  else if (totalSkills > 0) strength += 2; // Any skills get minimal points
-  
-  // Multiple skill categories bonus
-  const categoriesWithSkills = Object.values(data.skills_categories || {}).filter(skills => skills.length > 0).length;
-  if (categoriesWithSkills >= 3) strength += 5; // Bonus for diverse skills
-  else if (categoriesWithSkills >= 2) strength += 3;
-  
-  // Projects & Portfolio (10 points total)
-  if (data.linked_projects && data.linked_projects.length >= 3) strength += 10; // 3+ projects
-  else if (data.linked_projects && data.linked_projects.length >= 2) strength += 7; // 2 projects
-  else if (data.linked_projects && data.linked_projects.length >= 1) strength += 4; // 1 project
-  
-  // Profile Presentation (5 points total)
-  if (data.profile_pic_url && data.profile_pic_url.trim()) strength += 3;
-  if (data.desired_salary && data.desired_salary > 0) strength += 2;
-  
-  console.log('Profile strength calculation breakdown:', {
-    bio: data.bio?.length >= 50 ? 15 : (data.bio?.trim() ? 8 : 0),
-    location: data.location?.trim() ? 10 : 0,
-    preferredTitle: data.preferred_title?.trim() ? 5 : 0,
-    experience: data.experience_years > 0 ? 10 : 0,
-    githubHandle: data.github_handle?.trim() ? 10 : 0,
-    githubApp: data.github_installation_id?.trim() ? 8 : 0,
-    resume: data.resume_url?.trim() ? 7 : 0,
-    skillsCount: totalSkills,
-    skillsPoints: totalSkills >= 8 ? 12 : (totalSkills >= 5 ? 8 : (totalSkills >= 3 ? 5 : (totalSkills > 0 ? 2 : 0))),
-    categoriesBonus: categoriesWithSkills >= 3 ? 5 : (categoriesWithSkills >= 2 ? 3 : 0),
-    projects: data.linked_projects?.length >= 3 ? 10 : (data.linked_projects?.length >= 2 ? 7 : (data.linked_projects?.length >= 1 ? 4 : 0)),
-    profilePic: data.profile_pic_url?.trim() ? 3 : 0,
-    salary: data.desired_salary > 0 ? 2 : 0,
-    totalStrength: strength
-  });
-  
-  return Math.min(strength, 100);
-};
+// FIXED: Use centralized profile strength calculation
+export { calculateProfileStrength } from '../../utils/profileStrengthUtils';
 
 export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   initialData,
@@ -228,7 +174,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setLoading(true);
 
     try {
-      const profileStrength = calculateProfileStrength(formData);
+      const { strength } = calculateProfileStrength(formData);
       
       // Create the data object for database insertion/update
       const skills = Object.values(formData.skills_categories).flat();
@@ -243,7 +189,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         desired_salary: formData.desired_salary,
         skills: skills,
         skills_categories: formData.skills_categories,
-        profile_strength: profileStrength,
+        profile_strength: strength,
         public_profile_slug: formData.public_profile_slug,
         notification_preferences: formData.notification_preferences,
         resume_url: formData.resume_url,
@@ -386,7 +332,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
-  const currentProfileStrength = calculateProfileStrength(formData);
+  const { strength: currentProfileStrength, suggestions } = calculateProfileStrength(formData);
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -423,9 +369,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               />
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              {currentProfileStrength < 60 && "Complete more sections to improve your visibility"}
-              {currentProfileStrength >= 60 && currentProfileStrength < 85 && "Good progress! Add more details to stand out"}
-              {currentProfileStrength >= 85 && "Excellent! Your profile looks great to recruiters"}
+              {getProfileStrengthStatus(currentProfileStrength)}
             </p>
           </div>
 
