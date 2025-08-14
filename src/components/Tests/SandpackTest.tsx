@@ -89,7 +89,7 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
 };
 
 // Define the frameworks we support
-type SupportedFramework = 'react' | 'vue' | 'angular';
+type SupportedFramework = 'react' | 'vue' | 'angular' | 'javascript';
 
 // Define the shape of the props for the component
 interface SandpackTestProps {
@@ -151,6 +151,24 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
         },
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/app/app.component.spec.ts',
+      };
+
+    case 'javascript':
+      return {
+        setup: {
+          dependencies: {
+            '@testing-library/jest-dom': '^5.16.5',
+            'whatwg-fetch': '^3.6.2',
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
+            'jest': '^29.5.0',
+            'jest-environment-jsdom': '^29.5.0',
+          },
+          template: 'vanilla',
+        },
+        mainFile: '/src/index.js',
+        testFile: '/src/index.test.js',
       };
 
     case 'react':
@@ -593,6 +611,54 @@ getTestBed().initTestEnvironment(
         hidden: true
       };
       break;
+
+    case 'javascript':
+      baseFiles['/src/setupTests.js'] = {
+        code: `import '@testing-library/jest-dom';
+import 'whatwg-fetch';`,
+        hidden: true
+      };
+
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: 'javascript-test',
+          version: '1.0.0',
+          dependencies: {
+            '@testing-library/jest-dom': '^5.16.5',
+            'whatwg-fetch': '^3.6.2',
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
+            'jest': '^29.5.0',
+            'jest-environment-jsdom': '^29.5.0',
+          },
+          scripts: {
+            test: 'jest --watchAll=false'
+          },
+          jest: {
+            testEnvironment: 'jsdom',
+            setupFilesAfterEnv: ['<rootDir>/src/setupTests.js']
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JavaScript Test</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
+      break;
       
     case 'react':
     default:
@@ -659,9 +725,9 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     dependencies: setup.dependencies,
     devDependencies: setup.devDependencies || {},
     scripts: { 
-      start: framework === 'angular' ? 'ng serve' : framework === 'vue' ? 'vite' : 'react-scripts start',
-      build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : 'react-scripts build',
-      test: framework === 'angular' ? 'ng test' : framework === 'vue' ? 'vitest' : 'react-scripts test'
+      start: framework === 'angular' ? 'ng serve' : framework === 'vue' ? 'vite' : framework === 'javascript' ? 'node src/index.js' : 'react-scripts start',
+      build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : framework === 'javascript' ? 'echo "No build needed"' : 'react-scripts build',
+      test: framework === 'angular' ? 'ng test' : framework === 'vue' ? 'vitest' : 'jest --watchAll=false'
     },
   }, null, 2), [framework, setup]);
 
