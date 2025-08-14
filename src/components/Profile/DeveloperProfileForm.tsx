@@ -45,6 +45,64 @@ const SKILL_CATEGORIES = {
   'Tools & Others': ['Git', 'Webpack', 'Vite', 'Babel', 'ESLint', 'Prettier', 'Jest', 'Cypress', 'Selenium', 'Figma', 'Adobe XD', 'Sketch']
 };
 
+// FIXED: Comprehensive profile strength calculation
+export const calculateProfileStrength = (data: DeveloperProfile): number => {
+  let strength = 0;
+  
+  // Basic Information (40 points total)
+  if (data.bio && data.bio.trim().length >= 50) strength += 15; // Good bio with sufficient detail
+  else if (data.bio && data.bio.trim()) strength += 8; // Any bio gets partial credit
+  
+  if (data.location && data.location.trim()) strength += 10;
+  if (data.preferred_title && data.preferred_title.trim()) strength += 5;
+  if (data.experience_years > 0) strength += 10;
+  
+  // GitHub & Professional Info (25 points total)
+  if (data.github_handle && data.github_handle.trim()) strength += 10;
+  if (data.github_installation_id && data.github_installation_id.trim()) strength += 8; // GitHub app connected
+  if (data.resume_url && data.resume_url.trim()) strength += 7;
+  
+  // Skills & Technical (20 points total)
+  const totalSkills = Object.values(data.skills_categories || {}).flat().length;
+  if (totalSkills >= 8) strength += 12; // 8+ skills gets full points
+  else if (totalSkills >= 5) strength += 8; // 5-7 skills gets good points
+  else if (totalSkills >= 3) strength += 5; // 3-4 skills gets partial points
+  else if (totalSkills > 0) strength += 2; // Any skills get minimal points
+  
+  // Multiple skill categories bonus
+  const categoriesWithSkills = Object.values(data.skills_categories || {}).filter(skills => skills.length > 0).length;
+  if (categoriesWithSkills >= 3) strength += 5; // Bonus for diverse skills
+  else if (categoriesWithSkills >= 2) strength += 3;
+  
+  // Projects & Portfolio (10 points total)
+  if (data.linked_projects && data.linked_projects.length >= 3) strength += 10; // 3+ projects
+  else if (data.linked_projects && data.linked_projects.length >= 2) strength += 7; // 2 projects
+  else if (data.linked_projects && data.linked_projects.length >= 1) strength += 4; // 1 project
+  
+  // Profile Presentation (5 points total)
+  if (data.profile_pic_url && data.profile_pic_url.trim()) strength += 3;
+  if (data.desired_salary && data.desired_salary > 0) strength += 2;
+  
+  console.log('Profile strength calculation breakdown:', {
+    bio: data.bio?.length >= 50 ? 15 : (data.bio?.trim() ? 8 : 0),
+    location: data.location?.trim() ? 10 : 0,
+    preferredTitle: data.preferred_title?.trim() ? 5 : 0,
+    experience: data.experience_years > 0 ? 10 : 0,
+    githubHandle: data.github_handle?.trim() ? 10 : 0,
+    githubApp: data.github_installation_id?.trim() ? 8 : 0,
+    resume: data.resume_url?.trim() ? 7 : 0,
+    skillsCount: totalSkills,
+    skillsPoints: totalSkills >= 8 ? 12 : (totalSkills >= 5 ? 8 : (totalSkills >= 3 ? 5 : (totalSkills > 0 ? 2 : 0))),
+    categoriesBonus: categoriesWithSkills >= 3 ? 5 : (categoriesWithSkills >= 2 ? 3 : 0),
+    projects: data.linked_projects?.length >= 3 ? 10 : (data.linked_projects?.length >= 2 ? 7 : (data.linked_projects?.length >= 1 ? 4 : 0)),
+    profilePic: data.profile_pic_url?.trim() ? 3 : 0,
+    salary: data.desired_salary > 0 ? 2 : 0,
+    totalStrength: strength
+  });
+  
+  return Math.min(strength, 100);
+};
+
 export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   initialData,
   onSuccess,
@@ -156,22 +214,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const calculateProfileStrength = (data: DeveloperProfile) => {
-    let strength = 0;
-    
-    if (data.bio.trim()) strength += 15;
-    if (data.location.trim()) strength += 10;
-    if (data.github_handle.trim()) strength += 15;
-    if (data.linked_projects.length > 0) strength += 10;
-    if (data.experience_years > 0) strength += 10;
-    if (data.desired_salary > 0) strength += 5;
-    if (data.resume_url) strength += 10;
-    if (data.profile_pic_url) strength += 5;
-    if (Object.keys(data.skills_categories).length > 0) strength += 5;
-
-    return Math.min(strength, 100);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -381,9 +423,9 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               />
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              {currentProfileStrength < 50 && "Complete more sections to improve your visibility"}
-              {currentProfileStrength >= 50 && currentProfileStrength < 80 && "Good progress! Add more details to stand out"}
-              {currentProfileStrength >= 80 && "Excellent! Your profile looks great to recruiters"}
+              {currentProfileStrength < 60 && "Complete more sections to improve your visibility"}
+              {currentProfileStrength >= 60 && currentProfileStrength < 85 && "Good progress! Add more details to stand out"}
+              {currentProfileStrength >= 85 && "Excellent! Your profile looks great to recruiters"}
             </p>
           </div>
 
@@ -456,8 +498,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                 value={formData.bio}
                 onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Tell us about yourself, your experience, and what you're passionate about..."
+                placeholder="Tell us about yourself, your experience, and what you're passionate about... (At least 50 characters recommended for better profile strength)"
               />
+              <div className="text-xs text-gray-500 mt-1">
+                {formData.bio.length}/50+ characters (Current: {formData.bio.length >= 50 ? 'Good length' : 'Could be more detailed'})
+              </div>
               {errors.bio && (
                 <p className="text-red-600 text-sm mt-1">{errors.bio}</p>
               )}
@@ -473,7 +518,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                 value={formData.preferred_title || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, preferred_title: e.target.value }))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Full Stack Engineer"
+                placeholder="e.g., Full Stack Engineer, Frontend Developer, Backend Developer"
               />
             </div>
 
@@ -562,7 +607,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
-                Skills by Category
+                Skills by Category (Add at least 8 skills across 3+ categories for best profile strength)
               </label>
               <div className="space-y-4">
                 {Object.entries(SKILL_CATEGORIES).map(([category, predefinedSkills]) => (
@@ -638,6 +683,98 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+              Projects & Portfolio
+            </h3>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Linked Projects (Add at least 3 projects for best profile strength)
+              </label>
+              <div className="space-y-2 mb-4">
+                {formData.linked_projects.map((project) => (
+                  <div key={project} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">{project}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeProject(project)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newProject}
+                  onChange={(e) => setNewProject(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter project URL or description..."
+                />
+                <button
+                  type="button"
+                  onClick={addProject}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Resume
+              </label>
+              <div className="flex items-center space-x-4">
+                {formData.resume_url ? (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-green-700">Resume uploaded</span>
+                    <a
+                      href={formData.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-500">No resume uploaded</span>
+                )}
+                <div>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'resume');
+                    }}
+                    className="hidden"
+                    id="resume-upload"
+                  />
+                  <label
+                    htmlFor="resume-upload"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                  >
+                    {uploadingResume ? (
+                      <Loader className="animate-spin w-4 h-4 mr-2" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {uploadingResume ? 'Uploading...' : 'Upload Resume'}
+                  </label>
+                </div>
+              </div>
+              {errors.resume && (
+                <p className="text-red-600 text-sm mt-1">{errors.resume}</p>
+              )}
             </div>
           </div>
 
