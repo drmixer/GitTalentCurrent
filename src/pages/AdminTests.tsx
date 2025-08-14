@@ -62,8 +62,8 @@ const AdminTests: React.FC = () => {
         }
     };
 
-    const sandpackLanguages = ['react', 'vue', 'angular'];
-    const judge0Languages = ['python', 'java', 'javascript', 'c++', 'swift', 'kotlin'];
+    const sandpackLanguages = ['react', 'vue', 'angular', 'javascript'];
+    const judge0Languages = ['python', 'java', 'c++', 'swift', 'kotlin'];
 
     const handleSaveQuestion = async () => {
         if (!editingQuestion || !editingQuestion.test_id) return;
@@ -73,9 +73,9 @@ const AdminTests: React.FC = () => {
         let questionData: Partial<CodingQuestion>;
 
         if (isSandpack) {
-            // Handle Sandpack languages (React, Vue, Angular)
+            // Handle Sandpack languages (React, Vue, Angular, JavaScript)
             let finalTestCode = editingQuestion.test_code || '';
-            if (editingQuestion.language === 'react' && !finalTestCode.includes('@testing-library/jest-dom')) {
+            if (['react', 'javascript'].includes(editingQuestion.language?.toLowerCase() || '') && !finalTestCode.includes('@testing-library/jest-dom')) {
                 finalTestCode = `import '@testing-library/jest-dom';\n${finalTestCode}`;
             }
             questionData = {
@@ -89,7 +89,7 @@ const AdminTests: React.FC = () => {
                 test_cases: null, // Sandpack uses test_code instead
             };
         } else {
-            // Handle Judge0 languages (Python, Java, JavaScript, C++, Swift, Kotlin)
+            // Handle Judge0 languages (Python, Java, C++, Swift, Kotlin)
             questionData = {
                 test_id: editingQuestion.test_id,
                 title: editingQuestion.title,
@@ -159,10 +159,11 @@ class Main {
             javascript: `// Write your solution here
 function solve() {
     // Your code here
+    return "Hello World";
 }
 
-// Test your solution
-console.log(solve());`,
+// Export for testing
+module.exports = solve;`,
             'c++': `#include <iostream>
 using namespace std;
 
@@ -191,7 +192,7 @@ const MyComponent = () => {
 
 export default MyComponent;`
         };
-        return templates[language as keyof typeof templates] || templates.python;
+        return templates[language as keyof typeof templates] || templates.javascript;
     };
 
     const addDefaultTestCase = () => {
@@ -305,9 +306,9 @@ export default MyComponent;`
                                         onClick={() => setEditingQuestion({ 
                                             test_id: test.id, 
                                             title: '', 
-                                            language: 'python',
-                                            starter_code: getLanguageTemplate('python'),
-                                            test_cases: [{ input: '', expected_output: '' }]
+                                            language: 'javascript',
+                                            starter_code: getLanguageTemplate('javascript'),
+                                            test_code: ''
                                         })} 
                                         className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
                                     >
@@ -449,7 +450,6 @@ export default MyComponent;`
                                     <optgroup label="Judge0 Languages">
                                         <option value="python">Python</option>
                                         <option value="java">Java</option>
-                                        <option value="javascript">JavaScript</option>
                                         <option value="c++">C++</option>
                                         <option value="swift">Swift</option>
                                         <option value="kotlin">Kotlin</option>
@@ -458,6 +458,7 @@ export default MyComponent;`
                                         <option value="react">React</option>
                                         <option value="angular">Angular</option>
                                         <option value="vue">Vue</option>
+                                        <option value="javascript">JavaScript</option>
                                     </optgroup>
                                 </select>
                             </div>
@@ -494,7 +495,7 @@ export default MyComponent;`
                                     <div>
                                         <label className="block text-sm font-medium mb-2">Expected Behavior (Optional)</label>
                                         <textarea
-                                            placeholder="Describe what the component should do or how it should behave"
+                                            placeholder="Describe what the component/function should do or how it should behave"
                                             value={editingQuestion.expected_output || ''}
                                             onChange={(e) => setEditingQuestion({ ...editingQuestion, expected_output: e.target.value })}
                                             className="w-full p-3 border rounded-md h-24 focus:ring-2 focus:ring-blue-500"
