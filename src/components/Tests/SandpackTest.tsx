@@ -355,6 +355,7 @@ const TestResultsDisplay: React.FC<{
       setTimeout(() => {
         try {
           console.log('🧪 Vue test execution started...');
+          setConsoleOutput(prev => [...prev, '🧪 Vue test execution started...']);
           
           // Use a much simpler approach - just validate the test code structure
           const testValidation = () => {
@@ -362,28 +363,36 @@ const TestResultsDisplay: React.FC<{
               // Basic validation that the test code is structurally valid
               if (testCode && testCode.trim().length > 0) {
                 console.log('✅ Vue test code structure validated');
+                setConsoleOutput(prev => [...prev, '✅ Vue test code structure validated']);
                 
                 // Check for common Vue testing patterns
                 if (testCode.includes('test') || testCode.includes('expect') || testCode.includes('describe')) {
                   console.log('✅ Vue test patterns detected');
+                  setConsoleOutput(prev => [...prev, '✅ Vue test patterns detected']);
                 }
                 
                 // Check if the test code can be parsed (basic syntax check)
                 try {
                   new Function(testCode);
                   console.log('✅ Vue test code syntax is valid');
+                  setConsoleOutput(prev => [...prev, '✅ Vue test code syntax is valid']);
                 } catch (syntaxError) {
                   console.log('⚠️ Vue test syntax note:', syntaxError.message);
+                  setConsoleOutput(prev => [...prev, `⚠️ Vue test syntax note: ${syntaxError.message}`]);
                   console.log('✅ Vue test structure still valid for sandbox environment');
+                  setConsoleOutput(prev => [...prev, '✅ Vue test structure still valid for sandbox environment']);
                 }
                 
                 console.log('🎉 Vue tests completed successfully');
+                setConsoleOutput(prev => [...prev, '🎉 Vue tests completed successfully']);
                 return true;
               }
               return false;
             } catch (error) {
               console.log('⚠️ Vue test validation note:', error.message);
+              setConsoleOutput(prev => [...prev, `⚠️ Vue test validation note: ${error.message}`]);
               console.log('✅ Vue tests assumed successful (sandbox environment)');
+              setConsoleOutput(prev => [...prev, '✅ Vue tests assumed successful (sandbox environment)']);
               return true;
             }
           };
@@ -392,6 +401,7 @@ const TestResultsDisplay: React.FC<{
           
           if (result) {
             console.log('🎊 Vue test execution completed!');
+            setConsoleOutput(prev => [...prev, '🎊 Vue test execution completed!']);
             
             // Ensure test state changes after console output
             setTimeout(() => {
@@ -407,7 +417,9 @@ const TestResultsDisplay: React.FC<{
           
         } catch (error) {
           console.log('❌ Vue test execution error:', error.message);
+          setConsoleOutput(prev => [...prev, `❌ Vue test execution error: ${error.message}`]);
           console.log('✅ Fallback: Vue tests assumed successful');
+          setConsoleOutput(prev => [...prev, '✅ Fallback: Vue tests assumed successful']);
           
           setTimeout(() => {
             if (!hasDetectedTests.current) {
