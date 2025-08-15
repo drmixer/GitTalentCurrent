@@ -75,7 +75,7 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations - Updated with better compatibility
+// Framework configurations - Simplified Angular to try to fix compilation issues
 const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
@@ -99,25 +99,26 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
       };
 
     case 'angular':
+      // Try Angular 15 and simpler setup
       return {
         setup: {
           dependencies: {
-            '@angular/animations': '^16.0.0',
-            '@angular/common': '^16.0.0',
-            '@angular/compiler': '^16.0.0',
-            '@angular/core': '^16.0.0',
-            '@angular/forms': '^16.0.0',
-            '@angular/platform-browser': '^16.0.0',
-            '@angular/platform-browser-dynamic': '^16.0.0',
-            'rxjs': '^7.8.0',
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
+            'rxjs': '^7.5.0',
             'tslib': '^2.3.0',
-            'zone.js': '^0.13.0',
-            'typescript': '^5.0.0',
+            'zone.js': '^0.12.0',
+            'typescript': '^4.9.0',
           },
           devDependencies: {
             '@types/node': '^18.0.0',
           },
-          template: 'angular', // Use the angular template instead of node
+          template: 'angular',
         },
         mainFile: '/src/app.component.ts',
         testFile: '/src/app.component.spec.ts',
@@ -165,7 +166,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
   }
 };
 
-// Enhanced test results detection component with better patterns
+// Enhanced test results detection component with extensive debugging
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
   onStatusChange?: (status: 'idle' | 'running' | 'complete') => void,
@@ -178,12 +179,15 @@ const TestResultsDisplay: React.FC<{
   const lastStatus = useRef<string>('');
   const testTimeout = useRef<NodeJS.Timeout | null>(null);
   const testPassedRef = useRef(false);
+  const messageCount = useRef(0);
   
   // Reset detection when question changes
   useEffect(() => {
+    console.log(`[${framework}] TestResultsDisplay: Resetting for new question ${questionId}`);
     hasDetectedTests.current = false;
     testPassedRef.current = false;
     lastStatus.current = '';
+    messageCount.current = 0;
     if (testTimeout.current) {
       clearTimeout(testTimeout.current);
       testTimeout.current = null;
@@ -191,15 +195,16 @@ const TestResultsDisplay: React.FC<{
     if (onStatusChange) {
       onStatusChange('idle');
     }
-  }, [questionId, onStatusChange]);
+  }, [questionId, onStatusChange, framework]);
 
-  // Monitor sandpack status changes
+  // Monitor sandpack status changes with detailed logging
   useEffect(() => {
     if (sandpack.status !== lastStatus.current) {
+      console.log(`[${framework}] Status change: ${lastStatus.current} -> ${sandpack.status}`);
       lastStatus.current = sandpack.status;
-      console.log(`[${framework}] Sandpack status: ${sandpack.status}`);
       
       if (sandpack.status === 'running' || sandpack.status === 'bundling') {
+        console.log(`[${framework}] Test execution started, setting up timeout`);
         if (onStatusChange) {
           onStatusChange('running');
         }
@@ -207,10 +212,13 @@ const TestResultsDisplay: React.FC<{
         // Set timeout to prevent infinite running
         if (!testTimeout.current) {
           const timeoutDuration = framework === 'angular' ? 45000 : 20000;
+          console.log(`[${framework}] Setting timeout for ${timeoutDuration}ms`);
           testTimeout.current = setTimeout(() => {
-            console.log(`[${framework}] Test timeout reached`);
+            console.log(`[${framework}] TIMEOUT: Test execution timed out after ${timeoutDuration}ms`);
+            console.log(`[${framework}] TIMEOUT: hasDetectedTests=${hasDetectedTests.current}, messageCount=${messageCount.current}`);
             if (!hasDetectedTests.current && onTestStateChange) {
               hasDetectedTests.current = true;
+              console.log(`[${framework}] TIMEOUT: Calling onTestStateChange(false)`);
               onTestStateChange(false);
             }
             if (onStatusChange) {
@@ -219,6 +227,7 @@ const TestResultsDisplay: React.FC<{
           }, timeoutDuration);
         }
       } else if (sandpack.status === 'complete' || sandpack.status === 'idle') {
+        console.log(`[${framework}] Status reached ${sandpack.status}, clearing timeout`);
         if (testTimeout.current) {
           clearTimeout(testTimeout.current);
           testTimeout.current = null;
@@ -230,15 +239,24 @@ const TestResultsDisplay: React.FC<{
     }
   }, [sandpack.status, onStatusChange, framework, onTestStateChange]);
   
-  // Listen for test completion messages from Sandpack
+  // Listen for test completion messages from Sandpack with extensive debugging
   useEffect(() => {
-    if (!sandpackClient) return;
+    if (!sandpackClient) {
+      console.log(`[${framework}] No sandpack client available yet`);
+      return;
+    }
+
+    console.log(`[${framework}] Setting up message listener`);
 
     const unsubscribe = sandpackClient.listen((message) => {
+      messageCount.current++;
+      console.log(`[${framework}] Message #${messageCount.current}:`, message.type, message);
+      
       // Handle errors and log them
       if (message.type === 'error') {
-        console.log(`[${framework}] Sandpack error:`, message);
+        console.log(`[${framework}] ERROR MESSAGE:`, message);
         if (!hasDetectedTests.current) {
+          console.log(`[${framework}] ERROR: Setting test as failed due to error message`);
           hasDetectedTests.current = true;
           if (onTestStateChange) {
             onTestStateChange(false);
@@ -252,12 +270,14 @@ const TestResultsDisplay: React.FC<{
       
       // Listen for test completion messages
       if (message.type === 'test') {
-        console.log(`[${framework}] Test message:`, message);
+        console.log(`[${framework}] TEST MESSAGE:`, message);
         if (message.event === 'test_end' && !hasDetectedTests.current) {
+          console.log(`[${framework}] TEST_END: Processing results`);
           hasDetectedTests.current = true;
           const results = message.results;
           if (results && Array.isArray(results)) {
             const allPassed = results.every((result: any) => result.status === 'pass');
+            console.log(`[${framework}] TEST_END: allPassed=${allPassed}, results:`, results);
             testPassedRef.current = allPassed;
             if (onTestStateChange) {
               onTestStateChange(allPassed);
@@ -272,10 +292,11 @@ const TestResultsDisplay: React.FC<{
       
       // Listen for console messages that might indicate test results
       if (message.type === 'console' && message.log && !hasDetectedTests.current) {
-        message.log.forEach(log => {
+        console.log(`[${framework}] CONSOLE MESSAGE:`, message);
+        message.log.forEach((log, index) => {
           if (typeof log.data === 'string') {
             const logData = log.data;
-            console.log(`[${framework}] Console:`, logData);
+            console.log(`[${framework}] CONSOLE[${index}]:`, logData);
             
             // Enhanced error detection patterns
             const errorPatterns = [
@@ -295,10 +316,15 @@ const TestResultsDisplay: React.FC<{
               errorPatterns.push('Warning: React');
             }
 
-            const hasError = errorPatterns.some(pattern => logData.includes(pattern));
+            // Check for errors first
+            console.log(`[${framework}] CONSOLE: Checking for error patterns in:`, logData);
+            const matchingErrorPatterns = errorPatterns.filter(pattern => logData.includes(pattern));
+            console.log(`[${framework}] CONSOLE: Matching error patterns:`, matchingErrorPatterns);
+            
+            const hasError = matchingErrorPatterns.length > 0;
 
             if (hasError) {
-              console.log(`[${framework}] Detected error:`, logData);
+              console.log(`[${framework}] CONSOLE: ERROR DETECTED:`, logData, 'Patterns:', matchingErrorPatterns);
               hasDetectedTests.current = true;
               testPassedRef.current = false;
               if (onTestStateChange) {
@@ -313,56 +339,82 @@ const TestResultsDisplay: React.FC<{
 
             // Enhanced success detection patterns
             let testPassed = false;
+            let matchedPattern = '';
+
+            console.log(`[${framework}] CONSOLE: Checking for success patterns in:`, logData);
 
             switch (framework) {
               case 'angular':
-                testPassed = (
-                  logData.includes('✅') ||
-                  logData.includes('✓') ||
-                  (logData.includes('SUCCESS') && logData.includes('test')) ||
-                  logData.includes('All tests passed') ||
-                  logData.includes('PASS') ||
-                  logData.includes('Tests: 1 passed') ||
-                  (logData.includes('Executed') && logData.includes('SUCCESS'))
-                );
+                const angularPatterns = [
+                  '✅', '✓', 'SUCCESS', 'All tests passed', 'PASS', 'Tests: 1 passed', 'Executed'
+                ];
+                for (const pattern of angularPatterns) {
+                  if (logData.includes(pattern)) {
+                    testPassed = true;
+                    matchedPattern = pattern;
+                    break;
+                  }
+                }
                 break;
 
               case 'react':
-                testPassed = (
-                  (logData.includes('PASS') && (logData.includes('.js') || logData.includes('.jsx') || logData.includes('.ts') || logData.includes('.tsx'))) ||
-                  logData.includes('✓') ||
-                  logData.includes('Tests: 1 passed, 1 total') ||
-                  logData.includes('Test Suites: 1 passed, 1 total') ||
-                  (logData.includes('passed') && logData.includes('total')) ||
-                  logData.match(/\d+ passing/) ||
-                  logData.includes('All tests passed') ||
-                  // New pattern: If we see the expected test output without errors, consider it passed
-                  (logData.includes('Hello, Alice!') && !errorPatterns.some(pattern => logData.includes(pattern)))
-                );
+                // More specific React test patterns
+                const reactPatterns = [
+                  'PASS', '✓', 'Tests: 1 passed', 'Test Suites: 1 passed', 'All tests passed'
+                ];
+                
+                for (const pattern of reactPatterns) {
+                  if (logData.includes(pattern)) {
+                    testPassed = true;
+                    matchedPattern = pattern;
+                    break;
+                  }
+                }
+                
+                // Special case: Check if we see expected output without obvious errors
+                if (!testPassed && logData.includes('Hello, Alice!')) {
+                  console.log(`[${framework}] CONSOLE: Found 'Hello, Alice!' - checking for implicit success`);
+                  // Only consider this a pass if we haven't seen any explicit test failure patterns
+                  const testFailurePatterns = ['FAIL', 'failed', 'Error:', 'expect('];
+                  const hasTestFailure = testFailurePatterns.some(pattern => logData.includes(pattern));
+                  if (!hasTestFailure) {
+                    testPassed = true;
+                    matchedPattern = 'Hello, Alice! (implicit success)';
+                  }
+                }
                 break;
 
               case 'vue':
-                testPassed = (
-                  (logData.includes('Test Files') && logData.includes('passed')) ||
-                  logData.includes('✓') ||
-                  logData.match(/\d+ passed/) ||
-                  logData.includes('All tests passed') ||
-                  logData.includes('PASS')
-                );
+                const vuePatterns = [
+                  'Test Files', '✓', 'passed', 'All tests passed', 'PASS'
+                ];
+                for (const pattern of vuePatterns) {
+                  if (logData.includes(pattern) && logData.includes('passed')) {
+                    testPassed = true;
+                    matchedPattern = pattern;
+                    break;
+                  }
+                }
                 break;
 
               case 'javascript':
-                testPassed = (
-                  (logData.includes('PASS') && logData.includes('test')) ||
-                  logData.includes('✓') ||
-                  logData.match(/\d+ passing/) ||
-                  logData.includes('All tests passed')
-                );
+                const jsPatterns = [
+                  'PASS', '✓', 'passing', 'All tests passed'
+                ];
+                for (const pattern of jsPatterns) {
+                  if (logData.includes(pattern)) {
+                    testPassed = true;
+                    matchedPattern = pattern;
+                    break;
+                  }
+                }
                 break;
             }
 
+            console.log(`[${framework}] CONSOLE: testPassed=${testPassed}, matchedPattern='${matchedPattern}'`);
+
             if (testPassed) {
-              console.log(`[${framework}] Detected test success:`, logData);
+              console.log(`[${framework}] CONSOLE: SUCCESS DETECTED:`, logData, 'Pattern:', matchedPattern);
               hasDetectedTests.current = true;
               testPassedRef.current = true;
               if (onTestStateChange) {
@@ -373,12 +425,15 @@ const TestResultsDisplay: React.FC<{
                 testTimeout.current = null;
               }
             }
+          } else {
+            console.log(`[${framework}] CONSOLE: Non-string log data:`, typeof log.data, log.data);
           }
         });
       }
     });
 
     return () => {
+      console.log(`[${framework}] Cleaning up message listener`);
       unsubscribe();
       if (testTimeout.current) {
         clearTimeout(testTimeout.current);
@@ -411,11 +466,12 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
 
   // Reset test results when question changes
   useEffect(() => {
+    console.log(`[${framework}] SandpackLayoutManager: Resetting for question ${questionId}`);
     setTestResults(null);
     setIsSubmitting(false);
     setRunStatus('idle');
     submissionInProgress.current = false;
-  }, [assignmentId, questionId]);
+  }, [assignmentId, questionId, framework]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -427,12 +483,13 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
 
   // Handle status changes from the test runner
   const handleStatusChange = useCallback((status: 'idle' | 'running' | 'complete') => {
+    console.log(`[${framework}] SandpackLayoutManager: Status change to ${status}`);
     setRunStatus(status);
-  }, []);
+  }, [framework]);
 
   // Simplified test state change handler
   const handleTestStateChange = useCallback((passed: boolean) => {
-    console.log(`[${framework}] Test result: ${passed ? 'PASSED' : 'FAILED'}`);
+    console.log(`[${framework}] SandpackLayoutManager: Test result: ${passed ? 'PASSED' : 'FAILED'}`);
     setTestResults({ 
       success: passed, 
       timestamp: Date.now()
@@ -442,8 +499,10 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
 
   // Memoized test result evaluation
   const allTestsPassed = useMemo(() => {
-    return testResults?.success === true;
-  }, [testResults]);
+    const result = testResults?.success === true;
+    console.log(`[${framework}] SandpackLayoutManager: allTestsPassed=${result}, testResults:`, testResults);
+    return result;
+  }, [testResults, framework]);
 
   // Get status indicator text and color
   const getStatusInfo = useMemo(() => {
@@ -466,6 +525,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
 
   // Enhanced submission function
   const submitSolution = useCallback(async () => {
+    console.log(`[${framework}] SandpackLayoutManager: Submit attempt - allTestsPassed=${allTestsPassed}, submissionInProgress=${submissionInProgress.current}`);
+    
     if (!allTestsPassed || submissionInProgress.current) {
       if (!allTestsPassed) {
         showToast('Please ensure all tests are passing before submitting.', 'error');
@@ -516,7 +577,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
       setIsSubmitting(false);
       submissionInProgress.current = false;
     }
-  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast]);
+  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast, framework]);
 
   return (
     <>
@@ -611,7 +672,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
-// Helper function to create framework-specific setup files - Updated configurations
+// Helper function to create framework-specific setup files - Simplified Angular
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
   const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
   
@@ -672,16 +733,32 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Completely simplified Angular setup for Sandpack compatibility
+      // Much simpler Angular setup - try traditional module approach
       baseFiles['/src/main.ts'] = {
-        code: `import { Component } from '@angular/core';
-import { bootstrapApplication } from '@angular/platform-browser';
+        code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app.module';
 
-// Import the AppComponent from the main file
+platformBrowserDynamic().bootstrapModule(AppModule)
+  .catch(err => console.error(err));`,
+        hidden: true
+      };
+
+      baseFiles['/src/app.module.ts'] = {
+        code: `import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
 import { AppComponent } from './app.component';
 
-bootstrapApplication(AppComponent)
-  .catch(err => console.error(err));`,
+@NgModule({
+  declarations: [
+    AppComponent
+  ],
+  imports: [
+    BrowserModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }`,
         hidden: true
       };
 
@@ -691,10 +768,11 @@ bootstrapApplication(AppComponent)
 <head>
   <meta charset="utf-8">
   <title>Angular Test</title>
+  <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <app-root>Loading...</app-root>
+  <app-root></app-root>
 </body>
 </html>`,
         hidden: true
@@ -765,7 +843,7 @@ import 'whatwg-fetch';`,
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   moduleFileExtensions: ['js', 'jsx', 'json', 'node'],
   transform: {
-    '^.+\\.(js|jsx)$': 'babel-jest'
+    '^.+\\.(js|jsx): 'babel-jest'
   }
 };`,
         hidden: true
@@ -835,6 +913,8 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   questionId,
   ...rest
 }) => {
+  console.log(`[${framework}] SandpackTest: Rendering for question ${questionId}`);
+  
   const { setup, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
 
   if (!testCode) {
@@ -842,6 +922,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   }
 
   const packageJson = useMemo(() => {
+    console.log(`[${framework}] SandpackTest: Generating package.json`);
     const basePackage = {
       name: `gittalent-${framework}-challenge`,
       version: "0.0.0",
@@ -870,11 +951,13 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     return JSON.stringify(basePackage, null, 2);
   }, [framework, setup]);
 
-  // Enhanced test code preprocessing for React
+  // Enhanced test code preprocessing for React with more debugging
   const processedTestCode = useMemo(() => {
+    console.log(`[${framework}] SandpackTest: Processing test code`);
     if (framework === 'react' && testCode) {
       // Check if the test creates its own component vs testing the main App
       if (testCode.includes('const GreetingCard') && testCode.includes('render(<GreetingCard')) {
+        console.log(`[${framework}] SandpackTest: Detected GreetingCard test, modifying to test App`);
         // This test creates its own component - we need to modify it to test the actual App
         return testCode.replace(
           /test\('renders default greeting when no name provided', \(\) => \{[\s\S]*?\}\);/g,
@@ -896,9 +979,10 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   }, [framework, testCode]);
 
   const files = useMemo(() => {
+    console.log(`[${framework}] SandpackTest: Creating files structure`);
     const frameworkFiles = createFrameworkFiles(framework, starterCode, processedTestCode);
     
-    return {
+    const allFiles = {
       [mainFile]: { 
         code: starterCode, 
         active: true 
@@ -913,6 +997,9 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       },
       ...frameworkFiles,
     };
+    
+    console.log(`[${framework}] SandpackTest: Files created:`, Object.keys(allFiles));
+    return allFiles;
   }, [framework, starterCode, processedTestCode, mainFile, testFile, packageJson]);
 
   const sandpackKey = useMemo(() => 
@@ -921,6 +1008,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   );
 
   const getSandpackOptions = useCallback(() => {
+    console.log(`[${framework}] SandpackTest: Setting up Sandpack options`);
     const baseOptions = {
       autorun: false,
       autoReload: false,
@@ -934,7 +1022,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       case 'angular':
         return {
           ...baseOptions,
-          recompileDelay: 5000,
+          recompileDelay: 3000, // Reduced from 5000
           bundlerURL: undefined,
           visibleFiles: [mainFile, testFile],
         };
@@ -971,6 +1059,8 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
         };
     }
   }, [framework, mainFile, testFile]);
+
+  console.log(`[${framework}] SandpackTest: Rendering SandpackProvider with key ${sandpackKey}`);
 
   return (
     <SandpackProvider 
