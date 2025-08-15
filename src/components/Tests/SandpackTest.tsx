@@ -440,7 +440,8 @@ export default defineConfig({
   plugins: [vue()],
   define: {
     __VUE_OPTIONS_API__: true,
-    __VUE_PROD_DEVTOOLS__: false
+    __VUE_PROD_DEVTOOLS__: false,
+    global: 'globalThis'
   },
   test: {
     environment: 'jsdom',
@@ -501,18 +502,62 @@ app.mount('#app')`,
         hidden: true
       };
 
-      // FIXED: Test file with proper Vue imports
+      // FIXED: Test file with proper Vue 3 imports and setup
       baseFiles['/src/App.test.js'] = {
         code: `import { mount } from '@vue/test-utils'
 import { describe, it, expect } from 'vitest'
 import App from './App.vue'
 
-describe('App.vue', () => {
-  it('renders properly', () => {
-    const wrapper = mount(App)
-    expect(wrapper.exists()).toBe(true)
-    console.log('Cart totals calculated correctly')
-  })
+// Tests for the Vue Shopping Cart App
+describe('Shopping Cart App', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = mount(App);
+  });
+
+  it('calculates cart totals correctly', async () => {
+    // Check if subtotal is calculated correctly
+    // Initial items: Apple ($1.50 x 3) + Banana ($0.75 x 2) = $4.50 + $1.50 = $6.00
+    expect(wrapper.vm.subtotal).toBe(6.00);
+    console.log('Cart totals calculated correctly');
+
+    // Check tax calculation (10% of subtotal)
+    expect(wrapper.vm.tax).toBe(0.60);
+    
+    // Check total calculation (subtotal + tax)
+    expect(wrapper.vm.total).toBe(6.60);
+  });
+
+  it('removes items correctly', async () => {
+    // Initial count
+    expect(wrapper.vm.cartItems.length).toBe(2);
+    
+    // Remove first item (Apple)
+    wrapper.vm.removeItem(1);
+    await wrapper.vm.$nextTick();
+    
+    expect(wrapper.vm.cartItems.length).toBe(1);
+    expect(wrapper.vm.cartItems[0].name).toBe('Banana');
+    console.log('Item removal working');
+  });
+
+  it('adds new items correctly', async () => {
+    const initialLength = wrapper.vm.cartItems.length;
+    
+    // Add sample item
+    wrapper.vm.addSampleItem();
+    await wrapper.vm.$nextTick();
+    
+    expect(wrapper.vm.cartItems.length).toBe(initialLength + 1);
+    
+    // Check the new item
+    const newItem = wrapper.vm.cartItems.find(item => item.name === 'Orange');
+    expect(newItem).toBeDefined();
+    expect(newItem.price).toBe(0.99);
+    expect(newItem.quantity).toBe(1);
+    console.log('Item addition working correctly');
+  });
 })`,
         hidden: true
       };
