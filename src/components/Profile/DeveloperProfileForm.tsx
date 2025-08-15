@@ -58,9 +58,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [connectingGitHub, setConnectingGitHub] = useState(false);
-  const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
-  const [newProject, setNewProject] = useState('');
+  const [uploadingResume, setUploadingResume] = useState(false);
   const [activeSkillCategory, setActiveSkillCategory] = useState<string | null>(null);
   const [newSkill, setNewSkill] = useState('');
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
@@ -239,23 +238,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     // navigate('/github-setup');
   };
 
-  const addProject = () => {
-    if (newProject.trim() && !formData.linked_projects.includes(newProject.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        linked_projects: [...prev.linked_projects, newProject.trim()]
-      }));
-      setNewProject('');
-    }
-  };
-
-  const removeProject = (project: string) => {
-    setFormData(prev => ({
-      ...prev,
-      linked_projects: prev.linked_projects.filter(p => p !== project)
-    }));
-  };
-
   const addSkillToCategory = (category: string) => {
     if (newSkill.trim()) {
       setFormData(prev => ({
@@ -293,7 +275,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
-  const handleFileUpload = async (file: File, type: 'resume' | 'profile_pic') => {
+  const handleFileUpload = async (file: File, type: 'profile_pic' | 'resume') => {
     if (type === 'resume') {
       setUploadingResume(true);
     } else {
@@ -371,6 +353,61 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
             <p className="text-sm text-gray-600 mt-2">
               {getProfileStrengthStatus(currentProfileStrength)}
             </p>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
+              Resume & Documents
+            </h3>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Resume
+              </label>
+              <div className="flex items-center space-x-4">
+                {formData.resume_url ? (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-green-700">Resume uploaded</span>
+                    <a
+                      href={formData.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-500">No resume uploaded</span>
+                )}
+                <div>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'resume');
+                    }}
+                    className="hidden"
+                    id="resume-upload"
+                  />
+                  <label
+                    htmlFor="resume-upload"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                  >
+                    {uploadingResume ? (
+                      <Loader className="animate-spin w-4 h-4 mr-2" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {uploadingResume ? 'Uploading...' : 'Upload Resume'}
+                  </label>
+                </div>
+              </div>
+              {errors.resume && (
+                <p className="text-red-600 text-sm mt-1">{errors.resume}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -627,98 +664,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
-              Projects & Portfolio
-            </h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Linked Projects (Add at least 3 projects for best profile strength)
-              </label>
-              <div className="space-y-2 mb-4">
-                {formData.linked_projects.map((project) => (
-                  <div key={project} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm text-gray-700">{project}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeProject(project)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newProject}
-                  onChange={(e) => setNewProject(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProject())}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter project URL or description..."
-                />
-                <button
-                  type="button"
-                  onClick={addProject}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Resume
-              </label>
-              <div className="flex items-center space-x-4">
-                {formData.resume_url ? (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-green-700">Resume uploaded</span>
-                    <a
-                      href={formData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                ) : (
-                  <span className="text-sm text-gray-500">No resume uploaded</span>
-                )}
-                <div>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'resume');
-                    }}
-                    className="hidden"
-                    id="resume-upload"
-                  />
-                  <label
-                    htmlFor="resume-upload"
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
-                  >
-                    {uploadingResume ? (
-                      <Loader className="animate-spin w-4 h-4 mr-2" />
-                    ) : (
-                      <Upload className="w-4 h-4 mr-2" />
-                    )}
-                    {uploadingResume ? 'Uploading...' : 'Upload Resume'}
-                  </label>
-                </div>
-              </div>
-              {errors.resume && (
-                <p className="text-red-600 text-sm mt-1">{errors.resume}</p>
-              )}
             </div>
           </div>
 
