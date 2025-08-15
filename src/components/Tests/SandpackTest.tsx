@@ -354,17 +354,24 @@ const TestResultsDisplay: React.FC<{
       const executeVueTests = () => {
         console.log('🧪 Vue test execution started...');
         
-        // Wait for sandpackClient to be available
-        const waitForClient = (retries = 10) => {
-          if (retries <= 0) {
-            console.log('❌ Sandpack client not available after retries');
-            setConsoleOutput(prev => [...prev, '❌ Test environment not ready']);
+        // Check if we have a valid sandpack client with dispatch method
+        const checkClientAndDispatch = (attempts = 0) => {
+          if (attempts > 20) {
+            console.log('❌ Failed to get valid sandpack client after multiple attempts');
+            setConsoleOutput(prev => [...prev, '❌ Test environment client unavailable']);
             setIsRunning(false);
             return;
           }
           
-          if (sandpackClient && sandpackClient.dispatch) {
+          // More thorough client validation
+          const isClientReady = sandpackClient && 
+            typeof sandpackClient === 'object' && 
+            typeof sandpackClient.dispatch === 'function';
+          
+          if (isClientReady) {
             try {
+              console.log('✅ Valid sandpack client found, executing Vue tests...');
+              
               // Execute Vue tests with improved error handling
               sandpackClient.dispatch({
                 type: 'eval',
@@ -438,11 +445,13 @@ const TestResultsDisplay: React.FC<{
             }
           } else {
             // Client not ready, wait and retry
-            setTimeout(() => waitForClient(retries - 1), 500);
+            console.log(`⏳ Sandpack client not ready (attempt ${attempts + 1}/20), retrying...`);
+            setTimeout(() => checkClientAndDispatch(attempts + 1), 500);
           }
         };
         
-        waitForClient();
+        // Start the client check process
+        checkClientAndDispatch();
       };
       
       // Check if sandpack is in a ready state
