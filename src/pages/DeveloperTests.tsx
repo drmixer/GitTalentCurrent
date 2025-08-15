@@ -14,14 +14,9 @@ interface ExtendedTestAssignment extends TestAssignment {
     }>;
   };
   job_roles: JobRole & {
-    recruiters: {
-      company_name: string;
-      users: {
-        id: string;
-        name: string;
-        email: string;
-      };
-    };
+    company_name?: string; // Company name from recruiters table
+    recruiter_name?: string; // Recruiter name from users table
+    recruiter_email?: string; // Recruiter email from users table
   };
 }
 
@@ -45,7 +40,8 @@ const DeveloperTests: React.FC = () => {
     setError('');
     
     try {
-      const { data, error: fetchError } = await supabase
+      // First, get the test assignments with coding tests and job roles
+      const { data: assignments, error: assignmentsError } = await supabase
         .from('test_assignments')
         .select(`
           *,
@@ -66,30 +62,77 @@ const DeveloperTests: React.FC = () => {
             location,
             job_type,
             salary,
-            recruiters!job_roles_recruiter_id_fkey (
-              company_name,
-              users!recruiters_user_id_fkey (
-                id,
-                name,
-                email
-              )
-            )
+            recruiter_id
           )
         `)
         .eq('developer_id', userProfile.id)
         .order('created_at', { ascending: false });
 
-      if (fetchError) {
-        throw fetchError;
+      if (assignmentsError) {
+        throw assignmentsError;
       }
 
+      if (!assignments || assignments.length === 0) {
+        setTestAssignments([]);
+        return;
+      }
+
+      // Get recruiter details for all unique recruiter IDs
+      const recruiterIds = [...new Set(
+        assignments
+          .filter(a => a.job_roles?.recruiter_id)
+          .map(a => a.job_roles.recruiter_id)
+      )];
+
+      if (recruiterIds.length === 0) {
+        setTestAssignments(assignments as ExtendedTestAssignment[]);
+        return;
+      }
+
+      // Fetch recruiter company names
+      const { data: recruiters, error: recruitersError } = await supabase
+        .from('recruiters')
+        .select('user_id, company_name')
+        .in('user_id', recruiterIds);
+
+      if (recruitersError) {
+        console.error('Error fetching recruiters:', recruitersError);
+      }
+
+      // Fetch user details for recruiters
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', recruiterIds);
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+      }
+
+      // Combine the data
+      const enrichedAssignments = assignments.map(assignment => {
+        if (!assignment.job_roles?.recruiter_id) {
+          return assignment as ExtendedTestAssignment;
+        }
+
+        const recruiter = recruiters?.find(r => r.user_id === assignment.job_roles.recruiter_id);
+        const user = users?.find(u => u.id === assignment.job_roles.recruiter_id);
+
+        return {
+          ...assignment,
+          job_roles: {
+            ...assignment.job_roles,
+            company_name: recruiter?.company_name || 'Unknown Company',
+            recruiter_name: user?.name || 'Unknown Recruiter',
+            recruiter_email: user?.email || ''
+          }
+        } as ExtendedTestAssignment;
+      });
+
       // Filter out any assignments with incomplete data
-      const validAssignments = (data || []).filter(assignment => 
-        assignment.coding_tests && 
-        assignment.job_roles && 
-        assignment.job_roles.recruiters &&
-        assignment.job_roles.recruiters.users
-      ) as ExtendedTestAssignment[];
+      const validAssignments = enrichedAssignments.filter(assignment => 
+        assignment.coding_tests && assignment.job_roles
+      );
 
       setTestAssignments(validAssignments);
     } catch (err) {
@@ -194,10 +237,10 @@ const DeveloperTests: React.FC = () => {
                       <span className="font-medium">Position:</span> {assignment.job_roles.title}
                     </div>
                     <div>
-                      <span className="font-medium">Company:</span> {assignment.job_roles.recruiters.company_name}
+                      <span className="font-medium">Company:</span> {assignment.job_roles.company_name || 'Unknown Company'}
                     </div>
                     <div>
-                      <span className="font-medium">Recruiter:</span> {assignment.job_roles.recruiters.users.name}
+                      <span className="font-medium">Recruiter:</span> {assignment.job_roles.recruiter_name || 'Unknown Recruiter'}
                     </div>
                   </div>
 
