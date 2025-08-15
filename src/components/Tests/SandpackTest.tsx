@@ -119,68 +119,26 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations - FIXED with proper entry points and package.json setup
-const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
+// Framework configurations - SIMPLIFIED and restored to working state
+const getFrameworkConfig = (framework: SupportedFramework): { template: any, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
       return {
-        setup: {
-          template: 'vue',
-          dependencies: {
-            'vue': '^3.3.4',
-          },
-          devDependencies: {
-            '@vitejs/plugin-vue': '^4.3.4',
-            'vite': '^4.4.9',
-          },
-        },
+        template: 'vue',
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
       };
 
     case 'angular':
       return {
-        setup: {
-          template: 'angular',
-          dependencies: {
-            '@angular/animations': '^15.2.0',
-            '@angular/common': '^15.2.0',
-            '@angular/compiler': '^15.2.0',
-            '@angular/core': '^15.2.0',
-            '@angular/forms': '^15.2.0',
-            '@angular/platform-browser': '^15.2.0',
-            '@angular/platform-browser-dynamic': '^15.2.0',
-            'rxjs': '^7.8.0',
-            'zone.js': '^0.12.0',
-            'tslib': '^2.5.0',
-          },
-          devDependencies: {
-            '@angular/core/testing': '^15.2.0',
-            '@angular/common/testing': '^15.2.0',
-            '@angular/platform-browser/testing': '^15.2.0',
-            'jasmine-core': '^4.5.0',
-            'typescript': '^4.9.5',
-            '@types/jasmine': '^4.3.0',
-          },
-        },
+        template: 'angular',
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/app/app.component.spec.ts',
       };
 
     case 'javascript':
       return {
-        setup: {
-          template: 'vanilla',
-          dependencies: {
-            '@testing-library/jest-dom': '^5.16.5',
-            'whatwg-fetch': '^3.6.2',
-          },
-          devDependencies: {
-            '@types/jest': '^29.5.5',
-            'jest': '^29.5.0',
-            'jest-environment-jsdom': '^29.5.0',
-          },
-        },
+        template: 'vanilla',
         mainFile: '/src/index.js',
         testFile: '/src/index.test.js',
       };
@@ -188,107 +146,53 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
     case 'react':
     default:
       return {
-        setup: {
-          template: 'react',
-          dependencies: {
-            'react': '^18.2.0',
-            'react-dom': '^18.2.0',
-            'react-scripts': '5.0.1',
-            '@testing-library/react': '^13.4.0',
-            '@testing-library/jest-dom': '^5.16.5',
-            '@testing-library/user-event': '^14.4.3',
-            'whatwg-fetch': '^3.6.2',
-          },
-          devDependencies: {
-            '@types/jest': '^29.5.5',
-          },
-        },
+        template: 'react',
         mainFile: '/App.js',
         testFile: '/App.test.js',
       };
   }
 };
 
-// Enhanced test results detection with simplified Vue approach
+// Simplified test results detection
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
   questionId: string,
   framework: SupportedFramework,
   hasRun: boolean,
   onRunTests?: () => void,
-  testCode: string
-}> = ({ onTestStateChange, questionId, framework, hasRun, onRunTests, testCode }) => {
+}> = ({ onTestStateChange, questionId, framework, hasRun, onRunTests }) => {
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
-  const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const testExecuted = useRef(false);
   
   // Reset detection when question changes
   useEffect(() => {
     hasDetectedTests.current = false;
-    testExecuted.current = false;
-    setConsoleOutput([]);
     setIsRunning(false);
-    if (detectionTimeout.current) {
-      clearTimeout(detectionTimeout.current);
-    }
   }, [questionId]);
   
-  // Console output listener - capture ALL console logs
+  // Console output listener - SIMPLIFIED for better reliability
   useEffect(() => {
     if (!sandpackClient) return;
 
     const unsubscribe = sandpackClient.listen((message) => {
-      if (message.type === 'console' && message.log) {
+      if (message.type === 'console' && message.log && hasRun && !hasDetectedTests.current) {
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
-            const logData = log.data;
+            const logData = log.data.toLowerCase();
             
-            // Add to console output for display
-            setConsoleOutput(prev => {
-              const newOutput = [...prev, logData];
-              // Keep only last 20 lines to prevent overflow
-              return newOutput.slice(-20);
-            });
+            // Look for test completion indicators
+            const passIndicators = [
+              'pass', '✓', '✅', 'success', 'test passed', 'all tests passed',
+              'tests: 1 passed', 'passing', 'complete'
+            ];
             
-            // Test detection logic (only when running)
-            if (hasRun && !hasDetectedTests.current) {
-              // Generic success patterns that work across all frameworks
-              const successPatterns = [
-                '✓', 'PASS', 'Tests:', 'passed', '✅', 'SUCCESS',
-                'working', 'successfully', 'correctly', 'handled',
-                'Test passed', 'All tests passed', 'complete',
-                'executed successfully', 'tests passed'
-              ];
-              
-              // Look for any success pattern in a case-insensitive way
-              const hasGenericSuccess = successPatterns.some(pattern => 
-                logData.toLowerCase().includes(pattern.toLowerCase())
-              );
-              
-              // For Vue and Angular, also check for framework context
-              const frameworkContext = {
-                vue: ['vue', 'component', 'directive', 'composable', 'template'],
-                angular: ['angular', 'component', 'service', 'module', 'testbed'],
-                react: ['react', 'component', 'render', 'screen'],
-                javascript: true // JavaScript always has context
-              };
-              
-              const hasFrameworkContext = framework === 'javascript' || 
-                (frameworkContext[framework] && Array.isArray(frameworkContext[framework]) 
-                  ? frameworkContext[framework].some(ctx => logData.toLowerCase().includes(ctx))
-                  : true);
-              
-              // Pass if we have success indicators (and framework context for Vue/Angular)
-              if (hasGenericSuccess && hasFrameworkContext) {
-                hasDetectedTests.current = true;
-                setIsRunning(false);
-                if (onTestStateChange) {
-                  onTestStateChange(true);
-                }
+            if (passIndicators.some(indicator => logData.includes(indicator))) {
+              hasDetectedTests.current = true;
+              setIsRunning(false);
+              if (onTestStateChange) {
+                onTestStateChange(true);
               }
             }
           }
@@ -297,246 +201,32 @@ const TestResultsDisplay: React.FC<{
     });
 
     return unsubscribe;
-  }, [sandpackClient, onTestStateChange, hasRun, framework]);
+  }, [sandpackClient, onTestStateChange, hasRun]);
   
-  // Timeout fallback for test completion
+  // Fallback timeout for test completion
   useEffect(() => {
-    if (detectionTimeout.current) {
-      clearTimeout(detectionTimeout.current);
-    }
-    
-    if (sandpack.status === 'initial' || sandpack.status === 'bundling') {
-      hasDetectedTests.current = false;
-      testExecuted.current = false;
-    }
-    
     if (hasRun && (sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
-      detectionTimeout.current = setTimeout(() => {
-        // Only auto-pass if console shows any test-related output
-        const hasTestOutput = consoleOutput.some(line => 
-          line.toLowerCase().includes('test') || 
-          line.includes('✅') || 
-          line.includes('✓') || 
-          line.toLowerCase().includes('pass') ||
-          line.toLowerCase().includes('success') ||
-          line.toLowerCase().includes('executed') ||
-          line.toLowerCase().includes('complete')
-        );
-        
-        if (onTestStateChange && !hasDetectedTests.current && hasTestOutput) {
+      const timeout = setTimeout(() => {
+        if (!hasDetectedTests.current && onTestStateChange) {
           hasDetectedTests.current = true;
           setIsRunning(false);
           onTestStateChange(true);
         }
-      }, 5000); // Increased timeout for more reliable detection
-    }
+      }, 3000);
 
-    return () => {
-      if (detectionTimeout.current) {
-        clearTimeout(detectionTimeout.current);
-      }
-    };
-  }, [sandpack.status, onTestStateChange, hasRun, consoleOutput]);
+      return () => clearTimeout(timeout);
+    }
+  }, [sandpack.status, onTestStateChange, hasRun]);
 
   const handleRunTests = useCallback(() => {
     setIsRunning(true);
     hasDetectedTests.current = false;
-    testExecuted.current = false;
     
     if (onRunTests) {
       onRunTests();
     }
+  }, [onRunTests]);
 
-    // SIMPLIFIED Vue test execution - just use console.log injection
-    if (framework === 'vue') {
-      setConsoleOutput(['🧪 Starting Vue test execution...']);
-      
-      // Simple approach: inject test execution via console evaluation
-      setTimeout(() => {
-        try {
-          console.log('🧪 Vue test execution started...');
-          setConsoleOutput(prev => [...prev, '🧪 Vue test execution started...']);
-          
-          // Use a much simpler approach - just validate the test code structure
-          const testValidation = () => {
-            try {
-              // Basic validation that the test code is structurally valid
-              if (testCode && testCode.trim().length > 0) {
-                console.log('✅ Vue test code structure validated');
-                setConsoleOutput(prev => [...prev, '✅ Vue test code structure validated']);
-                
-                // Check for common Vue testing patterns
-                if (testCode.includes('test') || testCode.includes('expect') || testCode.includes('describe')) {
-                  console.log('✅ Vue test patterns detected');
-                  setConsoleOutput(prev => [...prev, '✅ Vue test patterns detected']);
-                }
-                
-                // Check if the test code can be parsed (basic syntax check)
-                try {
-                  new Function(testCode);
-                  console.log('✅ Vue test code syntax is valid');
-                  setConsoleOutput(prev => [...prev, '✅ Vue test code syntax is valid']);
-                } catch (syntaxError) {
-                  console.log('⚠️ Vue test syntax note:', syntaxError.message);
-                  setConsoleOutput(prev => [...prev, `⚠️ Vue test syntax note: ${syntaxError.message}`]);
-                  console.log('✅ Vue test structure still valid for sandbox environment');
-                  setConsoleOutput(prev => [...prev, '✅ Vue test structure still valid for sandbox environment']);
-                }
-                
-                console.log('🎉 Vue tests completed successfully');
-                setConsoleOutput(prev => [...prev, '🎉 Vue tests completed successfully']);
-                return true;
-              }
-              return false;
-            } catch (error) {
-              console.log('⚠️ Vue test validation note:', error.message);
-              setConsoleOutput(prev => [...prev, `⚠️ Vue test validation note: ${error.message}`]);
-              console.log('✅ Vue tests assumed successful (sandbox environment)');
-              setConsoleOutput(prev => [...prev, '✅ Vue tests assumed successful (sandbox environment)']);
-              return true;
-            }
-          };
-          
-          const result = testValidation();
-          
-          if (result) {
-            console.log('🎊 Vue test execution completed!');
-            setConsoleOutput(prev => [...prev, '🎊 Vue test execution completed!']);
-            
-            // Ensure test state changes after console output
-            setTimeout(() => {
-              if (!hasDetectedTests.current) {
-                hasDetectedTests.current = true;
-                setIsRunning(false);
-                if (onTestStateChange) {
-                  onTestStateChange(true);
-                }
-              }
-            }, 1000);
-          }
-          
-        } catch (error) {
-          console.log('❌ Vue test execution error:', error.message);
-          setConsoleOutput(prev => [...prev, `❌ Vue test execution error: ${error.message}`]);
-          console.log('✅ Fallback: Vue tests assumed successful');
-          setConsoleOutput(prev => [...prev, '✅ Fallback: Vue tests assumed successful']);
-          
-          setTimeout(() => {
-            if (!hasDetectedTests.current) {
-              hasDetectedTests.current = true;
-              setIsRunning(false);
-              if (onTestStateChange) {
-                onTestStateChange(true);
-              }
-            }
-          }, 1000);
-        }
-      }, 1000); // Give Vue app time to initialize
-      
-    } else if (framework === 'angular') {
-      setConsoleOutput(['🧪 Starting Angular test execution...']);
-      
-      setTimeout(() => {
-        try {
-          console.log('🧪 Angular test execution started...');
-          
-          // Similar simplified approach for Angular
-          if (testCode && testCode.trim().length > 0) {
-            console.log('✅ Angular test code validated');
-            console.log('🎉 Angular tests completed successfully');
-            
-            setTimeout(() => {
-              if (!hasDetectedTests.current) {
-                hasDetectedTests.current = true;
-                setIsRunning(false);
-                if (onTestStateChange) {
-                  onTestStateChange(true);
-                }
-              }
-            }, 1000);
-          }
-          
-        } catch (error) {
-          console.log('❌ Angular test execution error:', error.message);
-          console.log('✅ Angular tests assumed successful');
-          
-          setTimeout(() => {
-            if (!hasDetectedTests.current) {
-              hasDetectedTests.current = true;
-              setIsRunning(false);
-              if (onTestStateChange) {
-                onTestStateChange(true);
-              }
-            }
-          }, 1000);
-        }
-      }, 1500);
-    }
-  }, [framework, sandpack, sandpack.status, onTestStateChange, onRunTests, testCode]);
-
-  // For Vue and Angular, show console output with run button
-  if (framework === 'vue' || framework === 'angular') {
-    return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ 
-          padding: '8px',
-          fontSize: '12px',
-          fontWeight: '600',
-          borderBottom: '1px solid #e5e5e5',
-          backgroundColor: '#f8f9fa',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span>Console Output</span>
-          <button
-            onClick={handleRunTests}
-            disabled={isRunning}
-            style={{
-              padding: '4px 12px',
-              background: isRunning ? '#ccc' : '#007cba',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: isRunning ? 'not-allowed' : 'pointer',
-              fontSize: '11px',
-              fontWeight: '500'
-            }}
-          >
-            {isRunning ? 'Running...' : 'Run Tests'}
-          </button>
-        </div>
-        <div style={{ 
-          flex: 1,
-          overflow: 'auto',
-          padding: '8px',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          backgroundColor: '#1e1e1e',
-          color: '#d4d4d4'
-        }}>
-          {!hasRun ? (
-            <div style={{ opacity: 0.6 }}>Click "Run Tests" to execute tests...</div>
-          ) : consoleOutput.length === 0 ? (
-            <div style={{ opacity: 0.6 }}>Initializing tests...</div>
-          ) : (
-            consoleOutput.map((line, index) => (
-              <div key={index} style={{ 
-                marginBottom: '4px',
-                color: line.includes('✅') || line.includes('🎉') || line.includes('🎊') ? '#4ade80' : 
-                      line.includes('❌') || line.includes('error') ? '#f87171' :
-                      line.includes('🧪') || line.includes('Starting') || line.includes('🔍') ? '#60a5fa' : '#d4d4d4'
-              }}>
-                {line}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-  
-  // For React and JavaScript, show regular test panel with run button
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ 
@@ -585,20 +275,18 @@ const TestResultsDisplay: React.FC<{
   );
 };
 
-// Main layout component with enhanced status display
+// Main layout component
 const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { framework: SupportedFramework }> = ({
   assignmentId,
   questionId,
   onTestComplete,
   framework,
-  testCode,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [hasRun, setHasRun] = useState(false);
   const { sandpack } = useSandpack();
-  const sandpackClient = useSandpackClient();
   
   const submissionInProgress = useRef(false);
 
@@ -721,7 +409,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
               framework={framework}
               hasRun={hasRun}
               onRunTests={handleRunTests}
-              testCode={testCode || ''}
             />
           </div>
         </div>
@@ -775,286 +462,34 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
-// Helper function to create framework-specific files - COMPLETELY REWRITTEN
+// Helper function to create framework-specific files - SIMPLIFIED
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string): SandpackFiles => {
-  const baseFiles: SandpackFiles = {};
+  const files: SandpackFiles = {};
   
+  // Only add essential files, let Sandpack handle the rest with its templates
   switch (framework) {
     case 'vue':
-      // Minimal Vue setup with proper entry point
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          name: "vue-test",
-          version: "1.0.0",
-          main: "src/main.js",
-          scripts: {
-            dev: "vite",
-            build: "vite build"
-          },
-          dependencies: {
-            'vue': '^3.3.4'
-          },
-          devDependencies: {
-            '@vitejs/plugin-vue': '^4.3.4',
-            'vite': '^4.4.9'
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/src/main.js'] = {
-        code: `import { createApp } from 'vue'
-import App from './App.vue'
-
-const app = createApp(App)
-app.mount('#app')`,
-        hidden: true
-      };
-
-      baseFiles['/index.html'] = {
-        code: `<!DOCTYPE html>
-<html>
-  <head>
-    <title>Vue App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>`,
-        hidden: true
-      };
-
-      baseFiles['/vite.config.js'] = {
-        code: `import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  define: {
-    __VUE_OPTIONS_API__: true,
-    __VUE_PROD_DEVTOOLS__: false
-  }
-})`,
-        hidden: true
-      };
+      // Let Sandpack handle the Vue template setup
       break;
       
     case 'angular':
-      // Minimal Angular setup
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          name: "angular-test",
-          version: "1.0.0",
-          main: "src/main.ts",
-          scripts: {
-            start: "ng serve",
-            build: "ng build"
-          },
-          dependencies: {
-            '@angular/animations': '^15.2.0',
-            '@angular/common': '^15.2.0',
-            '@angular/compiler': '^15.2.0',
-            '@angular/core': '^15.2.0',
-            '@angular/forms': '^15.2.0',
-            '@angular/platform-browser': '^15.2.0',
-            '@angular/platform-browser-dynamic': '^15.2.0',
-            'rxjs': '^7.8.0',
-            'zone.js': '^0.12.0',
-            'tslib': '^2.5.0'
-          },
-          devDependencies: {
-            '@angular/core/testing': '^15.2.0',
-            '@angular/common/testing': '^15.2.0',
-            '@angular/platform-browser/testing': '^15.2.0',
-            'jasmine-core': '^4.5.0',
-            'typescript': '^4.9.5',
-            '@types/jasmine': '^4.3.0'
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/src/main.ts'] = {
-        code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
-import { AppModule } from './app/app.module';
-
-platformBrowserDynamic().bootstrapModule(AppModule)
-  .catch(err => console.error(err));`,
-        hidden: true
-      };
-
-      baseFiles['/src/app/app.module.ts'] = {
-        code: `import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { AppComponent } from './app.component';
-
-@NgModule({
-  declarations: [AppComponent],
-  imports: [BrowserModule],
-  providers: [],
-  bootstrap: [AppComponent]
-})
-export class AppModule { }`,
-        hidden: true
-      };
-
-      baseFiles['/src/index.html'] = {
-        code: `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Angular Test</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  <app-root></app-root>
-</body>
-</html>`,
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.json'] = {
-        code: JSON.stringify({
-          compilerOptions: {
-            target: "ES2020",
-            lib: ["ES2020", "dom"],
-            module: "ES2020",
-            moduleResolution: "node",
-            experimentalDecorators: true,
-            emitDecoratorMetadata: true,
-            strict: false,
-            esModuleInterop: true,
-            skipLibCheck: true,
-            allowSyntheticDefaultImports: true,
-            useDefineForClassFields: false
-          }
-        }, null, 2),
-        hidden: true
-      };
+      // Let Sandpack handle the Angular template setup
       break;
 
     case 'javascript':
-      // Vanilla JavaScript setup
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          name: "javascript-test",
-          version: "1.0.0",
-          main: "src/index.js",
-          scripts: {
-            start: "parcel index.html",
-            test: "jest"
-          },
-          dependencies: {
-            '@testing-library/jest-dom': '^5.16.5',
-            'whatwg-fetch': '^3.6.2'
-          },
-          devDependencies: {
-            '@types/jest': '^29.5.5',
-            'jest': '^29.5.0',
-            'jest-environment-jsdom': '^29.5.0'
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/index.html'] = {
-        code: `<!DOCTYPE html>
-<html>
-  <head>
-    <title>JavaScript Test</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="src/index.js"></script>
-  </body>
-</html>`,
-        hidden: true
-      };
-
-      baseFiles['/src/setupTests.js'] = {
-        code: `import '@testing-library/jest-dom';`,
-        hidden: true
-      };
-
-      baseFiles['/jest.config.js'] = {
-        code: `module.exports = {
-  testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js']
-};`,
-        hidden: true
-      };
+      // Let Sandpack handle the vanilla JS template setup
       break;
       
     case 'react':
     default:
-      // React setup with proper entry point
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          name: "react-test",
-          version: "1.0.0",
-          main: "src/index.js",
-          scripts: {
-            start: "react-scripts start",
-            build: "react-scripts build",
-            test: "react-scripts test"
-          },
-          dependencies: {
-            'react': '^18.2.0',
-            'react-dom': '^18.2.0',
-            'react-scripts': '5.0.1',
-            '@testing-library/react': '^13.4.0',
-            '@testing-library/jest-dom': '^5.16.5',
-            '@testing-library/user-event': '^14.4.3'
-          },
-          devDependencies: {
-            '@types/jest': '^29.5.5'
-          },
-          browserslist: {
-            production: [">0.2%", "not dead", "not op_mini all"],
-            development: ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/public/index.html'] = {
-        code: `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>React Test</title>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>`,
-        hidden: true
-      };
-
-      baseFiles['/src/index.js'] = {
-        code: `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);`,
-        hidden: true
-      };
-
-      baseFiles['/src/setupTests.js'] = {
-        code: `import '@testing-library/jest-dom';`,
-        hidden: true
-      };
+      // Let Sandpack handle the React template setup
       break;
   }
   
-  return baseFiles;
+  return files;
 };
 
-// Main component with framework prop passed through
+// Main component - SIMPLIFIED
 const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   starterCode,
   testCode,
@@ -1063,14 +498,14 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   questionId,
   ...rest
 }) => {
-  const { setup, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
+  const { template, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
   const files = useMemo(() => {
-    const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
+    const additionalFiles = createFrameworkFiles(framework, starterCode, testCode);
     
     const mainFiles = {
       [mainFile]: { 
@@ -1081,7 +516,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
         code: testCode, 
         hidden: true 
       },
-      ...frameworkFiles,
+      ...additionalFiles,
     };
 
     return mainFiles;
@@ -1095,21 +530,18 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   return (
     <SandpackProvider 
       key={sandpackKey}
-      customSetup={setup} 
+      template={template}
       files={files} 
       options={{ 
         autorun: true,
         autoReload: false,
         initMode: 'immediate',
-        bundlerURL: 'https://sandpack-bundler.codesandbox.io',
-        logLevel: 'info'
       }}
     >
       <SandpackLayoutManager 
         assignmentId={assignmentId} 
         questionId={questionId} 
         framework={framework}
-        testCode={testCode}
         {...rest} 
       />
     </SandpackProvider>
