@@ -756,7 +756,9 @@ import { AppComponent } from './app.component';
     FormsModule,
     ReactiveFormsModule
   ],
-  providers: [],
+  providers: [
+    // UserService will be provided by @Injectable decorator with providedIn: 'root'
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }`,
@@ -1034,38 +1036,51 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     
     // For Angular, we need to create a proper test file that sets up the testing module correctly
     if (framework === 'angular' && testCode) {
+      // Parse the starter code to extract the UserService and make it compatible
+      const modifiedStarterCode = starterCode.replace(
+        /export class UserService/g,
+        `@Injectable({
+  providedIn: 'root'
+})
+export class UserService`
+      );
+      
       // Create a comprehensive test that properly handles the Angular testing setup
       const angularTestCode = `import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+import { Injectable } from '@angular/core';
 import { of } from 'rxjs';
 
-// Extract the User interface and UserService from the starter code
+// User interface from the component
 interface User {
   id: number;
   name: string;
   email: string;
 }
 
-// Mock UserService that matches the component expectations
-class UserService {
+// Create the UserService that matches exactly what the component expects
+@Injectable({
+  providedIn: 'root'
+})
+export class UserService {
   private users: User[] = [
     { id: 1, name: 'John Doe', email: 'john@example.com' },
     { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
   ];
 
   getUsers() {
-    return of(this.users);
+    return of(this.users).pipe();
   }
   
   addUser(user: Omit<User, 'id'>) {
     const newUser = { ...user, id: Date.now() };
     this.users.push(newUser);
-    return of(newUser);
+    return of(newUser).pipe();
   }
   
   deleteUser(id: number) {
     this.users = this.users.filter(user => user.id !== id);
-    return of(true);
+    return of(true).pipe();
   }
 }
 
@@ -1083,16 +1098,15 @@ describe('AppComponent', () => {
       imports: [ReactiveFormsModule],
       providers: [
         FormBuilder,
-        { provide: 'UserService', useClass: UserService }
+        UserService  // Provide the actual UserService
       ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppComponent);
     component = fixture.componentInstance;
-    userService = TestBed.inject('UserService') as UserService;
+    userService = TestBed.inject(UserService);
     
-    // Initialize the component properly
-    fixture.detectChanges();
+    // Don't call detectChanges here - let the individual tests handle it
   });
 
   it('should create', () => {
@@ -1101,6 +1115,9 @@ describe('AppComponent', () => {
   });
 
   it('should initialize form', () => {
+    // Initialize the component
+    fixture.detectChanges();
+    
     expect(component.userForm).toBeTruthy();
     expect(component.userForm.get('name')).toBeTruthy();
     expect(component.userForm.get('email')).toBeTruthy();
@@ -1108,6 +1125,8 @@ describe('AppComponent', () => {
   });
 
   it('should validate form fields', () => {
+    fixture.detectChanges();
+    
     // Form should be invalid initially (empty required fields)
     expect(component.userForm.valid).toBeFalsy();
     console.log('✅ Form invalid initially (as expected)');
@@ -1123,20 +1142,33 @@ describe('AppComponent', () => {
   });
 
   it('should have users array', () => {
+    fixture.detectChanges();
     expect(Array.isArray(component.users)).toBeTruthy();
     console.log('✅ Users array exists');
   });
 
   it('should load users on init', () => {
-    component.ngOnInit();
-    expect(component.isLoading).toBeTruthy();
-    console.log('✅ Loading state works');
+    // Spy on the userService to verify it's called
+    spyOn(userService, 'getUsers').and.returnValue(of([
+      { id: 1, name: 'Test User', email: 'test@example.com' }
+    ]));
+    
+    fixture.detectChanges(); // This triggers ngOnInit
+    
+    expect(userService.getUsers).toHaveBeenCalled();
+    console.log('✅ Users loaded on init');
   });
 });`;
 
       frameworkFiles[testFile] = {
         code: angularTestCode,
         hidden: true
+      };
+
+      // Also update the main component file to ensure UserService is properly decorated
+      frameworkFiles[mainFile] = {
+        code: modifiedStarterCode,
+        active: true
       };
     }
     
