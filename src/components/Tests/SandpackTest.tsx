@@ -75,7 +75,7 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations
+// Framework configurations - Updated Vue configuration
 const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
@@ -88,11 +88,13 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'vitest': '^0.34.6',
             'jsdom': '^22.1.0',
             '@vitejs/plugin-vue': '^4.3.4',
-          },
-          devDependencies: {
             '@vue/compiler-sfc': '^3.3.4',
           },
-          template: 'vue',
+          devDependencies: {
+            'vite': '^4.4.9',
+            '@vitest/ui': '^0.34.6',
+          },
+          template: 'node',
         },
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
@@ -427,31 +429,54 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   );
 };
 
-// Helper function to create framework-specific setup files - Complete Angular setup restored
+// Helper function to create framework-specific setup files - Updated Vue configuration
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
   const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
   
   switch (framework) {
     case 'vue':
+      // Updated Vite configuration for Vue
       baseFiles['/vite.config.js'] = {
         code: `import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag) => false
+      }
+    }
+  })],
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false
+  },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.js']
+  },
+  esbuild: {
+    target: 'es2020'
+  },
+  optimizeDeps: {
+    include: ['vue', '@vue/test-utils']
   }
 })`,
         hidden: true
       };
       
+      // Updated test setup for Vue
       baseFiles['/src/test-setup.js'] = {
         code: `import { vi } from 'vitest'
 import '@testing-library/jest-dom'
+import { config } from '@vue/test-utils'
 
+// Configure Vue Test Utils
+config.global.config.warnHandler = () => {}
+
+// Mock fetch globally
 global.fetch = vi.fn()
 
 beforeEach(() => {
@@ -466,7 +491,8 @@ beforeEach(() => {
         code: `import { createApp } from 'vue'
 import App from './App.vue'
 
-createApp(App).mount('#app')`,
+const app = createApp(App)
+app.mount('#app')`,
         hidden: true
       };
 
@@ -483,6 +509,20 @@ createApp(App).mount('#app')`,
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>`,
+        hidden: true
+      };
+
+      // Add package.json configuration for Vue
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "vue-sandpack-test",
+          type: "module",
+          scripts: {
+            dev: "vite",
+            build: "vite build",
+            test: "vitest"
+          }
+        }, null, 2),
         hidden: true
       };
       break;
@@ -679,27 +719,52 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  const packageJson = useMemo(() => JSON.stringify({
-    name: `gittalent-${framework}-challenge`,
-    version: "0.0.0",
-    dependencies: setup.dependencies,
-    devDependencies: setup.devDependencies || {},
-    scripts: { 
-      start: framework === 'angular' ? 'ng serve' : framework === 'vue' ? 'vite' : framework === 'javascript' ? 'node src/index.js' : 'react-scripts start',
-      build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : framework === 'javascript' ? 'echo "No build needed"' : 'react-scripts build',
-      test: framework === 'angular' ? 'ng test' : framework === 'vue' ? 'vitest' : 'react-scripts test'
-    },
-  }, null, 2), [framework, setup]);
+  const packageJson = useMemo(() => {
+    // Special handling for Vue
+    if (framework === 'vue') {
+      return JSON.stringify({
+        name: `gittalent-vue-challenge`,
+        version: "0.0.0",
+        type: "module",
+        dependencies: setup.dependencies,
+        devDependencies: setup.devDependencies || {},
+        scripts: { 
+          dev: 'vite',
+          build: 'vite build',
+          test: 'vitest'
+        },
+      }, null, 2);
+    }
+    
+    // Default for other frameworks
+    return JSON.stringify({
+      name: `gittalent-${framework}-challenge`,
+      version: "0.0.0",
+      dependencies: setup.dependencies,
+      devDependencies: setup.devDependencies || {},
+      scripts: { 
+        start: framework === 'angular' ? 'ng serve' : framework === 'vue' ? 'vite' : framework === 'javascript' ? 'node src/index.js' : 'react-scripts start',
+        build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : framework === 'javascript' ? 'echo "No build needed"' : 'react-scripts build',
+        test: framework === 'angular' ? 'ng test' : framework === 'vue' ? 'vitest' : 'react-scripts test'
+      },
+    }, null, 2);
+  }, [framework, setup]);
 
   const files = useMemo(() => {
     const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
     
-    return {
+    const baseFiles = {
       [mainFile]: { code: starterCode, active: true },
       [testFile]: { code: testCode, hidden: true },
-      '/package.json': { code: packageJson, hidden: true },
       ...frameworkFiles,
     };
+
+    // Don't add package.json twice for Vue (it's already in frameworkFiles)
+    if (framework !== 'vue') {
+      baseFiles['/package.json'] = { code: packageJson, hidden: true };
+    }
+
+    return baseFiles;
   }, [framework, starterCode, testCode, mainFile, testFile, packageJson]);
 
   // Use a key that changes when the question changes to force remount
