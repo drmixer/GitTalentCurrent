@@ -135,12 +135,17 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@angular/forms': '^15.2.0',
             '@angular/platform-browser': '^15.2.0',
             '@angular/platform-browser-dynamic': '^15.2.0',
+            '@angular/common/http': '^15.2.0',
             'rxjs': '^7.8.0',
             'zone.js': '^0.12.0',
             'tslib': '^2.3.0',
           },
           devDependencies: {
             '@angular/testing': '^15.2.0',
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
+            '@angular/common/http/testing': '^15.2.0',
             '@types/jasmine': '^4.3.0',
             'jasmine-core': '^4.5.0',
             'typescript': '^4.9.0',
@@ -615,6 +620,73 @@ export default defineConfig({
 })`,
         hidden: true
       };
+
+      // Add Karma configuration for Angular testing
+      baseFiles['/karma.conf.js'] = {
+        code: `// Karma configuration file
+module.exports = function (config) {
+  config.set({
+    basePath: '',
+    frameworks: ['jasmine'],
+    files: [
+      'src/test.ts'
+    ],
+    preprocessors: {
+      'src/test.ts': ['typescript']
+    },
+    typescriptPreprocessor: {
+      options: {
+        sourceMap: false,
+        target: 'ES2020',
+        module: 'commonjs',
+        moduleResolution: 'node',
+        emitDecoratorMetadata: true,
+        experimentalDecorators: true,
+        lib: ['ES2020', 'dom'],
+        skipLibCheck: true
+      }
+    },
+    mime: {
+      'text/x-typescript': ['ts','tsx']
+    },
+    plugins: [
+      require('karma-jasmine'),
+      require('karma-chrome-launcher'),
+      require('karma-jasmine-html-reporter'),
+      require('karma-coverage'),
+      {
+        'preprocessor:typescript': ['factory', function () {
+          return require('typescript');
+        }]
+      }
+    ],
+    client: {
+      clearContext: false // leave Jasmine Spec Runner output visible in browser
+    },
+    coverageReporter: {
+      dir: require('path').join(__dirname, './coverage'),
+      subdir: '.',
+      reporters: [
+        { type: 'html' },
+        { type: 'text-summary' }
+      ]
+    },
+    reporters: ['progress', 'kjhtml'],
+    port: 9876,
+    colors: true,
+    logLevel: config.LOG_INFO,
+    autoWatch: false,
+    browsers: ['ChromeHeadless'],
+    singleRun: true,
+    restartOnFileChange: false,
+    browserNoActivityTimeout: 60000,
+    browserDisconnectTimeout: 10000,
+    browserDisconnectTolerance: 3,
+    captureTimeout: 60000
+  });
+};`,
+        hidden: true
+      };
       
       baseFiles['/src/test-setup.js'] = {
         code: `import { vi } from 'vitest'
@@ -656,7 +728,7 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Simplified Angular configuration for Sandpack
+      // Optimized Angular configuration for Sandpack
       baseFiles['/src/polyfills.ts'] = {
         code: `import 'zone.js';`,
         hidden: true
@@ -675,6 +747,7 @@ platformBrowserDynamic().bootstrapModule(AppModule)
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
 
 import { AppComponent } from './app.component';
 
@@ -685,7 +758,8 @@ import { AppComponent } from './app.component';
   imports: [
     BrowserModule,
     FormsModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    HttpClientModule
   ],
   providers: [],
   bootstrap: [AppComponent]
@@ -694,6 +768,7 @@ export class AppModule { }`,
         hidden: true
       };
 
+      // Updated test setup for Angular
       baseFiles['/src/test.ts'] = {
         code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
@@ -711,6 +786,36 @@ getTestBed().initTestEnvironment(
 // Find and run tests
 const context = require.context('./', true, /\.spec\.ts$/);
 context.keys().map(context);`,
+        hidden: true
+      };
+
+      // Create a simple user service that might be injected
+      baseFiles['/src/app/user.service.ts'] = {
+        code: `import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class UserService {
+  
+  constructor(private http: HttpClient) { }
+
+  getUsers(): Observable<User[]> {
+    // Mock implementation for testing
+    return of([
+      { id: 1, name: 'John Doe', email: 'john@example.com' },
+      { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
+    ]);
+  }
+}`,
         hidden: true
       };
 
@@ -735,22 +840,28 @@ context.keys().map(context);`,
         hidden: true
       };
 
+      // Updated TypeScript configuration with more permissive settings
       baseFiles['/tsconfig.json'] = {
         code: `{
   "compileOnSave": false,
   "compilerOptions": {
     "baseUrl": "./",
     "outDir": "./dist/out-tsc",
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
     "strict": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
-    "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
     "sourceMap": true,
     "declaration": false,
     "downlevelIteration": true,
     "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "moduleResolution": "node",
     "importHelpers": true,
     "target": "ES2020",
@@ -765,7 +876,18 @@ context.keys().map(context);`,
     "enableI18nLegacyMessageIdFormat": false,
     "strictInjectionParameters": false,
     "strictInputAccessModifiers": false,
-    "strictTemplates": false
+    "strictTemplates": false,
+    "strictPropertyInitialization": false,
+    "fullTemplateTypeCheck": false,
+    "strictInputTypes": false,
+    "strictNullInputTypes": false,
+    "strictAttributeTypes": false,
+    "strictSafeNavigationTypes": false,
+    "strictDomLocalRefTypes": false,
+    "strictOutputEventTypes": false,
+    "strictDomEventTypes": false,
+    "strictContextGenerics": false,
+    "strictLiteralTypes": false
   }
 }`,
         hidden: true
@@ -873,9 +995,14 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       case 'angular':
         basePackage.devDependencies = {
           ...basePackage.devDependencies,
-          'jasmine-ts': '^0.4.0',
+          'karma': '^6.4.0',
+          'karma-chrome-launcher': '^3.2.0',
+          'karma-coverage': '^2.2.0',
+          'karma-jasmine': '^5.1.0',
+          'karma-jasmine-html-reporter': '^2.1.0',
           '@types/node': '^18.0.0'
         };
+        basePackage.scripts.test = 'karma start --single-run';
         break;
       case 'javascript':
         basePackage.jest = {
