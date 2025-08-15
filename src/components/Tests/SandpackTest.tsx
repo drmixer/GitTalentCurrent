@@ -119,26 +119,67 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations - SIMPLIFIED and restored to working state
-const getFrameworkConfig = (framework: SupportedFramework): { template: any, mainFile: string, testFile: string } => {
+// Framework configurations - RESTORED to working state with proper dependencies
+const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
       return {
-        template: 'vue',
+        setup: {
+          template: 'vue',
+          dependencies: {
+            'vue': '^3.3.4',
+          },
+          devDependencies: {
+            '@vitejs/plugin-vue': '^4.3.4',
+            'vite': '^4.4.9',
+          },
+        },
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
       };
 
     case 'angular':
       return {
-        template: 'angular',
+        setup: {
+          template: 'angular',
+          dependencies: {
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
+            'rxjs': '^7.8.0',
+            'zone.js': '^0.12.0',
+            'tslib': '^2.5.0',
+          },
+          devDependencies: {
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
+            'jasmine-core': '^4.5.0',
+            'typescript': '^4.9.5',
+            '@types/jasmine': '^4.3.0',
+          },
+        },
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/app/app.component.spec.ts',
       };
 
     case 'javascript':
       return {
-        template: 'vanilla',
+        setup: {
+          template: 'vanilla',
+          dependencies: {
+            '@testing-library/jest-dom': '^5.16.5',
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
+            'jest': '^29.5.0',
+            'jest-environment-jsdom': '^29.5.0',
+          },
+        },
         mainFile: '/src/index.js',
         testFile: '/src/index.test.js',
       };
@@ -146,7 +187,18 @@ const getFrameworkConfig = (framework: SupportedFramework): { template: any, mai
     case 'react':
     default:
       return {
-        template: 'react',
+        setup: {
+          template: 'react',
+          dependencies: {
+            'react': '^18.2.0',
+            'react-dom': '^18.2.0',
+          },
+          devDependencies: {
+            '@testing-library/react': '^13.4.0',
+            '@testing-library/jest-dom': '^5.16.5',
+            '@testing-library/user-event': '^14.4.3',
+          },
+        },
         mainFile: '/App.js',
         testFile: '/App.test.js',
       };
@@ -489,7 +541,7 @@ const createFrameworkFiles = (framework: SupportedFramework, starterCode: string
   return files;
 };
 
-// Main component - SIMPLIFIED
+// Main component - RESTORED with proper setup
 const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   starterCode,
   testCode,
@@ -498,7 +550,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   questionId,
   ...rest
 }) => {
-  const { template, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
+  const { setup, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -530,7 +582,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   return (
     <SandpackProvider 
       key={sandpackKey}
-      template={template}
+      customSetup={setup}
       files={files} 
       options={{ 
         autorun: true,
