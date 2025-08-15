@@ -132,7 +132,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@vitejs/plugin-vue': '^4.3.4',
             'vite': '^4.4.9',
           },
-          template: 'vue',
+          template: 'node',
         },
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
@@ -775,6 +775,325 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
+// Helper function to create framework-specific setup files
+const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
+  const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
+  
+  switch (framework) {
+    case 'vue':
+      baseFiles['/vite.config.js'] = {
+        code: `import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({
+  plugins: [vue()],
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false
+  }
+})`,
+        hidden: true
+      };
+
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "vue-sandpack-test",
+          type: "module",
+          scripts: {
+            dev: "vite",
+            build: "vite build"
+          },
+          dependencies: {
+            'vue': '^3.3.4'
+          },
+          devDependencies: {
+            '@vitejs/plugin-vue': '^4.3.4',
+            'vite': '^4.4.9'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/src/main.js'] = {
+        code: `import { createApp } from 'vue'
+import App from './App.vue'
+
+console.log('🚀 Starting Vue app initialization...')
+
+// Create and mount the Vue app
+const app = createApp(App)
+const vm = app.mount('#app')
+
+// Make Vue instance globally available for testing
+window.__VUE_APP__ = vm
+console.log('✅ Vue app mounted and ready for testing')
+
+console.log('🎯 Vue app initialization complete')`,
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vue 3 App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
+      break;
+      
+    case 'angular':
+      baseFiles['/src/polyfills.ts'] = {
+        code: `import 'zone.js';`,
+        hidden: true
+      };
+
+      baseFiles['/src/environments/environment.ts'] = {
+        code: `export const environment = {
+  production: false
+};`,
+        hidden: true
+      };
+
+      baseFiles['/tsconfig.json'] = {
+        code: JSON.stringify({
+          "compilerOptions": {
+            "target": "ES2020",
+            "lib": ["ES2020", "dom"],
+            "module": "ES2020",
+            "moduleResolution": "node",
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+            "strict": false,
+            "esModuleInterop": true,
+            "skipLibCheck": true,
+            "allowSyntheticDefaultImports": true,
+            "useDefineForClassFields": false
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/src/main.ts'] = {
+        code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
+
+console.log('🚀 Starting Angular app initialization...');
+
+platformBrowserDynamic()
+  .bootstrapModule(AppModule)
+  .then(() => {
+    console.log('✅ Angular app bootstrapped successfully');
+  })
+  .catch(err => {
+    console.error('❌ Angular bootstrap error:', err);
+  });`,
+        hidden: true
+      };
+
+      baseFiles['/src/app/app.module.ts'] = {
+        code: `import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { ReactiveFormsModule } from '@angular/forms';
+import { AppComponent } from './app.component';
+
+@NgModule({
+  declarations: [
+    AppComponent
+  ],
+  imports: [
+    BrowserModule,
+    ReactiveFormsModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }`,
+        hidden: true
+      };
+
+      baseFiles['/src/test.ts'] = {
+        code: `import 'zone.js/testing';
+import { getTestBed } from '@angular/core/testing';
+import {
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting
+} from '@angular/platform-browser-dynamic/testing';
+
+declare const require: {
+  context(path: string, deep?: boolean, filter?: RegExp): {
+    keys(): string[];
+    <T>(id: string): T;
+  };
+};
+
+// First, initialize the Angular testing environment.
+getTestBed().initTestEnvironment(
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting()
+);
+
+console.log('🧪 Angular testing environment initialized');`,
+        hidden: true
+      };
+
+      baseFiles['/src/index.html'] = {
+        code: `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Angular Test</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>`,
+        hidden: true
+      };
+
+      baseFiles['/angular.json'] = {
+        code: JSON.stringify({
+          "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+          "version": 1,
+          "newProjectRoot": "projects",
+          "projects": {
+            "app": {
+              "projectType": "application",
+              "schematics": {},
+              "root": "",
+              "sourceRoot": "src",
+              "prefix": "app",
+              "architect": {
+                "build": {
+                  "builder": "@angular-devkit/build-angular:browser",
+                  "options": {
+                    "outputPath": "dist/app",
+                    "index": "src/index.html",
+                    "main": "src/main.ts",
+                    "polyfills": "src/polyfills.ts",
+                    "tsConfig": "tsconfig.json",
+                    "assets": [],
+                    "styles": [],
+                    "scripts": []
+                  }
+                },
+                "test": {
+                  "builder": "@angular-devkit/build-angular:karma",
+                  "options": {
+                    "main": "src/test.ts",
+                    "polyfills": "src/polyfills.ts",
+                    "tsConfig": "tsconfig.json",
+                    "assets": [],
+                    "styles": [],
+                    "scripts": []
+                  }
+                }
+              }
+            }
+          }
+        }, null, 2),
+        hidden: true
+      };
+      break;
+
+    case 'javascript':
+      baseFiles['/src/setupTests.js'] = {
+        code: `import '@testing-library/jest-dom';
+import 'whatwg-fetch';
+
+console.log('🧪 JavaScript testing environment setup complete');`,
+        hidden: true
+      };
+
+      baseFiles['/jest.config.js'] = {
+        code: `module.exports = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+  testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
+  moduleFileExtensions: ['js', 'jsx', 'json', 'node'],
+  transform: {
+    '^.+\\.(js|jsx)': 'babel-jest'
+  }
+};`,
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JavaScript Test</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
+      break;
+      
+    case 'react':
+    default:
+      baseFiles['/src/setupTests.js'] = {
+        code: `import '@testing-library/jest-dom';
+import 'whatwg-fetch';
+
+global.fetch = jest.fn();
+
+beforeEach(() => {
+  fetch.mockClear();
+});
+
+console.log('🧪 React testing environment setup complete');`,
+        hidden: true
+      };
+
+      baseFiles['/public/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`,
+        hidden: true
+      };
+
+      baseFiles['/src/index.js'] = {
+        code: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from '../App';
+
+console.log('🚀 Starting React app initialization...');
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+console.log('✅ React app rendered successfully');`,
+        hidden: true
+      };
+      break;
+  }
+  
+  return baseFiles;
+};
+
 // Main component with framework prop passed through
 const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   starterCode,
@@ -791,9 +1110,12 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   }
 
   const files = useMemo(() => {
+    const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
+    
     const baseFiles = {
       [mainFile]: { code: starterCode, active: true },
       [testFile]: { code: testCode, hidden: true },
+      ...frameworkFiles,
     };
 
     return baseFiles;
@@ -808,7 +1130,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     <SandpackProvider 
       key={sandpackKey}
       customSetup={setup} 
-      files={files}
+      files={files} 
       options={{ 
         autorun: true,
         autoReload: false,
