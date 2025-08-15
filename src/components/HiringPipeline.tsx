@@ -20,7 +20,15 @@ interface KanbanViewProps {
 
 const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected'];
 
-const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage, onSendTest, onViewResults, onViewResume }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ 
+    candidates, 
+    onUpdateStage, 
+    onViewDeveloperProfile, 
+    onSendMessage, 
+    onSendTest, 
+    onViewResults, 
+    onViewResume 
+}) => {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
         e.preventDefault();
         const candidateId = e.dataTransfer.getData("candidateId");
@@ -41,10 +49,20 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
     return (
         <div className="flex space-x-4 overflow-x-auto pb-4">
             {STAGES.map(stage => (
-                <div key={stage} className="min-w-[250px] bg-gray-100 p-3 rounded-lg flex-shrink-0" onDrop={(e) => handleDrop(e, stage)} onDragOver={handleDragOver}>
+                <div 
+                    key={stage} 
+                    className="min-w-[250px] bg-gray-100 p-3 rounded-lg flex-shrink-0" 
+                    onDrop={(e) => handleDrop(e, stage)} 
+                    onDragOver={handleDragOver}
+                >
                     <h2 className="font-bold mb-3 capitalize text-gray-700">{stage}</h2>
                     {candidates.filter(c => c.status === stage).map(c => (
-                        <div key={c.id} draggable onDragStart={(e) => handleDragStart(e, c.id)} className="p-3 bg-white rounded-lg shadow-sm mb-3 cursor-grab border border-gray-200">
+                        <div 
+                            key={c.id} 
+                            draggable 
+                            onDragStart={(e) => handleDragStart(e, c.id)} 
+                            className="p-3 bg-white rounded-lg shadow-sm mb-3 cursor-grab border border-gray-200"
+                        >
                             <p className="font-semibold text-gray-900">{c.developer.user?.name || 'Unknown Developer'}</p>
                             <p className="text-sm text-gray-500">{c.job_role.title}</p>
                             
@@ -89,11 +107,19 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                     </button>
                                 )}
                                 {c.test_assignment && c.test_assignment.status === 'Completed' ? (
-                                     <button onClick={() => onViewResults(c.test_assignment.id)} className="p-1 hover:bg-gray-50 rounded-full text-green-500" title="View Test Results">
+                                    <button 
+                                        onClick={() => onViewResults(c.test_assignment.id)} 
+                                        className="p-1 hover:bg-gray-50 rounded-full text-green-500" 
+                                        title="View Test Results"
+                                    >
                                         <FileCheck size={16} />
                                     </button>
                                 ) : (
-                                    <button onClick={() => onSendTest(c.developer.user_id, c.job_role.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="Send Test">
+                                    <button 
+                                        onClick={() => onSendTest(c.developer.user_id, c.job_role.id)} 
+                                        className="p-1 hover:bg-gray-50 rounded-full text-gray-500" 
+                                        title="Send Test"
+                                    >
                                         <Code size={16} />
                                     </button>
                                 )}
@@ -329,8 +355,22 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Hiring Pipeline</h1>
                 <div className="flex rounded-lg overflow-hidden border border-gray-300">
-                    <button onClick={() => setView('list')} className={`px-4 py-2 text-sm font-medium ${view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>List View</button>
-                    <button onClick={() => setView('kanban')} className={`px-4 py-2 text-sm font-medium ${view === 'kanban' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Kanban Board</button>
+                    <button 
+                        onClick={() => setView('list')} 
+                        className={`px-4 py-2 text-sm font-medium ${
+                            view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                        List View
+                    </button>
+                    <button 
+                        onClick={() => setView('kanban')} 
+                        className={`px-4 py-2 text-sm font-medium ${
+                            view === 'kanban' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                        Kanban Board
+                    </button>
                 </div>
             </div>
 
@@ -344,7 +384,9 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                             className="p-2 border border-blue-300 rounded-md text-sm text-blue-700 bg-white focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Bulk Change Stage</option>
-                            {STAGES.filter(s => s !== 'Hired').map(s => <option key={`bulk-${s}`} value={s} className="capitalize">{s}</option>)}
+                            {STAGES.filter(s => s !== 'Hired').map(s => (
+                                <option key={`bulk-${s}`} value={s} className="capitalize">{s}</option>
+                            ))}
                         </select>
                         <button className="px-3 py-2 border border-red-300 rounded-md text-sm text-red-700 bg-red-50 hover:bg-red-100 transition-colors flex items-center">
                             <Trash2 size={16} className="mr-1" /> Delete
@@ -365,7 +407,13 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="p-3 w-8 text-left"><input type="checkbox" onChange={handleSelectAll} checked={selectedCandidates.length === candidates.length && candidates.length > 0} /></th>
+                                    <th className="p-3 w-8 text-left">
+                                        <input 
+                                            type="checkbox" 
+                                            onChange={handleSelectAll} 
+                                            checked={selectedCandidates.length === candidates.length && candidates.length > 0} 
+                                        />
+                                    </th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
@@ -379,7 +427,13 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                             <tbody className="divide-y divide-gray-200">
                                 {candidates.map(c => (
                                     <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="p-3"><input type="checkbox" checked={selectedCandidates.includes(c.id)} onChange={() => handleSelectCandidate(c.id)} /></td>
+                                        <td className="p-3">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedCandidates.includes(c.id)} 
+                                                onChange={() => handleSelectCandidate(c.id)} 
+                                            />
+                                        </td>
                                         <td className="p-3">
                                             <div className="flex items-center space-x-3">
                                                 <img
@@ -398,7 +452,9 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                                 onChange={(e) => handleUpdateStage(c.id, e.target.value, c)}
                                                 className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                                             >
-                                                {STAGES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
+                                                {STAGES.map(s => (
+                                                    <option key={s} value={s} className="capitalize">{s}</option>
+                                                ))}
                                             </select>
                                         </td>
                                         <td className="p-3">
@@ -422,7 +478,14 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             )}
                                         </td>
                                         <td className="p-3">
-                                            <input type="text" value={notes[c.id] || c.notes || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
+                                            <input 
+                                                type="text" 
+                                                value={notes[c.id] || c.notes || ''} 
+                                                onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} 
+                                                onBlur={() => handleUpdateNotes(c.id)} 
+                                                placeholder="Add notes..." 
+                                                className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" 
+                                            />
                                         </td>
                                         <td className="p-3 flex items-center space-x-2">
                                             <button
@@ -434,13 +497,24 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             </button>
                                             <button
                                                 onClick={() => onSendMessage(c.developer.user_id, c.developer.user.name || '', c.job_role.id, c.job_role.title)}
-                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Message Candidate"><MessageSquare size={18} />
+                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600" 
+                                                title="Message Candidate"
+                                            >
+                                                <MessageSquare size={18} />
                                             </button>
-                                            <button onClick={() => handleOpenSendTestModal(c.developer.user_id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
+                                            <button 
+                                                onClick={() => handleOpenSendTestModal(c.developer.user_id, c.job_role.id)} 
+                                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600" 
+                                                title="Send Test"
+                                            >
                                                 <Code size={18} />
                                             </button>
                                             {c.test_assignment && c.test_assignment.status === 'Completed' && (
-                                                <button onClick={() => handleOpenResultsModal(c.test_assignment.id)} className="p-2 hover:bg-gray-100 rounded-full text-green-600" title="View Test Results">
+                                                <button 
+                                                    onClick={() => handleOpenResultsModal(c.test_assignment.id)} 
+                                                    className="p-2 hover:bg-gray-100 rounded-full text-green-600" 
+                                                    title="View Test Results"
+                                                >
                                                     <FileCheck size={18} />
                                                 </button>
                                             )}
@@ -462,7 +536,8 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     />
                 )
             )}
-             {isSendTestModalOpen && selectedCandidateForTest && (
+
+            {isSendTestModalOpen && selectedCandidateForTest && (
                 <SendTestModal
                     isOpen={isSendTestModalOpen}
                     onClose={handleCloseSendTestModal}
@@ -471,6 +546,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     onTestSent={handleTestSent}
                 />
             )}
+
             {isResultsModalOpen && selectedAssignmentId && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-screen overflow-y-auto">
@@ -486,3 +562,6 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
             )}
         </div>
     );
+};
+
+export default HiringPipeline;
