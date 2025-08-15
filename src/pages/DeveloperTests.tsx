@@ -28,9 +28,17 @@ const DeveloperTests: React.FC = () => {
                 .select(`
                     *,
                     coding_tests (*),
-                    recruiters:users!test_assignments_recruiter_id_fkey (
-                        name,
-                        email
+                    job_roles!test_assignments_job_id_fkey (
+                        id,
+                        title,
+                        recruiters!fk_job_roles_recruiter_user_id (
+                            user_id,
+                            users!fk_recruiters_user_id (
+                                id,
+                                name,
+                                email
+                            )
+                        )
                     )
                 `)
                 .eq('developer_id', userProfile.id)
@@ -146,10 +154,13 @@ const DeveloperTests: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Recruiter info */}
-                                    {assignment.recruiters && (
+                                    {/* Job and Recruiter info */}
+                                    {assignment.job_roles && (
                                         <div className="text-sm text-gray-600 mb-4">
-                                            <span className="font-medium">From:</span> {assignment.recruiters.name || assignment.recruiters.email}
+                                            <div><span className="font-medium">Job:</span> {assignment.job_roles.title}</div>
+                                            {assignment.job_roles.recruiters?.users && (
+                                                <div><span className="font-medium">From:</span> {assignment.job_roles.recruiters.users.name || assignment.job_roles.recruiters.users.email}</div>
+                                            )}
                                         </div>
                                     )}
 
