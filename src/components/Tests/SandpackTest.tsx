@@ -514,31 +514,226 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
-// Helper function to create framework-specific files - SIMPLIFIED
+// Helper function to create framework-specific files - RESTORED with proper entry points
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string): SandpackFiles => {
-  const files: SandpackFiles = {};
+  const baseFiles: SandpackFiles = {};
   
-  // Only add essential files, let Sandpack handle the rest with its templates
   switch (framework) {
     case 'vue':
-      // Let Sandpack handle the Vue template setup
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "vue-test",
+          version: "1.0.0",
+          main: "src/main.js",
+          scripts: {
+            dev: "vite",
+            build: "vite build"
+          },
+          dependencies: {
+            'vue': '^3.3.4'
+          },
+          devDependencies: {
+            '@vitejs/plugin-vue': '^4.3.4',
+            'vite': '^4.4.9'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/src/main.js'] = {
+        code: `import { createApp } from 'vue'
+import App from './App.vue'
+
+const app = createApp(App)
+app.mount('#app')`,
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Vue App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
       break;
       
     case 'angular':
-      // Let Sandpack handle the Angular template setup
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "angular-test",
+          version: "1.0.0",
+          main: "src/main.ts",
+          scripts: {
+            start: "ng serve",
+            build: "ng build"
+          },
+          dependencies: {
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
+            'rxjs': '^7.8.0',
+            'zone.js': '^0.12.0',
+            'tslib': '^2.5.0'
+          },
+          devDependencies: {
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
+            'jasmine-core': '^4.5.0',
+            'typescript': '^4.9.5',
+            '@types/jasmine': '^4.3.0'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/src/main.ts'] = {
+        code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
+
+platformBrowserDynamic().bootstrapModule(AppModule)
+  .catch(err => console.error(err));`,
+        hidden: true
+      };
+
+      baseFiles['/src/app/app.module.ts'] = {
+        code: `import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppComponent } from './app.component';
+
+@NgModule({
+  declarations: [AppComponent],
+  imports: [BrowserModule],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }`,
+        hidden: true
+      };
+
+      baseFiles['/src/index.html'] = {
+        code: `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Angular Test</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>`,
+        hidden: true
+      };
       break;
 
     case 'javascript':
-      // Let Sandpack handle the vanilla JS template setup
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "javascript-test",
+          version: "1.0.0",
+          main: "src/index.js",
+          scripts: {
+            start: "parcel index.html",
+            test: "jest"
+          },
+          dependencies: {
+            '@testing-library/jest-dom': '^5.16.5'
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
+            'jest': '^29.5.0',
+            'jest-environment-jsdom': '^29.5.0'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/index.html'] = {
+        code: `<!DOCTYPE html>
+<html>
+  <head>
+    <title>JavaScript Test</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="src/index.js"></script>
+  </body>
+</html>`,
+        hidden: true
+      };
       break;
       
     case 'react':
     default:
-      // Let Sandpack handle the React template setup
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "react-test",
+          version: "1.0.0",
+          main: "src/index.js",
+          scripts: {
+            start: "react-scripts start",
+            build: "react-scripts build",
+            test: "react-scripts test"
+          },
+          dependencies: {
+            'react': '^18.2.0',
+            'react-dom': '^18.2.0',
+            'react-scripts': '5.0.1'
+          },
+          devDependencies: {
+            '@testing-library/react': '^13.4.0',
+            '@testing-library/jest-dom': '^5.16.5',
+            '@testing-library/user-event': '^14.4.3'
+          },
+          browserslist: {
+            production: [">0.2%", "not dead", "not op_mini all"],
+            development: ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+          }
+        }, null, 2),
+        hidden: true
+      };
+
+      baseFiles['/public/index.html'] = {
+        code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React Test</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`,
+        hidden: true
+      };
+
+      baseFiles['/src/index.js'] = {
+        code: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from '../App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);`,
+        hidden: true
+      };
       break;
   }
   
-  return files;
+  return baseFiles;
 };
 
 // Main component - RESTORED with proper setup
