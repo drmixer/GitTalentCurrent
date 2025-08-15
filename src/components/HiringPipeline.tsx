@@ -15,11 +15,12 @@ interface KanbanViewProps {
     onSendMessage: (developerId: string, developerName: string, jobRoleId?: string, jobRoleTitle?: string) => void;
     onSendTest: (developerId: string, jobId: string) => void;
     onViewResults: (assignmentId: string) => void;
+    onViewResume: (resumeUrl: string) => void;
 }
 
 const STAGES = ['New', 'Contacted', 'Shortlisted', 'Hired', 'Rejected'];
 
-const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage, onSendTest, onViewResults }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onViewDeveloperProfile, onSendMessage, onSendTest, onViewResults, onViewResume }) => {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: string) => {
         e.preventDefault();
         const candidateId = e.dataTransfer.getData("candidateId");
@@ -46,6 +47,15 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                         <div key={c.id} draggable onDragStart={(e) => handleDragStart(e, c.id)} className="p-3 bg-white rounded-lg shadow-sm mb-3 cursor-grab border border-gray-200">
                             <p className="font-semibold text-gray-900">{c.developer.user?.name || 'Unknown Developer'}</p>
                             <p className="text-sm text-gray-500">{c.job_role.title}</p>
+                            
+                            {/* Resume indicator */}
+                            {c.developer.resume_url && (
+                                <div className="flex items-center space-x-1 text-green-600 text-xs mt-1">
+                                    <FileText size={12} />
+                                    <span>Resume available</span>
+                                </div>
+                            )}
+                            
                             <div className="flex justify-end mt-2 space-x-1">
                                 <button
                                     onClick={() => onViewDeveloperProfile(c.developer)}
@@ -61,6 +71,23 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                 >
                                     <MessageSquare size={16} />
                                 </button>
+                                {c.developer.resume_url ? (
+                                    <button
+                                        onClick={() => onViewResume(c.developer.resume_url!)}
+                                        className="p-1 hover:bg-gray-50 rounded-full text-green-500"
+                                        title="View Resume"
+                                    >
+                                        <FileText size={16} />
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="p-1 rounded-full text-gray-300 cursor-not-allowed"
+                                        title="No Resume Available"
+                                        disabled
+                                    >
+                                        <FileText size={16} />
+                                    </button>
+                                )}
                                 {c.status === 'Completed' ? (
                                      <button onClick={() => onViewResults(c.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="View Test Results">
                                         <FileCheck size={16} />
@@ -119,6 +146,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     assigned_at,
                     developer:developers!inner (
                         user_id,
+                        resume_url,
                         user:users!inner (
                             id,
                             name,
@@ -254,6 +282,12 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         setSelectedAssignmentId(null);
     };
 
+    const handleViewResume = (resumeUrl: string) => {
+        if (resumeUrl) {
+            window.open(resumeUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -321,6 +355,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test Status</th>
+                                    <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resume</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                                     <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -362,6 +397,23 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             )}
                                         </td>
                                         <td className="p-3">
+                                            {c.developer.resume_url ? (
+                                                <button
+                                                    onClick={() => handleViewResume(c.developer.resume_url!)}
+                                                    className="flex items-center space-x-1 text-green-600 hover:text-green-800 text-sm"
+                                                    title="View Resume"
+                                                >
+                                                    <FileText size={14} />
+                                                    <span>View</span>
+                                                </button>
+                                            ) : (
+                                                <span className="text-gray-400 text-sm flex items-center space-x-1">
+                                                    <FileText size={14} />
+                                                    <span>None</span>
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-3">
                                             <input type="text" value={notes[c.id] || c.notes || ''} onChange={e => setNotes(prev => ({...prev, [c.id]: e.target.value}))} onBlur={() => handleUpdateNotes(c.id)} placeholder="Add notes..." className="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" />
                                         </td>
                                         <td className="p-3 flex items-center space-x-2">
@@ -391,7 +443,15 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                         </table>
                     </div>
                 ) : (
-                    <KanbanView candidates={candidates} onUpdateStage={handleUpdateStage} onViewDeveloperProfile={onViewDeveloperProfile} onSendMessage={onSendMessage} onSendTest={handleOpenSendTestModal} onViewResults={handleOpenResultsModal} />
+                    <KanbanView 
+                        candidates={candidates} 
+                        onUpdateStage={handleUpdateStage} 
+                        onViewDeveloperProfile={onViewDeveloperProfile} 
+                        onSendMessage={onSendMessage} 
+                        onSendTest={handleOpenSendTestModal} 
+                        onViewResults={handleOpenResultsModal}
+                        onViewResume={handleViewResume}
+                    />
                 )
             )}
              {isSendTestModalOpen && selectedCandidateForTest && (
