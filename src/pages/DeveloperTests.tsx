@@ -21,7 +21,7 @@ interface ExtendedTestAssignment extends TestAssignment {
   };
 }
 
-export const DeveloperTests: React.FC = () => {
+const DeveloperTests: React.FC = () => {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
   const [testAssignments, setTestAssignments] = useState<ExtendedTestAssignment[]>([]);
@@ -248,3 +248,6 @@ export const DeveloperTests: React.FC = () => {
     </div>
   );
 };
+
+// Export as default to match the import in DeveloperDashboard.tsx
+export default DeveloperTests;
