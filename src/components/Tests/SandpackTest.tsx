@@ -196,33 +196,64 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
   }
 };
 
-// Simplified test results detection component
+// Enhanced test results detection component with status indicators
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
+  onStatusChange?: (status: 'idle' | 'running' | 'complete') => void,
   questionId: string 
-}> = ({ onTestStateChange, questionId }) => {
+}> = ({ onTestStateChange, onStatusChange, questionId }) => {
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
+  const lastStatus = useRef<string>('');
   
   // Reset detection when question changes
   useEffect(() => {
     hasDetectedTests.current = false;
-  }, [questionId]);
+    lastStatus.current = '';
+    if (onStatusChange) {
+      onStatusChange('idle');
+    }
+  }, [questionId, onStatusChange]);
+
+  // Monitor sandpack status changes
+  useEffect(() => {
+    if (sandpack.status !== lastStatus.current) {
+      lastStatus.current = sandpack.status;
+      
+      if (sandpack.status === 'running' || sandpack.status === 'bundling') {
+        if (onStatusChange) {
+          onStatusChange('running');
+        }
+      } else if (sandpack.status === 'complete' || sandpack.status === 'idle') {
+        if (onStatusChange) {
+          onStatusChange('complete');
+        }
+      }
+    }
+  }, [sandpack.status, onStatusChange]);
   
   // Listen for test completion messages from Sandpack
   useEffect(() => {
     if (!sandpackClient) return;
 
     const unsubscribe = sandpackClient.listen((message) => {
+      // Log all messages for debugging
+      if (message.type === 'action' && message.action === 'show-error') {
+        console.log('Sandpack error:', message);
+      }
+      
       // Listen for test completion messages
-      if (message.type === 'test' && message.event === 'test_end' && !hasDetectedTests.current) {
-        hasDetectedTests.current = true;
-        const results = message.results;
-        if (results && Array.isArray(results)) {
-          const allPassed = results.every((result: any) => result.status === 'pass');
-          if (onTestStateChange) {
-            onTestStateChange(allPassed);
+      if (message.type === 'test') {
+        console.log('Test message received:', message);
+        if (message.event === 'test_end' && !hasDetectedTests.current) {
+          hasDetectedTests.current = true;
+          const results = message.results;
+          if (results && Array.isArray(results)) {
+            const allPassed = results.every((result: any) => result.status === 'pass');
+            if (onTestStateChange) {
+              onTestStateChange(allPassed);
+            }
           }
         }
       }
@@ -231,11 +262,15 @@ const TestResultsDisplay: React.FC<{
       if (message.type === 'console' && message.log && !hasDetectedTests.current) {
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
-            // Look for test success indicators
-            if (log.data.includes('✓') || 
-                log.data.includes('PASS') ||
-                (log.data.includes('Tests:') && log.data.includes('passed')) ||
-                log.data.includes('All tests passed')) {
+            console.log('Console log:', log.data);
+            
+            // Look for Jest/React test indicators
+            if (log.data.includes('PASS') && log.data.includes('test') ||
+                log.data.includes('✓') ||
+                (log.data.includes('Tests:') && (log.data.includes('passed') || log.data.includes('1 passed'))) ||
+                log.data.includes('All tests passed') ||
+                log.data.match(/\d+ passing/) ||
+                log.data.includes('Test Suites: 1 passed')) {
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(true);
@@ -244,10 +279,32 @@ const TestResultsDisplay: React.FC<{
             // Look for test failure indicators
             else if (log.data.includes('FAIL') || 
                      log.data.includes('✗') ||
-                     log.data.includes('failed')) {
+                     log.data.includes('failed') ||
+                     log.data.includes('Test Suites: 0 passed') ||
+                     log.data.match(/\d+ failing/)) {
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(false);
+              }
+            }
+            // Angular specific test results
+            else if (log.data.includes('Executed') && log.data.includes('SUCCESS')) {
+              hasDetectedTests.current = true;
+              if (onTestStateChange) {
+                onTestStateChange(true);
+              }
+            }
+            else if (log.data.includes('Executed') && log.data.includes('FAILED')) {
+              hasDetectedTests.current = true;
+              if (onTestStateChange) {
+                onTestStateChange(false);
+              }
+            }
+            // Vue/Vitest specific
+            else if (log.data.includes('Test Files') && log.data.includes('passed')) {
+              hasDetectedTests.current = true;
+              if (onTestStateChange) {
+                onTestStateChange(true);
               }
             }
           }
@@ -265,7 +322,7 @@ const TestResultsDisplay: React.FC<{
   );
 };
 
-// Main layout component with simplified logic
+// Main layout component with status indicators
 const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   assignmentId,
   questionId,
@@ -273,6 +330,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
+  const [runStatus, setRunStatus] = useState<'idle' | 'running' | 'complete'>('idle');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Use refs to prevent unnecessary re-renders
@@ -282,6 +340,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   useEffect(() => {
     setTestResults(null);
     setIsSubmitting(false);
+    setRunStatus('idle');
     submissionInProgress.current = false;
   }, [assignmentId, questionId]);
 
@@ -293,18 +352,38 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setToast(null);
   }, []);
 
+  // Handle status changes from the test runner
+  const handleStatusChange = useCallback((status: 'idle' | 'running' | 'complete') => {
+    setRunStatus(status);
+  }, []);
+
   // Simplified test state change handler
   const handleTestStateChange = useCallback((passed: boolean) => {
     setTestResults({ 
       success: passed, 
       timestamp: Date.now()
     });
+    setRunStatus('complete');
   }, []);
 
   // Memoized test result evaluation
   const allTestsPassed = useMemo(() => {
     return testResults?.success === true;
   }, [testResults]);
+
+  // Get status indicator text and color
+  const getStatusInfo = useMemo(() => {
+    if (runStatus === 'running') {
+      return { text: '🔄 Running tests...', color: '#007bff' };
+    } else if (testResults) {
+      return {
+        text: allTestsPassed ? '✅ All tests passed!' : '❌ Some tests failed',
+        color: allTestsPassed ? '#28a745' : '#dc3545'
+      };
+    } else {
+      return { text: 'Click the run button (▶️) in Sandpack to test your solution', color: '#666' };
+    }
+  }, [runStatus, testResults, allTestsPassed]);
 
   // Optimized submission function with singleton client
   const submitSolution = useCallback(async () => {
@@ -386,10 +465,30 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
             alignItems: 'center'
           }}>
             <span>Test Results</span>
+            {runStatus === 'running' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: '#007bff'
+              }}>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #007bff',
+                  borderTop: '2px solid transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Running...
+              </div>
+            )}
           </div>
           <div style={{ flex: 1 }}>
             <TestResultsDisplay 
               onTestStateChange={handleTestStateChange}
+              onStatusChange={handleStatusChange}
               questionId={questionId}
             />
           </div>
@@ -397,14 +496,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       </SandpackLayout>
       
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '14px', color: '#666' }}>
-          {testResults ? (
-            <span style={{ color: allTestsPassed ? '#28a745' : '#dc3545' }}>
-              {allTestsPassed ? '✅ All tests passed!' : '❌ Some tests failed'}
-            </span>
-          ) : (
-            <span>Use the built-in run button to test your solution</span>
-          )}
+        <div style={{ fontSize: '14px', color: getStatusInfo.color }}>
+          {getStatusInfo.text}
         </div>
         <button
           onClick={submitSolution}
@@ -423,6 +516,14 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
           {isSubmitting ? 'Submitting...' : 'Submit Solution'}
         </button>
       </div>
+
+      {/* Add CSS animation for spinner */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 };
@@ -974,4 +1075,3 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
 SandpackTest.displayName = 'SandpackTest';
 
 export default SandpackTest;
-
