@@ -333,7 +333,6 @@ const TestResultsDisplay: React.FC<{
   }, [sandpack.status, onTestStateChange, hasRun]);
 
   const handleRunTests = useCallback(() => {
-    setHasRun(true);
     setIsRunning(true);
     hasDetectedTests.current = false;
     vueTestExecuted.current = false;
