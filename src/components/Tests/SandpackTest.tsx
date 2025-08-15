@@ -145,6 +145,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@angular/core/testing': '^16.0.0',
             '@angular/common/testing': '^16.0.0',
             '@angular/platform-browser/testing': '^16.0.0',
+            '@angular/forms/testing': '^16.0.0',
             'jasmine-core': '^4.6.0',
             'typescript': '^5.0.0',
             '@types/jasmine': '^4.3.0',
@@ -796,6 +797,7 @@ platformBrowserDynamic().bootstrapModule(AppModule)
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
+import { ReactiveFormsModule } from '@angular/forms';
 
 import { AppComponent } from './app.component';
 
@@ -804,7 +806,8 @@ import { AppComponent } from './app.component';
     AppComponent
   ],
   imports: [
-    BrowserModule
+    BrowserModule,
+    ReactiveFormsModule
   ],
   providers: [],
   bootstrap: [AppComponent]
