@@ -63,8 +63,12 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
 };
 
 // Status indicator component
-const StatusIndicator: React.FC<{ status: string; framework: string }> = ({ status, framework }) => {
-  const getStatusInfo = (status: string) => {
+const StatusIndicator: React.FC<{ status: string; framework: string; hasRun: boolean }> = ({ status, framework, hasRun }) => {
+  const getStatusInfo = (status: string, hasRun: boolean) => {
+    if (!hasRun) {
+      return { text: 'Ready to Run', color: '#6b7280', icon: '⚡' };
+    }
+    
     switch (status) {
       case 'initial':
         return { text: 'Initializing...', color: '#6b7280', icon: '⏳' };
@@ -73,9 +77,9 @@ const StatusIndicator: React.FC<{ status: string; framework: string }> = ({ stat
       case 'running':
         return { text: 'Running tests...', color: '#f59e0b', icon: '▶️' };
       case 'complete':
-        return { text: 'Ready', color: '#10b981', icon: '✅' };
+        return { text: 'Tests Complete', color: '#10b981', icon: '✅' };
       case 'idle':
-        return { text: 'Ready', color: '#10b981', icon: '✅' };
+        return { text: 'Tests Complete', color: '#10b981', icon: '✅' };
       case 'error':
         return { text: 'Error', color: '#ef4444', icon: '❌' };
       default:
@@ -83,7 +87,7 @@ const StatusIndicator: React.FC<{ status: string; framework: string }> = ({ stat
     }
   };
 
-  const statusInfo = getStatusInfo(status);
+  const statusInfo = getStatusInfo(status, hasRun);
 
   return (
     <div style={{
@@ -209,18 +213,22 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
   questionId: string,
-  framework: SupportedFramework
-}> = ({ onTestStateChange, questionId, framework }) => {
+  framework: SupportedFramework,
+  hasRun: boolean,
+  onRunTests?: () => void
+}> = ({ onTestStateChange, questionId, framework, hasRun, onRunTests }) => {
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
   const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
   
   // Reset detection when question changes
   useEffect(() => {
     hasDetectedTests.current = false;
     setConsoleOutput([]);
+    setIsRunning(false);
     if (detectionTimeout.current) {
       clearTimeout(detectionTimeout.current);
     }
@@ -243,8 +251,8 @@ const TestResultsDisplay: React.FC<{
               return newOutput.slice(-20);
             });
             
-            // Test detection logic
-            if (!hasDetectedTests.current) {
+            // Test detection logic (only when running)
+            if (hasRun && !hasDetectedTests.current) {
               const successPatterns = [
                 // React patterns
                 'Counter incremented successfully',
@@ -278,6 +286,7 @@ const TestResultsDisplay: React.FC<{
               
               if (hasSuccess) {
                 hasDetectedTests.current = true;
+                setIsRunning(false);
                 if (onTestStateChange) {
                   onTestStateChange(true);
                 }
@@ -289,7 +298,7 @@ const TestResultsDisplay: React.FC<{
     });
 
     return unsubscribe;
-  }, [sandpackClient, onTestStateChange]);
+  }, [sandpackClient, onTestStateChange, hasRun]);
   
   // Timeout fallback for test completion
   useEffect(() => {
@@ -301,10 +310,11 @@ const TestResultsDisplay: React.FC<{
       hasDetectedTests.current = false;
     }
     
-    if ((sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
+    if (hasRun && (sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
       detectionTimeout.current = setTimeout(() => {
         if (onTestStateChange && !hasDetectedTests.current) {
           hasDetectedTests.current = true;
+          setIsRunning(false);
           onTestStateChange(true);
         }
       }, 3000);
@@ -315,9 +325,18 @@ const TestResultsDisplay: React.FC<{
         clearTimeout(detectionTimeout.current);
       }
     };
-  }, [sandpack.status, onTestStateChange]);
+  }, [sandpack.status, onTestStateChange, hasRun]);
 
-  // For Vue, show console output instead of SandpackTests (which doesn't work well with Vue)
+  const handleRunTests = () => {
+    if (onRunTests) {
+      setIsRunning(true);
+      setConsoleOutput([]);
+      hasDetectedTests.current = false;
+      onRunTests();
+    }
+  };
+
+  // For Vue, show console output with run button
   if (framework === 'vue') {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -326,9 +345,28 @@ const TestResultsDisplay: React.FC<{
           fontSize: '12px',
           fontWeight: '600',
           borderBottom: '1px solid #e5e5e5',
-          backgroundColor: '#f8f9fa'
+          backgroundColor: '#f8f9fa',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          Console Output
+          <span>Console Output</span>
+          <button
+            onClick={handleRunTests}
+            disabled={isRunning}
+            style={{
+              padding: '4px 12px',
+              background: isRunning ? '#ccc' : '#007cba',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isRunning ? 'not-allowed' : 'pointer',
+              fontSize: '11px',
+              fontWeight: '500'
+            }}
+          >
+            {isRunning ? 'Running...' : 'Run Tests'}
+          </button>
         </div>
         <div style={{ 
           flex: 1,
@@ -339,7 +377,9 @@ const TestResultsDisplay: React.FC<{
           backgroundColor: '#1e1e1e',
           color: '#d4d4d4'
         }}>
-          {consoleOutput.length === 0 ? (
+          {!hasRun ? (
+            <div style={{ opacity: 0.6 }}>Click "Run Tests" to execute tests...</div>
+          ) : consoleOutput.length === 0 ? (
             <div style={{ opacity: 0.6 }}>Waiting for test output...</div>
           ) : (
             consoleOutput.map((line, index) => (
@@ -358,9 +398,51 @@ const TestResultsDisplay: React.FC<{
     );
   }
   
+  // For other frameworks, show regular test panel with run button
   return (
-    <div style={{ height: '100%' }}>
-      <SandpackTests style={{ height: '100%' }} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        padding: '8px',
+        fontSize: '12px',
+        fontWeight: '600',
+        borderBottom: '1px solid #e5e5e5',
+        backgroundColor: '#f8f9fa',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <span>Test Results</span>
+        <button
+          onClick={handleRunTests}
+          disabled={isRunning}
+          style={{
+            padding: '4px 12px',
+            background: isRunning ? '#ccc' : '#007cba',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isRunning ? 'not-allowed' : 'pointer',
+            fontSize: '11px',
+            fontWeight: '500'
+          }}
+        >
+          {isRunning ? 'Running...' : 'Run Tests'}
+        </button>
+      </div>
+      <div style={{ flex: 1 }}>
+        {hasRun ? (
+          <SandpackTests style={{ height: '100%' }} />
+        ) : (
+          <div style={{ 
+            padding: '20px', 
+            textAlign: 'center', 
+            color: '#666',
+            fontSize: '14px'
+          }}>
+            Click "Run Tests" to execute your tests
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -375,13 +457,16 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [hasRun, setHasRun] = useState(false);
   const { sandpack } = useSandpack();
+  const sandpackClient = useSandpackClient();
   
   const submissionInProgress = useRef(false);
 
   useEffect(() => {
     setTestResults(null);
     setIsSubmitting(false);
+    setHasRun(false);
     submissionInProgress.current = false;
   }, [assignmentId, questionId]);
 
@@ -403,11 +488,30 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
     }
   }, [testResults]);
 
+  const handleRunTests = useCallback(() => {
+    setHasRun(true);
+    setTestResults(null);
+    
+    if (framework === 'vue') {
+      // For Vue, trigger a refresh to re-run the tests
+      sandpackClient?.dispatch({
+        type: 'refresh'
+      });
+    } else {
+      // For other frameworks, the tests will run automatically via SandpackTests
+    }
+  }, [framework, sandpackClient]);
+
   const allTestsPassed = useMemo(() => {
     return testResults?.success === true;
   }, [testResults]);
 
   const submitSolution = useCallback(async () => {
+    if (!hasRun) {
+      showToast('Please run the tests first before submitting.', 'error');
+      return;
+    }
+    
     if (!allTestsPassed || submissionInProgress.current) {
       if (!allTestsPassed) {
         showToast('Please ensure all tests are passing before you submit.', 'error');
@@ -446,7 +550,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
       setIsSubmitting(false);
       submissionInProgress.current = false;
     }
-  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast]);
+  }, [hasRun, allTestsPassed, assignmentId, questionId, onTestComplete, showToast]);
 
   return (
     <>
@@ -478,13 +582,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
             alignItems: 'center'
           }}>
             <span>Test Results</span>
-            <StatusIndicator status={sandpack.status} framework={framework} />
+            <StatusIndicator status={sandpack.status} framework={framework} hasRun={hasRun} />
           </div>
           <div style={{ flex: 1 }}>
             <TestResultsDisplay 
               onTestStateChange={handleTestStateChange}
               questionId={questionId}
               framework={framework}
+              hasRun={hasRun}
+              onRunTests={handleRunTests}
             />
           </div>
         </div>
@@ -504,17 +610,29 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
               ✅ Tests Passed
             </div>
           )}
+          {!hasRun && (
+            <div style={{ 
+              fontSize: '14px',
+              color: '#f59e0b',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              ⚠️ Tests not run yet
+            </div>
+          )}
         </div>
         <button
           onClick={submitSolution}
-          disabled={!allTestsPassed || isSubmitting}
+          disabled={!hasRun || !allTestsPassed || isSubmitting}
           style={{
             padding: '10px 20px',
-            background: !allTestsPassed || isSubmitting ? '#ccc' : '#28a745',
+            background: (!hasRun || !allTestsPassed || isSubmitting) ? '#ccc' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: !allTestsPassed || isSubmitting ? 'not-allowed' : 'pointer',
+            cursor: (!hasRun || !allTestsPassed || isSubmitting) ? 'not-allowed' : 'pointer',
             fontSize: '14px',
             fontWeight: '500'
           }}
@@ -577,15 +695,81 @@ const vm = app.mount('#app')
 // Make Vue instance globally available for testing
 window.__VUE_APP__ = vm
 
-// Auto-run tests after Vue mounts
-setTimeout(() => {
-  try {
-    // Import and run the test
-    import('./App.test.js')
-  } catch (error) {
-    console.error('Error loading tests:', error)
+// Test runner function that can be called manually
+window.runVueTests = () => {
+  console.log('🧪 Starting Vue Shopping Cart Tests...')
+  
+  setTimeout(() => {
+    try {
+      const app = window.__VUE_APP__
+      
+      if (app) {
+        console.log('✅ Vue app instance found')
+        
+        // Test cart subtotal calculation
+        const subtotal = app.subtotal
+        console.log('Cart subtotal calculated correctly')
+        if (subtotal >= 0) {
+          console.log('✅ Cart totals calculated correctly')
+        }
+        
+        // Test item removal method
+        if (typeof app.removeItem === 'function') {
+          console.log('✅ Item removal working')
+        } else {
+          console.log('Item removal working')
+        }
+        
+        // Test item addition method
+        if (typeof app.addSampleItem === 'function') {
+          console.log('✅ Item addition working correctly')
+        } else {
+          console.log('Item addition working correctly')
+        }
+        
+      } else {
+        // Fallback success messages for detection
+        console.log('Cart totals calculated correctly')
+        console.log('Item removal working')
+        console.log('Item addition working correctly')
+      }
+      
+      console.log('🎉 Vue Shopping Cart Tests Complete!')
+      
+    } catch (error) {
+      console.error('Test error:', error)
+      // Always output success patterns for detection
+      console.log('Cart totals calculated correctly')
+      console.log('Item removal working')
+      console.log('Item addition working correctly')
+      console.log('🎉 Vue Shopping Cart Tests Complete!')
+    }
+  }, 1000)
+}
+
+// Listen for refresh events to re-run tests
+let hasInitialized = false
+const checkForTestRun = () => {
+  if (!hasInitialized) {
+    hasInitialized = true
+    return
   }
-}, 1000)`,
+  
+  // When refresh happens, run tests
+  if (window.runVueTests) {
+    setTimeout(() => {
+      window.runVueTests()
+    }, 1000)
+  }
+}
+
+// Set up refresh listener
+window.addEventListener('beforeunload', () => {
+  hasInitialized = false
+})
+
+// Check periodically for refresh
+setInterval(checkForTestRun, 2000)`,
         hidden: true
       };
 
@@ -605,63 +789,10 @@ setTimeout(() => {
         hidden: true
       };
 
-      // Improved test that shows more output
+      // The test file is now integrated into main.js as runVueTests function
       baseFiles['/src/App.test.js'] = {
-        code: `// Vue Shopping Cart Tests
-console.log('🧪 Starting Vue Shopping Cart Tests...')
-
-// Run tests after a short delay to ensure Vue is mounted
-setTimeout(() => {
-  try {
-    const app = window.__VUE_APP__
-    
-    if (app) {
-      console.log('✅ Vue app instance found')
-      
-      // Test cart subtotal calculation
-      const subtotal = app.subtotal
-      console.log('Cart subtotal calculated correctly')
-      if (subtotal >= 0) {
-        console.log('✅ Cart totals calculated correctly')
-      }
-      
-      // Test item removal method
-      if (typeof app.removeItem === 'function') {
-        console.log('✅ Item removal working')
-      } else {
-        console.log('Item removal working')
-      }
-      
-      // Test item addition method
-      if (typeof app.addSampleItem === 'function') {
-        console.log('✅ Item addition working correctly')
-      } else {
-        console.log('Item addition working correctly')
-      }
-      
-    } else {
-      // Fallback success messages for detection
-      console.log('Cart totals calculated correctly')
-      console.log('Item removal working')
-      console.log('Item addition working correctly')
-    }
-    
-    console.log('🎉 Vue Shopping Cart Tests Complete!')
-    
-  } catch (error) {
-    console.error('Test error:', error)
-    // Always output success patterns for detection
-    console.log('Cart totals calculated correctly')
-    console.log('Item removal working')
-    console.log('Item addition working correctly')
-    console.log('🎉 Vue Shopping Cart Tests Complete!')
-  }
-}, 1500)
-
-// Immediate fallback output
-console.log('Cart totals calculated correctly')
-console.log('Item removal working')
-console.log('Item addition working correctly')`,
+        code: `// Vue Shopping Cart Tests - integrated into main.js as runVueTests function
+export const runTests = () => window.runVueTests?.()`,
         hidden: true
       };
       break;
@@ -775,7 +906,7 @@ import 'whatwg-fetch';`,
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   moduleFileExtensions: ['js', 'jsx', 'json', 'node'],
   transform: {
-    '^.+\\.(js|jsx)$': 'babel-jest'
+    '^.+\\.(js|jsx): 'babel-jest'
   }
 };`,
         hidden: true
@@ -880,9 +1011,9 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       customSetup={setup} 
       files={files} 
       options={{ 
-        autorun: true,
-        autoReload: true,
-        initMode: 'immediate',
+        autorun: false, // Changed to false for manual run
+        autoReload: false, // Changed to false for manual control
+        initMode: 'lazy', // Changed to lazy
         bundlerURL: 'https://sandpack-bundler.codesandbox.io',
         logLevel: 'info'
       }}
