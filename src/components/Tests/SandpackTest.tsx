@@ -243,6 +243,17 @@ const TestResultsDisplay: React.FC<{
         console.log('Sandpack error:', message);
       }
       
+      // Handle errors and log them
+      if (message.type === 'error') {
+        console.log('Sandpack error message:', message);
+        if (!hasDetectedTests.current) {
+          hasDetectedTests.current = true;
+          if (onTestStateChange) {
+            onTestStateChange(false);
+          }
+        }
+      }
+      
       // Listen for test completion messages
       if (message.type === 'test') {
         console.log('Test message received:', message);
@@ -263,6 +274,20 @@ const TestResultsDisplay: React.FC<{
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
             console.log('Console log:', log.data);
+            
+            // Look for compilation/runtime errors first
+            if (log.data.includes('ERROR') || 
+                log.data.includes('RuntimeError') ||
+                log.data.includes('NG0') ||
+                log.data.includes('TypeError') ||
+                log.data.includes('ReferenceError')) {
+              console.log('Detected error in console:', log.data);
+              hasDetectedTests.current = true;
+              if (onTestStateChange) {
+                onTestStateChange(false);
+              }
+              return;
+            }
             
             // Look for Jest/React test indicators
             if (log.data.includes('PASS') && log.data.includes('test') ||
@@ -377,7 +402,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       return { text: '🔄 Running tests...', color: '#007bff' };
     } else if (testResults) {
       return {
-        text: allTestsPassed ? '✅ All tests passed!' : '❌ Some tests failed',
+        text: allTestsPassed ? '✅ All tests passed!' : '❌ Tests failed - check console for errors',
         color: allTestsPassed ? '#28a745' : '#dc3545'
       };
     } else {
