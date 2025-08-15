@@ -17,6 +17,7 @@ const TestPage: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
     const [lastResult, setLastResult] = useState<any>(null);
+    const [completedQuestions, setCompletedQuestions] = useState<Set<string>>(new Set());
     const navigate = useNavigate();
 
     const fetchAssignmentAndQuestions = useCallback(async () => {
@@ -120,6 +121,28 @@ const TestPage: React.FC = () => {
         }
     };
 
+    const updateTestAssignmentStatus = async () => {
+        if (!assignmentId) return;
+        
+        try {
+            const { error } = await supabase
+                .from('test_assignments')
+                .update({ 
+                    status: 'Completed',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', assignmentId);
+
+            if (error) {
+                console.error('Error updating test assignment status:', error);
+            } else {
+                console.log('Test assignment status updated to Completed');
+            }
+        } catch (error) {
+            console.error('Error updating test assignment status:', error);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!assignmentId) return;
         setIsSubmitting(true);
@@ -141,6 +164,9 @@ const TestPage: React.FC = () => {
                 setOutput(`Error submitting code: ${error.message}`);
             } else if (data) {
                 setLastResult(data);
+                
+                // Mark this question as completed
+                setCompletedQuestions(prev => new Set([...prev, question.id]));
                 
                 // Display detailed results
                 let resultOutput = '';
@@ -173,11 +199,12 @@ const TestPage: React.FC = () => {
         }
     };
 
-    const handleNextQuestion = () => {
+    const handleNextQuestion = async () => {
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
-            // Test completed
+            // Test completed - update the test assignment status
+            await updateTestAssignmentStatus();
             setIsCompleted(true);
             setTimeout(() => {
                 navigate('/developer');
@@ -242,7 +269,21 @@ const TestPage: React.FC = () => {
                         testCode={currentQuestion.test_code}
                         assignmentId={assignmentId!}
                         questionId={currentQuestion.id}
-                        onTestComplete={handleNextQuestion}
+                        onTestComplete={async () => {
+                            // Mark this question as completed
+                            setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
+                            
+                            if (currentQuestionIndex < questions.length - 1) {
+                                setCurrentQuestionIndex(currentQuestionIndex + 1);
+                            } else {
+                                // Test completed - update the test assignment status
+                                await updateTestAssignmentStatus();
+                                setIsCompleted(true);
+                                setTimeout(() => {
+                                    navigate('/developer');
+                                }, 3000);
+                            }
+                        }}
                     />
                 </div>
             </div>
