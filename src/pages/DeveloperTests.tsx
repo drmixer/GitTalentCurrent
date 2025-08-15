@@ -8,7 +8,11 @@ import { Clock, FileText, CheckCircle, XCircle, Loader, AlertCircle, Play } from
 import { useNavigate } from 'react-router-dom';
 
 interface ExtendedTestAssignment extends TestAssignment {
-  coding_tests: CodingTest;
+  coding_tests: CodingTest & {
+    coding_questions: Array<{
+      language: string;
+    }>;
+  };
   job_roles: JobRole & {
     recruiters: {
       company_name: string;
@@ -49,10 +53,12 @@ const DeveloperTests: React.FC = () => {
             id,
             title,
             description,
-            language,
             difficulty,
             time_limit,
-            created_at
+            created_at,
+            coding_questions (
+              language
+            )
           ),
           job_roles!test_assignments_job_id_fkey (
             id,
@@ -133,6 +139,14 @@ const DeveloperTests: React.FC = () => {
     return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   };
 
+  // Helper function to get the primary language for a test (from first question)
+  const getTestLanguage = (codingTest: ExtendedTestAssignment['coding_tests']): string => {
+    if (codingTest.coding_questions && codingTest.coding_questions.length > 0) {
+      return codingTest.coding_questions[0].language;
+    }
+    return 'N/A';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -201,7 +215,7 @@ const DeveloperTests: React.FC = () => {
                     <div className="flex items-center">
                       <span className="font-medium mr-1">Language:</span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                        {assignment.coding_tests.language}
+                        {getTestLanguage(assignment.coding_tests)}
                       </span>
                     </div>
                     <div>
