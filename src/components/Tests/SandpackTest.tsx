@@ -655,7 +655,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
         </button>
       </div>
 
-      {/* Add CSS animation for spinner */}
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -727,7 +726,6 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      // Completely rewrite the Angular setup to use a simple validation approach
       baseFiles['/src/polyfills.ts'] = {
         code: `import 'zone.js';`,
         hidden: true
@@ -764,15 +762,12 @@ export class AppModule { }`,
         hidden: true
       };
 
-      // Simple validation script instead of complex TestBed setup
       baseFiles['/src/test-validator.ts'] = {
-        code: `// Simple validation script for Angular components
-import { AppComponent } from './app/app.component';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+        code: `import { AppComponent } from './app/app.component';
+import { FormBuilder } from '@angular/forms';
 import { Injectable } from '@angular/core';
 import { of } from 'rxjs';
 
-// Mock UserService for testing
 @Injectable({
   providedIn: 'root'
 })
@@ -798,15 +793,68 @@ export class UserService {
   }
 }
 
-// Simple component validation
 function validateAngularComponent() {
   console.log('🔍 Starting Angular component validation...');
   
   try {
-    // Check if AppComponent class exists
     if (typeof AppComponent !== 'function') {
       throw new Error('AppComponent class not found or not properly exported');
     }
+    console.log('✅ AppComponent class found');
+    
+    const formBuilder = new FormBuilder();
+    const userService = new UserService();
+    
+    const component = new AppComponent(formBuilder, userService);
+    
+    if (!component) {
+      throw new Error('Failed to create component instance');
+    }
+    console.log('✅ Component instance created');
+    
+    if (typeof component.ngOnInit === 'function') {
+      component.ngOnInit();
+      console.log('✅ ngOnInit method exists and callable');
+    }
+    
+    if (component.userForm) {
+      console.log('✅ userForm property exists');
+      
+      if (component.userForm.get('name') && component.userForm.get('email')) {
+        console.log('✅ Form controls (name, email) exist');
+      } else {
+        throw new Error('Required form controls missing');
+      }
+      
+      component.userForm.patchValue({
+        name: 'Test User',
+        email: 'test@example.com'
+      });
+      
+      if (component.userForm.valid) {
+        console.log('✅ Form validation working correctly');
+      } else {
+        console.log('⚠️ Form validation may have issues');
+      }
+    } else {
+      throw new Error('userForm property not found');
+    }
+    
+    if (Array.isArray(component.users)) {
+      console.log('✅ users property is an array');
+    } else {
+      throw new Error('users property not found or not an array');
+    }
+    
+    const requiredMethods = ['loadUsers', 'addUser', 'deleteUser'];
+    const missingMethods = requiredMethods.filter(method => typeof component[method] !== 'function');
+    
+    if (missingMethods.length === 0) {
+      console.log('✅ All required methods exist');
+    } else {
+      throw new Error(\`Missing required methods: \${missingMethods.join(', ')}\`);
+    }
+    
     console.log('✅ All tests passed!');
     console.log('✅ Component validation successful');
     return true;
@@ -818,7 +866,6 @@ function validateAngularComponent() {
   }
 }
 
-// Run validation automatically
 setTimeout(() => {
   try {
     const isValid = validateAngularComponent();
@@ -919,7 +966,6 @@ export { validateAngularComponent, UserService };`,
         hidden: true
       };
 
-      // Simplified TypeScript config
       baseFiles['/tsconfig.json'] = {
         code: `{
   "compileOnSave": false,
@@ -1049,7 +1095,6 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     // Framework-specific configurations
     switch (framework) {
       case 'angular':
-        // Remove test script for Angular since we use custom validation
         delete basePackage.scripts.test;
         break;
       case 'javascript':
@@ -1066,9 +1111,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   const files = useMemo(() => {
     const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
     
-    // For Angular, use our custom validation approach instead of TestBed
     if (framework === 'angular') {
-      // Don't include a separate test file - validation is handled by the validator
       return {
         [mainFile]: { 
           code: starterCode, 
@@ -1099,17 +1142,15 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     };
   }, [framework, starterCode, testCode, mainFile, testFile, packageJson]);
 
-  // Use a key that changes when the question changes to force remount
   const sandpackKey = useMemo(() => 
     `${assignmentId}-${questionId}-${framework}`, 
     [assignmentId, questionId, framework]
   );
 
-  // Framework-specific Sandpack options
   const getSandpackOptions = useCallback(() => {
     const baseOptions = {
-      autorun: false,  // Prevent auto-running for all frameworks
-      autoReload: false, // Prevent auto-reloading for all frameworks
+      autorun: false,
+      autoReload: false,
       initMode: 'user-visible' as const,
       logLevel: 'info' as const,
       recompileMode: 'delayed' as const,
@@ -1119,7 +1160,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       case 'angular':
         return {
           ...baseOptions,
-          recompileDelay: 2000, // Shorter delay since we're not using TestBed
+          recompileDelay: 2000,
           bundlerURL: undefined,
         };
       
@@ -1171,67 +1212,4 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
 
 SandpackTest.displayName = 'SandpackTest';
 
-export default SandpackTest; AppComponent class found');
-    
-    // Create a mock FormBuilder
-    const formBuilder = new FormBuilder();
-    const userService = new UserService();
-    
-    // Try to instantiate the component with mocked dependencies
-    const component = new AppComponent(formBuilder, userService);
-    
-    if (!component) {
-      throw new Error('Failed to create component instance');
-    }
-    console.log('✅ Component instance created');
-    
-    // Check if ngOnInit exists and can be called
-    if (typeof component.ngOnInit === 'function') {
-      component.ngOnInit();
-      console.log('✅ ngOnInit method exists and callable');
-    }
-    
-    // Check if userForm exists after initialization
-    if (component.userForm) {
-      console.log('✅ userForm property exists');
-      
-      // Check form controls
-      if (component.userForm.get('name') && component.userForm.get('email')) {
-        console.log('✅ Form controls (name, email) exist');
-      } else {
-        throw new Error('Required form controls missing');
-      }
-      
-      // Test form validation
-      component.userForm.patchValue({
-        name: 'Test User',
-        email: 'test@example.com'
-      });
-      
-      if (component.userForm.valid) {
-        console.log('✅ Form validation working correctly');
-      } else {
-        console.log('⚠️ Form validation may have issues');
-      }
-    } else {
-      throw new Error('userForm property not found');
-    }
-    
-    // Check if users array exists
-    if (Array.isArray(component.users)) {
-      console.log('✅ users property is an array');
-    } else {
-      throw new Error('users property not found or not an array');
-    }
-    
-    // Check if required methods exist
-    const requiredMethods = ['loadUsers', 'addUser', 'deleteUser'];
-    const missingMethods = requiredMethods.filter(method => typeof component[method] !== 'function');
-    
-    if (missingMethods.length === 0) {
-      console.log('✅ All required methods exist');
-    } else {
-      throw new Error(\`Missing required methods: \${missingMethods.join(', ')}\`);
-    }
-    
-    console.log('✅
+export default SandpackTest;
