@@ -88,8 +88,8 @@ const KanbanView: React.FC<KanbanViewProps> = ({ candidates, onUpdateStage, onVi
                                         <FileText size={16} />
                                     </button>
                                 )}
-                                {c.status === 'Completed' ? (
-                                     <button onClick={() => onViewResults(c.id)} className="p-1 hover:bg-gray-50 rounded-full text-gray-500" title="View Test Results">
+                                {c.test_assignment && c.test_assignment.status === 'Completed' ? (
+                                     <button onClick={() => onViewResults(c.test_assignment.id)} className="p-1 hover:bg-gray-50 rounded-full text-green-500" title="View Test Results">
                                         <FileCheck size={16} />
                                     </button>
                                 ) : (
@@ -163,11 +163,13 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                     ),
                     test_assignment:test_assignments (
                         id,
-                        status
+                        status,
+                        updated_at
                     )
                 `)
                 .eq('recruiter_id', userProfile.id)
-                .neq('status', 'Hired');
+                .neq('status', 'Hired')
+                .order('assigned_at', { ascending: false });
 
             if (assignmentsError) {
                 throw assignmentsError;
@@ -288,6 +290,20 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
         }
     };
 
+    const getTestStatusDisplay = (testAssignment: any) => {
+        if (!testAssignment) {
+            return <span className="text-gray-500 text-sm">Not Sent</span>;
+        }
+        
+        return (
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                testAssignment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+            }`}>
+                {testAssignment.status}
+            </span>
+        );
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -386,15 +402,7 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             </select>
                                         </td>
                                         <td className="p-3">
-                                            {c.test_assignment ? (
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                    c.test_assignment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                    {c.test_assignment.status}
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-500">Not Sent</span>
-                                            )}
+                                            {getTestStatusDisplay(c.test_assignment)}
                                         </td>
                                         <td className="p-3">
                                             {c.developer.resume_url ? (
@@ -431,8 +439,8 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
                                             <button onClick={() => handleOpenSendTestModal(c.developer.user_id, c.job_role.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="Send Test">
                                                 <Code size={18} />
                                             </button>
-                                            {c.test_assignment && (
-                                                <button onClick={() => handleOpenResultsModal(c.test_assignment.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600" title="View Test Results">
+                                            {c.test_assignment && c.test_assignment.status === 'Completed' && (
+                                                <button onClick={() => handleOpenResultsModal(c.test_assignment.id)} className="p-2 hover:bg-gray-100 rounded-full text-green-600" title="View Test Results">
                                                     <FileCheck size={18} />
                                                 </button>
                                             )}
@@ -478,6 +486,3 @@ const HiringPipeline: React.FC<HiringPipelineProps> = ({ onSendMessage, onViewDe
             )}
         </div>
     );
-};
-
-export default HiringPipeline;
