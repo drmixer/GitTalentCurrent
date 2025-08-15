@@ -128,27 +128,22 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
       return {
         setup: {
           dependencies: {
-            '@angular/animations': '^16.0.0',
-            '@angular/common': '^16.0.0',
-            '@angular/compiler': '^16.0.0',
-            '@angular/core': '^16.0.0',
-            '@angular/forms': '^16.0.0',
-            '@angular/platform-browser': '^16.0.0',
-            '@angular/platform-browser-dynamic': '^16.0.0',
-            '@angular/router': '^16.0.0',
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
             'rxjs': '^7.8.0',
-            'zone.js': '^0.13.0',
-            'tslib': '^2.5.0',
+            'zone.js': '^0.12.0',
+            'tslib': '^2.3.0',
           },
           devDependencies: {
-            '@angular/testing': '^16.0.0',
-            '@angular/core/testing': '^16.0.0',
-            '@angular/common/testing': '^16.0.0',
-            '@angular/platform-browser/testing': '^16.0.0',
-            '@angular/forms/testing': '^16.0.0',
-            'jasmine-core': '^4.6.0',
-            'typescript': '^5.0.0',
+            '@angular/testing': '^15.2.0',
             '@types/jasmine': '^4.3.0',
+            'jasmine-core': '^4.5.0',
+            'typescript': '^4.9.0',
           },
           template: 'angular',
         },
@@ -190,6 +185,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
           devDependencies: {
             '@types/jest': '^29.5.5',
           },
+          template: 'react',
         },
         mainFile: '/App.js',
         testFile: '/App.test.js',
@@ -201,8 +197,9 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
   onStatusChange?: (status: 'idle' | 'running' | 'complete') => void,
-  questionId: string 
-}> = ({ onTestStateChange, onStatusChange, questionId }) => {
+  questionId: string,
+  framework: SupportedFramework 
+}> = ({ onTestStateChange, onStatusChange, questionId, framework }) => {
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
@@ -239,11 +236,6 @@ const TestResultsDisplay: React.FC<{
     if (!sandpackClient) return;
 
     const unsubscribe = sandpackClient.listen((message) => {
-      // Log all messages for debugging
-      if (message.type === 'action' && message.action === 'show-error') {
-        console.log('Sandpack error:', message);
-      }
-      
       // Handle errors and log them
       if (message.type === 'error') {
         console.log('Sandpack error message:', message);
@@ -274,63 +266,110 @@ const TestResultsDisplay: React.FC<{
       if (message.type === 'console' && message.log && !hasDetectedTests.current) {
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
-            console.log('Console log:', log.data);
+            const logData = log.data;
+            console.log(`[${framework}] Console log:`, logData);
             
-            // Look for compilation/runtime errors first
-            if (log.data.includes('ERROR') || 
-                log.data.includes('RuntimeError') ||
-                log.data.includes('NG0') ||
-                log.data.includes('TypeError') ||
-                log.data.includes('ReferenceError')) {
-              console.log('Detected error in console:', log.data);
+            // Framework-specific error detection
+            const hasError = 
+              logData.includes('ERROR') || 
+              logData.includes('RuntimeError') ||
+              logData.includes('TypeError') ||
+              logData.includes('ReferenceError') ||
+              logData.includes('SyntaxError') ||
+              logData.includes('Failed to compile') ||
+              logData.includes('Module not found') ||
+              (framework === 'angular' && logData.includes('NG0')) ||
+              (framework === 'vue' && logData.includes('[Vue warn]')) ||
+              (framework === 'react' && logData.includes('Warning: React'));
+
+            if (hasError) {
+              console.log(`[${framework}] Detected error in console:`, logData);
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(false);
               }
               return;
             }
-            
-            // Look for Jest/React test indicators
-            if (log.data.includes('PASS') && log.data.includes('test') ||
-                log.data.includes('✓') ||
-                (log.data.includes('Tests:') && (log.data.includes('passed') || log.data.includes('1 passed'))) ||
-                log.data.includes('All tests passed') ||
-                log.data.match(/\d+ passing/) ||
-                log.data.includes('Test Suites: 1 passed')) {
+
+            // Framework-specific success patterns
+            let testPassed = false;
+            let testFailed = false;
+
+            switch (framework) {
+              case 'react':
+                testPassed = (
+                  (logData.includes('PASS') && logData.includes('test')) ||
+                  logData.includes('✓') ||
+                  (logData.includes('Tests:') && (logData.includes('passed') || logData.includes('1 passed'))) ||
+                  logData.includes('All tests passed') ||
+                  logData.match(/\d+ passing/) ||
+                  logData.includes('Test Suites: 1 passed')
+                );
+                testFailed = (
+                  logData.includes('FAIL') || 
+                  logData.includes('✗') ||
+                  logData.includes('failed') ||
+                  logData.includes('Test Suites: 0 passed') ||
+                  logData.match(/\d+ failing/)
+                );
+                break;
+
+              case 'angular':
+                testPassed = (
+                  (logData.includes('Executed') && logData.includes('SUCCESS')) ||
+                  logData.includes('✓') ||
+                  logData.includes('TOTAL: 1 SUCCESS') ||
+                  (logData.includes('spec') && logData.includes('0 failures'))
+                );
+                testFailed = (
+                  (logData.includes('Executed') && logData.includes('FAILED')) ||
+                  logData.includes('TOTAL: 0 SUCCESS') ||
+                  logData.includes('Expected:') ||
+                  logData.includes('Actual:') ||
+                  logData.includes('failures')
+                );
+                break;
+
+              case 'vue':
+                testPassed = (
+                  (logData.includes('Test Files') && logData.includes('passed')) ||
+                  logData.includes('✓') ||
+                  logData.match(/\d+ passed/) ||
+                  logData.includes('All tests passed')
+                );
+                testFailed = (
+                  logData.includes('FAIL') ||
+                  logData.includes('✗') ||
+                  logData.includes('failed') ||
+                  logData.match(/\d+ failed/)
+                );
+                break;
+
+              case 'javascript':
+                testPassed = (
+                  (logData.includes('PASS') && logData.includes('test')) ||
+                  logData.includes('✓') ||
+                  logData.match(/\d+ passing/) ||
+                  logData.includes('All tests passed')
+                );
+                testFailed = (
+                  logData.includes('FAIL') ||
+                  logData.includes('✗') ||
+                  logData.includes('failed') ||
+                  logData.match(/\d+ failing/)
+                );
+                break;
+            }
+
+            if (testPassed) {
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(true);
               }
-            }
-            // Look for test failure indicators
-            else if (log.data.includes('FAIL') || 
-                     log.data.includes('✗') ||
-                     log.data.includes('failed') ||
-                     log.data.includes('Test Suites: 0 passed') ||
-                     log.data.match(/\d+ failing/)) {
+            } else if (testFailed) {
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(false);
-              }
-            }
-            // Angular specific test results
-            else if (log.data.includes('Executed') && log.data.includes('SUCCESS')) {
-              hasDetectedTests.current = true;
-              if (onTestStateChange) {
-                onTestStateChange(true);
-              }
-            }
-            else if (log.data.includes('Executed') && log.data.includes('FAILED')) {
-              hasDetectedTests.current = true;
-              if (onTestStateChange) {
-                onTestStateChange(false);
-              }
-            }
-            // Vue/Vitest specific
-            else if (log.data.includes('Test Files') && log.data.includes('passed')) {
-              hasDetectedTests.current = true;
-              if (onTestStateChange) {
-                onTestStateChange(true);
               }
             }
           }
@@ -339,7 +378,7 @@ const TestResultsDisplay: React.FC<{
     });
 
     return unsubscribe;
-  }, [sandpackClient, onTestStateChange]);
+  }, [sandpackClient, onTestStateChange, framework]);
   
   return (
     <div style={{ height: '100%' }}>
@@ -349,10 +388,11 @@ const TestResultsDisplay: React.FC<{
 };
 
 // Main layout component with status indicators
-const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
+const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { framework: SupportedFramework }> = ({
   assignmentId,
   questionId,
   onTestComplete,
+  framework,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
@@ -490,7 +530,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <span>Test Results</span>
+            <span>Test Results ({framework})</span>
             {runStatus === 'running' && (
               <div style={{
                 display: 'flex',
@@ -516,6 +556,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
               onTestStateChange={handleTestStateChange}
               onStatusChange={handleStatusChange}
               questionId={questionId}
+              framework={framework}
             />
           </div>
         </div>
@@ -615,179 +656,15 @@ createApp(App).mount('#app')`,
       break;
       
     case 'angular':
-      baseFiles['/angular.json'] = {
-        code: JSON.stringify({
-          "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
-          "version": 1,
-          "newProjectRoot": "projects",
-          "projects": {
-            "demo": {
-              "projectType": "application",
-              "schematics": {},
-              "root": "",
-              "sourceRoot": "src",
-              "prefix": "app",
-              "architect": {
-                "build": {
-                  "builder": "@angular-devkit/build-angular:browser",
-                  "options": {
-                    "outputPath": "dist/demo",
-                    "index": "src/index.html",
-                    "main": "src/main.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.app.json",
-                    "assets": [
-                      "src/favicon.ico",
-                      "src/assets"
-                    ],
-                    "styles": [
-                      "src/styles.css"
-                    ],
-                    "scripts": []
-                  }
-                },
-                "serve": {
-                  "builder": "@angular-devkit/build-angular:dev-server",
-                  "options": {}
-                },
-                "test": {
-                  "builder": "@angular-devkit/build-angular:karma",
-                  "options": {
-                    "main": "src/test.ts",
-                    "polyfills": "src/polyfills.ts",
-                    "tsConfig": "tsconfig.spec.json",
-                    "karmaConfig": "karma.conf.js",
-                    "assets": [
-                      "src/favicon.ico",
-                      "src/assets"
-                    ],
-                    "styles": [
-                      "src/styles.css"
-                    ],
-                    "scripts": []
-                  }
-                }
-              }
-            }
-          },
-          "defaultProject": "demo"
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.json'] = {
-        code: JSON.stringify({
-          "compileOnSave": false,
-          "compilerOptions": {
-            "baseUrl": "./",
-            "outDir": "./dist/out-tsc",
-            "forceConsistentCasingInFileNames": true,
-            "strict": false,
-            "noImplicitOverride": true,
-            "noPropertyAccessFromIndexSignature": false,
-            "noImplicitReturns": true,
-            "noFallthroughCasesInSwitch": true,
-            "sourceMap": true,
-            "declaration": false,
-            "downlevelIteration": true,
-            "experimentalDecorators": true,
-            "moduleResolution": "node",
-            "importHelpers": true,
-            "target": "ES2022",
-            "module": "ES2022",
-            "useDefineForClassFields": false,
-            "lib": [
-              "ES2022",
-              "dom"
-            ]
-          },
-          "angularCompilerOptions": {
-            "enableI18nLegacyMessageIdFormat": false,
-            "strictInjectionParameters": true,
-            "strictInputAccessModifiers": true,
-            "strictTemplates": true
-          }
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.app.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/app",
-            "types": []
-          },
-          "files": [
-            "src/main.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.d.ts"
-          ]
-        }, null, 2),
-        hidden: true
-      };
-
-      baseFiles['/tsconfig.spec.json'] = {
-        code: JSON.stringify({
-          "extends": "./tsconfig.json",
-          "compilerOptions": {
-            "outDir": "./out-tsc/spec",
-            "types": [
-              "jasmine"
-            ]
-          },
-          "files": [
-            "src/test.ts",
-            "src/polyfills.ts"
-          ],
-          "include": [
-            "src/**/*.spec.ts",
-            "src/**/*.d.ts"
-          ]
-        }, null, 2),
-        hidden: true
-      };
-
+      // Simplified Angular configuration for Sandpack
       baseFiles['/src/polyfills.ts'] = {
-        code: `/**
- * This file includes polyfills needed by Angular and is loaded before the app.
- * You can add your own extra polyfills to this file.
- *
- * This file is divided into 2 sections:
- *   1. Browser polyfills. These are applied before loading ZoneJS and are sorted by browsers.
- *   2. Application imports. Files imported after ZoneJS that should be loaded before your main
- *      file.
- *
- * The current setup is for so-called "evergreen" browsers; the last versions of browsers that
- * automatically update themselves. This includes recent versions of Safari, Chrome (including
- * Opera), Edge on the desktop, and iOS and Chrome on mobile.
- *
- * Learn more in https://angular.io/guide/browser-support
- */
-
-/***************************************************************************************************
- * BROWSER POLYFILLS
- */
-
-/***************************************************************************************************
- * Zone JS is required by default for Angular itself.
- */
-import 'zone.js';  // Included with Angular CLI.
-
-
-/***************************************************************************************************
- * APPLICATION IMPORTS
- */`,
+        code: `import 'zone.js';`,
         hidden: true
       };
 
       baseFiles['/src/main.ts'] = {
         code: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
-
 import { AppModule } from './app/app.module';
-
 
 platformBrowserDynamic().bootstrapModule(AppModule)
   .catch(err => console.error(err));`,
@@ -797,7 +674,7 @@ platformBrowserDynamic().bootstrapModule(AppModule)
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 import { AppComponent } from './app.component';
 
@@ -807,6 +684,7 @@ import { AppComponent } from './app.component';
   ],
   imports: [
     BrowserModule,
+    FormsModule,
     ReactiveFormsModule
   ],
   providers: [],
@@ -817,21 +695,12 @@ export class AppModule { }`,
       };
 
       baseFiles['/src/test.ts'] = {
-        code: `// This file is required by karma.conf.js and loads recursively all the .spec and framework files
-
-import 'zone.js/testing';
+        code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
 import {
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
-
-declare const require: {
-  context(path: string, deep?: boolean, filter?: RegExp): {
-    keys(): string[];
-    <T>(id: string): T;
-  };
-};
 
 // First, initialize the Angular testing environment.
 getTestBed().initTestEnvironment(
@@ -839,9 +708,8 @@ getTestBed().initTestEnvironment(
   platformBrowserDynamicTesting(),
 );
 
-// Then we find all the tests.
+// Find and run tests
 const context = require.context('./', true, /\.spec\.ts$/);
-// And load the modules.
 context.keys().map(context);`,
         hidden: true
       };
@@ -854,7 +722,6 @@ context.keys().map(context);`,
   <title>Angular Test</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
   <app-root></app-root>
@@ -864,55 +731,43 @@ context.keys().map(context);`,
       };
 
       baseFiles['/src/styles.css'] = {
-        code: `/* You can add global styles to this file, and also import other style files */`,
+        code: `/* Global styles */`,
         hidden: true
       };
 
-      baseFiles['/karma.conf.js'] = {
-        code: `// Karma configuration file, see link for more information
-// https://karma-runner.github.io/1.0/config/configuration-file.html
-
-module.exports = function (config) {
-  config.set({
-    basePath: '',
-    frameworks: ['jasmine', '@angular-devkit/build-angular'],
-    plugins: [
-      require('karma-jasmine'),
-      require('karma-chrome-headless'),
-      require('karma-jasmine-html-reporter'),
-      require('karma-coverage'),
-      require('@angular-devkit/build-angular/plugins/karma')
-    ],
-    client: {
-      jasmine: {
-        // you can add configuration options for Jasmine here
-        // the possible options are listed at https://jasmine.github.io/api/edge/Configuration.html
-        // for example, you can disable the random execution order
-        // random: false
-      },
-      clearContext: false // leave Jasmine Spec Runner output visible in browser
-    },
-    jasmineHtmlReporter: {
-      suppressAll: true // removes the duplicated traces
-    },
-    coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/demo'),
-      subdir: '.',
-      reporters: [
-        { type: 'html' },
-        { type: 'text-summary' }
-      ]
-    },
-    reporters: ['progress', 'kjhtml'],
-    port: 9876,
-    colors: true,
-    logLevel: config.LOG_INFO,
-    autoWatch: true,
-    browsers: ['Chrome'],
-    singleRun: false,
-    restartOnFileChange: true
-  });
-};`,
+      baseFiles['/tsconfig.json'] = {
+        code: `{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist/out-tsc",
+    "forceConsistentCasingInFileNames": true,
+    "strict": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "sourceMap": true,
+    "declaration": false,
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "target": "ES2020",
+    "module": "ES2020",
+    "useDefineForClassFields": false,
+    "lib": [
+      "ES2020",
+      "dom"
+    ]
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": false,
+    "strictInputAccessModifiers": false,
+    "strictTemplates": false
+  }
+}`,
         hidden: true
       };
       break;
@@ -921,30 +776,6 @@ module.exports = function (config) {
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';`,
-        hidden: true
-      };
-
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          name: 'javascript-test',
-          version: '1.0.0',
-          dependencies: {
-            '@testing-library/jest-dom': '^5.16.5',
-            'whatwg-fetch': '^3.6.2',
-          },
-          devDependencies: {
-            '@types/jest': '^29.5.5',
-            'jest': '^29.5.0',
-            'jest-environment-jsdom': '^29.5.0',
-          },
-          scripts: {
-            test: 'jest --watchAll=false'
-          },
-          jest: {
-            testEnvironment: 'jsdom',
-            setupFilesAfterEnv: ['<rootDir>/src/setupTests.js']
-          }
-        }, null, 2),
         hidden: true
       };
 
@@ -1033,22 +864,25 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       scripts: {
         start: framework === 'angular' ? 'ng serve --port 4200' : framework === 'vue' ? 'vite' : framework === 'javascript' ? 'node src/index.js' : 'react-scripts start',
         build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : framework === 'javascript' ? 'echo "No build needed"' : 'react-scripts build',
-        test: framework === 'angular' ? 'ng test --watch=false --browsers=ChromeHeadless' : framework === 'vue' ? 'vitest --run' : 'jest --watchAll=false'
+        test: framework === 'angular' ? 'jasmine-ts src/**/*.spec.ts' : framework === 'vue' ? 'vitest --run' : 'jest --watchAll=false'
       },
     };
 
-    // Add Angular CLI configuration if needed
-    if (framework === 'angular') {
-      basePackage.devDependencies = {
-        ...basePackage.devDependencies,
-        '@angular-devkit/build-angular': '^16.0.0',
-        '@angular/cli': '^16.0.0',
-        'karma': '^6.4.0',
-        'karma-chrome-launcher': '^3.2.0',
-        'karma-coverage': '^2.2.0',
-        'karma-jasmine': '^5.1.0',
-        'karma-jasmine-html-reporter': '^2.1.0'
-      };
+    // Framework-specific configurations
+    switch (framework) {
+      case 'angular':
+        basePackage.devDependencies = {
+          ...basePackage.devDependencies,
+          'jasmine-ts': '^0.4.0',
+          '@types/node': '^18.0.0'
+        };
+        break;
+      case 'javascript':
+        basePackage.jest = {
+          testEnvironment: 'jsdom',
+          setupFilesAfterEnv: ['<rootDir>/src/setupTests.js']
+        };
+        break;
     }
 
     return JSON.stringify(basePackage, null, 2);
@@ -1080,22 +914,69 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     [assignmentId, questionId, framework]
   );
 
+  // Framework-specific Sandpack options
+  const getSandpackOptions = useCallback(() => {
+    const baseOptions = {
+      autorun: false,  // Prevent auto-running for all frameworks
+      autoReload: false, // Prevent auto-reloading for all frameworks
+      initMode: 'user-visible' as const,
+      logLevel: 'info' as const,
+      recompileMode: 'delayed' as const,
+    };
+
+    switch (framework) {
+      case 'angular':
+        return {
+          ...baseOptions,
+          recompileDelay: 2000, // Longer delay for Angular compilation
+          bundlerURL: undefined, // Use default bundler for Angular
+          externalResources: [
+            'https://unpkg.com/zone.js@0.12.0/dist/zone.min.js'
+          ]
+        };
+      
+      case 'vue':
+        return {
+          ...baseOptions,
+          recompileDelay: 1000,
+          bundlerURL: undefined,
+        };
+      
+      case 'react':
+        return {
+          ...baseOptions,
+          recompileDelay: 500,
+          bundlerURL: undefined,
+        };
+      
+      case 'javascript':
+        return {
+          ...baseOptions,
+          recompileDelay: 300,
+          bundlerURL: undefined,
+        };
+      
+      default:
+        return {
+          ...baseOptions,
+          recompileDelay: 500,
+        };
+    }
+  }, [framework]);
+
   return (
     <SandpackProvider 
       key={sandpackKey}
       customSetup={setup} 
       files={files} 
-      options={{ 
-        autorun: false,  // Prevent auto-running
-        autoReload: false, // Prevent auto-reloading
-        initMode: 'user-visible', // Ensures proper initialization for all frameworks
-        bundlerURL: 'https://2-19-8-sandpack.codesandbox.io',
-        logLevel: 'error', // Reduce console noise
-        recompileMode: 'delayed',
-        recompileDelay: 500
-      }}
+      options={getSandpackOptions()}
     >
-      <SandpackLayoutManager assignmentId={assignmentId} questionId={questionId} {...rest} />
+      <SandpackLayoutManager 
+        assignmentId={assignmentId} 
+        questionId={questionId} 
+        framework={framework}
+        {...rest} 
+      />
     </SandpackProvider>
   );
 });
