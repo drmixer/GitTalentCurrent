@@ -1013,6 +1013,73 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     
     // For Angular, we need to create a proper test file that sets up the testing module
     if (framework === 'angular' && testCode) {
+      // Extract UserService from the component code if it exists
+      let cleanedComponentCode = starterCode;
+      let userServiceCode = '';
+      
+      // Check if the component code includes the UserService definition
+      if (starterCode.includes('@Injectable') && starterCode.includes('export class UserService')) {
+        const serviceStart = starterCode.indexOf('interface User');
+        const serviceEnd = starterCode.lastIndexOf('export class UserService') + starterCode.substring(starterCode.lastIndexOf('export class UserService')).indexOf('\n}') + 2;
+        
+        if (serviceStart !== -1 && serviceEnd !== -1) {
+          userServiceCode = `import { Injectable } from '@angular/core';
+import { Observable, of, delay } from 'rxjs';
+
+${starterCode.substring(serviceStart, serviceEnd)}`;
+          
+          // Remove the service from component code and add the import
+          const componentStart = starterCode.indexOf('@Component');
+          if (componentStart !== -1) {
+            const imports = starterCode.substring(0, componentStart);
+            const componentPart = starterCode.substring(componentStart);
+            cleanedComponentCode = `${imports}import { UserService, User } from './user.service';
+
+${componentPart}`;
+            
+            // Remove the UserService definition from the component
+            cleanedComponentCode = cleanedComponentCode.replace(/interface User[\s\S]*?}\s*@Injectable[\s\S]*?export class UserService[\s\S]*?}\s*/, '');
+          }
+        }
+      }
+      
+      // If we didn't extract a service, use a default one
+      if (!userServiceCode) {
+        userServiceCode = `import { Injectable } from '@angular/core';
+import { Observable, of, delay } from 'rxjs';
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class UserService {
+  private users: User[] = [
+    { id: 1, name: 'John Doe', email: 'john@example.com' },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
+  ];
+
+  getUsers(): Observable<User[]> {
+    return of(this.users).pipe(delay(500));
+  }
+
+  addUser(user: Omit<User, 'id'>): Observable<User> {
+    const newUser = { ...user, id: Date.now() };
+    this.users.push(newUser);
+    return of(newUser).pipe(delay(300));
+  }
+
+  deleteUser(id: number): Observable<boolean> {
+    this.users = this.users.filter(user => user.id !== id);
+    return of(true).pipe(delay(300));
+  }
+}`;
+      }
+
       const angularTestCode = `import { TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { of } from 'rxjs';
@@ -1061,10 +1128,8 @@ describe('AppComponent', () => {
   it('should validate form fields', () => {
     fixture.detectChanges();
     
-    // Check that form is initially invalid
     expect(component.userForm.valid).toBeFalsy();
     
-    // Set valid values
     component.userForm.patchValue({
       name: 'Test User',
       email: 'test@example.com'
@@ -1077,13 +1142,11 @@ describe('AppComponent', () => {
   it('should add user on form submit', () => {
     fixture.detectChanges();
     
-    // Set form values
     component.userForm.patchValue({
       name: 'New User',
       email: 'new@example.com'
     });
     
-    // Submit form
     component.onSubmit();
     
     expect(userService.addUser).toHaveBeenCalledWith({
@@ -1098,15 +1161,26 @@ describe('AppComponent', () => {
         code: angularTestCode,
         hidden: true
       };
+      
+      frameworkFiles['/src/app/user.service.ts'] = {
+        code: userServiceCode,
+        hidden: true
+      };
+      
+      // Update the main file with cleaned component code
+      frameworkFiles[mainFile] = {
+        code: cleanedComponentCode,
+        active: true
+      };
     }
     
     return {
       [mainFile]: { 
-        code: starterCode, 
+        code: framework === 'angular' && frameworkFiles[mainFile] ? frameworkFiles[mainFile].code : starterCode, 
         active: true 
       },
       [testFile]: { 
-        code: framework === 'angular' ? frameworkFiles[testFile].code : testCode, 
+        code: framework === 'angular' ? frameworkFiles[testFile]?.code || testCode : testCode, 
         hidden: true 
       },
       '/package.json': { 
