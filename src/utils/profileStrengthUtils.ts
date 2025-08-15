@@ -24,7 +24,6 @@ export interface ProfileStrengthBreakdown {
   resume: number;
   skillsPoints: number;
   categoriesBonus: number;
-  projects: number;
   profilePic: number;
   salary: number;
   totalStrength: number;
@@ -33,6 +32,7 @@ export interface ProfileStrengthBreakdown {
 
 /**
  * Calculate profile strength with detailed breakdown
+ * Note: Projects are managed in a separate portfolio tab, so they don't contribute to profile strength
  * @param data Profile data to analyze
  * @returns Profile strength percentage (0-100) and detailed breakdown
  */
@@ -44,11 +44,11 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
   let strength = 0;
   const suggestions: string[] = [];
 
-  // Basic Information (40 points total)
-  const bioPoints = data.bio?.trim().length >= 50 ? 15 : (data.bio?.trim() ? 8 : 0);
-  const locationPoints = data.location?.trim() ? 10 : 0;
-  const titlePoints = data.preferred_title?.trim() ? 5 : 0;
-  const experiencePoints = data.experience_years > 0 ? 10 : 0;
+  // Basic Information (45 points total - increased from 40 since projects removed)
+  const bioPoints = data.bio?.trim().length >= 50 ? 18 : (data.bio?.trim() ? 10 : 0);
+  const locationPoints = data.location?.trim() ? 12 : 0;
+  const titlePoints = data.preferred_title?.trim() ? 7 : 0;
+  const experiencePoints = data.experience_years > 0 ? 8 : 0;
 
   strength += bioPoints + locationPoints + titlePoints + experiencePoints;
 
@@ -71,10 +71,10 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Add your years of experience');
   }
 
-  // GitHub & Professional Info (25 points total)
-  const githubHandlePoints = data.github_handle?.trim() ? 10 : 0;
-  const githubAppPoints = data.github_installation_id?.trim() ? 8 : 0;
-  const resumePoints = data.resume_url?.trim() ? 7 : 0;
+  // GitHub & Professional Info (28 points total - increased from 25)
+  const githubHandlePoints = data.github_handle?.trim() ? 12 : 0;
+  const githubAppPoints = data.github_installation_id?.trim() ? 10 : 0;
+  const resumePoints = data.resume_url?.trim() ? 6 : 0;
 
   strength += githubHandlePoints + githubAppPoints + resumePoints;
 
@@ -91,7 +91,7 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Upload your resume for recruiters to review');
   }
 
-  // Skills & Technical (20 points total)
+  // Skills & Technical (20 points total - same as before)
   const totalSkills = Object.values(data.skills_categories || {}).flat().length;
   let skillsPoints = 0;
   if (totalSkills >= 8) skillsPoints = 12;
@@ -122,27 +122,9 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Consider adding skills in a third category for better diversity');
   }
 
-  // Projects & Portfolio (10 points total)
-  const projectCount = data.linked_projects?.length || 0;
-  let projectsPoints = 0;
-  if (projectCount >= 3) projectsPoints = 10;
-  else if (projectCount >= 2) projectsPoints = 7;
-  else if (projectCount >= 1) projectsPoints = 4;
-
-  strength += projectsPoints;
-
-  // Add suggestions for projects
-  if (projectCount === 0) {
-    suggestions.push('Link your projects to demonstrate your work');
-  } else if (projectCount < 2) {
-    suggestions.push('Add more projects to better showcase your portfolio');
-  } else if (projectCount < 3) {
-    suggestions.push('Consider adding one more project to reach the recommended 3+ projects');
-  }
-
-  // Profile Presentation (5 points total)
-  const profilePicPoints = data.profile_pic_url?.trim() ? 3 : 0;
-  const salaryPoints = data.desired_salary && data.desired_salary > 0 ? 2 : 0;
+  // Profile Presentation (7 points total - increased from 5)
+  const profilePicPoints = data.profile_pic_url?.trim() ? 4 : 0;
+  const salaryPoints = data.desired_salary && data.desired_salary > 0 ? 3 : 0;
 
   strength += profilePicPoints + salaryPoints;
 
@@ -154,6 +136,9 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
   if (!data.desired_salary || data.desired_salary === 0) {
     suggestions.push('Set your desired salary to help match with appropriate roles');
   }
+
+  // Add portfolio-related suggestion
+  suggestions.push('Complete your portfolio in the Portfolio tab to showcase your projects');
 
   const finalStrength = Math.min(strength, 100);
   
@@ -167,7 +152,6 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     resume: resumePoints,
     skillsPoints,
     categoriesBonus,
-    projects: projectsPoints,
     profilePic: profilePicPoints,
     salary: salaryPoints,
     totalStrength: finalStrength,
