@@ -54,7 +54,6 @@ const DeveloperTests: React.FC = () => {
             title,
             description,
             difficulty,
-            time_limit,
             created_at,
             coding_questions (
               language
@@ -129,14 +128,6 @@ const DeveloperTests: React.FC = () => {
       default:
         return 'text-gray-700 bg-gray-50 border-gray-200';
     }
-  };
-
-  const formatTimeLimit = (minutes: number | null) => {
-    if (!minutes) return 'No time limit';
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   };
 
   // Helper function to get the primary language for a test (from first question)
@@ -220,9 +211,6 @@ const DeveloperTests: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-medium">Difficulty:</span> {assignment.coding_tests.difficulty}
-                    </div>
-                    <div>
-                      <span className="font-medium">Time Limit:</span> {formatTimeLimit(assignment.coding_tests.time_limit)}
                     </div>
                     <div>
                       <span className="font-medium">Assigned:</span> {new Date(assignment.created_at).toLocaleDateString()}
