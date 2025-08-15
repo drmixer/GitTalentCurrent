@@ -196,7 +196,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
   }
 };
 
-// Optimized test results detection component with better detection
+// Simplified test results detection component
 const TestResultsDisplay: React.FC<{ 
   onTestStateChange?: (passed: boolean) => void,
   questionId: string 
@@ -204,64 +204,50 @@ const TestResultsDisplay: React.FC<{
   const { sandpack } = useSandpack();
   const sandpackClient = useSandpackClient();
   const hasDetectedTests = useRef(false);
-  const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
   
   // Reset detection when question changes
   useEffect(() => {
     hasDetectedTests.current = false;
-    if (detectionTimeout.current) {
-      clearTimeout(detectionTimeout.current);
-    }
   }, [questionId]);
   
+  // Listen for test completion messages from Sandpack
   useEffect(() => {
-    // Clear any existing timeout
-    if (detectionTimeout.current) {
-      clearTimeout(detectionTimeout.current);
-    }
-    
-    // Reset detection flag when sandpack reloads/restarts
-    if (sandpack.status === 'initial' || sandpack.status === 'bundling') {
-      hasDetectedTests.current = false;
-    }
-    
-    // Only run detection once when status becomes complete/idle and we haven't detected before
-    if ((sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
-      // Use a single timeout to detect test completion
-      detectionTimeout.current = setTimeout(() => {
-        if (onTestStateChange && !hasDetectedTests.current) {
-          hasDetectedTests.current = true;
-          onTestStateChange(true);
-        }
-      }, 2000); // Longer timeout for more reliable detection
-    }
-
-    return () => {
-      if (detectionTimeout.current) {
-        clearTimeout(detectionTimeout.current);
-      }
-    };
-  }, [sandpack.status, onTestStateChange]);
-
-  // Also listen for console messages that indicate test success
-  useEffect(() => {
-    if (!sandpackClient || hasDetectedTests.current) return;
+    if (!sandpackClient) return;
 
     const unsubscribe = sandpackClient.listen((message) => {
+      // Listen for test completion messages
+      if (message.type === 'test' && message.event === 'test_end' && !hasDetectedTests.current) {
+        hasDetectedTests.current = true;
+        const results = message.results;
+        if (results && Array.isArray(results)) {
+          const allPassed = results.every((result: any) => result.status === 'pass');
+          if (onTestStateChange) {
+            onTestStateChange(allPassed);
+          }
+        }
+      }
+      
+      // Listen for console messages that might indicate test results
       if (message.type === 'console' && message.log && !hasDetectedTests.current) {
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
-            // Look for test success indicators in console
-            if ((log.data.includes('Hello, Alice!') || 
-                 log.data.includes('✓') || 
-                 log.data.includes('PASS') ||
-                 log.data.includes('Tests: ') ||
-                 (log.data.includes('expect') && !log.data.includes('FAIL'))) && 
-                !hasDetectedTests.current) {
-              
+            // Look for test success indicators
+            if (log.data.includes('✓') || 
+                log.data.includes('PASS') ||
+                (log.data.includes('Tests:') && log.data.includes('passed')) ||
+                log.data.includes('All tests passed')) {
               hasDetectedTests.current = true;
               if (onTestStateChange) {
                 onTestStateChange(true);
+              }
+            }
+            // Look for test failure indicators
+            else if (log.data.includes('FAIL') || 
+                     log.data.includes('✗') ||
+                     log.data.includes('failed')) {
+              hasDetectedTests.current = true;
+              if (onTestStateChange) {
+                onTestStateChange(false);
               }
             }
           }
@@ -279,28 +265,23 @@ const TestResultsDisplay: React.FC<{
   );
 };
 
-// Main layout component with optimized re-rendering
+// Main layout component with simplified logic
 const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
   assignmentId,
   questionId,
   onTestComplete,
 }) => {
-  const { sandpack } = useSandpack();
-  const sandpackClient = useSandpackClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Use refs to prevent unnecessary re-renders
-  const listenerSetup = useRef(false);
   const submissionInProgress = useRef(false);
 
-  // CRITICAL FIX: Reset test results when question changes
+  // Reset test results when question changes
   useEffect(() => {
     setTestResults(null);
     setIsSubmitting(false);
-    setIsRunning(false);
     submissionInProgress.current = false;
   }, [assignmentId, questionId]);
 
@@ -312,134 +293,17 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setToast(null);
   }, []);
 
-  // Function to run tests manually
-  const runTests = useCallback(async () => {
-    if (!sandpackClient || isRunning) return;
-    
-    setIsRunning(true);
-    setTestResults(null);
-    
-    try {
-      // Restart the sandbox to ensure clean state
-      await sandpackClient.dispatch({ type: 'restart' });
-      
-      // Wait a bit for restart to complete
-      setTimeout(() => {
-        // Run tests by dispatching a refresh
-        sandpackClient.dispatch({ type: 'refresh' });
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error running tests:', error);
-      showToast('Failed to run tests. Please try again.', 'error');
-    } finally {
-      // Reset running state after a delay
-      setTimeout(() => {
-        setIsRunning(false);
-      }, 3000);
-    }
-  }, [sandpackClient, isRunning, showToast]);
-
-  // Optimized test state change handler
+  // Simplified test state change handler
   const handleTestStateChange = useCallback((passed: boolean) => {
-    if (passed && !testResults) {
-      setTestResults({ 
-        type: 'test', 
-        success: true, 
-        source: 'status-detection',
-        timestamp: Date.now()
-      });
-      setIsRunning(false); // Stop running state when tests complete
-    }
-  }, [testResults]);
-
-  // Enhanced test result detection
-  useEffect(() => {
-    if (!sandpackClient) return;
-
-    const unsubscribe = sandpackClient.listen((message) => {
-      // Listen for test completion messages
-      if (message.type === 'test' && message.event === 'test_end') {
-        setIsRunning(false);
-        const results = message.results;
-        if (results && Array.isArray(results)) {
-          const allPassed = results.every((result: any) => result.status === 'pass');
-          setTestResults({
-            type: 'test',
-            event: 'test_end',
-            results: results,
-            success: allPassed,
-            source: 'test-listener',
-            timestamp: Date.now()
-          });
-        }
-      }
-      
-      // Listen for console messages that might indicate test results
-      if (message.type === 'console' && message.log) {
-        message.log.forEach(log => {
-          if (typeof log.data === 'string') {
-            // Look for test success indicators
-            if (log.data.includes('✓') || 
-                log.data.includes('PASS') ||
-                (log.data.includes('Tests:') && log.data.includes('passed')) ||
-                log.data.includes('All tests passed')) {
-              setIsRunning(false);
-              setTestResults({
-                type: 'console',
-                success: true,
-                source: 'console-parse',
-                timestamp: Date.now()
-              });
-            }
-            // Look for test failure indicators
-            else if (log.data.includes('FAIL') || 
-                     log.data.includes('✗') ||
-                     log.data.includes('failed')) {
-              setIsRunning(false);
-              setTestResults({
-                type: 'console',
-                success: false,
-                source: 'console-parse',
-                timestamp: Date.now()
-              });
-            }
-          }
-        });
-      }
+    setTestResults({ 
+      success: passed, 
+      timestamp: Date.now()
     });
-
-    return unsubscribe;
-  }, [sandpackClient]);
+  }, []);
 
   // Memoized test result evaluation
   const allTestsPassed = useMemo(() => {
-    if (!testResults) return false;
-    
-    // Check different result formats
-    if (testResults.source === 'console-parse' && testResults.success) {
-      return true;
-    }
-    
-    if (testResults.type === 'test' && testResults.event === 'test_end') {
-      const results = testResults.results;
-      if (results && Array.isArray(results)) {
-        return results.every((result: any) => result.status === 'pass');
-      }
-    }
-    
-    if (testResults.success !== undefined) {
-      return testResults.success;
-    }
-    
-    if (testResults.type === 'test' && testResults.results) {
-      const results = testResults.results;
-      if (results.numFailedTests !== undefined) {
-        return results.numFailedTests === 0 && results.numPassedTests > 0;
-      }
-    }
-    
-    return false;
+    return testResults?.success === true;
   }, [testResults]);
 
   // Optimized submission function with singleton client
@@ -522,22 +386,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
             alignItems: 'center'
           }}>
             <span>Test Results</span>
-            <button
-              onClick={runTests}
-              disabled={isRunning}
-              style={{
-                padding: '4px 12px',
-                backgroundColor: isRunning ? '#ccc' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isRunning ? 'not-allowed' : 'pointer',
-                fontSize: '12px',
-                fontWeight: '500'
-              }}
-            >
-              {isRunning ? 'Running...' : 'Run Tests'}
-            </button>
           </div>
           <div style={{ flex: 1 }}>
             <TestResultsDisplay 
@@ -555,7 +403,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
               {allTestsPassed ? '✅ All tests passed!' : '❌ Some tests failed'}
             </span>
           ) : (
-            <span>Click "Run Tests" to check your solution</span>
+            <span>Use the built-in run button to test your solution</span>
           )}
         </div>
         <button
@@ -1109,11 +957,11 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       customSetup={setup} 
       files={files} 
       options={{ 
-        autorun: false,  // Keep false so code doesn't run until user clicks run
-        autoReload: false, // Keep false to prevent auto-reloading
+        autorun: false,  // Prevent auto-running
+        autoReload: false, // Prevent auto-reloading
         initMode: 'user-visible', // Ensures proper initialization for all frameworks
         bundlerURL: 'https://2-19-8-sandpack.codesandbox.io',
-        logLevel: 'error', // Keep at error to reduce noise
+        logLevel: 'error', // Reduce console noise
         recompileMode: 'delayed',
         recompileDelay: 500
       }}
