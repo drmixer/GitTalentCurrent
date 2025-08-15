@@ -735,13 +735,14 @@ platformBrowserDynamic().bootstrapModule(AppModule)
         hidden: true
       };
 
-      // Simplified app module with minimal dependencies
+      // App module with UserService properly registered
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 import { AppComponent } from './app.component';
+import { UserService } from './user.service';
 
 @NgModule({
   declarations: [
@@ -752,7 +753,7 @@ import { AppComponent } from './app.component';
     FormsModule,
     ReactiveFormsModule
   ],
-  providers: [],
+  providers: [UserService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }`,
@@ -1010,13 +1011,102 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   const files = useMemo(() => {
     const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
     
+    // For Angular, we need to create a proper test file that sets up the testing module
+    if (framework === 'angular' && testCode) {
+      const angularTestCode = `import { TestBed } from '@angular/core/testing';
+import { ReactiveFormsModule } from '@angular/forms';
+import { of } from 'rxjs';
+import { AppComponent } from './app.component';
+import { UserService } from './user.service';
+
+describe('AppComponent', () => {
+  let component: AppComponent;
+  let fixture: any;
+  let userService: jasmine.SpyObj<UserService>;
+
+  beforeEach(async () => {
+    const spy = jasmine.createSpyObj('UserService', ['getUsers', 'addUser', 'deleteUser']);
+
+    await TestBed.configureTestingModule({
+      declarations: [AppComponent],
+      imports: [ReactiveFormsModule],
+      providers: [
+        { provide: UserService, useValue: spy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(AppComponent);
+    component = fixture.componentInstance;
+    userService = TestBed.inject(UserService) as jasmine.SpyObj<UserService>;
+
+    // Setup default spy returns
+    userService.getUsers.and.returnValue(of([
+      { id: 1, name: 'Test User', email: 'test@example.com' }
+    ]));
+    userService.addUser.and.returnValue(of({ id: 2, name: 'New User', email: 'new@example.com' }));
+    userService.deleteUser.and.returnValue(of(true));
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+    console.log('Component created successfully');
+  });
+
+  it('should load users on init', () => {
+    fixture.detectChanges();
+    expect(userService.getUsers).toHaveBeenCalled();
+    console.log('Users loaded on initialization');
+  });
+
+  it('should validate form fields', () => {
+    fixture.detectChanges();
+    
+    // Check that form is initially invalid
+    expect(component.userForm.valid).toBeFalsy();
+    
+    // Set valid values
+    component.userForm.patchValue({
+      name: 'Test User',
+      email: 'test@example.com'
+    });
+    
+    expect(component.userForm.valid).toBeTruthy();
+    console.log('Form validation working correctly');
+  });
+
+  it('should add user on form submit', () => {
+    fixture.detectChanges();
+    
+    // Set form values
+    component.userForm.patchValue({
+      name: 'New User',
+      email: 'new@example.com'
+    });
+    
+    // Submit form
+    component.onSubmit();
+    
+    expect(userService.addUser).toHaveBeenCalledWith({
+      name: 'New User',
+      email: 'new@example.com'
+    });
+    console.log('User add functionality working');
+  });
+});`;
+
+      frameworkFiles[testFile] = {
+        code: angularTestCode,
+        hidden: true
+      };
+    }
+    
     return {
       [mainFile]: { 
         code: starterCode, 
         active: true 
       },
       [testFile]: { 
-        code: testCode, 
+        code: framework === 'angular' ? frameworkFiles[testFile].code : testCode, 
         hidden: true 
       },
       '/package.json': { 
