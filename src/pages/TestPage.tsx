@@ -212,6 +212,18 @@ const TestPage: React.FC = () => {
         }
     };
 
+    // Helper function to map language names to Monaco editor language IDs
+    const getEditorLanguage = (language: string): string => {
+        const languageMap: { [key: string]: string } = {
+            'python': 'python',
+            'java': 'java',
+            'c++': 'cpp',
+            'swift': 'swift',
+            'kotlin': 'kotlin'
+        };
+        return languageMap[language.toLowerCase()] || 'python';
+    };
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -420,17 +432,5 @@ const TestPage: React.FC = () => {
         </div>
     );
 };
-
-// Helper function to map language names to Monaco editor language IDs
-function getEditorLanguage(language: string): string {
-    const languageMap: { [key: string]: string } = {
-        'python': 'python',
-        'java': 'java',
-        'c++': 'cpp',
-        'swift': 'swift',
-        'kotlin': 'kotlin'
-    };
-    return languageMap[language.toLowerCase()] || 'python';
-}
 
 export default TestPage;
