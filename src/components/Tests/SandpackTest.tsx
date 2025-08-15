@@ -85,8 +85,6 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'vue': '^3.3.4',
             '@vitejs/plugin-vue': '^4.3.4',
             'vite': '^4.4.9',
-          },
-          devDependencies: {
             '@vue/test-utils': '^2.4.1',
             'vitest': '^0.34.6',
             'jsdom': '^22.1.0',
@@ -466,15 +464,13 @@ export default defineConfig({
             test: "vitest run"
           },
           dependencies: {
-            'vue': '^3.3.4'
-          },
-          devDependencies: {
-            '@vitejs/plugin-vue': '^4.3.4',
-            'vite': '^4.4.9',
+            'vue': '^3.3.4',
             '@vue/test-utils': '^2.4.1',
             'vitest': '^0.34.6',
             'jsdom': '^22.1.0',
-            '@vue/compiler-sfc': '^3.3.4'
+            '@vue/compiler-sfc': '^3.3.4',
+            '@vitejs/plugin-vue': '^4.3.4',
+            'vite': '^4.4.9'
           }
         }, null, 2),
         hidden: true
