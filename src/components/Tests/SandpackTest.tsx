@@ -121,7 +121,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
           template: 'vue',
         },
         mainFile: '/src/App.vue',
-        testFile: '/src/App.spec.js',
+        testFile: '/src/App.test.js',
       };
 
     case 'angular':
@@ -135,14 +135,17 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@angular/forms': '^16.0.0',
             '@angular/platform-browser': '^16.0.0',
             '@angular/platform-browser-dynamic': '^16.0.0',
+            '@angular/testing': '^16.0.0',
             'rxjs': '^7.8.0',
             'zone.js': '^0.13.0',
             'tslib': '^2.3.0',
           },
           devDependencies: {
-            '@angular/testing': '^16.0.0',
             '@types/jasmine': '^4.3.0',
             'jasmine': '^4.5.0',
+            'karma': '^6.4.0',
+            'karma-jasmine': '^5.1.0',
+            'karma-chrome-headless': '^3.1.0',
             'typescript': '^5.0.0',
           },
           template: 'angular',
@@ -229,10 +232,11 @@ const TestResultsDisplay: React.FC<{
           onStatusChange('running');
         }
         
-        // Set timeout for Angular to prevent infinite running
-        if (framework === 'angular' && !testTimeout.current) {
+        // Set timeout to prevent infinite running
+        if (!testTimeout.current) {
+          const timeoutDuration = framework === 'angular' ? 30000 : 15000;
           testTimeout.current = setTimeout(() => {
-            console.log('[Angular] Test timeout reached, marking as failed');
+            console.log(`[${framework}] Test timeout reached, marking as failed`);
             if (!hasDetectedTests.current && onTestStateChange) {
               hasDetectedTests.current = true;
               onTestStateChange(false);
@@ -240,7 +244,7 @@ const TestResultsDisplay: React.FC<{
             if (onStatusChange) {
               onStatusChange('complete');
             }
-          }, 25000); // 25 second timeout for Angular
+          }, timeoutDuration);
         }
       } else if (sandpack.status === 'complete' || sandpack.status === 'idle') {
         if (testTimeout.current) {
@@ -318,10 +322,7 @@ const TestResultsDisplay: React.FC<{
                 logData.includes('NullInjectorError') ||
                 logData.includes('Can\'t resolve all parameters') ||
                 logData.includes('No provider for') ||
-                logData.includes('StaticInjectorError') ||
-                logData.includes('TestBed') ||
-                logData.includes('fixture') ||
-                logData.includes('ComponentFixture')
+                logData.includes('StaticInjectorError')
               )) ||
               (framework === 'vue' && logData.includes('[Vue warn]')) ||
               (framework === 'react' && logData.includes('Warning: React'));
@@ -350,8 +351,8 @@ const TestResultsDisplay: React.FC<{
                   logData.includes('All Angular tests completed successfully') ||
                   (logData.includes('SUCCESS') && logData.includes('test')) ||
                   logData.includes('✅ Component validation successful') ||
-                  logData.includes('✅ Form validation successful') ||
-                  logData.includes('✅ User management complete')
+                  logData.includes('PASS') ||
+                  logData.includes('✓')
                 );
                 testFailed = (
                   logData.includes('FAILED') ||
@@ -360,7 +361,8 @@ const TestResultsDisplay: React.FC<{
                   logData.includes('Actual:') ||
                   logData.includes('failures') ||
                   logData.includes('●') ||
-                  logData.includes('Received: undefined')
+                  logData.includes('Received: undefined') ||
+                  logData.includes('FAIL')
                 );
                 break;
 
@@ -387,7 +389,8 @@ const TestResultsDisplay: React.FC<{
                   (logData.includes('Test Files') && logData.includes('passed')) ||
                   logData.includes('✓') ||
                   logData.match(/\d+ passed/) ||
-                  logData.includes('All tests passed')
+                  logData.includes('All tests passed') ||
+                  logData.includes('PASS')
                 );
                 testFailed = (
                   logData.includes('FAIL') ||
@@ -508,7 +511,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
     if (runStatus === 'running') {
       return { 
         text: framework === 'angular' 
-          ? '🔄 Compiling Angular app... (this may take up to 25 seconds)' 
+          ? '🔄 Compiling Angular app... (this may take up to 30 seconds)' 
           : '🔄 Running tests...', 
         color: '#007bff' 
       };
@@ -762,127 +765,6 @@ export class AppModule { }`,
         hidden: true
       };
 
-      baseFiles['/src/test-validator.ts'] = {
-        code: `import { AppComponent } from './app/app.component';
-import { FormBuilder } from '@angular/forms';
-import { Injectable } from '@angular/core';
-import { of } from 'rxjs';
-
-@Injectable({
-  providedIn: 'root'
-})
-export class UserService {
-  private users: any[] = [
-    { id: 1, name: 'John Doe', email: 'john@example.com' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
-  ];
-
-  getUsers() {
-    return of(this.users);
-  }
-  
-  addUser(user: any) {
-    const newUser = { ...user, id: Date.now() };
-    this.users.push(newUser);
-    return of(newUser);
-  }
-  
-  deleteUser(id: number) {
-    this.users = this.users.filter(user => user.id !== id);
-    return of(true);
-  }
-}
-
-function validateAngularComponent() {
-  console.log('🔍 Starting Angular component validation...');
-  
-  try {
-    if (typeof AppComponent !== 'function') {
-      throw new Error('AppComponent class not found or not properly exported');
-    }
-    console.log('✅ AppComponent class found');
-    
-    const formBuilder = new FormBuilder();
-    const userService = new UserService();
-    
-    const component = new AppComponent(formBuilder, userService);
-    
-    if (!component) {
-      throw new Error('Failed to create component instance');
-    }
-    console.log('✅ Component instance created');
-    
-    if (typeof component.ngOnInit === 'function') {
-      component.ngOnInit();
-      console.log('✅ ngOnInit method exists and callable');
-    }
-    
-    if (component.userForm) {
-      console.log('✅ userForm property exists');
-      
-      if (component.userForm.get('name') && component.userForm.get('email')) {
-        console.log('✅ Form controls (name, email) exist');
-      } else {
-        throw new Error('Required form controls missing');
-      }
-      
-      component.userForm.patchValue({
-        name: 'Test User',
-        email: 'test@example.com'
-      });
-      
-      if (component.userForm.valid) {
-        console.log('✅ Form validation working correctly');
-      } else {
-        console.log('⚠️ Form validation may have issues');
-      }
-    } else {
-      throw new Error('userForm property not found');
-    }
-    
-    if (Array.isArray(component.users)) {
-      console.log('✅ users property is an array');
-    } else {
-      throw new Error('users property not found or not an array');
-    }
-    
-    const requiredMethods = ['loadUsers', 'addUser', 'deleteUser'];
-    const missingMethods = requiredMethods.filter(method => typeof component[method] !== 'function');
-    
-    if (missingMethods.length === 0) {
-      console.log('✅ All required methods exist');
-    } else {
-      throw new Error(\`Missing required methods: \${missingMethods.join(', ')}\`);
-    }
-    
-    console.log('✅ All tests passed!');
-    console.log('✅ Component validation successful');
-    return true;
-    
-  } catch (error) {
-    console.error('❌ Component validation failed:', error.message);
-    console.log('❌ Tests failed - check your component implementation');
-    return false;
-  }
-}
-
-setTimeout(() => {
-  try {
-    const isValid = validateAngularComponent();
-    if (isValid) {
-      console.log('SUCCESS: All Angular tests completed successfully');
-    } else {
-      console.log('FAILED: Angular component validation failed');
-    }
-  } catch (error) {
-    console.error('FAILED: Validation error:', error);
-  }
-}, 1000);
-
-export { validateAngularComponent, UserService };`,
-        hidden: true
-      };
-
       baseFiles['/src/index.html'] = {
         code: `<!doctype html>
 <html lang="en">
@@ -891,7 +773,6 @@ export { validateAngularComponent, UserService };`,
   <title>Angular Test</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script type="module" src="/src/test-validator.ts"></script>
 </head>
 <body>
   <app-root>Loading...</app-root>
@@ -966,6 +847,33 @@ export { validateAngularComponent, UserService };`,
         hidden: true
       };
 
+      baseFiles['/karma.conf.js'] = {
+        code: `module.exports = function (config) {
+  config.set({
+    basePath: '',
+    frameworks: ['jasmine', '@angular-devkit/build-angular'],
+    plugins: [
+      require('karma-jasmine'),
+      require('karma-chrome-headless'),
+      require('@angular-devkit/build-angular/plugins/karma')
+    ],
+    client: {
+      clearContext: false // leave Jasmine Spec Runner output visible in browser
+    },
+    browsers: ['ChromeHeadlessNoSandbox'],
+    customLaunchers: {
+      ChromeHeadlessNoSandbox: {
+        base: 'ChromeHeadless',
+        flags: ['--no-sandbox', '--disable-web-security']
+      }
+    },
+    singleRun: true,
+    restartOnFileChange: false
+  });
+};`,
+        hidden: true
+      };
+
       baseFiles['/tsconfig.json'] = {
         code: `{
   "compileOnSave": false,
@@ -1000,6 +908,19 @@ export { validateAngularComponent, UserService };`,
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';`,
+        hidden: true
+      };
+
+      baseFiles['/jest.config.js'] = {
+        code: `module.exports = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+  testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
+  moduleFileExtensions: ['js', 'jsx', 'json', 'node'],
+  transform: {
+    '^.+\\.(js|jsx): 'babel-jest'
+  }
+};`,
         hidden: true
       };
 
@@ -1088,20 +1009,20 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       scripts: {
         start: framework === 'angular' ? 'ng serve --port 4200' : framework === 'vue' ? 'vite' : framework === 'javascript' ? 'node src/index.js' : 'react-scripts start',
         build: framework === 'angular' ? 'ng build' : framework === 'vue' ? 'vite build' : framework === 'javascript' ? 'echo "No build needed"' : 'react-scripts build',
-        test: framework === 'angular' ? 'echo "Tests run automatically"' : framework === 'vue' ? 'vitest --run' : 'jest --watchAll=false'
+        test: framework === 'angular' ? 'ng test --watch=false --browsers=ChromeHeadlessNoSandbox' : framework === 'vue' ? 'vitest --run' : 'jest --watchAll=false'
       },
     };
 
     // Framework-specific configurations
     switch (framework) {
-      case 'angular':
-        delete basePackage.scripts.test;
-        break;
       case 'javascript':
         basePackage.jest = {
           testEnvironment: 'jsdom',
           setupFilesAfterEnv: ['<rootDir>/src/setupTests.js']
         };
+        break;
+      case 'vue':
+        basePackage.type = 'module';
         break;
     }
 
@@ -1111,28 +1032,15 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   const files = useMemo(() => {
     const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
     
-    if (framework === 'angular') {
-      return {
-        [mainFile]: { 
-          code: starterCode, 
-          active: true 
-        },
-        '/package.json': { 
-          code: packageJson, 
-          hidden: true 
-        },
-        ...frameworkFiles,
-      };
-    }
-    
     return {
       [mainFile]: { 
         code: starterCode, 
         active: true 
       },
       [testFile]: { 
-        code: testCode, 
-        hidden: true 
+        code: testCode,
+        // Don't hide test files - Sandpack needs to find them
+        hidden: false
       },
       '/package.json': { 
         code: packageJson, 
@@ -1154,21 +1062,26 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       initMode: 'user-visible' as const,
       logLevel: 'info' as const,
       recompileMode: 'delayed' as const,
+      // Ensure test files are visible to the test runner
+      visibleFiles: [mainFile, testFile],
     };
 
     switch (framework) {
       case 'angular':
         return {
           ...baseOptions,
-          recompileDelay: 2000,
+          recompileDelay: 3000,
           bundlerURL: undefined,
+          // For Angular, we want the test file to be found by the test runner
+          visibleFiles: [mainFile, testFile],
         };
       
       case 'vue':
         return {
           ...baseOptions,
-          recompileDelay: 1000,
+          recompileDelay: 1500,
           bundlerURL: undefined,
+          visibleFiles: [mainFile, testFile],
         };
       
       case 'react':
@@ -1176,6 +1089,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
           ...baseOptions,
           recompileDelay: 500,
           bundlerURL: undefined,
+          visibleFiles: [mainFile, testFile],
         };
       
       case 'javascript':
@@ -1183,15 +1097,17 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
           ...baseOptions,
           recompileDelay: 300,
           bundlerURL: undefined,
+          visibleFiles: [mainFile, testFile],
         };
       
       default:
         return {
           ...baseOptions,
           recompileDelay: 500,
+          visibleFiles: [mainFile, testFile],
         };
     }
-  }, [framework]);
+  }, [framework, mainFile, testFile]);
 
   return (
     <SandpackProvider 
