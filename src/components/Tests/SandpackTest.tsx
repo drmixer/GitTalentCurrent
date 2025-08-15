@@ -240,7 +240,7 @@ const TestResultsDisplay: React.FC<{
             if (onStatusChange) {
               onStatusChange('complete');
             }
-          }, 15000); // 15 second timeout for Angular
+          }, 20000); // 20 second timeout for Angular
         }
       } else if (sandpack.status === 'complete' || sandpack.status === 'idle') {
         if (testTimeout.current) {
@@ -310,12 +310,15 @@ const TestResultsDisplay: React.FC<{
               logData.includes('Failed to compile') ||
               logData.includes('Module not found') ||
               logData.includes('Cannot resolve dependency') ||
+              logData.includes('expect(received).toBeTruthy()') ||
+              logData.includes('Cannot read properties of undefined') ||
               (framework === 'angular' && (
                 logData.includes('NG0') || 
                 logData.includes('NullInjectorError') ||
                 logData.includes('Can\'t resolve all parameters') ||
                 logData.includes('No provider for') ||
-                logData.includes('StaticInjectorError')
+                logData.includes('StaticInjectorError') ||
+                logData.includes('Received: undefined')
               )) ||
               (framework === 'vue' && logData.includes('[Vue warn]')) ||
               (framework === 'react' && logData.includes('Warning: React'));
@@ -345,7 +348,8 @@ const TestResultsDisplay: React.FC<{
                   logData.includes('All tests passed') ||
                   (logData.includes('Executed') && logData.includes('SUCCESS')) ||
                   logData.includes('✓') ||
-                  logData.includes('TOTAL: 1 SUCCESS')
+                  logData.includes('TOTAL: 1 SUCCESS') ||
+                  (logData.includes('✅') && logData.includes('successfully'))
                 );
                 testFailed = (
                   (logData.includes('Executed') && logData.includes('FAILED')) ||
@@ -353,7 +357,8 @@ const TestResultsDisplay: React.FC<{
                   logData.includes('Expected:') ||
                   logData.includes('Actual:') ||
                   logData.includes('failures') ||
-                  logData.includes('FAILED')
+                  logData.includes('FAILED') ||
+                  logData.includes('❌')
                 );
                 break;
 
@@ -501,7 +506,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
     if (runStatus === 'running') {
       return { 
         text: framework === 'angular' 
-          ? '🔄 Compiling Angular app... (this may take up to 15 seconds)' 
+          ? '🔄 Compiling Angular app... (this may take up to 20 seconds)' 
           : '🔄 Running tests...', 
         color: '#007bff' 
       };
@@ -735,14 +740,12 @@ platformBrowserDynamic().bootstrapModule(AppModule)
         hidden: true
       };
 
-      // App module with UserService properly registered
+      // App module with proper imports and providers
       baseFiles['/src/app/app.module.ts'] = {
         code: `import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-
 import { AppComponent } from './app.component';
-import { UserService } from './user.service';
 
 @NgModule({
   declarations: [
@@ -753,14 +756,14 @@ import { UserService } from './user.service';
     FormsModule,
     ReactiveFormsModule
   ],
-  providers: [UserService],
+  providers: [],
   bootstrap: [AppComponent]
 })
 export class AppModule { }`,
         hidden: true
       };
 
-      // Simplified test setup
+      // Simplified test setup that should work reliably
       baseFiles['/src/test.ts'] = {
         code: `import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
@@ -778,7 +781,7 @@ getTestBed().initTestEnvironment(
 // Find all the tests
 const context = (require as any).context('./', true, /\.spec\.ts$/);
 // And load the modules
-context.keys().map(context);`,
+context.keys().forEach(context);`,
         hidden: true
       };
 
@@ -890,6 +893,24 @@ context.keys().map(context);`,
       "dom"
     ]
   }
+}`,
+        hidden: true
+      };
+
+      // Simplified Angular testing configuration
+      baseFiles['/tsconfig.spec.json'] = {
+        code: `{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": [
+      "jasmine"
+    ]
+  },
+  "include": [
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts"
+  ]
 }`,
         hidden: true
       };
@@ -1011,50 +1032,67 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   const files = useMemo(() => {
     const frameworkFiles = createFrameworkFiles(framework, starterCode, testCode);
     
-    // For Angular, we need to create a proper test file that sets up the testing module
+    // For Angular, we need to create a proper test file that sets up the testing module correctly
     if (framework === 'angular' && testCode) {
-      // Create a simple, working test that doesn't rely on complex extraction
+      // Create a comprehensive test that properly handles the Angular testing setup
       const angularTestCode = `import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { of } from 'rxjs';
-import { AppComponent } from './app.component';
 
-// Mock UserService
-class MockUserService {
+// Extract the User interface and UserService from the starter code
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+// Mock UserService that matches the component expectations
+class UserService {
+  private users: User[] = [
+    { id: 1, name: 'John Doe', email: 'john@example.com' },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
+  ];
+
   getUsers() {
-    return of([
-      { id: 1, name: 'Test User', email: 'test@example.com' }
-    ]);
+    return of(this.users);
   }
   
-  addUser(user: any) {
-    return of({ id: 2, name: user.name, email: user.email });
+  addUser(user: Omit<User, 'id'>) {
+    const newUser = { ...user, id: Date.now() };
+    this.users.push(newUser);
+    return of(newUser);
   }
   
   deleteUser(id: number) {
+    this.users = this.users.filter(user => user.id !== id);
     return of(true);
   }
 }
 
+// Import the AppComponent from the starter code
+import { AppComponent } from './app.component';
+
 describe('AppComponent', () => {
   let component: AppComponent;
   let fixture: ComponentFixture<AppComponent>;
-  let mockUserService: MockUserService;
+  let userService: UserService;
 
   beforeEach(async () => {
-    mockUserService = new MockUserService();
-    
     await TestBed.configureTestingModule({
       declarations: [AppComponent],
       imports: [ReactiveFormsModule],
       providers: [
         FormBuilder,
-        { provide: 'UserService', useValue: mockUserService }
+        { provide: 'UserService', useClass: UserService }
       ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppComponent);
     component = fixture.componentInstance;
+    userService = TestBed.inject('UserService') as UserService;
+    
+    // Initialize the component properly
+    fixture.detectChanges();
   });
 
   it('should create', () => {
@@ -1063,7 +1101,6 @@ describe('AppComponent', () => {
   });
 
   it('should initialize form', () => {
-    fixture.detectChanges();
     expect(component.userForm).toBeTruthy();
     expect(component.userForm.get('name')).toBeTruthy();
     expect(component.userForm.get('email')).toBeTruthy();
@@ -1071,9 +1108,7 @@ describe('AppComponent', () => {
   });
 
   it('should validate form fields', () => {
-    fixture.detectChanges();
-    
-    // Form should be invalid initially
+    // Form should be invalid initially (empty required fields)
     expect(component.userForm.valid).toBeFalsy();
     console.log('✅ Form invalid initially (as expected)');
     
@@ -1088,59 +1123,20 @@ describe('AppComponent', () => {
   });
 
   it('should have users array', () => {
-    fixture.detectChanges();
     expect(Array.isArray(component.users)).toBeTruthy();
     console.log('✅ Users array exists');
+  });
+
+  it('should load users on init', () => {
+    component.ngOnInit();
+    expect(component.isLoading).toBeTruthy();
+    console.log('✅ Loading state works');
   });
 });`;
 
       frameworkFiles[testFile] = {
         code: angularTestCode,
         hidden: true
-      };
-      
-      // Create a simplified UserService that matches the component
-      frameworkFiles['/src/app/user.service.ts'] = {
-        code: `import { Injectable } from '@angular/core';
-import { Observable, of, delay } from 'rxjs';
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
-@Injectable({
-  providedIn: 'root'
-})
-export class UserService {
-  private users: User[] = [
-    { id: 1, name: 'John Doe', email: 'john@example.com' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
-  ];
-
-  getUsers(): Observable<User[]> {
-    return of(this.users).pipe(delay(100)); // Reduced delay for faster tests
-  }
-
-  addUser(user: Omit<User, 'id'>): Observable<User> {
-    const newUser = { ...user, id: Date.now() };
-    this.users.push(newUser);
-    return of(newUser).pipe(delay(100));
-  }
-
-  deleteUser(id: number): Observable<boolean> {
-    this.users = this.users.filter(user => user.id !== id);
-    return of(true).pipe(delay(100));
-  }
-}`,
-        hidden: true
-      };
-      
-      // Don't modify the component code - use it as is but make sure it can work standalone
-      frameworkFiles[mainFile] = {
-        code: starterCode,
-        active: true
       };
     }
     
