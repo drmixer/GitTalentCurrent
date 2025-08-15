@@ -1,4 +1,4 @@
-// src/components/DeveloperTests.tsx
+// src/pages/DeveloperTests.tsx
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -59,14 +59,14 @@ const DeveloperTests: React.FC = () => {
               language
             )
           ),
-          job_roles!test_assignments_job_id_fkey (
+          job_roles (
             id,
             title,
             description,
             location,
-            employment_type,
+            job_type,
             salary,
-            recruiters!fk_job_roles_recruiter_user_id (
+            recruiters!job_roles_recruiter_id_fkey (
               company_name,
               users!recruiters_user_id_fkey (
                 id,
@@ -211,6 +211,9 @@ const DeveloperTests: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-medium">Difficulty:</span> {assignment.coding_tests.difficulty}
+                    </div>
+                    <div>
+                      <span className="font-medium">Job Type:</span> {assignment.job_roles.job_type}
                     </div>
                     <div>
                       <span className="font-medium">Assigned:</span> {new Date(assignment.created_at).toLocaleDateString()}
