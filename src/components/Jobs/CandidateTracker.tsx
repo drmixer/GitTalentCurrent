@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { JobRole, Developer, AppliedJob, User } from '../../types'; // Ensure User is imported
-import { Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle } from 'lucide-react';
+import { Briefcase, User as UserIcon, ChevronRight, Clock, Eye, MessageSquare, Check, X, Star, Loader, AlertCircle, FileText, ExternalLink } from 'lucide-react';
 
 interface Candidate extends AppliedJob {
   developer: Developer & { user: User }; // Ensure this matches your Developer type if 'user' is always present
@@ -117,6 +117,12 @@ export const CandidateTracker: React.FC = () => {
     }
   };
 
+  const handleViewResume = (resumeUrl: string) => {
+    if (resumeUrl) {
+      window.open(resumeUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   if (loadingJobs) {
     return <div className="flex items-center justify-center py-12"><Loader className="animate-spin h-8 w-8 text-blue-600" /></div>;
   }
@@ -164,23 +170,119 @@ export const CandidateTracker: React.FC = () => {
                   <div key={candidate.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <img src={candidate.developer.profile_pic_url || candidate.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.developer.user?.name || candidate.developer.github_handle || 'U')}&background=random`} alt={candidate.developer.user?.name || 'Developer'} className="w-12 h-12 rounded-full object-cover" />
+                        <img 
+                          src={candidate.developer.profile_pic_url || candidate.developer.user?.profile_pic_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.developer.user?.name || candidate.developer.github_handle || 'U')}&background=random`} 
+                          alt={candidate.developer.user?.name || 'Developer'} 
+                          className="w-12 h-12 rounded-full object-cover" 
+                        />
                         <div>
                           <h4 className="font-bold">{candidate.developer.user?.name || 'Unknown'}</h4>
                           <p className="text-sm text-gray-600">{candidate.developer.github_handle}</p>
+                          {candidate.developer.preferred_title && (
+                            <p className="text-sm text-blue-600 font-medium">{candidate.developer.preferred_title}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <button className="p-2 hover:bg-gray-100 rounded-full"><Eye size={18} /></button>
-                        <button className="p-2 hover:bg-gray-100 rounded-full"><MessageSquare size={18} /></button>
-                        <button className="p-2 hover:bg-gray-100 rounded-full"><Star size={18} /></button>
+                        <button 
+                          className="p-2 hover:bg-gray-100 rounded-full"
+                          title="View Profile"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          className="p-2 hover:bg-gray-100 rounded-full"
+                          title="Send Message"
+                        >
+                          <MessageSquare size={18} />
+                        </button>
+                        {candidate.developer.resume_url ? (
+                          <button 
+                            onClick={() => handleViewResume(candidate.developer.resume_url!)}
+                            className="p-2 hover:bg-gray-100 rounded-full text-green-600"
+                            title="View Resume"
+                          >
+                            <FileText size={18} />
+                          </button>
+                        ) : (
+                          <button 
+                            className="p-2 rounded-full text-gray-300 cursor-not-allowed"
+                            title="No Resume Available"
+                            disabled
+                          >
+                            <FileText size={18} />
+                          </button>
+                        )}
+                        <button 
+                          className="p-2 hover:bg-gray-100 rounded-full"
+                          title="Save Candidate"
+                        >
+                          <Star size={18} />
+                        </button>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center justify-between">
+                    
+                    {/* Candidate Details */}
+                    <div className="mt-3 space-y-2">
+                      {candidate.developer.bio && (
+                        <p className="text-sm text-gray-700 line-clamp-2">{candidate.developer.bio}</p>
+                      )}
+                      
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        {candidate.developer.location && (
+                          <span>📍 {candidate.developer.location}</span>
+                        )}
+                        {candidate.developer.experience_years > 0 && (
+                          <span>💼 {candidate.developer.experience_years}+ years</span>
+                        )}
+                        {candidate.developer.desired_salary > 0 && (
+                          <span>💰 ${candidate.developer.desired_salary.toLocaleString()}</span>
+                        )}
+                      </div>
+
+                      {/* Skills */}
+                      {candidate.developer.skills && candidate.developer.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {candidate.developer.skills.slice(0, 5).map((skill, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                              {skill}
+                            </span>
+                          ))}
+                          {candidate.developer.skills.length > 5 && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                              +{candidate.developer.skills.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Resume indicator */}
+                      <div className="flex items-center space-x-2 mt-2">
+                        {candidate.developer.resume_url ? (
+                          <div className="flex items-center space-x-1 text-green-600 text-xs">
+                            <FileText size={14} />
+                            <span>Resume available</span>
+                            <button 
+                              onClick={() => handleViewResume(candidate.developer.resume_url!)}
+                              className="text-green-600 hover:text-green-800 underline"
+                            >
+                              View
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-1 text-gray-400 text-xs">
+                            <FileText size={14} />
+                            <span>No resume uploaded</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100">
                       <div className="text-sm text-gray-500">
                         Applied: {new Date(candidate.applied_at).toLocaleDateString()}
                       </div>
-                      <div>
+                      <div className="flex items-center space-x-3">
                         <select
                           value={candidate.status}
                           onChange={(e) => updateCandidateStatus(candidate.id, e.target.value)}
@@ -192,13 +294,26 @@ export const CandidateTracker: React.FC = () => {
                           <option value="hired">Hired</option>
                           <option value="rejected">Rejected</option>
                         </select>
+                        
+                        {/* Quick action buttons */}
+                        <button 
+                          onClick={() => updateCandidateStatus(candidate.id, 'contacted')}
+                          className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                          disabled={candidate.status === 'contacted'}
+                        >
+                          {candidate.status === 'contacted' ? 'Contacted' : 'Mark Contacted'}
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p>No candidates have applied for this job yet.</p>
+              <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+                <UserIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Applications Yet</h3>
+                <p className="text-gray-600">No candidates have applied for this job yet.</p>
+              </div>
             )}
           </div>
         ) : (
