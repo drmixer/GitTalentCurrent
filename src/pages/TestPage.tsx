@@ -1,21 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CodingQuestion, TestAssignment, CodingTest } from '../types';
+import { CodingQuestion, TestAssignment } from '../types';
 import Editor from '@monaco-editor/react';
-import { Play, Send, Loader, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react';
-
-// Static import instead of dynamic require - this should resolve the import issue
+import { Play, Send, Loader, CheckCircle, ArrowRight } from 'lucide-react';
 import SandpackTest from '../components/Tests/SandpackTest';
-
-interface ExtendedTestAssignment extends TestAssignment {
-    coding_tests?: CodingTest;
-}
 
 const TestPage: React.FC = () => {
     const { assignmentId } = useParams<{ assignmentId: string }>();
-    const [assignment, setAssignment] = useState<ExtendedTestAssignment | null>(null);
-    const [codingTest, setCodingTest] = useState<CodingTest | null>(null);
+    const [assignment, setAssignment] = useState<TestAssignment | null>(null);
     const [questions, setQuestions] = useState<CodingQuestion[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [code, setCode] = useState('');
@@ -24,68 +17,37 @@ const TestPage: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
     const [lastResult, setLastResult] = useState<any>(null);
-    const [completedQuestions, setCompletedQuestions] = useState<Set<string>>(new Set());
-    const [error, setError] = useState<string>('');
-    const [sandpackError, setSandpackError] = useState<boolean>(false);
     const navigate = useNavigate();
 
     const fetchAssignmentAndQuestions = useCallback(async () => {
         if (!assignmentId) return;
         setIsLoading(true);
-        setError('');
-        
-        try {
-            // Fetch the test assignment
-            const { data: assignmentData, error: assignmentError } = await supabase
-                .from('test_assignments')
-                .select('*')
-                .eq('id', assignmentId)
-                .single();
+        const { data: assignmentData, error: assignmentError } = await supabase
+            .from('test_assignments')
+            .select('*, coding_tests(*)')
+            .eq('id', assignmentId)
+            .single();
 
-            if (assignmentError) {
-                console.error('Error fetching assignment:', assignmentError);
-                setError('Failed to load test assignment: ' + assignmentError.message);
-                setIsLoading(false);
-                return;
-            }
-
-            setAssignment(assignmentData as ExtendedTestAssignment);
-
-            // Fetch the coding test details separately
-            const { data: testData, error: testError } = await supabase
-                .from('coding_tests')
-                .select('*')
-                .eq('id', assignmentData.test_id)
-                .single();
-
-            if (testError) {
-                console.error('Error fetching coding test:', testError);
-                setError('Failed to load coding test: ' + testError.message);
-                setIsLoading(false);
-                return;
-            }
-
-            setCodingTest(testData as CodingTest);
-
-            // Fetch the questions for this test
-            const { data: questionsData, error: questionsError } = await supabase
-                .from('coding_questions')
-                .select('*')
-                .eq('test_id', assignmentData.test_id)
-                .order('created_at', { ascending: true });
-
-            if (questionsError) {
-                console.error('Error fetching questions:', questionsError);
-                setError('Failed to load questions: ' + questionsError.message);
-            } else {
-                setQuestions(questionsData as CodingQuestion[]);
-            }
-        } catch (err) {
-            console.error('Unexpected error:', err);
-            setError('An unexpected error occurred while loading the test.');
-        } finally {
+        if (assignmentError) {
+            console.error('Error fetching assignment:', assignmentError);
             setIsLoading(false);
+            return;
         }
+
+        setAssignment(assignmentData as TestAssignment);
+
+        const { data: questionsData, error: questionsError } = await supabase
+            .from('coding_questions')
+            .select('*')
+            .eq('test_id', assignmentData.test_id)
+            .order('created_at', { ascending: true });
+
+        if (questionsError) {
+            console.error('Error fetching questions:', questionsError);
+        } else {
+            setQuestions(questionsData as CodingQuestion[]);
+        }
+        setIsLoading(false);
     }, [assignmentId]);
 
     useEffect(() => {
@@ -95,17 +57,13 @@ const TestPage: React.FC = () => {
 
     const markNotificationAsRead = async () => {
         if (!assignmentId) return;
-        try {
-            const { error } = await supabase
-                .from('notifications')
-                .update({ is_read: true })
-                .eq('entity_id', assignmentId)
-                .eq('type', 'test_assignment');
-            if (error) {
-                console.error('Error marking notification as read:', error);
-            }
-        } catch (err) {
-            console.error('Error marking notification as read:', err);
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('entity_id', assignmentId)
+            .eq('type', 'test_assignment');
+        if (error) {
+            console.error('Error marking notification as read:', error);
         }
     };
 
@@ -162,28 +120,6 @@ const TestPage: React.FC = () => {
         }
     };
 
-    const updateTestAssignmentStatus = async () => {
-        if (!assignmentId) return;
-        
-        try {
-            const { error } = await supabase
-                .from('test_assignments')
-                .update({ 
-                    status: 'Completed',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', assignmentId);
-
-            if (error) {
-                console.error('Error updating test assignment status:', error);
-            } else {
-                console.log('Test assignment status updated to Completed');
-            }
-        } catch (error) {
-            console.error('Error updating test assignment status:', error);
-        }
-    };
-
     const handleSubmit = async () => {
         if (!assignmentId) return;
         setIsSubmitting(true);
@@ -205,9 +141,6 @@ const TestPage: React.FC = () => {
                 setOutput(`Error submitting code: ${error.message}`);
             } else if (data) {
                 setLastResult(data);
-                
-                // Mark this question as completed
-                setCompletedQuestions(prev => new Set([...prev, question.id]));
                 
                 // Display detailed results
                 let resultOutput = '';
@@ -240,29 +173,16 @@ const TestPage: React.FC = () => {
         }
     };
 
-    const handleNextQuestion = async () => {
+    const handleNextQuestion = () => {
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
-            // Test completed - update the test assignment status
-            await updateTestAssignmentStatus();
+            // Test completed
             setIsCompleted(true);
             setTimeout(() => {
-                navigate('/developer?tab=tests');
+                navigate('/developer');
             }, 3000);
         }
-    };
-
-    // Helper function to map language names to Monaco editor language IDs
-    const getEditorLanguage = (language: string): string => {
-        const languageMap: { [key: string]: string } = {
-            'python': 'python',
-            'java': 'java',
-            'c++': 'cpp',
-            'swift': 'swift',
-            'kotlin': 'kotlin'
-        };
-        return languageMap[language.toLowerCase()] || 'python';
     };
 
     if (isLoading) {
@@ -274,52 +194,12 @@ const TestPage: React.FC = () => {
         );
     }
 
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen">
-                <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-                <h1 className="text-2xl font-bold mb-2 text-red-600">Error Loading Test</h1>
-                <p className="text-gray-600 text-center mb-4">{error}</p>
-                <button 
-                    onClick={() => navigate('/developer?tab=tests')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                    Back to Tests
-                </button>
-            </div>
-        );
-    }
-
-    if (!assignment || !codingTest) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen">
-                <AlertCircle className="w-16 h-16 text-gray-400 mb-4" />
-                <h1 className="text-2xl font-bold mb-2">Test Not Found</h1>
-                <p className="text-gray-600 text-center mb-4">The requested test could not be found.</p>
-                <button 
-                    onClick={() => navigate('/developer?tab=tests')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                    Back to Tests
-                </button>
-            </div>
-        );
+    if (!assignment) {
+        return <div className="p-8 text-center">Test not found.</div>;
     }
 
     if (questions.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen">
-                <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
-                <h1 className="text-2xl font-bold mb-2">No Questions Available</h1>
-                <p className="text-gray-600 text-center mb-4">This test has no questions configured.</p>
-                <button 
-                    onClick={() => navigate('/developer?tab=tests')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                    Back to Tests
-                </button>
-            </div>
-        );
+        return <div className="p-8 text-center">This test has no questions.</div>;
     }
 
     if (isCompleted) {
@@ -339,127 +219,34 @@ const TestPage: React.FC = () => {
 
     const currentQuestion = questions[currentQuestionIndex];
     const sandpackLanguages = ['react', 'vue', 'angular', 'javascript'];
-    const isSandpackLanguage = sandpackLanguages.includes(currentQuestion.language.toLowerCase());
 
-    // Handle Sandpack languages (React, Vue, Angular, JavaScript) - with fallback for import errors
-    if (isSandpackLanguage) {
-        // Error boundary for Sandpack component
-        try {
-            return (
-                <div className="p-8">
-                    <div className="w-full lg:w-2/3 mx-auto">
-                        <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
-                        <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                        <p className="mb-4">{currentQuestion.question_text}</p>
-                        
-                        {currentQuestion.expected_output && (
-                            <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
-                                <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
-                                <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
-                            </div>
-                        )}
-                        
-                        <React.Suspense 
-                            fallback={
-                                <div className="flex justify-center items-center h-64">
-                                    <Loader className="animate-spin w-8 h-8" />
-                                    <span className="ml-2">Loading test environment...</span>
-                                </div>
-                            }
-                        >
-                            <SandpackTest
-                                framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
-                                starterCode={currentQuestion.starter_code || ''}
-                                testCode={currentQuestion.test_code}
-                                assignmentId={assignmentId!}
-                                questionId={currentQuestion.id}
-                                onTestComplete={async () => {
-                                    // Mark this question as completed
-                                    setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
-                                    
-                                    if (currentQuestionIndex < questions.length - 1) {
-                                        setCurrentQuestionIndex(currentQuestionIndex + 1);
-                                    } else {
-                                        // Test completed - update the test assignment status
-                                        await updateTestAssignmentStatus();
-                                        setIsCompleted(true);
-                                        setTimeout(() => {
-                                            navigate('/developer?tab=tests');
-                                        }, 3000);
-                                    }
-                                }}
-                            />
-                        </React.Suspense>
-                    </div>
+    // Handle Sandpack languages (React, Vue, Angular, JavaScript)
+    if (sandpackLanguages.includes(currentQuestion.language.toLowerCase())) {
+        return (
+            <div className="p-8">
+                <div className="w-full lg:w-2/3 mx-auto">
+                    <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
+                    <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                    <p className="mb-4">{currentQuestion.question_text}</p>
+                    
+                    {currentQuestion.expected_output && (
+                        <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                            <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
+                            <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
+                        </div>
+                    )}
+                    
+                    <SandpackTest
+                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
+                        starterCode={currentQuestion.starter_code || ''}
+                        testCode={currentQuestion.test_code}
+                        assignmentId={assignmentId!}
+                        questionId={currentQuestion.id}
+                        onTestComplete={handleNextQuestion}
+                    />
                 </div>
-            );
-        } catch (sandpackImportError) {
-            console.error('Sandpack component error:', sandpackImportError);
-            // Fallback to Monaco Editor for frontend languages if Sandpack fails
-            return (
-                <div className="p-8">
-                    <div className="w-full mx-auto">
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                            <div className="flex items-center">
-                                <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
-                                <div>
-                                    <p className="text-yellow-800 font-medium">Sandpack Environment Unavailable</p>
-                                    <p className="text-yellow-700 text-sm mt-1">
-                                        Using fallback Monaco Editor. Some interactive features may not be available.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
-                        <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                        <p className="mb-4">{currentQuestion.question_text}</p>
-                        
-                        {currentQuestion.expected_output && (
-                            <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
-                                <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
-                                <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
-                            </div>
-                        )}
-
-                        <div className="mb-4">
-                            <Editor
-                                height="500px"
-                                language="javascript"
-                                value={code}
-                                onChange={(value) => setCode(value || '')}
-                                theme="vs-dark"
-                                options={{
-                                    fontSize: 14,
-                                    minimap: { enabled: false },
-                                    scrollBeyondLastLine: false,
-                                    wordWrap: 'on',
-                                    automaticLayout: true
-                                }}
-                            />
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                            <div className="text-sm text-gray-600">
-                                Question {currentQuestionIndex + 1} of {questions.length} • {currentQuestion.language}
-                            </div>
-                            <div className="flex space-x-4">
-                                <button
-                                    onClick={() => {
-                                        // For frontend languages, we'll mark as completed without backend validation
-                                        setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
-                                        handleNextQuestion();
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                                >
-                                    Mark Complete & Continue
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
+            </div>
+        );
     }
 
     // Handle Judge0 languages (Python, Java, C++, Swift, Kotlin)
@@ -468,7 +255,7 @@ const TestPage: React.FC = () => {
             <div className="flex h-screen">
                 {/* Question Panel */}
                 <div className="w-1/3 p-4 overflow-y-auto border-r border-gray-200">
-                    <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
+                    <h1 className="text-2xl font-bold mb-4">{assignment.coding_tests.title}</h1>
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
                     
                     <div className="mb-4 p-3 bg-gray-100 rounded-md">
@@ -592,5 +379,17 @@ const TestPage: React.FC = () => {
         </div>
     );
 };
+
+// Helper function to map language names to Monaco editor language IDs
+function getEditorLanguage(language: string): string {
+    const languageMap: { [key: string]: string } = {
+        'python': 'python',
+        'java': 'java',
+        'c++': 'cpp',
+        'swift': 'swift',
+        'kotlin': 'kotlin'
+    };
+    return languageMap[language.toLowerCase()] || 'python';
+}
 
 export default TestPage;
