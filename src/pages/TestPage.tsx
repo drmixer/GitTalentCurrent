@@ -5,13 +5,8 @@ import { CodingQuestion, TestAssignment, CodingTest } from '../types';
 import Editor from '@monaco-editor/react';
 import { Play, Send, Loader, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react';
 
-// Import SandpackTest with error boundary handling
-let SandpackTest: React.ComponentType<any> | null = null;
-try {
-    SandpackTest = require('../components/Tests/SandpackTest').default;
-} catch (error) {
-    console.warn('SandpackTest component not available:', error);
-}
+// Static import instead of dynamic require - this should resolve the import issue
+import SandpackTest from '../components/Tests/SandpackTest';
 
 interface ExtendedTestAssignment extends TestAssignment {
     coding_tests?: CodingTest;
@@ -31,6 +26,7 @@ const TestPage: React.FC = () => {
     const [lastResult, setLastResult] = useState<any>(null);
     const [completedQuestions, setCompletedQuestions] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string>('');
+    const [sandpackError, setSandpackError] = useState<boolean>(false);
     const navigate = useNavigate();
 
     const fetchAssignmentAndQuestions = useCallback(async () => {
@@ -345,65 +341,125 @@ const TestPage: React.FC = () => {
     const sandpackLanguages = ['react', 'vue', 'angular', 'javascript'];
     const isSandpackLanguage = sandpackLanguages.includes(currentQuestion.language.toLowerCase());
 
-    // Handle Sandpack languages (React, Vue, Angular, JavaScript) - with error handling
+    // Handle Sandpack languages (React, Vue, Angular, JavaScript) - with fallback for import errors
     if (isSandpackLanguage) {
-        if (!SandpackTest) {
+        // Error boundary for Sandpack component
+        try {
             return (
-                <div className="flex flex-col items-center justify-center h-screen">
-                    <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
-                    <h1 className="text-2xl font-bold mb-2">Sandpack Not Available</h1>
-                    <p className="text-gray-600 text-center mb-4">
-                        This test requires the Sandpack component which is currently unavailable.
-                    </p>
-                    <button 
-                        onClick={() => navigate('/developer?tab=tests')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                    >
-                        Back to Tests
-                    </button>
+                <div className="p-8">
+                    <div className="w-full lg:w-2/3 mx-auto">
+                        <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
+                        <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                        <p className="mb-4">{currentQuestion.question_text}</p>
+                        
+                        {currentQuestion.expected_output && (
+                            <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
+                                <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
+                            </div>
+                        )}
+                        
+                        <React.Suspense 
+                            fallback={
+                                <div className="flex justify-center items-center h-64">
+                                    <Loader className="animate-spin w-8 h-8" />
+                                    <span className="ml-2">Loading test environment...</span>
+                                </div>
+                            }
+                        >
+                            <SandpackTest
+                                framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
+                                starterCode={currentQuestion.starter_code || ''}
+                                testCode={currentQuestion.test_code}
+                                assignmentId={assignmentId!}
+                                questionId={currentQuestion.id}
+                                onTestComplete={async () => {
+                                    // Mark this question as completed
+                                    setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
+                                    
+                                    if (currentQuestionIndex < questions.length - 1) {
+                                        setCurrentQuestionIndex(currentQuestionIndex + 1);
+                                    } else {
+                                        // Test completed - update the test assignment status
+                                        await updateTestAssignmentStatus();
+                                        setIsCompleted(true);
+                                        setTimeout(() => {
+                                            navigate('/developer?tab=tests');
+                                        }, 3000);
+                                    }
+                                }}
+                            />
+                        </React.Suspense>
+                    </div>
+                </div>
+            );
+        } catch (sandpackImportError) {
+            console.error('Sandpack component error:', sandpackImportError);
+            // Fallback to Monaco Editor for frontend languages if Sandpack fails
+            return (
+                <div className="p-8">
+                    <div className="w-full mx-auto">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <div className="flex items-center">
+                                <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
+                                <div>
+                                    <p className="text-yellow-800 font-medium">Sandpack Environment Unavailable</p>
+                                    <p className="text-yellow-700 text-sm mt-1">
+                                        Using fallback Monaco Editor. Some interactive features may not be available.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
+                        <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
+                        <p className="mb-4">{currentQuestion.question_text}</p>
+                        
+                        {currentQuestion.expected_output && (
+                            <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
+                                <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
+                            </div>
+                        )}
+
+                        <div className="mb-4">
+                            <Editor
+                                height="500px"
+                                language="javascript"
+                                value={code}
+                                onChange={(value) => setCode(value || '')}
+                                theme="vs-dark"
+                                options={{
+                                    fontSize: 14,
+                                    minimap: { enabled: false },
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    automaticLayout: true
+                                }}
+                            />
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                            <div className="text-sm text-gray-600">
+                                Question {currentQuestionIndex + 1} of {questions.length} • {currentQuestion.language}
+                            </div>
+                            <div className="flex space-x-4">
+                                <button
+                                    onClick={() => {
+                                        // For frontend languages, we'll mark as completed without backend validation
+                                        setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
+                                        handleNextQuestion();
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    Mark Complete & Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         }
-
-        return (
-            <div className="p-8">
-                <div className="w-full lg:w-2/3 mx-auto">
-                    <h1 className="text-2xl font-bold mb-4">{codingTest.title}</h1>
-                    <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
-                    <p className="mb-4">{currentQuestion.question_text}</p>
-                    
-                    {currentQuestion.expected_output && (
-                        <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
-                            <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
-                            <p className="text-blue-700 whitespace-pre-wrap">{currentQuestion.expected_output}</p>
-                        </div>
-                    )}
-                    
-                    <SandpackTest
-                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
-                        starterCode={currentQuestion.starter_code || ''}
-                        testCode={currentQuestion.test_code}
-                        assignmentId={assignmentId!}
-                        questionId={currentQuestion.id}
-                        onTestComplete={async () => {
-                            // Mark this question as completed
-                            setCompletedQuestions(prev => new Set([...prev, currentQuestion.id]));
-                            
-                            if (currentQuestionIndex < questions.length - 1) {
-                                setCurrentQuestionIndex(currentQuestionIndex + 1);
-                            } else {
-                                // Test completed - update the test assignment status
-                                await updateTestAssignmentStatus();
-                                setIsCompleted(true);
-                                setTimeout(() => {
-                                    navigate('/developer?tab=tests');
-                                }, 3000);
-                            }
-                        }}
-                    />
-                </div>
-            </div>
-        );
     }
 
     // Handle Judge0 languages (Python, Java, C++, Swift, Kotlin)
