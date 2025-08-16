@@ -518,7 +518,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [hasRun, setHasRun] = useState(false);
   const { sandpack } = useSandpack();
-  const sandpackClient = useSandpackClient();
   
   const submissionInProgress = useRef(false);
 
