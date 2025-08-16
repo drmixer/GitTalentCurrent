@@ -143,11 +143,9 @@ const getFrameworkConfig = (
             '@testing-library/react': '^14.2.1',
             '@testing-library/jest-dom': '^6.5.0',
             '@testing-library/user-event': '^14.5.2',
-            vitest: '^0.34.6',
-            jsdom: '^22.1.0',
+            // NOTE: no vitest/jsdom here; Sandpack runs tests in-browser
           },
         },
-        // IMPORTANT: keep files under /src for the react-ts template
         mainFile: '/src/App.tsx',
         testFile: '/src/App.test.tsx',
       };
@@ -222,16 +220,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTestsPassed, setAllTestsPassed] = useState(false);
-  const [testsCompleted, setTestsCompleted] = useState(false); // completed regardless of pass/fail
+  const [testsCompleted, setTestsCompleted] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'passed' | 'failed' | 'error'>('idle');
   const [testResults, setTestResults] = useState<SandpackTestResult | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [testsTriggered, setTestsTriggered] = useState(false);
-  const [runId, setRunId] = useState(0); // force remount of SandpackTests to re-run
+  const [runId, setRunId] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
-  // Access to Sandpack context if needed
   useSandpack();
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -255,7 +252,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     setAllTestsPassed(false);
     setTestsCompleted(false);
     setTestsTriggered(true);
-    setRunId(prev => prev + 1); // re-mount SandpackTests
+    setRunId(prev => prev + 1);
 
     window.setTimeout(() => {
       setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
@@ -314,7 +311,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   }, [clearPendingTimeout]);
 
   const submitSolution = useCallback(async () => {
-    // Allow submit after tests complete regardless of pass/fail; block if there was a runner error/timeout
     if (!(testStatus === 'passed' || testStatus === 'failed')) {
       showToast('Please run tests and wait for completion before submitting.', 'error');
       return;
@@ -373,7 +369,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     <div className="flex flex-col h-full">
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
 
-      {/* Status Bar */}
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <TestStatus status={testStatus} />
         <div className="flex items-center space-x-3">
@@ -391,9 +386,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex">
-        {/* Code Editor */}
         <div className="flex-1">
           <SandpackCodeEditor
             style={{ height: '60vh' }}
@@ -404,9 +397,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
           />
         </div>
 
-        {/* Console and Tests Panel */}
         <div className="w-1/2 flex flex-col border-l">
-          {/* Console Output */}
           <div className="flex-1 bg-gray-900 text-green-400 p-4 font-mono text-sm overflow-auto">
             <h3 className="text-white font-bold mb-2">Console Output</h3>
             {consoleOutput.length === 0 ? (
@@ -420,11 +411,10 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
-          {/* Sandpack Tests (controlled by testsTriggered state) */}
           <div className="h-64 border-t">
             {testsTriggered ? (
               <SandpackTests
-                key={runId} // re-mount each run
+                key={runId}
                 onComplete={handleTestComplete}
                 showVerboseButton={false}
                 showWatchButton={false}
@@ -458,52 +448,10 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(
         [testFile]: { code: testCode ?? '', hidden: false },
       };
 
-      // Ensure vitest runs properly in the sandbox for React/Vite template
-      if (setup.template === 'react-ts') {
-        baseFiles['/vitest.config.ts'] = {
-          code: `
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./setupTests.ts'],
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
-  },
-});
-`.trim(),
-          hidden: true,
-        };
-        baseFiles['/setupTests.ts'] = {
-          code: `
-import '@testing-library/jest-dom/vitest';
-`.trim(),
-          hidden: true,
-        };
-        baseFiles['/tsconfig.json'] = {
-          code: JSON.stringify(
-            {
-              compilerOptions: {
-                target: 'ES2020',
-                lib: ['ES2020', 'DOM', 'DOM.Iterable'],
-                jsx: 'react-jsx',
-                module: 'ESNext',
-                moduleResolution: 'Bundler',
-                strict: true,
-                skipLibCheck: true,
-                types: ['vitest/globals'],
-              },
-            },
-            null,
-            2
-          ),
-          hidden: true,
-        };
-      }
-
+      // IMPORTANT: do not inject a Vitest config or jsdom; tests run in-browser in Sandpack
       console.log('📁 Sandpack files created for', framework, ':', Object.keys(baseFiles));
       return baseFiles;
-    }, [framework, starterCode, testCode, mainFile, testFile, setup.template]);
+    }, [framework, starterCode, testCode, mainFile, testFile]);
 
     const sandpackKey = useMemo(
       () => `${assignmentId}-${questionId}-${framework}`,
@@ -529,7 +477,6 @@ import '@testing-library/jest-dom/vitest';
           autorun: false,
           autoReload: false,
           initMode: 'user-visible',
-          bundlerURL: undefined,
           logLevel: 'info',
           recompileMode: 'delayed',
           recompileDelay: 500,
