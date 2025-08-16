@@ -1,20 +1,24 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
   SandpackCodeEditor,
   SandpackTests,
-  SandpackConsole,
   useSandpack,
 } from '@codesandbox/sandpack-react';
-import type { SandpackSetup, SandpackFiles, SandpackTestResult, SandpackProviderProps } from '@codesandbox/sandpack-react';
+import type {
+  SandpackSetup,
+  SandpackFiles,
+  SandpackTestResult,
+  SandpackProviderProps,
+} from '@codesandbox/sandpack-react';
 import { Play, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 
 // Simple inline toast notification component
-const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ 
-  message, 
-  type, 
-  onClose 
+const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({
+  message,
+  type,
+  onClose,
 }) => {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000);
@@ -22,7 +26,7 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
   }, [onClose]);
 
   return (
-    <div 
+    <div
       className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 ease-in-out ${
         type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
       }`}
@@ -36,20 +40,20 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
         zIndex: 1000,
         backgroundColor: type === 'success' ? '#10b981' : '#ef4444',
         color: 'white',
-        fontWeight: '500'
+        fontWeight: '500',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>{message}</span>
-        <button 
+        <button
           onClick={onClose}
-          style={{ 
-            marginLeft: '16px', 
-            background: 'none', 
-            border: 'none', 
-            color: 'white', 
+          style={{
+            marginLeft: '16px',
+            background: 'none',
+            border: 'none',
+            color: 'white',
             cursor: 'pointer',
-            fontSize: '18px'
+            fontSize: '18px',
           }}
           aria-label="Close"
         >
@@ -73,18 +77,20 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// FIXED: Use proper Sandpack templates with updated dependencies to fix babel polyfill issues
-const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
+// Use proper Sandpack templates with updated dependencies
+const getFrameworkConfig = (
+  framework: SupportedFramework
+): { setup: SandpackSetup; mainFile: string; testFile: string } => {
   switch (framework) {
     case 'vue':
       return {
         setup: {
-          template: 'vue', // Use 'vue' instead of 'vue3'
+          template: 'vue',
           dependencies: {
-            'vue': '^3.3.4',
+            vue: '^3.3.4',
             '@vue/test-utils': '^2.4.1',
-            'vitest': '^0.34.0',
-          }
+            vitest: '^0.34.6',
+          },
         },
         mainFile: '/src/App.vue',
         testFile: '/src/test.js',
@@ -93,7 +99,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
     case 'angular':
       return {
         setup: {
-          template: 'angular', // Use proper Angular template
+          template: 'angular',
           dependencies: {
             '@angular/animations': '^16.0.0',
             '@angular/common': '^16.0.0',
@@ -103,11 +109,11 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@angular/platform-browser': '^16.0.0',
             '@angular/platform-browser-dynamic': '^16.0.0',
             '@angular/testing': '^16.0.0',
-            'rxjs': '^7.8.0',
+            rxjs: '^7.8.0',
             'zone.js': '^0.13.0',
             'jasmine-core': '^4.6.0',
-            'karma': '^6.4.0',
-          }
+            karma: '^6.4.0',
+          },
         },
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/test.ts',
@@ -116,11 +122,11 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
     case 'javascript':
       return {
         setup: {
-          template: 'vanilla', // Use vanilla for plain JavaScript
+          template: 'vanilla',
           dependencies: {
-            'vitest': '^0.34.0',
-            '@testing-library/jest-dom': '^5.16.5',
-          }
+            vitest: '^0.34.6',
+            '@testing-library/jest-dom': '^6.5.0',
+          },
         },
         mainFile: '/src/index.js',
         testFile: '/src/index.test.js',
@@ -130,16 +136,16 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
     default:
       return {
         setup: {
-          template: 'react-ts', // Use react-ts template for better compatibility
+          template: 'react-ts',
           dependencies: {
-            'react': '^18.2.0',
+            react: '^18.2.0',
             'react-dom': '^18.2.0',
-            '@testing-library/react': '^13.4.0',
-            '@testing-library/jest-dom': '^5.16.5',
-            '@testing-library/user-event': '^14.4.3',
-            'jest': '^29.0.0',
-            '@types/jest': '^29.0.0',
-          }
+            '@testing-library/react': '^14.2.1',
+            '@testing-library/jest-dom': '^6.5.0',
+            '@testing-library/user-event': '^14.5.2',
+            vitest: '^0.34.6',
+            jsdom: '^22.1.0',
+          },
         },
         mainFile: '/App.tsx',
         testFile: '/App.test.tsx',
@@ -148,9 +154,9 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 };
 
 // Status tracking component
-const TestStatus: React.FC<{ status: 'idle' | 'running' | 'passed' | 'failed' | 'error', message?: string }> = ({ 
-  status, 
-  message 
+const TestStatus: React.FC<{ status: 'idle' | 'running' | 'passed' | 'failed' | 'error'; message?: string }> = ({
+  status,
+  message,
 }) => {
   const getStatusConfig = () => {
     switch (status) {
@@ -187,10 +193,10 @@ const TestStatus: React.FC<{ status: 'idle' | 'running' | 'passed' | 'failed' | 
 };
 
 // Run Tests Button Component
-const RunTestsButton: React.FC<{ onRunTests: () => void, isRunning: boolean, disabled?: boolean }> = ({ 
-  onRunTests, 
-  isRunning, 
-  disabled = false 
+const RunTestsButton: React.FC<{ onRunTests: () => void; isRunning: boolean; disabled?: boolean }> = ({
+  onRunTests,
+  isRunning,
+  disabled = false,
 }) => {
   return (
     <button
@@ -198,10 +204,7 @@ const RunTestsButton: React.FC<{ onRunTests: () => void, isRunning: boolean, dis
       disabled={isRunning || disabled}
       className={`
         flex items-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors
-        ${isRunning || disabled 
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-          : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-        }
+        ${isRunning || disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'}
       `}
     >
       <Play className="w-4 h-4" />
@@ -209,6 +212,7 @@ const RunTestsButton: React.FC<{ onRunTests: () => void, isRunning: boolean, dis
     </button>
   );
 };
+
 // Main layout component with enhanced status display and manual test running
 const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'starterCode' | 'testCode'>> = ({
   assignmentId,
@@ -217,14 +221,17 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTestsPassed, setAllTestsPassed] = useState(false);
+  const [testsCompleted, setTestsCompleted] = useState(false); // completed regardless of pass/fail
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'passed' | 'failed' | 'error'>('idle');
   const [testResults, setTestResults] = useState<SandpackTestResult | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [testsTriggered, setTestsTriggered] = useState(false); // Track if tests have been manually triggered
+  const [testsTriggered, setTestsTriggered] = useState(false);
+  const [runId, setRunId] = useState(0); // force remount of SandpackTests to re-run
+  const timeoutRef = useRef<number | null>(null);
 
-  // Use Sandpack context to access the client
-  const { sandpack } = useSandpack();
+  // Access to Sandpack context if needed
+  useSandpack();
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -234,76 +241,91 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     setToast(null);
   }, []);
 
-  // Handle manual test running
+  const clearPendingTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
   const handleRunTests = useCallback(async () => {
     setTestStatus('running');
     setConsoleOutput(['🚀 Compiling and running tests...']);
     setAllTestsPassed(false);
-    setTestsTriggered(true); // Mark that tests have been manually triggered
-    
-    // Add some delay to show compilation status
-    setTimeout(() => {
-      setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
-    }, 500);
+    setTestsCompleted(false);
+    setTestsTriggered(true);
+    setRunId(prev => prev + 1); // re-mount SandpackTests
 
-    // Set a timeout to reset status if tests don't complete
-    setTimeout(() => {
+    window.setTimeout(() => {
+      setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
+    }, 300);
+
+    clearPendingTimeout();
+    timeoutRef.current = window.setTimeout(() => {
       setTestStatus(prev => {
         if (prev === 'running') {
-          setConsoleOutput(prevOutput => [...prevOutput, '⏰ Test execution timed out - please try again']);
+          setConsoleOutput(prevOut => [...prevOut, '⏰ Test execution timed out - please try again']);
           return 'error';
         }
         return prev;
       });
-    }, 30000); // 30 second timeout
+    }, 30000);
+  }, [clearPendingTimeout]);
 
-    // The SandpackTests component will handle the actual test execution
-  }, []);
-
-  // Handle test completion results
   const handleTestComplete = useCallback((results: SandpackTestResult) => {
-    console.log('🔬 Test results received:', results);
+    clearPendingTimeout();
     setTestResults(results);
-    
-    if (results && results.tests) {
+
+    if (results && results.tests && results.tests.length > 0) {
       const passedTests = results.tests.filter(test => test.status === 'pass').length;
       const totalTests = results.tests.length;
       const allPassed = results.tests.every(result => result.status === 'pass');
-      
+
       setAllTestsPassed(allPassed);
+      setTestsCompleted(true);
       setTestStatus(allPassed ? 'passed' : 'failed');
-      
-      // Update console output with results
+
       setConsoleOutput(prev => [
         ...prev,
         `📊 Test Results: ${passedTests}/${totalTests} tests passed`,
-        allPassed ? '🎉 All tests passed! You can now submit your solution.' : '❌ Some tests failed. Please review and fix your code.',
-        ...results.tests.map(test => 
-          `${test.status === 'pass' ? '✅' : '❌'} ${test.name || 'Test'}: ${test.status === 'pass' ? 'PASSED' : test.errors?.[0] || 'FAILED'}`
-        )
+        allPassed ? '🎉 All tests passed! You can now submit your solution.' : '❌ Some tests failed. You can still submit if allowed.',
+        ...results.tests.map(test => `${test.status === 'pass' ? '✅' : '❌'} ${test.name || 'Test'}: ${test.status === 'pass' ? 'PASSED' : test.errors?.[0] || 'FAILED'}`),
+      ]);
+    } else if (results && results.errors && results.errors.length > 0) {
+      setTestsCompleted(false);
+      setTestStatus('error');
+      setConsoleOutput(prev => [
+        ...prev,
+        '⚠️ Test runner error:',
+        ...results.errors.map(e => (typeof e === 'string' ? e : e.message || 'Unknown error')),
       ]);
     } else {
-      console.log('⚠️ No test results or empty tests array received');
+      setTestsCompleted(false);
       setTestStatus('error');
       setConsoleOutput(prev => [...prev, '⚠️ No test results received - check test configuration']);
     }
-  }, []);
+  }, [clearPendingTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingTimeout();
+    };
+  }, [clearPendingTimeout]);
 
   const submitSolution = useCallback(async () => {
-    if (!allTestsPassed) {
-      showToast('Please ensure all tests are passing before you submit.', 'error');
+    // Allow submit after tests complete regardless of pass/fail; block if there was a runner error/timeout
+    if (!(testStatus === 'passed' || testStatus === 'failed')) {
+      showToast('Please run tests and wait for completion before submitting.', 'error');
       return;
     }
 
     setIsSubmitting(true);
     setConsoleOutput(prev => [...prev, '📤 Submitting solution...']);
-    
+
     try {
-      // Check if Supabase is available, if not just simulate success for testing
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
+
       if (!supabaseUrl) {
-        // Simulate successful submission for testing
         setTimeout(() => {
           setConsoleOutput(prev => [...prev, '✅ Solution submitted successfully! (Test mode - no actual submission)']);
           showToast('Solution submitted successfully! 🎉 (Test mode)', 'success');
@@ -312,28 +334,29 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
         }, 1000);
         return;
       }
-      
-      // Dynamically import supabase when needed
+
       const { supabase } = await import('../../lib/supabase');
-      
+
       const { error: insertError } = await supabase
         .from('test_results')
-        .upsert({
-          assignment_id: assignmentId,
-          question_id: questionId,
-          score: 1,
-          passed_test_cases: testResults?.tests?.filter(t => t.status === 'pass').length || 1,
-          total_test_cases: testResults?.tests?.length || 1,
-          stdout: consoleOutput.join('\n'),
-          stderr: '',
-        }, { onConflict: 'assignment_id,question_id' });
+        .upsert(
+          {
+            assignment_id: assignmentId,
+            question_id: questionId,
+            score: allTestsPassed ? 1 : 0,
+            passed_test_cases: testResults?.tests?.filter(t => t.status === 'pass').length || 0,
+            total_test_cases: testResults?.tests?.length || 0,
+            stdout: consoleOutput.join('\n'),
+            stderr: '',
+          },
+          { onConflict: 'assignment_id,question_id' }
+        );
 
       if (insertError) throw insertError;
 
       setConsoleOutput(prev => [...prev, '✅ Solution submitted successfully!']);
       showToast('Solution submitted successfully! 🎉', 'success');
       onTestComplete();
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setConsoleOutput(prev => [...prev, `❌ Failed to submit: ${errorMessage}`]);
@@ -341,29 +364,25 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     } finally {
       setIsSubmitting(false);
     }
-  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast, testResults, consoleOutput]);
+  }, [allTestsPassed, assignmentId, questionId, onTestComplete, showToast, testResults, consoleOutput, testStatus]);
+
+  const canSubmit = (testStatus === 'passed' || testStatus === 'failed') && !isSubmitting;
 
   return (
     <div className="flex flex-col h-full">
       {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
-      
+
       {/* Status Bar */}
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <TestStatus status={testStatus} />
         <div className="flex items-center space-x-3">
-          <RunTestsButton 
-            onRunTests={handleRunTests} 
-            isRunning={testStatus === 'running'} 
-          />
+          <RunTestsButton onRunTests={handleRunTests} isRunning={testStatus === 'running'} />
           <button
             onClick={submitSolution}
-            disabled={!allTestsPassed || isSubmitting}
+            disabled={!canSubmit}
             className={`
               px-4 py-2 rounded-md font-medium transition-colors
-              ${(!allTestsPassed || isSubmitting) 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-              }
+              ${!canSubmit ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'}
             `}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Solution'}
@@ -375,8 +394,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
       <div className="flex-1 flex">
         {/* Code Editor */}
         <div className="flex-1">
-          <SandpackCodeEditor 
-            style={{ height: '60vh' }} 
+          <SandpackCodeEditor
+            style={{ height: '60vh' }}
             showTabs
             showLineNumbers
             showInlineErrors
@@ -393,7 +412,9 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
               <p className="text-gray-500">Click "Run Tests" to see output...</p>
             ) : (
               consoleOutput.map((line, index) => (
-                <div key={index} className="mb-1">{line}</div>
+                <div key={index} className="mb-1">
+                  {line}
+                </div>
               ))
             )}
           </div>
@@ -401,7 +422,8 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
           {/* Sandpack Tests (controlled by testsTriggered state) */}
           <div className="h-64 border-t">
             {testsTriggered ? (
-              <SandpackTests 
+              <SandpackTests
+                key={runId} // re-mount each run
                 onComplete={handleTestComplete}
                 showVerboseButton={false}
                 showWatchButton={false}
@@ -425,76 +447,107 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
 };
 
 // Main component with framework prop passed through
-const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
-  starterCode,
-  testCode,
-  framework,
-  assignmentId,
-  questionId,
-  ...rest
-}) => {
-  const { setup, mainFile, testFile } = getFrameworkConfig(framework);
+const SandpackTest: React.FC<SandpackTestProps> = React.memo(
+  ({ starterCode, testCode, framework, assignmentId, questionId, ...rest }) => {
+    const { setup, mainFile, testFile } = getFrameworkConfig(framework);
 
-  const files = useMemo(() => {
-    const baseFiles: SandpackFiles = {
-      [mainFile]: { code: starterCode, active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
-    };
+    const files = useMemo(() => {
+      const baseFiles: SandpackFiles = {
+        [mainFile]: { code: starterCode, active: true },
+        [testFile]: { code: testCode ?? '', hidden: false },
+      };
 
-    console.log('📁 Sandpack files created for', framework, ':', Object.keys(baseFiles));
-    return baseFiles;
-  }, [framework, starterCode, testCode, mainFile, testFile]);
+      // Ensure vitest runs properly in the sandbox for React/Vite template
+      if (setup.template === 'react-ts') {
+        baseFiles['/vitest.config.ts'] = {
+          code: `
+import { defineConfig } from 'vitest/config';
 
-  const sandpackKey = useMemo(() => 
-    `${assignmentId}-${questionId}-${framework}`, 
-    [assignmentId, questionId, framework]
-  );
-
-  if (!testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
-
-  console.log('🚀 Initializing Sandpack with template:', setup.template, 'for framework:', framework);
-
-  return (
-    <SandpackProvider 
-      key={sandpackKey}
-      template={setup.template as SandpackProviderProps['template']}
-      customSetup={{
-        dependencies: setup.dependencies,
-        devDependencies: setup.devDependencies || {}
-      }}
-      files={files} 
-      options={{ 
-        autorun: false, // Disable autorun to prevent automatic test execution
-        autoReload: false, 
-        initMode: 'user-visible',
-        bundlerURL: undefined, // Use default bundler for better compatibility
-        logLevel: 'info', // Show more logs for debugging
-        recompileMode: 'delayed',
-        recompileDelay: 500,
-        showTabs: true,
-        showNavigator: false,
-        showInlineErrors: true,
-        showErrorOverlay: true,
-        showConsole: false, // We'll use our custom console
-        showRefreshButton: false, // We have our own run button
-        visibleFiles: [mainFile, testFile],
-        activeFile: mainFile,
-        externalResources: [
-          // Add core-js polyfills to fix babel issues
-          'https://unpkg.com/core-js-bundle@3.32.2/minified.js',
-        ]
-      }}
-    >
-      <SandpackLayoutManager 
-        assignmentId={assignmentId} 
-        questionId={questionId} 
-        {...rest} 
-      />
-    </SandpackProvider>
-  );
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./setupTests.ts'],
+  },
 });
+`.trim(),
+          hidden: true,
+        };
+        baseFiles['/setupTests.ts'] = {
+          code: `
+import '@testing-library/jest-dom';
+`.trim(),
+          hidden: true,
+        };
+        baseFiles['/tsconfig.json'] = {
+          code: JSON.stringify(
+            {
+              compilerOptions: {
+                target: 'ES2020',
+                lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+                jsx: 'react-jsx',
+                module: 'ESNext',
+                moduleResolution: 'Bundler',
+                strict: true,
+                skipLibCheck: true,
+                types: ['vitest/globals'],
+              },
+            },
+            null,
+            2
+          ),
+          hidden: true,
+        };
+      }
+
+      console.log('📁 Sandpack files created for', framework, ':', Object.keys(baseFiles));
+      return baseFiles;
+    }, [framework, starterCode, testCode, mainFile, testFile, setup.template]);
+
+    const sandpackKey = useMemo(
+      () => `${assignmentId}-${questionId}-${framework}`,
+      [assignmentId, questionId, framework]
+    );
+
+    if (!testCode) {
+      return <div>This Sandpack question is missing its test code.</div>;
+    }
+
+    console.log('🚀 Initializing Sandpack with template:', setup.template, 'for framework:', framework);
+
+    return (
+      <SandpackProvider
+        key={sandpackKey}
+        template={setup.template as SandpackProviderProps['template']}
+        customSetup={{
+          dependencies: setup.dependencies,
+          devDependencies: setup.devDependencies || {},
+        }}
+        files={files}
+        options={{
+          autorun: false,
+          autoReload: false,
+          initMode: 'user-visible',
+          bundlerURL: undefined,
+          logLevel: 'info',
+          recompileMode: 'delayed',
+          recompileDelay: 500,
+          showTabs: true,
+          showNavigator: false,
+          showInlineErrors: true,
+          showErrorOverlay: true,
+          showConsole: false,
+          showRefreshButton: false,
+          visibleFiles: [mainFile, testFile],
+          activeFile: mainFile,
+        }}
+      >
+        <SandpackLayout>
+          <SandpackLayoutManager assignmentId={assignmentId} questionId={questionId} {...rest} />
+        </SandpackLayout>
+      </SandpackProvider>
+    );
+  }
+);
 
 SandpackTest.displayName = 'SandpackTest';
 
