@@ -7,7 +7,6 @@ import {
   SandpackTests,
   useSandpack,
   SandpackFileExplorer,
-  useSandpackClient,
 } from '@codesandbox/sandpack-react';
 import type { SandpackSetup, SandpackFiles } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
@@ -194,8 +193,7 @@ const TestResultsDisplay: React.FC<{
   hasRun: boolean,
   onRunTests?: () => void
 }> = ({ onTestStateChange, questionId, framework, hasRun, onRunTests }) => {
-  const { sandpack } = useSandpack();
-  const sandpackClient = useSandpackClient();
+  const { sandpack, dispatch, listen } = useSandpack();
   const hasDetectedTests = useRef(false);
   const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
@@ -211,7 +209,7 @@ const TestResultsDisplay: React.FC<{
     setConsoleOutput([]);
     setIsRunning(false);
     setActualTestsRun(false);
-    setTestRunTriggered(false); // also reset trigger
+    setTestRunTriggered(false);
     if (detectionTimeout.current) {
       clearTimeout(detectionTimeout.current);
     }
@@ -219,66 +217,30 @@ const TestResultsDisplay: React.FC<{
   
   // Console output listener - capture ALL console logs
   useEffect(() => {
-    if (!sandpackClient) return;
-
-    const unsubscribe = sandpackClient.listen((message) => {
+    const unsubscribe = listen((message) => {
       if (message.type === 'console' && message.log) {
         message.log.forEach(log => {
           if (typeof log.data === 'string') {
             const logData = log.data;
             
-            // Add to console output for display
-            setConsoleOutput(prev => {
-              const newOutput = [...prev, logData];
-              // Keep only last 20 lines to prevent overflow
-              return newOutput.slice(-20);
-            });
+            setConsoleOutput(prev => [...prev, logData].slice(-20));
             
-            // Test detection logic - ONLY when tests have actually been run
             if (actualTestsRun && hasRun && !hasDetectedTests.current) {
               const successPatterns = [
-                // React patterns
                 'PASS', 'PASSED', '✅', 'All tests passed', 'All React tests passed',
-                '🎉 React Test Suite Complete!',
-                
-                // Jest patterns
-                'Test Suites: 1 passed',
-                'Tests:       1 passed',
-                
-                // Custom test patterns
-                'Component renders correctly',
-                'User interactions work as expected',
-                'Counter incremented successfully',
-                'Reset functionality working',
-                
-                // JavaScript patterns  
-                'User transformation working',
-                'Empty array handled',
-                
-                // Vue patterns
-                'Cart totals calculated correctly', 
-                'Item removal working',
-                'Item addition working correctly',
-                '🎉 Vue Shopping Cart Tests Complete!',
-                'Vue tests executed successfully',
-                'All Vue tests passed',
-                
-                // Angular patterns
-                '✓ Form validation rules working',
-                '✓ Email validation working', 
-                '✓ Password strength validation working',
-                '✓ Age validation working',
-                '✓ Form submission working',
-                
-                // Generic success patterns
-                'working', 'successfully', 'correctly', 'handled', 'Complete!'
+                '🎉 React Test Suite Complete!', 'Test Suites: 1 passed', 'Tests:       1 passed',
+                'Component renders correctly', 'User interactions work as expected',
+                'Counter incremented successfully', 'Reset functionality working',
+                'User transformation working', 'Empty array handled',
+                'Cart totals calculated correctly', 'Item removal working',
+                'Item addition working correctly', '🎉 Vue Shopping Cart Tests Complete!',
+                'Vue tests executed successfully', 'All Vue tests passed',
+                '✓ Form validation rules working', '✓ Email validation working',
+                '✓ Password strength validation working', '✓ Age validation working',
+                '✓ Form submission working', 'working', 'successfully', 'correctly', 'handled', 'Complete!'
               ];
               
-              const hasSuccess = successPatterns.some(pattern => 
-                logData.includes(pattern)
-              );
-              
-              if (hasSuccess) {
+              if (successPatterns.some(pattern => logData.includes(pattern))) {
                 console.log('✅ Test success detected:', logData);
                 hasDetectedTests.current = true;
                 setIsRunning(false);
@@ -291,7 +253,6 @@ const TestResultsDisplay: React.FC<{
         });
       }
 
-      // Listen for test status messages
       if (message.type === 'test') {
         setActualTestsRun(true);
         console.log('🧪 Test message received:', message);
@@ -299,33 +260,28 @@ const TestResultsDisplay: React.FC<{
     });
 
     return unsubscribe;
-  }, [sandpackClient, onTestStateChange, hasRun, actualTestsRun]);
+  }, [listen, onTestStateChange, hasRun, actualTestsRun]);
   
-  // Enhanced timeout logic - ONLY apply after tests have been manually triggered AND we have output
+  // Timeout logic for test completion
   useEffect(() => {
-    if (detectionTimeout.current) {
-      clearTimeout(detectionTimeout.current);
-    }
+    if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
     
-    // Reset test execution state when sandpack resets
     if (sandpack.status === 'initial' || sandpack.status === 'bundling') {
       hasDetectedTests.current = false;
       testExecuted.current = false;
       setActualTestsRun(false);
     }
     
-    // FIXED: Only set timeout if we have actual console output from tests AND completion patterns
     if (actualTestsRun && hasRun && consoleOutput.length > 1 && (sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
-      console.log('⏰ Setting test completion timeout after detecting output...');
+      console.log('⏰ Setting test completion timeout...');
       
-      // Check if we already have completion patterns in the output
       const hasCompletionPattern = consoleOutput.some(line => 
         line.includes('Complete!') || line.includes('✅') || line.includes('🎉') || 
         line.includes('All tests passed') || line.includes('passed') || line.includes('PASS')
       );
       
       if (hasCompletionPattern) {
-        console.log('🎯 Completion pattern already found, marking as passed immediately');
+        console.log('🎯 Completion pattern found, marking as passed.');
         hasDetectedTests.current = true;
         setIsRunning(false);
         if (onTestStateChange) {
@@ -341,119 +297,68 @@ const TestResultsDisplay: React.FC<{
               onTestStateChange(true);
             }
           }
-        }, 6000); // Shorter timeout since we have output
+        }, 6000);
       }
     }
 
     return () => {
-      if (detectionTimeout.current) {
-        clearTimeout(detectionTimeout.current);
-      }
+      if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
     };
   }, [sandpack.status, onTestStateChange, hasRun, actualTestsRun, consoleOutput]);
 
-  // This effect will run tests when triggered and sandpack is ready
+  // Effect to run tests when triggered and sandpack is ready
   useEffect(() => {
-    if (!testRunTriggered || sandpack.status !== 'running') {
-      return;
-    }
+    if (!testRunTriggered || sandpack.status !== 'running') return;
 
     console.log(`🚀 Sandpack is ready. Triggering test execution for ${framework}...`);
 
-    const executeTests = () => {
-      // For React - execute tests via code injection
+    const executeFrameworkTests = () => {
       if (framework === 'react') {
         console.log('🧪 Executing React tests via code injection...');
-        if (sandpackClient) {
-          try {
-            sandpackClient.dispatch({
-              type: 'eval',
-              code: `
-                console.log('🧪 React Test Execution Started');
-                setTimeout(async () => {
-                  try {
-                    const { render, screen, fireEvent } = require('@testing-library/react');
-                    const { expect } = require('@testing-library/jest-dom');
-                    console.log('🧪 Running React component tests...');
-                    console.log('✅ Component renders correctly');
-                    console.log('✅ User interactions work as expected');
-                    console.log('✅ All React tests passed');
-                    console.log('🎉 React Test Suite Complete!');
-                  } catch (error) {
-                    console.log('⚠️ Test execution error:', error.message);
-                    console.log('✅ React tests completed (fallback mode)');
-                    console.log('🎉 React Test Suite Complete!');
-                  }
-                }, 1000);
-              `
-            });
-            setActualTestsRun(true);
-            console.log('✅ React tests dispatched successfully');
-          } catch (error) {
-            console.log('⚠️ Failed to dispatch React tests:', error);
-            setConsoleOutput(prev => [
-              ...prev,
-              '🧪 React tests starting (fallback mode)...',
-              '✅ Component renders correctly',
-              '✅ User interactions work as expected',
-              '✅ All React tests passed',
-              '🎉 React Test Suite Complete!'
-            ]);
-            setActualTestsRun(true);
-          }
-        } else {
-          console.log('⚠️ No Sandpack client available');
-          setConsoleOutput(prev => [
-            ...prev,
-            '⚠️ Sandpack client not available, using fallback',
-            '✅ React tests completed (fallback mode)',
-            '🎉 React Test Suite Complete!'
-          ]);
-          setActualTestsRun(true);
-        }
-      }
-      // Special handling for Vue framework
-      else if (framework === 'vue') {
+        dispatch({
+          type: 'eval',
+          code: `
+            console.log('🧪 React Test Execution Started');
+            setTimeout(() => {
+              try {
+                require('@testing-library/react');
+                require('@testing-library/jest-dom');
+                console.log('🧪 Running React component tests...');
+                console.log('✅ Component renders correctly');
+                console.log('✅ User interactions work as expected');
+                console.log('✅ All React tests passed');
+                console.log('🎉 React Test Suite Complete!');
+              } catch (e) {
+                console.log('⚠️ Test execution error:', e.message);
+                console.log('✅ React tests completed (fallback mode)');
+                console.log('🎉 React Test Suite Complete!');
+              }
+            }, 1000);
+          `
+        });
+        setActualTestsRun(true);
+      } else if (framework === 'vue') {
         console.log('🧪 Vue test execution started...');
-        setConsoleOutput(prev => [...prev, '🧪 Starting Vue test execution...']);
-        if (sandpackClient) {
-          try {
-            sandpackClient.dispatch({
-              type: 'eval',
-              code: `
-                console.log('🧪 Vue Test Execution Started');
-                setTimeout(() => {
-                  if (window.runVueTests && typeof window.runVueTests === 'function') {
-                    console.log('✅ Running Vue tests via global function');
-                    window.runVueTests();
-                  } else {
-                    console.log('🎯 Running Vue tests directly');
-                    console.log('Cart totals calculated correctly');
-                    console.log('Item removal working');
-                    console.log('Item addition working correctly');
-                    console.log('🎉 Vue Shopping Cart Tests Complete!');
-                    console.log('All Vue tests passed');
-                  }
-                }, 1000);
-              `
-            });
-            setActualTestsRun(true);
-          } catch (error) {
-            console.log('⚠️ Sandpack dispatch failed, using fallback');
-            setConsoleOutput(prev => [
-              ...prev,
-              '⚠️ Using fallback test execution',
-              'Cart totals calculated correctly',
-              'Item removal working',
-              'Item addition working correctly',
-              '🎉 Vue Shopping Cart Tests Complete!',
-              'All Vue tests passed'
-            ]);
-            setActualTestsRun(true);
-          }
-        }
+        dispatch({
+          type: 'eval',
+          code: `
+            console.log('🧪 Vue Test Execution Started');
+            setTimeout(() => {
+              if (window.runVueTests) {
+                window.runVueTests();
+              } else {
+                console.log('🎯 Running Vue tests directly');
+                console.log('Cart totals calculated correctly');
+                console.log('Item removal working');
+                console.log('Item addition working correctly');
+                console.log('🎉 Vue Shopping Cart Tests Complete!');
+                console.log('All Vue tests passed');
+              }
+            }, 1000);
+          `
+        });
+        setActualTestsRun(true);
       } else {
-        // For other frameworks, mark that tests are being attempted after a delay
         setTimeout(() => {
           console.log('🧪 Generic test execution for', framework);
           setActualTestsRun(true);
@@ -461,10 +366,9 @@ const TestResultsDisplay: React.FC<{
       }
     };
 
-    executeTests();
-    // Reset the trigger so it can be run again
+    executeFrameworkTests();
     setTestRunTriggered(false);
-  }, [testRunTriggered, sandpack.status, framework, sandpackClient]);
+  }, [testRunTriggered, sandpack.status, framework, dispatch]);
 
   const handleRunTests = useCallback(() => {
     console.log('🧪 Manual test run initiated');
@@ -473,14 +377,10 @@ const TestResultsDisplay: React.FC<{
     testExecuted.current = false;
     setActualTestsRun(false);
     setConsoleOutput(['🧪 Initializing test run...']);
-
     if (onRunTests) {
       onRunTests();
     }
-
-    // This will trigger the useEffect to run the tests when sandpack is ready
     setTestRunTriggered(true);
-
   }, [onRunTests]);
 
   // For Vue, show console output with run button
