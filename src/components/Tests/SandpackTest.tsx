@@ -138,7 +138,8 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@testing-library/react': '^13.4.0',
             '@testing-library/jest-dom': '^5.16.5',
             '@testing-library/user-event': '^14.4.3',
-            'vitest': '^0.34.0',
+            'jest': '^29.0.0',
+            '@types/jest': '^29.0.0',
           }
         },
         mainFile: '/App.tsx',
@@ -243,26 +244,25 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     // Add some delay to show compilation status
     setTimeout(() => {
       setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
-      
-      // Try to trigger tests using sandpack client
-      if (sandpack?.clients) {
-        try {
-          // Get the first (and usually only) client
-          const clients = Array.from(sandpack.clients.values());
-          if (clients.length > 0) {
-            const client = clients[0];
-            // Dispatch a message to trigger test execution
-            client.dispatch({ type: 'test', codesandbox: true });
-          }
-        } catch (error) {
-          console.log('Could not trigger tests:', error);
+    }, 500);
+
+    // Set a timeout to reset status if tests don't complete
+    setTimeout(() => {
+      setTestStatus(prev => {
+        if (prev === 'running') {
+          setConsoleOutput(prevOutput => [...prevOutput, '⏰ Test execution timed out - please try again']);
+          return 'error';
         }
-      }
-    }, 1000);
-  }, [sandpack]);
+        return prev;
+      });
+    }, 30000); // 30 second timeout
+
+    // The SandpackTests component will handle the actual test execution
+  }, []);
 
   // Handle test completion results
   const handleTestComplete = useCallback((results: SandpackTestResult) => {
+    console.log('🔬 Test results received:', results);
     setTestResults(results);
     
     if (results && results.tests) {
@@ -282,6 +282,10 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
           `${test.status === 'pass' ? '✅' : '❌'} ${test.name || 'Test'}: ${test.status === 'pass' ? 'PASSED' : test.errors?.[0] || 'FAILED'}`
         )
       ]);
+    } else {
+      console.log('⚠️ No test results or empty tests array received');
+      setTestStatus('error');
+      setConsoleOutput(prev => [...prev, '⚠️ No test results received - check test configuration']);
     }
   }, []);
 
@@ -377,12 +381,13 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
-          {/* Sandpack Tests (always shown, but triggered manually) */}
+          {/* Sandpack Tests (auto-run when triggered) */}
           <div className="h-64 border-t">
             <SandpackTests 
               onComplete={handleTestComplete}
               showVerboseButton={false}
               showWatchButton={false}
+              verbose={true}
               style={{ height: '100%' }}
             />
           </div>
@@ -434,7 +439,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       }}
       files={files} 
       options={{ 
-        autorun: false, // Keep autorun disabled initially
+        autorun: true, // Enable autorun to allow tests to run when triggered
         autoReload: false, 
         initMode: 'user-visible',
         bundlerURL: undefined, // Use default bundler for better compatibility
