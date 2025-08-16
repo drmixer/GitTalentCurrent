@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -9,111 +9,47 @@ import {
 } from '@codesandbox/sandpack-react';
 import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
 
-type Framework = 'react' | 'react-js' | 'vue' | 'vanilla';
-
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
-  framework: Framework; // 'react' | 'react-js' | 'vue' | 'vanilla'
+  framework: 'react'; // current setup is React-specific; can be extended later
   assignmentId?: string;
   questionId?: string;
   onTestComplete?: () => void;
 }
 
-const getSetup = (framework: Framework) => {
-  switch (framework) {
-    case 'react':
-      return {
-        template: 'react-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/App.tsx',
-        testFile: '/src/App.test.tsx',
-        deps: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6',
-        },
-      };
-    case 'react-js':
-      return {
-        template: 'react' as SandpackProviderProps['template'],
-        codeFile: '/src/App.jsx',
-        testFile: '/src/App.test.jsx',
-        deps: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6',
-        },
-      };
-    case 'vue':
-      return {
-        template: 'vue3' as SandpackProviderProps['template'],
-        codeFile: '/src/App.vue',
-        testFile: '/src/App.test.ts',
-        deps: {
-          vue: '^3.4.21',
-          '@testing-library/vue': '^8.0.3',
-          '@testing-library/dom': '^9.3.4',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6',
-        },
-      };
-    case 'vanilla':
-      return {
-        template: 'vanilla-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/index.ts',
-        testFile: '/src/index.test.ts',
-        deps: {
-          '@testing-library/dom': '^9.3.4',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6',
-        },
-      };
-    default:
-      return {
-        template: 'react-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/App.tsx',
-        testFile: '/src/App.test.tsx',
-        deps: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6',
-        },
-      };
-  }
-};
-
 /**
  * Branded toolbar with a decoupled "Run Tests" button.
- * - isRunning is local and only flips true after clicking our button.
- * - When the bundler returns to idle after a run, we reset it.
+ * - No reliance on sandpack.listen (some builds don't expose it).
+ * - We toggle a local "isRunning" after click and auto-reset with a timer.
  */
+const RUN_RESET_MS = 2500;
+
 const TestToolbar: React.FC<{
   isRunning: boolean;
   setIsRunning: (v: boolean) => void;
 }> = ({ isRunning, setIsRunning }) => {
   const { sandpack } = useSandpack();
-  const lastClickedRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   const handleRun = () => {
-    lastClickedRef.current = Date.now();
-    setIsRunning(true);
-    sandpack.runSandpack();
-  };
+    // Clear any previous timer
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
 
-  useEffect(() => {
-    const unsub = sandpack.listen((e) => {
-      if (e.type === 'status' && e.status === 'idle' && lastClickedRef.current) {
-        setIsRunning(false);
-      }
-    });
-    return () => unsub();
-  }, [sandpack, setIsRunning]);
+    setIsRunning(true);
+    // Trigger the run – SandpackTests will execute the test suite.
+    sandpack.runSandpack();
+
+    // Fallback: reset the button state after a short period.
+    // You can tune RUN_RESET_MS or replace with richer logic later.
+    timerRef.current = window.setTimeout(() => {
+      setIsRunning(false);
+      timerRef.current = null;
+    }, RUN_RESET_MS);
+  };
 
   return (
     <div style={{
@@ -124,6 +60,7 @@ const TestToolbar: React.FC<{
       borderBottom: '1px solid #e5e7eb',
       background: '#fff',
     }}>
+      {/* Status pill */}
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -138,6 +75,7 @@ const TestToolbar: React.FC<{
         {isRunning ? 'Running tests…' : 'Ready to run tests'}
       </div>
 
+      {/* Actions */}
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={handleRun}
@@ -189,16 +127,15 @@ const TestToolbar: React.FC<{
   );
 };
 
-const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, framework }) => {
+const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) => {
   const [isRunning, setIsRunning] = useState(false);
-  const { template, codeFile, testFile, deps } = getSetup(framework);
 
   const files = useMemo<SandpackFiles>(() => {
     return {
-      [codeFile]: { code: starterCode ?? '', active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
+      '/src/App.tsx': { code: starterCode ?? '', active: true },
+      '/src/App.test.tsx': { code: testCode ?? '', hidden: false },
     };
-  }, [starterCode, testCode, codeFile, testFile]);
+  }, [starterCode, testCode]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -206,22 +143,30 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
 
   return (
     <SandpackProvider
-      template={template}
-      customSetup={{ dependencies: deps }}
+      template={'react-ts' as SandpackProviderProps['template']}
+      customSetup={{
+        dependencies: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6', // available for the runner; tests use fireEvent for stability
+        },
+      }}
       files={files}
       options={{
-        autorun: true,
+        autorun: true,               // compile on load; does not auto-run tests
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
         showErrorOverlay: true,
         showConsole: false,
-        visibleFiles: [codeFile, testFile],
-        activeFile: codeFile,
+        visibleFiles: ['/src/App.tsx', '/src/App.test.tsx'],
+        activeFile: '/src/App.tsx',
       }}
     >
-      {/* Hide the built-in test action buttons inside the Tests panel only */}
+      {/* Hide only the built-in test action buttons inside the Tests panel */}
       <style>{`
         .gt-tests [class*="sp-test-actions"] button,
         .gt-tests [data-testid="test-actions"] button {
