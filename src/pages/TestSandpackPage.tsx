@@ -9,13 +9,19 @@ function Counter() {
 
   return (
     <div>
-      <h1>Counter: {count}</h1>
-      <button onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-      <button onClick={() => setCount(count - 1)}>
-        Decrement
-      </button>
+      <h1>Counter App</h1>
+      <div>
+        <p>Current Count: {count}</p>
+        <button onClick={() => setCount(count + 1)}>
+          Increment
+        </button>
+        <button onClick={() => setCount(count - 1)} disabled={count <= 0}>
+          Decrement
+        </button>
+        <button onClick={() => setCount(0)}>
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
@@ -26,23 +32,32 @@ export default Counter;`;
 import '@testing-library/jest-dom';
 import Counter from './App';
 
-test('renders counter with initial value', () => {
-  render(<Counter />);
-  expect(screen.getByText('Counter: 0')).toBeInTheDocument();
-});
-
-test('increments counter when increment button is clicked', () => {
+test('counter increments correctly', () => {
   render(<Counter />);
   const incrementButton = screen.getByText('Increment');
   fireEvent.click(incrementButton);
-  expect(screen.getByText('Counter: 1')).toBeInTheDocument();
+  expect(screen.getByText('1')).toBeInTheDocument();
 });
 
-test('decrements counter when decrement button is clicked', () => {
+test('counter decrements and disables at zero', () => {
   render(<Counter />);
   const decrementButton = screen.getByText('Decrement');
-  fireEvent.click(decrementButton);
-  expect(screen.getByText('Counter: -1')).toBeInTheDocument();
+  expect(decrementButton).toBeDisabled();
+  expect(screen.getByText('0')).toBeInTheDocument();
+});
+
+test('reset button works correctly', () => {
+  render(<Counter />);
+  const incrementButton = screen.getByText('Increment');
+  const resetButton = screen.getByText('Reset');
+  
+  // Increment a few times
+  fireEvent.click(incrementButton);
+  fireEvent.click(incrementButton);
+  
+  // Reset
+  fireEvent.click(resetButton);
+  expect(screen.getByText('0')).toBeInTheDocument();
 });`;
 
   const handleTestComplete = () => {
