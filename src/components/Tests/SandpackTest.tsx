@@ -79,7 +79,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
     case 'vue':
       return {
         setup: {
-          template: 'vue3', // Use proper Vue3 template
+          template: 'vue', // Use 'vue' instead of 'vue3'
           dependencies: {
             'vue': '^3.3.4',
             '@vue/test-utils': '^2.4.1',

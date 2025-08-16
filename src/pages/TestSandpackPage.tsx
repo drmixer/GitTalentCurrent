@@ -55,9 +55,38 @@ test('decrements counter when decrement button is clicked', () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Sandpack Testing Environment
         </h1>
-        <p className="text-gray-600 mb-8">
+        <p className="text-gray-600 mb-4">
           This page demonstrates the improved Sandpack testing functionality with manual test running and enhanced console output.
         </p>
+        
+        {/* Framework Navigation */}
+        <div className="flex space-x-4 mb-8">
+          <a 
+            href="/test-sandpack" 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            React Test
+          </a>
+          <a 
+            href="/test-javascript" 
+            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+          >
+            JavaScript Test
+          </a>
+          <a 
+            href="/test-vue" 
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+          >
+            Vue.js Test
+          </a>
+          <a 
+            href="#" 
+            className="px-4 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed"
+            title="Angular support coming soon"
+          >
+            Angular Test (Coming Soon)
+          </a>
+        </div>
         
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-semibold mb-4">React Counter Component Test</h2>
