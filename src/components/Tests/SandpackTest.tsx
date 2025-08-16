@@ -13,7 +13,6 @@ import type {
   SandpackTestResult,
   SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
-import { Play, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 
 type SupportedFramework = 'react' | 'vue' | 'angular' | 'javascript';
 
@@ -37,7 +36,6 @@ const getFrameworkConfig = (
           dependencies: {
             vue: '^3.3.4',
             '@vue/test-utils': '^2.4.1',
-            vitest: '^0.34.6',
           },
         },
         mainFile: '/src/App.vue',
@@ -57,6 +55,7 @@ const getFrameworkConfig = (
             '@angular/platform-browser-dynamic': '^16.0.0',
             '@angular/testing': '^16.0.0',
             rxjs: '^7.8.0',
+            'zone.js': '^0.13.0',
             'jasmine-core': '^4.6.0',
             karma: '^6.4.0',
           },
@@ -69,7 +68,6 @@ const getFrameworkConfig = (
         setup: {
           template: 'vanilla',
           dependencies: {
-            vitest: '^0.34.6',
             '@testing-library/jest-dom': '^6.5.0',
           },
         },
@@ -87,8 +85,6 @@ const getFrameworkConfig = (
             '@testing-library/react': '^14.2.1',
             '@testing-library/jest-dom': '^6.5.0',
             '@testing-library/user-event': '^14.5.2',
-            // IMPORTANT: vitest is required so the Tests runner can start
-            vitest: '^0.34.6',
           },
         },
         mainFile: '/src/App.tsx',
@@ -102,16 +98,15 @@ const TestStatus: React.FC<{ status: 'idle' | 'running' | 'passed' | 'failed' | 
   message,
 }) => {
   const map = {
-    idle: { icon: null, color: 'text-gray-500', bg: 'bg-gray-100', text: 'Ready to run tests' },
-    running: { icon: <Loader className="w-4 h-4 animate-spin" />, color: 'text-blue-600', bg: 'bg-blue-50', text: 'Running tests...' },
-    passed: { icon: <CheckCircle className="w-4 h-4" />, color: 'text-green-600', bg: 'bg-green-50', text: 'All tests passed!' },
-    failed: { icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-600', bg: 'bg-red-50', text: 'Some tests failed' },
-    error: { icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-600', bg: 'bg-red-50', text: 'Error running tests' },
+    idle: { icon: null, color: 'text-gray-600', bg: 'bg-gray-100', text: 'Ready to run tests' },
+    running: { icon: null, color: 'text-blue-700', bg: 'bg-blue-50', text: 'Running tests...' },
+    passed: { icon: null, color: 'text-green-700', bg: 'bg-green-50', text: 'All tests passed!' },
+    failed: { icon: null, color: 'text-red-700', bg: 'bg-red-50', text: 'Some tests failed' },
+    error: { icon: null, color: 'text-red-700', bg: 'bg-red-50', text: 'Error running tests' },
   } as const;
   const cfg = map[status];
   return (
     <div className={`flex items-center space-x-2 px-3 py-2 rounded-md ${cfg.bg} ${cfg.color}`}>
-      {cfg.icon}
       <span className="text-sm font-medium">{cfg.text}</span>
       {message && <span className="text-xs opacity-75">- {message}</span>}
     </div>
@@ -130,9 +125,6 @@ const RunTestsButton: React.FC<{ onRunTests: () => void; isRunning: boolean; dis
       isRunning || disabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
     }`}
   >
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
-      <path d="M8 5v14l11-7z" />
-    </svg>
     <span>{isRunning ? 'Running Tests...' : 'Run Tests'}</span>
   </button>
 );
@@ -151,7 +143,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   const [runId, setRunId] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
-  useSandpack(); // keeps context warm
+  useSandpack(); // keep context warm
 
   const clearPendingTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -295,25 +287,21 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
-          {/* In-sandbox console (from the iframe) to surface runner errors/missing deps */}
           <div className="h-40 border-t overflow-auto">
             <SandpackConsole maxMessageCount={200} />
           </div>
 
           <div className="h-64 border-t">
             {testsTriggered ? (
-              <>
-                <div className="px-3 py-1 text-xs text-gray-500">Mounting test runner (watch: off)…</div>
-                <SandpackTests
-                  key={runId}
-                  onComplete={handleTestComplete}
-                  showVerboseButton={false}
-                  showWatchButton={false}
-                  verbose={true}
-                  watchMode={false}
-                  style={{ height: '100%' }}
-                />
-              </>
+              <SandpackTests
+                key={runId}
+                onComplete={handleTestComplete}
+                showVerboseButton={false}
+                showWatchButton={false}
+                verbose={true}
+                watchMode={false}
+                style={{ height: '100%' }}
+              />
             ) : (
               <div className="flex items-center justify-center h-full bg-gray-50 text-gray-500">
                 <div className="text-center">
@@ -336,8 +324,27 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(
     const files = useMemo(() => {
       const baseFiles: SandpackFiles = {
         [mainFile]: { code: starterCode, active: true },
+        // Author's test lives in /src
         [testFile]: { code: testCode ?? '', hidden: false },
+        // Bridge file at project root to guarantee discovery
+        '/App.test.tsx': {
+          code: `
+/**
+ * Bridge test file to ensure test discovery at project root.
+ * It imports the real tests from /src so Sandpack's runner always finds them.
+ */
+import './setupTests';
+import './src/App.test.tsx';
+`.trim(),
+          hidden: false,
+        },
+        // Global setup for jest-dom matchers
+        '/setupTests.ts': {
+          code: `import '@testing-library/jest-dom';`,
+          hidden: true,
+        },
       };
+
       console.log('📁 Sandpack files created for', framework, ':', Object.keys(baseFiles));
       return baseFiles;
     }, [framework, starterCode, testCode, mainFile, testFile]);
@@ -354,16 +361,16 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(
         customSetup={{ dependencies: setup.dependencies, devDependencies: setup.devDependencies || {} }}
         files={files}
         options={{
-          autorun: true,        // ensure bundler boots so the test runner can start
+          autorun: true,
           initMode: 'immediate',
           logLevel: 'info',
           showTabs: true,
           showNavigator: false,
           showInlineErrors: true,
           showErrorOverlay: true,
-          showConsole: false,   // we render SandpackConsole separately
+          showConsole: false, // we render SandpackConsole separately
           showRefreshButton: false,
-          visibleFiles: [mainFile, testFile],
+          visibleFiles: [mainFile, testFile, '/App.test.tsx'],
           activeFile: mainFile,
         }}
       >
