@@ -1,0 +1,82 @@
+import React from 'react';
+import SandpackTest from '../components/Tests/SandpackTest';
+
+const TestSandpackPage: React.FC = () => {
+  const sampleReactCode = `import React, { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div>
+      <h1>Counter: {count}</h1>
+      <button onClick={() => setCount(count + 1)}>
+        Increment
+      </button>
+      <button onClick={() => setCount(count - 1)}>
+        Decrement
+      </button>
+    </div>
+  );
+}
+
+export default Counter;`;
+
+  const sampleTestCode = `import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import Counter from './App';
+
+test('renders counter with initial value', () => {
+  render(<Counter />);
+  expect(screen.getByText('Counter: 0')).toBeInTheDocument();
+});
+
+test('increments counter when increment button is clicked', () => {
+  render(<Counter />);
+  const incrementButton = screen.getByText('Increment');
+  fireEvent.click(incrementButton);
+  expect(screen.getByText('Counter: 1')).toBeInTheDocument();
+});
+
+test('decrements counter when decrement button is clicked', () => {
+  render(<Counter />);
+  const decrementButton = screen.getByText('Decrement');
+  fireEvent.click(decrementButton);
+  expect(screen.getByText('Counter: -1')).toBeInTheDocument();
+});`;
+
+  const handleTestComplete = () => {
+    console.log('Test completed and submitted!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Sandpack Testing Environment
+        </h1>
+        <p className="text-gray-600 mb-8">
+          This page demonstrates the improved Sandpack testing functionality with manual test running and enhanced console output.
+        </p>
+        
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">React Counter Component Test</h2>
+          <p className="text-gray-600 mb-6">
+            Complete the counter component and make sure all tests pass. Click "Run Tests" to execute the test suite.
+          </p>
+          
+          <SandpackTest
+            framework="react"
+            starterCode={sampleReactCode}
+            testCode={sampleTestCode}
+            assignmentId="test-assignment-123"
+            questionId="test-question-456"
+            onTestComplete={handleTestComplete}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TestSandpackPage;

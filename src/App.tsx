@@ -28,6 +28,7 @@ import TestPage from './pages/TestPage';
 import AdminTests from './pages/AdminTests';
 import DeveloperTests from './pages/DeveloperTests';
 import TestResultsPage from './pages/TestResultsPage';
+import TestSandpackPage from './pages/TestSandpackPage';
 import EndorsementPage from './pages/EndorsementPage';
 
 // Helper component to redirect users from a generic /dashboard
@@ -138,6 +139,9 @@ function App() {
             <Route path="/pricing" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Pricing Coming Soon</h1></div>} />
             <Route path="/about" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">About Coming Soon</h1></div>} />
             <Route path="/contact" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Contact Coming Soon</h1></div>} />
+
+            {/* Test Sandpack Page - Demo */}
+            <Route path="/test-sandpack" element={<TestSandpackPage />} />
 
             {/* Fallback 404 Route */}
             <Route path="*" element={<div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-700">
