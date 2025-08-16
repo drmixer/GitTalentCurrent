@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -18,49 +18,114 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-const TestToolbar: React.FC = () => {
+/**
+ * Branded toolbar with a decoupled "Run Tests" button.
+ * - We DO NOT bind the label to sandpack.status because the bundler is often "running" on mount.
+ * - We flip isRunning only after the user clicks our button.
+ * - We auto-reset isRunning when the bundler returns to "idle" after a run.
+ */
+const TestToolbar: React.FC<{
+  isRunning: boolean;
+  setIsRunning: (v: boolean) => void;
+}> = ({ isRunning, setIsRunning }) => {
   const { sandpack } = useSandpack();
-  const isRunning = sandpack.status === 'running';
+  const lastClickedRef = useRef<number | null>(null);
 
   const handleRun = () => {
-    // Triggers a fresh compile/run; the Tests panel will pick it up.
+    lastClickedRef.current = Date.now();
+    setIsRunning(true);
     sandpack.runSandpack();
   };
+
+  // When bundler transitions back to idle AFTER a click, clear running state.
+  useEffect(() => {
+    const unsub = sandpack.listen((e) => {
+      if (e.type === 'status' && e.status === 'idle' && lastClickedRef.current) {
+        setIsRunning(false);
+      }
+    });
+    return () => unsub();
+  }, [sandpack, setIsRunning]);
 
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '10px 12px',
+      padding: '12px 14px',
       borderBottom: '1px solid #e5e7eb',
-      background: '#fafafa',
+      background: '#fff',
     }}>
-      <div style={{ fontWeight: 600 }}>Tests</div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/* Left: status pill */}
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '6px 10px',
+        borderRadius: 8,
+        border: '1px solid #e5e7eb',
+        background: '#f9fafb',
+        color: '#374151',
+        fontWeight: 600,
+        fontSize: 13,
+      }}>
+        {isRunning ? 'Running tests…' : 'Ready to run tests'}
+      </div>
+
+      {/* Right: primary Run Tests + secondary Submit Solution (disabled for now) */}
+      <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={handleRun}
           disabled={isRunning}
+          aria-busy={isRunning}
           style={{
-            padding: '8px 12px',
-            borderRadius: 6,
-            border: '1px solid #111827',
-            background: isRunning ? '#9CA3AF' : '#111827',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid #2563eb',
+            background: isRunning ? '#93c5fd' : '#2563eb',
             color: '#fff',
             cursor: isRunning ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
+            fontWeight: 700,
           }}
           aria-label="Run tests"
           title={isRunning ? 'Running…' : 'Run tests'}
         >
+          <span style={{
+            display: 'inline-block',
+            width: 0,
+            height: 0,
+            borderLeft: '7px solid currentColor',
+            borderTop: '5px solid transparent',
+            borderBottom: '5px solid transparent',
+          }} />
           {isRunning ? 'Running…' : 'Run Tests'}
+        </button>
+
+        <button
+          disabled
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
+            background: '#f3f4f6',
+            color: '#6b7280',
+            fontWeight: 700,
+            cursor: 'not-allowed',
+          }}
+          title="Submit Solution (disabled for now)"
+        >
+          Submit Solution
         </button>
       </div>
     </div>
   );
 };
 
-const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) => {
+const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTestComplete }) => {
+  const [isRunning, setIsRunning] = useState(false);
+
   const files = useMemo<SandpackFiles>(() => {
     return {
       '/src/App.tsx': { code: starterCode ?? '', active: true },
@@ -81,13 +146,12 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
           'react-dom': '^18.2.0',
           '@testing-library/react': '^14.2.1',
           '@testing-library/user-event': '^14.5.2',
-          // We keep vitest available to the runner, but tests use plain assertions for stability
-          vitest: '^0.34.6',
+          vitest: '^0.34.6', // available to the runner; tests use fireEvent for stability
         },
       }}
       files={files}
       options={{
-        autorun: true,
+        autorun: true,               // compile on load (does not auto-run tests)
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
@@ -98,14 +162,17 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
         activeFile: '/src/App.tsx',
       }}
     >
-      {/* Scoped CSS that hides the built-in Run button inside the Tests panel only */}
+      {/* Hide only the built-in test action buttons inside the Tests panel */}
       <style>{`
-        /* Hide ALL buttons inside our Tests panel to ensure there's only one Run button (ours). */
-        .custom-tests-panel button { display: none !important; }
+        .gt-tests [class*="sp-test-actions"] button,
+        .gt-tests [data-testid="test-actions"] button {
+          display: none !important;
+        }
       `}</style>
 
       <SandpackLayout>
         <div style={{ display: 'flex', width: '100%' }}>
+          {/* Left: Editor */}
           <div style={{ flex: 1 }}>
             <SandpackCodeEditor
               style={{ height: '60vh' }}
@@ -115,18 +182,44 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
             />
           </div>
 
+          {/* Right: Console + Tests */}
           <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-            <div style={{ height: 160, borderBottom: '1px solid #e5e7eb', overflow: 'auto' }}>
-              <SandpackConsole maxMessageCount={200} />
+            {/* Console Header + Body (dark) */}
+            <div style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 12px',
+                background: '#0f172a',
+                color: '#e2e8f0',
+                fontWeight: 700,
+              }}>
+                Console Output
+              </div>
+              <div style={{ height: 140, background: '#0f172a' }}>
+                <SandpackConsole
+                  maxMessageCount={200}
+                  showHeader={false}
+                  standalone
+                  style={{
+                    height: '100%',
+                    background: '#0f172a',
+                    color: '#e2e8f0',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontSize: 12,
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Custom header + button */}
-            <TestToolbar />
+            {/* Custom Toolbar */}
+            <TestToolbar isRunning={isRunning} setIsRunning={setIsRunning} />
 
-            {/* Tests panel: results UI only (its internal Run button is hidden via CSS) */}
+            {/* Tests panel (results only; built-in buttons hidden via CSS) */}
             <div style={{ flex: 1, minHeight: 0 }}>
               <SandpackTests
-                className="custom-tests-panel"
+                className="gt-tests"
                 showVerboseButton={false}
                 showWatchButton={false}
                 verbose={true}
