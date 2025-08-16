@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
   SandpackCodeEditor,
   SandpackTests,
-  useSandpack,
-  SandpackFileExplorer,
 } from '@codesandbox/sandpack-react';
-import type { SandpackSetup, SandpackFiles } from '@codesandbox/sandpack-react';
+import type { SandpackSetup, SandpackFiles, SandpackTestResult, SandpackProviderProps } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
 // Simple inline toast notification component
@@ -141,7 +139,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 };
 
 // Main layout component with enhanced status display
-const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
+const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'starterCode' | 'testCode'>> = ({
   assignmentId,
   questionId,
   onTestComplete,
@@ -158,7 +156,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
     setToast(null);
   }, []);
 
-  const handleTestComplete = (results: { tests: Array<{ name: string; status: 'pass' | 'fail' | 'skip' }> }) => {
+  const handleTestComplete = (results: SandpackTestResult) => {
     if (results && results.tests) {
         const allPassed = results.tests.every(result => result.status === 'pass');
         setAllTestsPassed(allPassed);
@@ -192,7 +190,11 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'>> = ({
       onTestComplete();
       
     } catch (error) {
-      showToast('Failed to submit solution. Please try again.', 'error');
+      if (error instanceof Error) {
+        showToast(`Failed to submit solution: ${error.message}`, 'error');
+      } else {
+        showToast('Failed to submit solution. Please try again.', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -236,16 +238,12 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   questionId,
   ...rest
 }) => {
-  const { setup, mainFile, testFile } = useMemo(() => getFrameworkConfig(framework), [framework]);
-
-  if (!testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
+  const { setup, mainFile, testFile } = getFrameworkConfig(framework);
 
   const files = useMemo(() => {
-    const baseFiles = {
+    const baseFiles: SandpackFiles = {
       [mainFile]: { code: starterCode, active: true },
-      [testFile]: { code: testCode, hidden: false },
+      [testFile]: { code: testCode ?? '', hidden: false },
     };
 
     console.log('📁 Sandpack files created for', framework, ':', Object.keys(baseFiles));
@@ -257,12 +255,16 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
     [assignmentId, questionId, framework]
   );
 
+  if (!testCode) {
+    return <div>This Sandpack question is missing its test code.</div>;
+  }
+
   console.log('🚀 Initializing Sandpack with template:', setup.template, 'for framework:', framework);
 
   return (
     <SandpackProvider 
       key={sandpackKey}
-      template={setup.template as any}
+      template={setup.template as SandpackProviderProps['template']}
       customSetup={{
         dependencies: setup.dependencies,
         devDependencies: setup.devDependencies || {}
@@ -273,7 +275,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
         autoReload: false, 
         initMode: 'user-visible',
         bundlerURL: 'https://sandpack-bundler.codesandbox.io',
-        logLevel: 'error', // Reduce babel noise by only showing errors
+        logLevel: 'error',
         recompileMode: 'delayed',
         recompileDelay: 300,
         showTabs: true,
