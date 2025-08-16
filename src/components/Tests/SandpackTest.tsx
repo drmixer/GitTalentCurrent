@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -9,46 +9,164 @@ import {
 } from '@codesandbox/sandpack-react';
 import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
 
+type Framework = 'react' | 'react-js' | 'vue' | 'vanilla';
+
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
-  framework: 'react'; // current setup is React-specific; can be extended later
-  assignmentId?: string;
-  questionId?: string;
-  onTestComplete?: () => void;
+  framework: Framework; // react | react-js | vue | vanilla
+  onSubmit?: (result: {
+    allPassed: boolean;
+    suites: { passed: number; total: number } | null;
+    tests: { passed: number; total: number } | null;
+    rawText: string;
+  }) => void;
 }
 
-/**
- * Branded toolbar with a decoupled "Run Tests" button.
- * - No reliance on sandpack.listen (some builds don't expose it).
- * - We toggle a local "isRunning" after click and auto-reset with a timer.
- */
-const RUN_RESET_MS = 2500;
+const getSetup = (framework: Framework) => {
+  switch (framework) {
+    case 'react':
+      return {
+        template: 'react-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/App.tsx',
+        testFile: '/src/App.test.tsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'react-js':
+      return {
+        template: 'react' as SandpackProviderProps['template'],
+        codeFile: '/src/App.jsx',
+        testFile: '/src/App.test.jsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'vue':
+      return {
+        template: 'vue3' as SandpackProviderProps['template'],
+        codeFile: '/src/App.vue',
+        testFile: '/src/App.test.ts',
+        deps: {
+          vue: '^3.4.21',
+          '@testing-library/vue': '^8.0.3',
+          '@testing-library/dom': '^9.3.4',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'vanilla':
+      return {
+        template: 'vanilla-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/index.ts',
+        testFile: '/src/index.test.ts',
+        deps: {
+          '@testing-library/dom': '^9.3.4',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    default:
+      return {
+        template: 'react-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/App.tsx',
+        testFile: '/src/App.test.tsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+  }
+};
+
+function parseSummaryFromText(text: string) {
+  const suitesRe = /Test suites:\s*(\d+)\s*passed,\s*(\d+)\s*total/i;
+  const testsRe = /Tests:\s*(\d+)\s*passed,\s*(\d+)\s*total/i;
+
+  const suitesMatch = text.match(suitesRe);
+  const testsMatch = text.match(testsRe);
+
+  const suites =
+    suitesMatch && suitesMatch.length >= 3
+      ? { passed: Number(suitesMatch[1]), total: Number(suitesMatch[2]) }
+      : null;
+
+  const tests =
+    testsMatch && testsMatch.length >= 3
+      ? { passed: Number(testsMatch[1]), total: Number(testsMatch[2]) }
+      : null;
+
+  const allPassed =
+    (!!suites ? suites.passed === suites.total && suites.total > 0 : true) &&
+    (!!tests ? tests.passed === tests.total && tests.total > 0 : true) &&
+    // guard: avoid the “ready to run” state
+    /Pass/i.test(text) && !/Fail/i.test(text);
+
+  return { allPassed, suites, tests };
+}
+
+const RUN_RESET_FALLBACK_MS = 4000;
 
 const TestToolbar: React.FC<{
   isRunning: boolean;
   setIsRunning: (v: boolean) => void;
-}> = ({ isRunning, setIsRunning }) => {
+  canSubmit: boolean;
+  onSubmit?: () => void;
+  testsRootRef: React.RefObject<HTMLDivElement>;
+}> = ({ isRunning, setIsRunning, canSubmit, onSubmit, testsRootRef }) => {
   const { sandpack } = useSandpack();
   const timerRef = useRef<number | null>(null);
 
+  const clickBuiltInRun = () => {
+    const root = testsRootRef.current;
+    if (!root) return false;
+    // Try several likely selectors; we hide these with CSS but can still click programmatically.
+    const candidates = Array.from(
+      root.querySelectorAll<HTMLButtonElement>(
+        `
+        [class*="sp-test-actions"] button,
+        [data-testid="test-actions"] button,
+        button`
+      )
+    ).filter((btn) => !btn.disabled && btn.offsetParent !== null);
+    const runBtn = candidates[0];
+    if (runBtn) {
+      runBtn.click();
+      return true;
+    }
+    return false;
+  };
+
   const handleRun = () => {
-    // Clear any previous timer
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-
     setIsRunning(true);
-    // Trigger the run – SandpackTests will execute the test suite.
-    sandpack.runSandpack();
 
-    // Fallback: reset the button state after a short period.
-    // You can tune RUN_RESET_MS or replace with richer logic later.
+    // Prefer clicking the built-in Run button; fallback to bundler run.
+    const didClick = clickBuiltInRun();
+    if (!didClick) {
+      sandpack.runSandpack();
+    }
+
+    // Fallback: ensure the button doesn’t get stuck forever.
     timerRef.current = window.setTimeout(() => {
       setIsRunning(false);
       timerRef.current = null;
-    }, RUN_RESET_MS);
+    }, RUN_RESET_FALLBACK_MS);
   };
 
   return (
@@ -60,7 +178,6 @@ const TestToolbar: React.FC<{
       borderBottom: '1px solid #e5e7eb',
       background: '#fff',
     }}>
-      {/* Status pill */}
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -75,7 +192,6 @@ const TestToolbar: React.FC<{
         {isRunning ? 'Running tests…' : 'Ready to run tests'}
       </div>
 
-      {/* Actions */}
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={handleRun}
@@ -108,17 +224,18 @@ const TestToolbar: React.FC<{
         </button>
 
         <button
-          disabled
+          onClick={() => onSubmit?.()}
+          disabled={!canSubmit}
           style={{
             padding: '8px 14px',
             borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            background: '#f3f4f6',
-            color: '#6b7280',
+            border: canSubmit ? '1px solid #10b981' : '1px solid #e5e7eb',
+            background: canSubmit ? '#10b981' : '#f3f4f6',
+            color: canSubmit ? '#fff' : '#6b7280',
             fontWeight: 700,
-            cursor: 'not-allowed',
+            cursor: canSubmit ? 'pointer' : 'not-allowed',
           }}
-          title="Submit Solution (disabled for now)"
+          title={canSubmit ? 'Submit Solution' : 'Run and pass all tests to submit'}
         >
           Submit Solution
         </button>
@@ -127,15 +244,41 @@ const TestToolbar: React.FC<{
   );
 };
 
-const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) => {
+const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, framework, onSubmit }) => {
   const [isRunning, setIsRunning] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
+  const testsRootRef = useRef<HTMLDivElement>(null);
+
+  const { template, codeFile, testFile, deps } = getSetup(framework);
 
   const files = useMemo<SandpackFiles>(() => {
     return {
-      '/src/App.tsx': { code: starterCode ?? '', active: true },
-      '/src/App.test.tsx': { code: testCode ?? '', hidden: false },
+      [codeFile]: { code: starterCode ?? '', active: true },
+      [testFile]: { code: testCode ?? '', hidden: false },
     };
-  }, [starterCode, testCode]);
+  }, [starterCode, testCode, codeFile, testFile]);
+
+  // Watch the Tests panel text and enable submit when everything passes.
+  useEffect(() => {
+    const root = testsRootRef.current;
+    if (!root) return;
+
+    const handleCheck = () => {
+      const text = root.textContent || '';
+      const { allPassed } = parseSummaryFromText(text);
+      if (allPassed) {
+        setCanSubmit(true);
+        setIsRunning(false);
+      }
+    };
+
+    const obs = new MutationObserver(() => {
+      // Debounce a tiny bit
+      window.requestAnimationFrame(handleCheck);
+    });
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => obs.disconnect();
+  }, []);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -143,30 +286,22 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
 
   return (
     <SandpackProvider
-      template={'react-ts' as SandpackProviderProps['template']}
-      customSetup={{
-        dependencies: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6', // available for the runner; tests use fireEvent for stability
-        },
-      }}
+      template={template}
+      customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true,               // compile on load; does not auto-run tests
+        autorun: true,
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
         showErrorOverlay: true,
         showConsole: false,
-        visibleFiles: ['/src/App.tsx', '/src/App.test.tsx'],
-        activeFile: '/src/App.tsx',
+        visibleFiles: [codeFile, testFile],
+        activeFile: codeFile,
       }}
     >
-      {/* Hide only the built-in test action buttons inside the Tests panel */}
+      {/* Hide built-in Test action buttons inside the Tests panel only */}
       <style>{`
         .gt-tests [class*="sp-test-actions"] button,
         .gt-tests [data-testid="test-actions"] button {
@@ -188,7 +323,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
 
           {/* Console + Tests */}
           <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-            {/* Console header + body (dark) */}
+            {/* Console header + body (dark), with a static helper text */}
             <div style={{ borderBottom: '1px solid #e5e7eb' }}>
               <div style={{
                 height: 44,
@@ -201,7 +336,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
               }}>
                 Console Output
               </div>
-              <div style={{ height: 140, background: '#0f172a' }}>
+              <div style={{ height: 140, background: '#0f172a', position: 'relative' }}>
                 <SandpackConsole
                   maxMessageCount={200}
                   showHeader={false}
@@ -214,16 +349,37 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) =>
                     fontSize: 12,
                   }}
                 />
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#94a3b8',
+                  fontSize: 12,
+                }}>
+                  Click "Run Tests" to see output...
+                </div>
               </div>
             </div>
 
             {/* Custom toolbar */}
-            <TestToolbar isRunning={isRunning} setIsRunning={setIsRunning} />
+            <TestToolbar
+              isRunning={isRunning}
+              setIsRunning={setIsRunning}
+              canSubmit={canSubmit}
+              onSubmit={() => {
+                const text = testsRootRef.current?.textContent || '';
+                const parsed = parseSummaryFromText(text);
+                onSubmit?.({ ...parsed, rawText: text });
+              }}
+              testsRootRef={testsRootRef}
+            />
 
             {/* Tests (results only; built-in buttons hidden) */}
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div ref={testsRootRef} className="gt-tests" style={{ flex: 1, minHeight: 0 }}>
               <SandpackTests
-                className="gt-tests"
                 showVerboseButton={false}
                 showWatchButton={false}
                 verbose={true}
