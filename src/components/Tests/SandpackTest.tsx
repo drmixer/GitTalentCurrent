@@ -221,7 +221,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   const [testResults, setTestResults] = useState<SandpackTestResult | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [showTests, setShowTests] = useState(false);
+  const [showTests, setShowTests] = useState(true); // Always show tests, but they won't run until triggered
 
   // Use Sandpack context to access the client
   const { sandpack } = useSandpack();
@@ -243,9 +243,23 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     // Add some delay to show compilation status
     setTimeout(() => {
       setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
-      setShowTests(true); // Show the tests after compilation
+      
+      // Try to trigger tests using sandpack client
+      if (sandpack?.clients) {
+        try {
+          // Get the first (and usually only) client
+          const clients = Array.from(sandpack.clients.values());
+          if (clients.length > 0) {
+            const client = clients[0];
+            // Dispatch a message to trigger test execution
+            client.dispatch({ type: 'test', codesandbox: true });
+          }
+        } catch (error) {
+          console.log('Could not trigger tests:', error);
+        }
+      }
     }, 1000);
-  }, []);
+  }, [sandpack]);
 
   // Handle test completion results
   const handleTestComplete = useCallback((results: SandpackTestResult) => {
@@ -363,18 +377,15 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
-          {/* Sandpack Tests (conditionally shown and auto-triggered when enabled) */}
-          {showTests && (
-            <div className="h-64 border-t">
-              <SandpackTests 
-                onComplete={handleTestComplete}
-                showVerboseButton={false}
-                showWatchButton={false}
-                autorun={true}
-                style={{ height: '100%' }}
-              />
-            </div>
-          )}
+          {/* Sandpack Tests (always shown, but triggered manually) */}
+          <div className="h-64 border-t">
+            <SandpackTests 
+              onComplete={handleTestComplete}
+              showVerboseButton={false}
+              showWatchButton={false}
+              style={{ height: '100%' }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -423,7 +434,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       }}
       files={files} 
       options={{ 
-        autorun: false, // Keep autorun disabled - we'll trigger tests manually
+        autorun: false, // Keep autorun disabled initially
         autoReload: false, 
         initMode: 'user-visible',
         bundlerURL: undefined, // Use default bundler for better compatibility
