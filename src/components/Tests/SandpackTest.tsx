@@ -9,20 +9,89 @@ import {
 } from '@codesandbox/sandpack-react';
 import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
 
+type Framework = 'react' | 'react-js' | 'vue' | 'vanilla';
+
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
-  framework: 'react';
-  assignmentId: string;
-  questionId: string;
-  onTestComplete: () => void;
+  framework: Framework; // 'react' | 'react-js' | 'vue' | 'vanilla'
+  assignmentId?: string;
+  questionId?: string;
+  onTestComplete?: () => void;
 }
+
+const getSetup = (framework: Framework) => {
+  switch (framework) {
+    case 'react':
+      return {
+        template: 'react-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/App.tsx',
+        testFile: '/src/App.test.tsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'react-js':
+      return {
+        template: 'react' as SandpackProviderProps['template'],
+        codeFile: '/src/App.jsx',
+        testFile: '/src/App.test.jsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'vue':
+      return {
+        template: 'vue3' as SandpackProviderProps['template'],
+        codeFile: '/src/App.vue',
+        testFile: '/src/App.test.ts',
+        deps: {
+          vue: '^3.4.21',
+          '@testing-library/vue': '^8.0.3',
+          '@testing-library/dom': '^9.3.4',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    case 'vanilla':
+      return {
+        template: 'vanilla-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/index.ts',
+        testFile: '/src/index.test.ts',
+        deps: {
+          '@testing-library/dom': '^9.3.4',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+    default:
+      return {
+        template: 'react-ts' as SandpackProviderProps['template'],
+        codeFile: '/src/App.tsx',
+        testFile: '/src/App.test.tsx',
+        deps: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      };
+  }
+};
 
 /**
  * Branded toolbar with a decoupled "Run Tests" button.
- * - We DO NOT bind the label to sandpack.status because the bundler is often "running" on mount.
- * - We flip isRunning only after the user clicks our button.
- * - We auto-reset isRunning when the bundler returns to "idle" after a run.
+ * - isRunning is local and only flips true after clicking our button.
+ * - When the bundler returns to idle after a run, we reset it.
  */
 const TestToolbar: React.FC<{
   isRunning: boolean;
@@ -37,7 +106,6 @@ const TestToolbar: React.FC<{
     sandpack.runSandpack();
   };
 
-  // When bundler transitions back to idle AFTER a click, clear running state.
   useEffect(() => {
     const unsub = sandpack.listen((e) => {
       if (e.type === 'status' && e.status === 'idle' && lastClickedRef.current) {
@@ -56,7 +124,6 @@ const TestToolbar: React.FC<{
       borderBottom: '1px solid #e5e7eb',
       background: '#fff',
     }}>
-      {/* Left: status pill */}
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -71,7 +138,6 @@ const TestToolbar: React.FC<{
         {isRunning ? 'Running tests…' : 'Ready to run tests'}
       </div>
 
-      {/* Right: primary Run Tests + secondary Submit Solution (disabled for now) */}
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={handleRun}
@@ -123,15 +189,16 @@ const TestToolbar: React.FC<{
   );
 };
 
-const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTestComplete }) => {
+const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, framework }) => {
   const [isRunning, setIsRunning] = useState(false);
+  const { template, codeFile, testFile, deps } = getSetup(framework);
 
   const files = useMemo<SandpackFiles>(() => {
     return {
-      '/src/App.tsx': { code: starterCode ?? '', active: true },
-      '/src/App.test.tsx': { code: testCode ?? '', hidden: false },
+      [codeFile]: { code: starterCode ?? '', active: true },
+      [testFile]: { code: testCode ?? '', hidden: false },
     };
-  }, [starterCode, testCode]);
+  }, [starterCode, testCode, codeFile, testFile]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -139,30 +206,22 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTe
 
   return (
     <SandpackProvider
-      template={'react-ts' as SandpackProviderProps['template']}
-      customSetup={{
-        dependencies: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          vitest: '^0.34.6', // available to the runner; tests use fireEvent for stability
-        },
-      }}
+      template={template}
+      customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true,               // compile on load (does not auto-run tests)
+        autorun: true,
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
         showErrorOverlay: true,
         showConsole: false,
-        visibleFiles: ['/src/App.tsx', '/src/App.test.tsx'],
-        activeFile: '/src/App.tsx',
+        visibleFiles: [codeFile, testFile],
+        activeFile: codeFile,
       }}
     >
-      {/* Hide only the built-in test action buttons inside the Tests panel */}
+      {/* Hide the built-in test action buttons inside the Tests panel only */}
       <style>{`
         .gt-tests [class*="sp-test-actions"] button,
         .gt-tests [data-testid="test-actions"] button {
@@ -172,7 +231,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTe
 
       <SandpackLayout>
         <div style={{ display: 'flex', width: '100%' }}>
-          {/* Left: Editor */}
+          {/* Editor */}
           <div style={{ flex: 1 }}>
             <SandpackCodeEditor
               style={{ height: '60vh' }}
@@ -182,9 +241,9 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTe
             />
           </div>
 
-          {/* Right: Console + Tests */}
+          {/* Console + Tests */}
           <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-            {/* Console Header + Body (dark) */}
+            {/* Console header + body (dark) */}
             <div style={{ borderBottom: '1px solid #e5e7eb' }}>
               <div style={{
                 height: 44,
@@ -213,10 +272,10 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, onTe
               </div>
             </div>
 
-            {/* Custom Toolbar */}
+            {/* Custom toolbar */}
             <TestToolbar isRunning={isRunning} setIsRunning={setIsRunning} />
 
-            {/* Tests panel (results only; built-in buttons hidden via CSS) */}
+            {/* Tests (results only; built-in buttons hidden) */}
             <div style={{ flex: 1, minHeight: 0 }}>
               <SandpackTests
                 className="gt-tests"
