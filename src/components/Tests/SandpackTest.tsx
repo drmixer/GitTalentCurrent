@@ -97,9 +97,8 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        // compile the sandbox on load; tests are run via the built-in button
-        autorun: true,
-        initMode: 'immediate',
+        autorun: false,            // only run when clicking the built-in Run button
+        initMode: 'immediate',     // initialize immediately, but don't autorun tests
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
@@ -109,16 +108,13 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       }}
     >
       <SandpackLayout>
-        {/* Left: Editor */}
+        {/* Editor */}
         <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
 
-        {/* Right: Built-in Tests UI (with its own Run button) and Console */}
+        {/* Right: built-in Tests UI and Console */}
         <div style={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0, borderLeft: '1px solid #e5e7eb' }}>
-            <SandpackTests
-              // keep defaults; provide Run/Watch/Verbose controls from Sandpack itself
-              style={{ height: '100%' }}
-            />
+            <SandpackTests style={{ height: '100%' }} />
           </div>
           <div style={{ height: 180, borderLeft: '1px solid #e5e7eb', borderTop: '1px solid #e5e7eb' }}>
             <SandpackConsole
