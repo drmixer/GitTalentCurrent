@@ -147,8 +147,9 @@ const getFrameworkConfig = (
             jsdom: '^22.1.0',
           },
         },
-        mainFile: '/App.tsx',
-        testFile: '/App.test.tsx',
+        // IMPORTANT: keep files under /src for the react-ts template
+        mainFile: '/src/App.tsx',
+        testFile: '/src/App.test.tsx',
       };
   }
 };
@@ -467,6 +468,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./setupTests.ts'],
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
   },
 });
 `.trim(),
@@ -474,7 +476,7 @@ export default defineConfig({
         };
         baseFiles['/setupTests.ts'] = {
           code: `
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 `.trim(),
           hidden: true,
         };
