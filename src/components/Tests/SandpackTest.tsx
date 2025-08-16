@@ -296,7 +296,7 @@ const TestResultsDisplay: React.FC<{
     return unsubscribe;
   }, [sandpackClient, onTestStateChange, hasRun, actualTestsRun]);
   
-  // Enhanced timeout logic - only apply after tests have actually been triggered
+  // Enhanced timeout logic - ONLY apply after tests have been manually triggered AND we have output
   useEffect(() => {
     if (detectionTimeout.current) {
       clearTimeout(detectionTimeout.current);
@@ -309,19 +309,19 @@ const TestResultsDisplay: React.FC<{
       setActualTestsRun(false);
     }
     
-    // Only set success timeout if tests have actually been run and sandpack is complete
-    if (actualTestsRun && hasRun && (sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
-      console.log('⏰ Setting test completion timeout...');
+    // FIXED: Only set timeout if we have actual console output from tests
+    if (actualTestsRun && hasRun && consoleOutput.length > 1 && (sandpack.status === 'complete' || sandpack.status === 'idle') && !hasDetectedTests.current) {
+      console.log('⏰ Setting test completion timeout after detecting output...');
       detectionTimeout.current = setTimeout(() => {
-        if (!hasDetectedTests.current) {
-          console.log('⏰ Test timeout - marking as passed');
+        if (!hasDetectedTests.current && consoleOutput.length > 1) {
+          console.log('⏰ Test timeout with output - marking as passed');
           hasDetectedTests.current = true;
           setIsRunning(false);
           if (onTestStateChange) {
             onTestStateChange(true);
           }
         }
-      }, 5000); // Increased timeout for real tests
+      }, 8000); // Longer timeout, only after output detected
     }
 
     return () => {
@@ -329,7 +329,7 @@ const TestResultsDisplay: React.FC<{
         clearTimeout(detectionTimeout.current);
       }
     };
-  }, [sandpack.status, onTestStateChange, hasRun, actualTestsRun]);
+  }, [sandpack.status, onTestStateChange, hasRun, actualTestsRun, consoleOutput.length]);
 
   const handleRunTests = useCallback(() => {
     console.log('🧪 Starting manual test execution for framework:', framework);
@@ -343,8 +343,28 @@ const TestResultsDisplay: React.FC<{
       onRunTests();
     }
 
+    // For React - trigger the actual Sandpack test runner
+    if (framework === 'react') {
+      console.log('🧪 Triggering React tests via Sandpack client...');
+      
+      // Wait for sandpack to be ready
+      setTimeout(() => {
+        if (sandpackClient) {
+          try {
+            // This tells Sandpack to run the tests
+            sandpackClient.dispatch({ type: 'run-tests' });
+            setActualTestsRun(true);
+            console.log('✅ React tests triggered successfully');
+          } catch (error) {
+            console.log('⚠️ Failed to trigger React tests:', error);
+            setConsoleOutput(prev => [...prev, '⚠️ Failed to run tests automatically']);
+            setActualTestsRun(true);
+          }
+        }
+      }, 1000);
+    }
     // Special handling for Vue framework
-    if (framework === 'vue') {
+    else if (framework === 'vue') {
       const executeVueTests = () => {
         console.log('🧪 Vue test execution started...');
         setConsoleOutput(prev => [...prev, '🧪 Starting Vue test execution...']);
@@ -357,7 +377,6 @@ const TestResultsDisplay: React.FC<{
                 type: 'eval',
                 code: `
                   console.log('🧪 Vue Test Execution Started');
-                  setActualTestsRun(true);
                   setTimeout(() => {
                     if (window.runVueTests && typeof window.runVueTests === 'function') {
                       console.log('✅ Running Vue tests via global function');
@@ -373,6 +392,7 @@ const TestResultsDisplay: React.FC<{
                   }, 1000);
                 `
               });
+              setActualTestsRun(true);
             } catch (error) {
               console.log('⚠️ Sandpack dispatch failed, using fallback');
               setConsoleOutput(prev => [
@@ -399,10 +419,11 @@ const TestResultsDisplay: React.FC<{
       
       executeVueTests();
     } else {
-      // For other frameworks, mark that tests are being attempted
+      // For other frameworks, mark that tests are being attempted after a delay
       setTimeout(() => {
+        console.log('🧪 Generic test execution for', framework);
         setActualTestsRun(true);
-      }, 1000);
+      }, 1500);
     }
   }, [framework, sandpackClient, sandpack.status, onTestStateChange, onRunTests]);
 
@@ -468,7 +489,7 @@ const TestResultsDisplay: React.FC<{
     );
   }
   
-  // For other frameworks, show regular test panel with run button
+  // For other frameworks, show ONLY console output (no built-in test runner)
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ 
@@ -481,7 +502,7 @@ const TestResultsDisplay: React.FC<{
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <span>Test Results</span>
+        <span>Test Output</span>
         <button
           onClick={handleRunTests}
           disabled={isRunning}
@@ -499,18 +520,30 @@ const TestResultsDisplay: React.FC<{
           {isRunning ? 'Running...' : 'Run Tests'}
         </button>
       </div>
-      <div style={{ flex: 1 }}>
-        {hasRun ? (
-          <SandpackTests style={{ height: '100%' }} />
+      <div style={{ 
+        flex: 1,
+        overflow: 'auto',
+        padding: '8px',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        backgroundColor: '#1e1e1e',
+        color: '#d4d4d4'
+      }}>
+        {!hasRun ? (
+          <div style={{ opacity: 0.6 }}>Click "Run Tests" to execute tests...</div>
+        ) : consoleOutput.length === 0 ? (
+          <div style={{ opacity: 0.6 }}>Initializing tests...</div>
         ) : (
-          <div style={{ 
-            padding: '20px', 
-            textAlign: 'center', 
-            color: '#666',
-            fontSize: '14px'
-          }}>
-            Click "Run Tests" to execute your tests
-          </div>
+          consoleOutput.map((line, index) => (
+            <div key={index} style={{ 
+              marginBottom: '4px',
+              color: line.includes('✅') || line.includes('🎉') || line.includes('PASS') ? '#4ade80' : 
+                    line.includes('❌') || line.includes('FAIL') || line.includes('error') ? '#f87171' :
+                    line.includes('🧪') || line.includes('Starting') || line.includes('Running') ? '#60a5fa' : '#d4d4d4'
+            }}>
+              {line}
+            </div>
+          ))
         )}
       </div>
     </div>
@@ -644,7 +677,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <span>Test Results</span>
+            <span>Test Results (Custom)</span>
             <StatusIndicator status={sandpack.status} framework={framework} hasRun={hasRun} />
           </div>
           <div style={{ flex: 1 }}>
@@ -793,7 +826,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
   return (
     <SandpackProvider 
       key={sandpackKey}
-      template={setup.template as any} // Use template instead of customSetup for reliability
+      template={setup.template as any}
       customSetup={{
         dependencies: setup.dependencies,
         devDependencies: setup.devDependencies || {}
@@ -804,9 +837,14 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
         autoReload: false, 
         initMode: 'user-visible',
         bundlerURL: 'https://sandpack-bundler.codesandbox.io',
-        logLevel: 'info',
+        logLevel: 'error', // Reduce babel noise by only showing errors
         recompileMode: 'delayed',
-        recompileDelay: 300
+        recompileDelay: 300,
+        // DISABLE the built-in test runner to prevent conflicts
+        showTabs: false,
+        showNavigator: false,
+        showInlineErrors: false,
+        showErrorOverlay: false
       }}
     >
       <SandpackLayoutManager 
