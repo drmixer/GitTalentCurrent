@@ -119,7 +119,7 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations - IMPROVED Vue configuration
+// Framework configurations - FIXED with proper entry points
 const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
@@ -132,7 +132,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@vitejs/plugin-vue': '^4.3.4',
             'vite': '^4.4.9',
           },
-          template: 'node',
+          template: 'vanilla', // Use vanilla template for better control
         },
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
@@ -161,7 +161,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'typescript': '^4.9.5',
             '@types/jasmine': '^4.3.0',
           },
-          template: 'angular',
+          template: 'vanilla', // Use vanilla for better control
         },
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/app/app.component.spec.ts',
@@ -770,30 +770,18 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
-// Helper function to create framework-specific setup files - IMPROVED Vue configuration
+// Helper function to create framework-specific setup files - FIXED with proper package.json entries
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
   const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
   
   switch (framework) {
     case 'vue':
-      // Minimal Vite config
-      baseFiles['/vite.config.js'] = {
-        code: `import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  define: {
-    __VUE_OPTIONS_API__: true,
-    __VUE_PROD_DEVTOOLS__: false
-  }
-})`,
-        hidden: true
-      };
-
+      // FIXED: Proper package.json with main entry point
       baseFiles['/package.json'] = {
         code: JSON.stringify({
           name: "vue-sandpack-test",
+          version: "1.0.0",
+          main: "/src/main.js", // CRITICAL: This was missing!
           type: "module",
           scripts: {
             dev: "vite",
@@ -807,6 +795,21 @@ export default defineConfig({
             'vite': '^4.4.9'
           }
         }, null, 2),
+        hidden: true
+      };
+
+      // Minimal Vite config
+      baseFiles['/vite.config.js'] = {
+        code: `import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({
+  plugins: [vue()],
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false
+  }
+})`,
         hidden: true
       };
 
@@ -904,6 +907,41 @@ export const runTests = () => window.runVueTests?.()`,
       break;
       
     case 'angular':
+      // FIXED: Proper package.json for Angular
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "angular-sandpack-test",
+          version: "1.0.0",
+          main: "/src/main.ts", // CRITICAL: This was missing!
+          scripts: {
+            build: "ng build",
+            start: "ng serve",
+            test: "ng test"
+          },
+          dependencies: {
+            '@angular/animations': '^15.2.0',
+            '@angular/common': '^15.2.0',
+            '@angular/compiler': '^15.2.0',
+            '@angular/core': '^15.2.0',
+            '@angular/forms': '^15.2.0',
+            '@angular/platform-browser': '^15.2.0',
+            '@angular/platform-browser-dynamic': '^15.2.0',
+            'rxjs': '^7.8.0',
+            'zone.js': '^0.12.0',
+            'tslib': '^2.5.0'
+          },
+          devDependencies: {
+            '@angular/core/testing': '^15.2.0',
+            '@angular/common/testing': '^15.2.0',
+            '@angular/platform-browser/testing': '^15.2.0',
+            'jasmine-core': '^4.5.0',
+            'typescript': '^4.9.5',
+            '@types/jasmine': '^4.3.0'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
       baseFiles['/src/polyfills.ts'] = {
         code: `import 'zone.js';`,
         hidden: true
@@ -999,6 +1037,30 @@ getTestBed().initTestEnvironment(
       break;
 
     case 'javascript':
+      // FIXED: Proper package.json for JavaScript
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "javascript-sandpack-test",
+          version: "1.0.0",
+          main: "/src/index.js", // CRITICAL: This was missing!
+          type: "module",
+          scripts: {
+            test: "jest",
+            start: "node src/index.js"
+          },
+          dependencies: {
+            '@testing-library/jest-dom': '^5.16.5',
+            'whatwg-fetch': '^3.6.2'
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5',
+            'jest': '^29.5.0',
+            'jest-environment-jsdom': '^29.5.0'
+          }
+        }, null, 2),
+        hidden: true
+      };
+
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';`,
@@ -1037,6 +1099,7 @@ import 'whatwg-fetch';`,
       
     case 'react':
     default:
+      // React uses the default template, so we don't need to override package.json
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';
