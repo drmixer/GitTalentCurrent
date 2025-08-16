@@ -4,6 +4,7 @@ import {
   SandpackLayout,
   SandpackCodeEditor,
   SandpackTests,
+  SandpackConsole,
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import type {
@@ -56,7 +57,6 @@ const getFrameworkConfig = (
             '@angular/platform-browser-dynamic': '^16.0.0',
             '@angular/testing': '^16.0.0',
             rxjs: '^7.8.0',
-            'zone.js': '^0.13.0',
             'jasmine-core': '^4.6.0',
             karma: '^6.4.0',
           },
@@ -87,7 +87,8 @@ const getFrameworkConfig = (
             '@testing-library/react': '^14.2.1',
             '@testing-library/jest-dom': '^6.5.0',
             '@testing-library/user-event': '^14.5.2',
-            // No vitest/jsdom here; Sandpack runs tests in the browser
+            // IMPORTANT: vitest is required so the Tests runner can start
+            vitest: '^0.34.6',
           },
         },
         mainFile: '/src/App.tsx',
@@ -150,7 +151,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   const [runId, setRunId] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
-  const { sandpack } = useSandpack();
+  useSandpack(); // keeps context warm
 
   const clearPendingTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -166,7 +167,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     setTestsTriggered(true);
     setRunId(prev => prev + 1);
 
-    // Give the bundler a moment (autorun is enabled now)
     window.setTimeout(() => {
       setConsoleOutput(prev => [...prev, '✅ Compilation successful', '🧪 Running test suite...']);
     }, 300);
@@ -187,7 +187,6 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     clearPendingTimeout();
     setTestResults(results);
 
-    // Basic result handling
     const tests = results?.tests ?? [];
     if (tests.length > 0) {
       const passed = tests.filter(t => t.status === 'pass').length;
@@ -296,6 +295,11 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
+          {/* In-sandbox console (from the iframe) to surface runner errors/missing deps */}
+          <div className="h-40 border-t overflow-auto">
+            <SandpackConsole maxMessageCount={200} />
+          </div>
+
           <div className="h-64 border-t">
             {testsTriggered ? (
               <>
@@ -349,17 +353,15 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(
         template={setup.template as SandpackProviderProps['template']}
         customSetup={{ dependencies: setup.dependencies, devDependencies: setup.devDependencies || {} }}
         files={files}
-        // IMPORTANT: autorun must be true so the bundler boots and tests can run
         options={{
-          autorun: true,
-          // compile immediately when visible so tests can start promptly
+          autorun: true,        // ensure bundler boots so the test runner can start
           initMode: 'immediate',
           logLevel: 'info',
           showTabs: true,
           showNavigator: false,
           showInlineErrors: true,
           showErrorOverlay: true,
-          showConsole: false,
+          showConsole: false,   // we render SandpackConsole separately
           showRefreshButton: false,
           visibleFiles: [mainFile, testFile],
           activeFile: mainFile,
