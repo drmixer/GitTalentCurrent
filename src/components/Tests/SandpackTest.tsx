@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -14,6 +14,13 @@ interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
   framework: Framework; // react (TS), vue (Vue 3), vanilla (TS)
+  // Optional: receive raw summary text and parsed counts when user clicks Submit
+  onSubmit?: (result: {
+    ran: boolean;
+    rawText: string;
+    suites?: { passed?: number; failed?: number; total?: number };
+    tests?: { passed?: number; failed?: number; total?: number };
+  }) => void;
 }
 
 const getSetup = (framework: Framework) => {
@@ -75,8 +82,44 @@ const getSetup = (framework: Framework) => {
   }
 };
 
-const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, framework }) => {
+// Parse a jest-style summary out of the Tests panel text.
+// We only need to know if a run finished; pass/fail is allowed for submit.
+function parseSummary(text: string) {
+  const ran = /Test suites?:|Tests?:|No tests found/i.test(text);
+
+  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? '';
+  const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
+
+  const num = (re: RegExp, s: string) => {
+    const m = s.match(re);
+    return m ? Number(m[1]) : undefined;
+  };
+
+  const suites = suitesLine
+    ? {
+        passed: num(/(\d+)\s*passed/i, suitesLine),
+        failed: num(/(\d+)\s*failed/i, suitesLine),
+        total: num(/(\d+)\s*total/i, suitesLine),
+      }
+    : undefined;
+
+  const tests = testsLine
+    ? {
+        passed: num(/(\d+)\s*passed/i, testsLine),
+        failed: num(/(\d+)\s*failed/i, testsLine),
+        total: num(/(\d+)\s*total/i, testsLine),
+      }
+    : undefined;
+
+  return { ran, suites, tests };
+}
+
+const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, framework, onSubmit }) => {
   const { template, codeFile, testFile, deps } = getSetup(framework);
+
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [lastText, setLastText] = useState('');
+  const testsRootRef = useRef<HTMLDivElement>(null);
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
@@ -85,6 +128,35 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       [testFile]: { code: testCode ?? '', hidden: false },
     };
   }, [starterCode, testCode, codeFile, testFile]);
+
+  // Watch for a test summary to appear; enable Submit once a run finished (pass or fail).
+  useEffect(() => {
+    const root = testsRootRef.current;
+    if (!root) return;
+
+    setCanSubmit(false);
+    setLastText('');
+
+    const check = () => {
+      const text = root.textContent || '';
+      if (!text || text === lastText) return;
+
+      setLastText(text);
+      const { ran } = parseSummary(text);
+      if (ran) {
+        setCanSubmit(true);
+      }
+    };
+
+    const obs = new MutationObserver(() => {
+      // Batch DOM updates
+      window.requestAnimationFrame(check);
+    });
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
+
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [framework, codeFile, testFile, starterCode, testCode]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -97,8 +169,8 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false,            // only run when clicking the built-in Run button
-        initMode: 'immediate',     // initialize immediately, but don't autorun tests
+        autorun: false,           // Only run when user clicks the built-in Run button
+        initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
@@ -108,15 +180,54 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       }}
     >
       <SandpackLayout>
-        {/* Editor */}
+        {/* Left: Editor */}
         <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
 
-        {/* Right: built-in Tests UI and Console */}
-        <div style={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1, minHeight: 0, borderLeft: '1px solid #e5e7eb' }}>
+        {/* Right: Tests + Console + Submit */}
+        <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
+          {/* Submit bar (keeps the built-in Run button untouched) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              borderBottom: '1px solid #e5e7eb',
+              background: '#f8fafc',
+            }}
+          >
+            <div style={{ fontSize: 13, color: '#475569' }}>
+              {canSubmit ? 'Run complete. You can submit.' : 'Click Run in the Tests panel to enable Submit.'}
+            </div>
+            <button
+              onClick={() => {
+                const rawText = testsRootRef.current?.textContent || '';
+                const parsed = parseSummary(rawText);
+                onSubmit?.({ rawText, ...parsed });
+              }}
+              disabled={!canSubmit}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: canSubmit ? '1px solid #10b981' : '1px solid #cbd5e1',
+                background: canSubmit ? '#10b981' : '#e2e8f0',
+                color: canSubmit ? '#fff' : '#64748b',
+                fontWeight: 700,
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+              }}
+              title={canSubmit ? 'Submit Solution' : 'Run tests first'}
+            >
+              Submit
+            </button>
+          </div>
+
+          {/* Tests panel with built-in Run button */}
+          <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
             <SandpackTests style={{ height: '100%' }} />
           </div>
-          <div style={{ height: 180, borderLeft: '1px solid #e5e7eb', borderTop: '1px solid #e5e7eb' }}>
+
+          {/* Console */}
+          <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
             <SandpackConsole
               maxMessageCount={200}
               showHeader
