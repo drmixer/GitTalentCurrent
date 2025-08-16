@@ -29,6 +29,7 @@ import AdminTests from './pages/AdminTests';
 import DeveloperTests from './pages/DeveloperTests';
 import TestResultsPage from './pages/TestResultsPage';
 import TestSandpackPage from './pages/TestSandpackPage';
+import TestSandpackSimplePage from './pages/TestSandpackSimplePage';
 import TestJavaScriptPage from './pages/TestJavaScriptPage';
 import TestVuePage from './pages/TestVuePage';
 import EndorsementPage from './pages/EndorsementPage';
@@ -144,6 +145,7 @@ function App() {
 
             {/* Test Sandpack Pages - Demo */}
             <Route path="/test-sandpack" element={<TestSandpackPage />} />
+            <Route path="/test-sandpack-simple" element={<TestSandpackSimplePage />} />
             <Route path="/test-javascript" element={<TestJavaScriptPage />} />
             <Route path="/test-vue" element={<TestVuePage />} />
 

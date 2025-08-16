@@ -8,7 +8,6 @@ import {
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import type { SandpackSetup, SandpackFiles, SandpackTestResult, SandpackProviderProps } from '@codesandbox/sandpack-react';
-import { supabase } from '../../lib/supabase';
 import { Play, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 
 // Simple inline toast notification component
@@ -222,7 +221,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   const [testResults, setTestResults] = useState<SandpackTestResult | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [showTests, setShowTests] = useState(true); // Always show tests, but they won't run until triggered
+  const [testsTriggered, setTestsTriggered] = useState(false); // Track if tests have been manually triggered
 
   // Use Sandpack context to access the client
   const { sandpack } = useSandpack();
@@ -240,6 +239,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     setTestStatus('running');
     setConsoleOutput(['🚀 Compiling and running tests...']);
     setAllTestsPassed(false);
+    setTestsTriggered(true); // Mark that tests have been manually triggered
     
     // Add some delay to show compilation status
     setTimeout(() => {
@@ -299,6 +299,23 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
     setConsoleOutput(prev => [...prev, '📤 Submitting solution...']);
     
     try {
+      // Check if Supabase is available, if not just simulate success for testing
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      
+      if (!supabaseUrl) {
+        // Simulate successful submission for testing
+        setTimeout(() => {
+          setConsoleOutput(prev => [...prev, '✅ Solution submitted successfully! (Test mode - no actual submission)']);
+          showToast('Solution submitted successfully! 🎉 (Test mode)', 'success');
+          onTestComplete();
+          setIsSubmitting(false);
+        }, 1000);
+        return;
+      }
+      
+      // Dynamically import supabase when needed
+      const { supabase } = await import('../../lib/supabase');
+      
       const { error: insertError } = await supabase
         .from('test_results')
         .upsert({
@@ -381,15 +398,25 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
             )}
           </div>
 
-          {/* Sandpack Tests (auto-run when triggered) */}
+          {/* Sandpack Tests (controlled by testsTriggered state) */}
           <div className="h-64 border-t">
-            <SandpackTests 
-              onComplete={handleTestComplete}
-              showVerboseButton={false}
-              showWatchButton={false}
-              verbose={true}
-              style={{ height: '100%' }}
-            />
+            {testsTriggered ? (
+              <SandpackTests 
+                onComplete={handleTestComplete}
+                showVerboseButton={false}
+                showWatchButton={false}
+                verbose={true}
+                watchMode={false}
+                style={{ height: '100%' }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full bg-gray-50 text-gray-500">
+                <div className="text-center">
+                  <p className="mb-2">🧪 Tests ready to run</p>
+                  <p className="text-sm">Click "Run Tests" to execute the test suite</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -439,7 +466,7 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(({
       }}
       files={files} 
       options={{ 
-        autorun: true, // Enable autorun to allow tests to run when triggered
+        autorun: false, // Disable autorun to prevent automatic test execution
         autoReload: false, 
         initMode: 'user-visible',
         bundlerURL: undefined, // Use default bundler for better compatibility
