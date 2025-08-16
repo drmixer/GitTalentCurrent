@@ -119,7 +119,7 @@ interface SandpackTestProps {
   onTestComplete: () => void;
 }
 
-// Framework configurations - FIXED with proper entry points
+// FIXED: Framework configurations with explicit entry points for ALL frameworks
 const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSetup, mainFile: string, testFile: string } => {
   switch (framework) {
     case 'vue':
@@ -132,7 +132,8 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             '@vitejs/plugin-vue': '^4.3.4',
             'vite': '^4.4.9',
           },
-          template: 'vanilla', // Use vanilla template for better control
+          template: 'vanilla',
+          entry: '/src/main.js', // EXPLICIT ENTRY POINT
         },
         mainFile: '/src/App.vue',
         testFile: '/src/App.test.js',
@@ -161,7 +162,8 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'typescript': '^4.9.5',
             '@types/jasmine': '^4.3.0',
           },
-          template: 'vanilla', // Use vanilla for better control
+          template: 'vanilla',
+          entry: '/src/main.ts', // EXPLICIT ENTRY POINT
         },
         mainFile: '/src/app/app.component.ts',
         testFile: '/src/app/app.component.spec.ts',
@@ -180,6 +182,7 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
             'jest-environment-jsdom': '^29.5.0',
           },
           template: 'vanilla',
+          entry: '/src/index.js', // EXPLICIT ENTRY POINT
         },
         mainFile: '/src/index.js',
         testFile: '/src/index.test.js',
@@ -187,12 +190,12 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
 
     case 'react':
     default:
+      // FIXED: React now uses vanilla template with explicit entry point
       return {
         setup: {
           dependencies: {
             'react': '^18.2.0',
             'react-dom': '^18.2.0',
-            'react-scripts': '5.0.1',
             '@testing-library/react': '^13.4.0',
             '@testing-library/jest-dom': '^5.16.5',
             '@testing-library/user-event': '^14.4.3',
@@ -201,7 +204,8 @@ const getFrameworkConfig = (framework: SupportedFramework): { setup: SandpackSet
           devDependencies: {
             '@types/jest': '^29.5.5',
           },
-          template: 'react',
+          template: 'vanilla', // CHANGED: Use vanilla instead of react template
+          entry: '/src/index.js', // EXPLICIT ENTRY POINT
         },
         mainFile: '/App.js',
         testFile: '/App.test.js',
@@ -770,18 +774,18 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework'> & { f
   );
 };
 
-// Helper function to create framework-specific setup files - FIXED with proper package.json entries
+// FIXED: Helper function to create framework-specific setup files with proper package.json entries
 const createFrameworkFiles = (framework: SupportedFramework, starterCode: string, testCode: string) => {
   const baseFiles: Record<string, { code: string; hidden?: boolean; active?: boolean }> = {};
   
   switch (framework) {
     case 'vue':
-      // FIXED: Proper package.json with main entry point
+      // Proper package.json with main entry point
       baseFiles['/package.json'] = {
         code: JSON.stringify({
           name: "vue-sandpack-test",
           version: "1.0.0",
-          main: "/src/main.js", // CRITICAL: This was missing!
+          main: "/src/main.js",
           type: "module",
           scripts: {
             dev: "vite",
@@ -907,12 +911,12 @@ export const runTests = () => window.runVueTests?.()`,
       break;
       
     case 'angular':
-      // FIXED: Proper package.json for Angular
+      // Proper package.json for Angular
       baseFiles['/package.json'] = {
         code: JSON.stringify({
           name: "angular-sandpack-test",
           version: "1.0.0",
-          main: "/src/main.ts", // CRITICAL: This was missing!
+          main: "/src/main.ts",
           scripts: {
             build: "ng build",
             start: "ng serve",
@@ -1037,12 +1041,12 @@ getTestBed().initTestEnvironment(
       break;
 
     case 'javascript':
-      // FIXED: Proper package.json for JavaScript
+      // Proper package.json for JavaScript
       baseFiles['/package.json'] = {
         code: JSON.stringify({
           name: "javascript-sandpack-test",
           version: "1.0.0",
-          main: "/src/index.js", // CRITICAL: This was missing!
+          main: "/src/index.js",
           type: "module",
           scripts: {
             test: "jest",
@@ -1099,7 +1103,36 @@ import 'whatwg-fetch';`,
       
     case 'react':
     default:
-      // React uses the default template, so we don't need to override package.json
+      // FIXED: React now needs explicit package.json since we're using vanilla template
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          name: "react-sandpack-test",
+          version: "1.0.0",
+          main: "/src/index.js",
+          scripts: {
+            start: "react-scripts start",
+            build: "react-scripts build",
+            test: "react-scripts test"
+          },
+          dependencies: {
+            'react': '^18.2.0',
+            'react-dom': '^18.2.0',
+            '@testing-library/react': '^13.4.0',
+            '@testing-library/jest-dom': '^5.16.5',
+            '@testing-library/user-event': '^14.4.3',
+            'whatwg-fetch': '^3.6.2'
+          },
+          devDependencies: {
+            '@types/jest': '^29.5.5'
+          },
+          browserslist: {
+            production: [">0.2%", "not dead", "not op_mini all"],
+            development: ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+          }
+        }, null, 2),
+        hidden: true
+      };
+
       baseFiles['/src/setupTests.js'] = {
         code: `import '@testing-library/jest-dom';
 import 'whatwg-fetch';
