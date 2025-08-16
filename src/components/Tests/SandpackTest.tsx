@@ -36,6 +36,7 @@ const getFrameworkConfig = (
           dependencies: {
             vue: '^3.3.4',
             '@vue/test-utils': '^2.4.1',
+            vitest: '^0.34.6',
           },
         },
         mainFile: '/src/App.vue',
@@ -68,6 +69,7 @@ const getFrameworkConfig = (
         setup: {
           template: 'vanilla',
           dependencies: {
+            vitest: '^0.34.6',
             '@testing-library/jest-dom': '^6.5.0',
           },
         },
@@ -85,6 +87,8 @@ const getFrameworkConfig = (
             '@testing-library/react': '^14.2.1',
             '@testing-library/jest-dom': '^6.5.0',
             '@testing-library/user-event': '^14.5.2',
+            // Vitest is required so SandpackTests can run in-browser
+            vitest: '^0.34.6',
           },
         },
         mainFile: '/src/App.tsx',
@@ -98,11 +102,11 @@ const TestStatus: React.FC<{ status: 'idle' | 'running' | 'passed' | 'failed' | 
   message,
 }) => {
   const map = {
-    idle: { icon: null, color: 'text-gray-600', bg: 'bg-gray-100', text: 'Ready to run tests' },
-    running: { icon: null, color: 'text-blue-700', bg: 'bg-blue-50', text: 'Running tests...' },
-    passed: { icon: null, color: 'text-green-700', bg: 'bg-green-50', text: 'All tests passed!' },
-    failed: { icon: null, color: 'text-red-700', bg: 'bg-red-50', text: 'Some tests failed' },
-    error: { icon: null, color: 'text-red-700', bg: 'bg-red-50', text: 'Error running tests' },
+    idle: { color: 'text-gray-600', bg: 'bg-gray-100', text: 'Ready to run tests' },
+    running: { color: 'text-blue-700', bg: 'bg-blue-50', text: 'Running tests...' },
+    passed: { color: 'text-green-700', bg: 'bg-green-50', text: 'All tests passed!' },
+    failed: { color: 'text-red-700', bg: 'bg-red-50', text: 'Some tests failed' },
+    error: { color: 'text-red-700', bg: 'bg-red-50', text: 'Error running tests' },
   } as const;
   const cfg = map[status];
   return (
@@ -143,7 +147,7 @@ const SandpackLayoutManager: React.FC<Omit<SandpackTestProps, 'framework' | 'sta
   const [runId, setRunId] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
-  useSandpack(); // keep context warm
+  useSandpack();
 
   const clearPendingTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -324,23 +328,20 @@ const SandpackTest: React.FC<SandpackTestProps> = React.memo(
     const files = useMemo(() => {
       const baseFiles: SandpackFiles = {
         [mainFile]: { code: starterCode, active: true },
-        // Author's test lives in /src
-        [testFile]: { code: testCode ?? '', hidden: false },
-        // Bridge file at project root to guarantee discovery
+        [testFile]: { code: testCode ?? '', hidden: false }, // real tests in /src
         '/App.test.tsx': {
           code: `
 /**
- * Bridge test file to ensure test discovery at project root.
- * It imports the real tests from /src so Sandpack's runner always finds them.
+ * Bridge test file at project root to ensure discovery.
+ * It imports the real tests from /src and runs global setup.
  */
 import './setupTests';
 import './src/App.test.tsx';
 `.trim(),
           hidden: false,
         },
-        // Global setup for jest-dom matchers
         '/setupTests.ts': {
-          code: `import '@testing-library/jest-dom';`,
+          code: `import '@testing-library/jest-dom/vitest';`,
           hidden: true,
         },
       };
@@ -358,7 +359,10 @@ import './src/App.test.tsx';
     return (
       <SandpackProvider
         template={setup.template as SandpackProviderProps['template']}
-        customSetup={{ dependencies: setup.dependencies, devDependencies: setup.devDependencies || {} }}
+        customSetup={{
+          dependencies: setup.dependencies,
+          devDependencies: setup.devDependencies || {},
+        }}
         files={files}
         options={{
           autorun: true,
@@ -368,7 +372,7 @@ import './src/App.test.tsx';
           showNavigator: false,
           showInlineErrors: true,
           showErrorOverlay: true,
-          showConsole: false, // we render SandpackConsole separately
+          showConsole: false,
           showRefreshButton: false,
           visibleFiles: [mainFile, testFile, '/App.test.tsx'],
           activeFile: mainFile,
