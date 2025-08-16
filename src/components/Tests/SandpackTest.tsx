@@ -6,64 +6,24 @@ import {
   SandpackTests,
   SandpackConsole,
 } from '@codesandbox/sandpack-react';
-import type {
-  SandpackFiles,
-  SandpackProviderProps,
-  SandpackSetup,
-} from '@codesandbox/sandpack-react';
-
-type SupportedFramework = 'react';
+import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
 
 interface SandpackTestProps {
   starterCode: string;
-  testCode: string | undefined | null;
-  framework: SupportedFramework;
+  testCode: string | null | undefined;
+  framework: 'react';
   assignmentId: string;
   questionId: string;
   onTestComplete: () => void;
 }
 
-const getFrameworkConfig = (): { setup: SandpackSetup; mainFile: string; testFile: string } => ({
-  setup: {
-    template: 'react-ts',
-    dependencies: {
-      react: '^18.2.0',
-      'react-dom': '^18.2.0',
-      '@testing-library/react': '^14.2.1',
-      '@testing-library/jest-dom': '^6.5.0',
-      '@testing-library/user-event': '^14.5.2',
-      vitest: '^0.34.6',
-    },
-  },
-  mainFile: '/src/App.tsx',
-  testFile: '/src/App.test.tsx',
-});
-
 const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode }) => {
-  const { setup, mainFile, testFile } = getFrameworkConfig();
-
-  const files = useMemo(() => {
-    const baseFiles: SandpackFiles = {
-      [mainFile]: { code: starterCode, active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
-      '/App.test.tsx': {
-        code: `
-/**
- * Bridge file to guarantee test discovery at project root.
- * Ensures jest-dom (vitest) matchers are registered before running /src tests.
- */
-import './setupTests';
-import './src/App.test.tsx';
-`.trim(),
-        hidden: false,
-      },
-      '/setupTests.ts': {
-        code: `import '@testing-library/jest-dom/vitest';`,
-        hidden: true,
-      },
+  const files = useMemo<SandpackFiles>(() => {
+    return {
+      '/src/App.tsx': { code: starterCode ?? '', active: true },
+      '/src/App.test.tsx': { code: testCode ?? '', hidden: false },
     };
-    return baseFiles;
-  }, [starterCode, testCode, mainFile, testFile]);
+  }, [starterCode, testCode]);
 
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
@@ -71,8 +31,17 @@ import './src/App.test.tsx';
 
   return (
     <SandpackProvider
-      template={setup.template as SandpackProviderProps['template']}
-      customSetup={{ dependencies: setup.dependencies, devDependencies: setup.devDependencies || {} }}
+      template={'react-ts' as SandpackProviderProps['template']}
+      customSetup={{
+        dependencies: {
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+          '@testing-library/react': '^14.2.1',
+          '@testing-library/jest-dom': '^6.5.0',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^0.34.6',
+        },
+      }}
       files={files}
       options={{
         autorun: true,
@@ -82,8 +51,8 @@ import './src/App.test.tsx';
         showInlineErrors: true,
         showErrorOverlay: true,
         showConsole: false,
-        visibleFiles: [mainFile, testFile, '/App.test.tsx'],
-        activeFile: mainFile,
+        visibleFiles: ['/src/App.tsx', '/src/App.test.tsx'],
+        activeFile: '/src/App.tsx',
       }}
     >
       <SandpackLayout>
@@ -100,6 +69,7 @@ import './src/App.test.tsx';
             <div style={{ height: 160, borderBottom: '1px solid #e5e7eb', overflow: 'auto' }}>
               <SandpackConsole maxMessageCount={200} />
             </div>
+            {/* Single, built-in Run button lives here */}
             <div style={{ flex: 1 }}>
               <SandpackTests
                 showVerboseButton={false}
