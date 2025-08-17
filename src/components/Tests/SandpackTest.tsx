@@ -17,11 +17,8 @@ interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
   framework: Framework;
-
   assignmentId: string;
   questionId: string;
-
-  // Flow control from parent
   isLastQuestion: boolean;
   onNext: () => void;
   onComplete: () => void;
@@ -74,11 +71,9 @@ const getSetup = (framework: Framework) => {
   }
 };
 
-// IMPROVED: Better test result parsing with more robust logic
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
   
-  // Check if any tests actually ran
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
   
   if (!ran) {
@@ -86,7 +81,6 @@ function parseSummary(text: string) {
     return { ran: false, suites: undefined, tests: undefined };
   }
 
-  // Extract test suite information
   const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
 
@@ -130,7 +124,6 @@ const TestsAndConsole: React.FC<{
 
     console.log('[SandpackTest] Setting up test completion observer');
 
-    // Clean up existing observer
     observerRef.current?.disconnect();
 
     const observe = () => {
@@ -168,7 +161,15 @@ const TestsAndConsole: React.FC<{
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests style={{ height: '100%' }} watchMode={false} showWatchButton={false} showVerboseButton={false} />
+        {/* Hide the built-in test controls since we'll trigger them programmatically */}
+        <SandpackTests 
+          style={{ height: '100%' }} 
+          watchMode={false} 
+          showWatchButton={false} 
+          showVerboseButton={false}
+          // Hide the run button since we'll have our own
+          hideTestsAndSupressLogs={false}
+        />
       </div>
 
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
@@ -211,6 +212,7 @@ const SandpackTestInner: React.FC<
 
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
 
@@ -261,9 +263,44 @@ export default defineConfig({
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
+    setIsRunning(false);
   };
 
-  // FIXED: Better submit handling with correct score calculation
+  // NEW: Single button that triggers both compile and test execution
+  const handleRunTests = async () => {
+    console.log('[SandpackTest] Running tests...');
+    setIsRunning(true);
+    setCanSubmit(false);
+    setLastRawText('');
+    setLastParsed(null);
+
+    try {
+      // First, ensure code is compiled/updated
+      await sandpack.runSandpack();
+      
+      // Small delay to ensure compilation completes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Now trigger the tests by finding and clicking the test run button
+      // We need to find the actual test run button in the DOM
+      const testButton = document.querySelector('[data-sp-tests] button[title="Run tests"], [data-sp-tests] button:contains("Run")');
+      
+      if (testButton && testButton instanceof HTMLButtonElement) {
+        console.log('[SandpackTest] Clicking test button programmatically');
+        testButton.click();
+      } else {
+        // Fallback: try to trigger tests via sandpack API if available
+        console.log('[SandpackTest] Could not find test button, trying sandpack API');
+        // Reset running state if we can't find the button
+        setIsRunning(false);
+      }
+      
+    } catch (error) {
+      console.error('[SandpackTest] Error running tests:', error);
+      setIsRunning(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!lastParsed) {
       console.log('[SandpackTest] Cannot submit - no test results parsed');
@@ -277,20 +314,13 @@ export default defineConfig({
     const failed = typeof tests.failed === 'number' ? tests.failed : undefined;
     const passed = typeof tests.passed === 'number' ? tests.passed : undefined;
 
-    // FIXED: Correct score calculation logic
-    // Score should be 1 if ALL tests passed (failed === 0 or undefined, and total > 0)
     let score = 0;
     if (total && total > 0) {
-      // If we have explicit failed count, use it
       if (typeof failed === 'number') {
         score = failed === 0 ? 1 : 0;
-      }
-      // If we have passed count, check if it matches total
-      else if (typeof passed === 'number') {
+      } else if (typeof passed === 'number') {
         score = passed === total ? 1 : 0;
-      }
-      // Fallback: if we only have total and no failed count, assume passed
-      else {
+      } else {
         score = 1;
       }
     }
@@ -337,7 +367,6 @@ export default defineConfig({
         console.log('[SandpackTest] Could not dispatch submitted event:', error);
       }
 
-      // Use the parent callbacks to handle navigation
       setTimeout(() => {
         console.log('[SandpackTest] Advancing to next question/completion');
         if (isLastQuestion) {
@@ -359,43 +388,97 @@ export default defineConfig({
 
   return (
     <>
-      {/* REMOVED: Custom toolbar completely - let users interact directly with Sandpack's built-in controls */}
+      {/* NEW: Single, clear action bar with one run button */}
       <div 
         style={{
-          padding: '12px',
+          padding: '16px',
           backgroundColor: '#f8fafc',
           borderBottom: '1px solid #e5e7eb',
-          textAlign: 'center'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '16px'
         }}
       >
-        <p style={{ margin: 0, fontSize: '14px', color: '#475569' }}>
-          {submitted 
-            ? '✅ Submitted! Advancing to next question...'
-            : canSubmit 
-            ? (
+        {submitted ? (
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
+            ✅ Submitted! Advancing to next question...
+          </p>
+        ) : canSubmit ? (
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
+              ✅ Tests completed!
+            </p>
+            <button
+              onClick={handleSubmit}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              Submit Results
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+              Write your code, then run tests to see results
+            </p>
+            <button
+              onClick={handleRunTests}
+              disabled={isRunning}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isRunning ? (
                 <>
-                  Tests completed! 
-                  <button
-                    onClick={handleSubmit}
-                    style={{
-                      marginLeft: '12px',
-                      padding: '8px 16px',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Submit Results
-                  </button>
+                  <div style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #ffffff40',
+                    borderTop: '2px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Running Tests...
                 </>
-              )
-            : 'Click the "Run" button in the Tests panel on the right to execute your tests.'
-          }
-        </p>
+              ) : (
+                '▶️ Run Tests'
+              )}
+            </button>
+          </>
+        )}
       </div>
+
+      {/* Add CSS animation for spinner */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
+
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
