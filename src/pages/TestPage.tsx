@@ -173,17 +173,35 @@ const TestPage: React.FC = () => {
         }
     };
 
-    const handleNextQuestion = () => {
+    // FIXED: Proper next question handler that works for both Sandpack and Judge0
+    const handleNextQuestion = useCallback(() => {
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
             // Test completed
-            setIsCompleted(true);
-            setTimeout(() => {
-                navigate('/developer');
-            }, 3000);
+            handleTestComplete();
         }
-    };
+    }, [currentQuestionIndex, questions.length]);
+
+    // FIXED: Separate test completion handler
+    const handleTestComplete = useCallback(async () => {
+        // Mark assignment as completed
+        if (assignmentId) {
+            try {
+                await supabase
+                    .from('test_assignments')
+                    .update({ status: 'Completed' })
+                    .eq('id', assignmentId);
+            } catch (error) {
+                console.error('Error updating assignment status:', error);
+            }
+        }
+        
+        setIsCompleted(true);
+        setTimeout(() => {
+            navigate('/developer?tab=tests');
+        }, 3000);
+    }, [assignmentId, navigate]);
 
     if (isLoading) {
         return (
@@ -229,6 +247,15 @@ const TestPage: React.FC = () => {
                     <h2 className="text-xl font-semibold mb-2">{currentQuestion.title}</h2>
                     <p className="mb-4">{currentQuestion.question_text}</p>
                     
+                    <div className="mb-4 p-3 bg-gray-100 rounded-md">
+                        <p className="text-sm text-gray-600">
+                            Question {currentQuestionIndex + 1} of {questions.length}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Language: {currentQuestion.language}
+                        </p>
+                    </div>
+                    
                     {currentQuestion.expected_output && (
                         <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
                             <h3 className="font-semibold text-blue-800 mb-2">Expected Behavior/Output:</h3>
@@ -237,12 +264,14 @@ const TestPage: React.FC = () => {
                     )}
                     
                     <SandpackTest
-                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'angular' | 'javascript'}
+                        framework={currentQuestion.language.toLowerCase() as 'react' | 'vue' | 'javascript'}
                         starterCode={currentQuestion.starter_code || ''}
                         testCode={currentQuestion.test_code}
                         assignmentId={assignmentId!}
                         questionId={currentQuestion.id}
-                        onTestComplete={handleNextQuestion}
+                        isLastQuestion={currentQuestionIndex === questions.length - 1}
+                        onNext={handleNextQuestion}
+                        onComplete={handleTestComplete}
                     />
                 </div>
             </div>
