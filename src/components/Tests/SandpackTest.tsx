@@ -73,15 +73,18 @@ const getSetup = (framework: Framework) => {
 
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
-  
+
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
-  
+
   if (!ran) {
     console.log('[SandpackTest] No test indicators found in output');
     return { ran: false, suites: undefined, tests: undefined };
   }
 
-  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
+  const suitesLine =
+    text.match(/Test suites?:([^\n]+)/i)?.[1] ??
+    text.match(/Test files?:([^\n]+)/i)?.[1] ??
+    '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
 
   console.log('[SandpackTest] Extracted lines - suites:', suitesLine, 'tests:', testsLine);
@@ -115,7 +118,8 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-}> = ({ testsRootRef, onTestsComplete }) => {
+  rerunKey: number;
+}> = ({ testsRootRef, onTestsComplete, rerunKey }) => {
   const observerRef = useRef<MutationObserver | null>(null);
 
   useEffect(() => {
@@ -129,11 +133,10 @@ const TestsAndConsole: React.FC<{
     const observe = () => {
       const obs = new MutationObserver(() => {
         const text = root.textContent || '';
-        
         if (!text) return;
-        
+
         const parsed = parseSummary(text);
-        
+
         if (parsed.ran) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
           onTestsComplete(text, parsed);
@@ -141,11 +144,11 @@ const TestsAndConsole: React.FC<{
           observerRef.current = null;
         }
       });
-      
-      obs.observe(root, { 
-        childList: true, 
-        subtree: true, 
-        characterData: true
+
+      obs.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
       });
       observerRef.current = obs;
     };
@@ -156,19 +159,18 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, rerunKey]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        {/* Hide the built-in test controls since we'll trigger them programmatically */}
-        <SandpackTests 
-          style={{ height: '100%' }} 
-          watchMode={false} 
-          showWatchButton={false} 
+        {/* Remount SandpackTests on rerunKey to trigger a fresh run */}
+        <SandpackTests
+          key={rerunKey}
+          style={{ height: '100%' }}
+          watchMode={false}
+          showWatchButton={false}
           showVerboseButton={false}
-          // Hide the run button since we'll have our own
-          hideTestsAndSupressLogs={false}
         />
       </div>
 
@@ -179,7 +181,8 @@ const TestsAndConsole: React.FC<{
           standalone
           style={{
             height: '100%',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
           }}
         />
@@ -205,9 +208,6 @@ const SandpackTestInner: React.FC<
     isLastQuestion,
     onNext,
     onComplete,
-    template,
-    codeFile,
-    testFile,
   } = props;
 
   const [canSubmit, setCanSubmit] = useState(false);
@@ -215,76 +215,10 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
+  const [rerunKey, setRerunKey] = useState(0); // force remount of SandpackTests to trigger run
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
-
-  const files = useMemo<SandpackFiles>(() => {
-    if (!testCode) return {};
-    
-    const baseFiles = {
-      [codeFile]: { code: starterCode ?? '', active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
-      '/vitest.config.ts': {
-        code: `
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./setupTests.ts'],
-  },
-});
-        `.trim(),
-        hidden: true,
-      },
-      '/setupTests.ts': {
-        code: `import '@testing-library/jest-dom';`,
-        hidden: true,
-      },
-      '/package.json': {
-        code: JSON.stringify(
-          {
-            name: 'sandpack-tests',
-            version: '1.0.0',
-            private: true,
-            scripts: { test: 'vitest run --reporter=basic' },
-          },
-          null,
-          2
-        ),
-        hidden: true,
-      },
-    };
-
-    // Add Vue-specific entry files for vue3 template
-    if (framework === 'vue') {
-      baseFiles['/index.html'] = {
-        code: `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Vue 3 App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>`,
-        hidden: true,
-      };
-      
-      baseFiles['/src/main.js'] = {
-        code: `import { createApp } from 'vue';
-import App from './App.vue';
-createApp(App).mount('#app');`,
-        hidden: true,
-      };
-    }
-
-    return baseFiles;
-  }, [starterCode, testCode, codeFile, testFile, framework]);
 
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
@@ -295,7 +229,7 @@ createApp(App).mount('#app');`,
     setIsRunning(false);
   };
 
-  // NEW: Single button that triggers both compile and test execution
+  // Run tests without querying DOM buttons; rely on remount-triggered autorun inside SandpackTests
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -304,107 +238,19 @@ createApp(App).mount('#app');`,
     setLastParsed(null);
 
     try {
-      // First, ensure code is compiled/updated
+      // Ensure sandpack compiles latest code
       await sandpack.runSandpack();
-      
-      // Wait a bit longer for Sandpack to fully initialize
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      let testButton = null;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      // Keep trying to find the test button for up to 5 seconds
-      while (!testButton && attempts < maxAttempts) {
-        attempts++;
-        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
-        
-        // Method 1: More comprehensive selectors
-        const selectors = [
-          'button[title*="Run"]',
-          'button[aria-label*="Run"]',
-          'button[aria-label*="run"]',
-          'button[title*="run"]',
-          '[data-sp-tests] button',
-          '.sp-tests button',
-          '.sp-test button',
-          'button[data-testid*="run"]',
-          'button[class*="run"]',
-          'button[class*="test"]'
-        ];
-        
-        for (const selector of selectors) {
-          try {
-            const buttons = document.querySelectorAll(selector);
-            for (const btn of buttons) {
-              if (btn instanceof HTMLButtonElement && !btn.disabled) {
-                // Check if this button is in the test area
-                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-                if (parentClasses) {
-                  testButton = btn;
-                  console.log('[SandpackTest] Found test button with selector:', selector);
-                  break;
-                }
-              }
-            }
-            if (testButton) break;
-          } catch (e) {
-            // Invalid selector, continue
-          }
+      // Give a brief delay for bundler to settle, then remount tests to auto-run
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setRerunKey((k) => k + 1);
+
+      // Safety timeout to avoid indefinite "running" state
+      setTimeout(() => {
+        if (!canSubmit) {
+          console.log('[SandpackTest] Tests seem stuck, resetting running state');
+          setIsRunning(false);
         }
-        
-        // Method 2: Look for play button or run button by content and SVG
-        if (!testButton) {
-          const allButtons = document.querySelectorAll('button');
-          for (const button of allButtons) {
-            // Check for play icon (triangle/arrow) or run text
-            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
-            const text = button.textContent?.toLowerCase() || '';
-            const title = button.title?.toLowerCase() || '';
-            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-            
-            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-            
-            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
-              testButton = button;
-              console.log('[SandpackTest] Found test button by content/icon');
-              break;
-            }
-          }
-        }
-        
-        if (!testButton) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-      if (testButton && testButton instanceof HTMLButtonElement) {
-        console.log('[SandpackTest] Clicking test button programmatically');
-        
-        // Try multiple ways to trigger the button
-        testButton.focus();
-        testButton.click();
-        
-        // Also try dispatching events
-        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        
-        // Set a timeout to reset running state if tests don't complete
-        setTimeout(() => {
-          console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit) {
-            console.log('[SandpackTest] Tests seem stuck, resetting state');
-            setIsRunning(false);
-          }
-        }, 15000); // 15 second timeout
-        
-      } else {
-        console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
-        setIsRunning(false);
-      }
-      
+      }, 20000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
@@ -439,7 +285,7 @@ createApp(App).mount('#app');`,
       total,
       passed,
       failed,
-      calculatedScore: score
+      calculatedScore: score,
     });
 
     try {
@@ -485,7 +331,6 @@ createApp(App).mount('#app');`,
           onNext();
         }
       }, 2000);
-
     } catch (err) {
       console.error('[SandpackTest] submit exception', err);
       alert('Unexpected error during submit.');
@@ -498,8 +343,8 @@ createApp(App).mount('#app');`,
 
   return (
     <>
-      {/* NEW: Single, clear action bar with one run button */}
-      <div 
+      {/* Action bar */}
+      <div
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
@@ -507,7 +352,7 @@ createApp(App).mount('#app');`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px'
+          gap: '16px',
         }}
       >
         {submitted ? (
@@ -516,9 +361,7 @@ createApp(App).mount('#app');`,
           </p>
         ) : canSubmit ? (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-              ✅ Tests completed!
-            </p>
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>✅ Tests completed!</p>
             <button
               onClick={handleSubmit}
               style={{
@@ -530,7 +373,7 @@ createApp(App).mount('#app');`,
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
               }}
             >
               Submit Results
@@ -538,9 +381,7 @@ createApp(App).mount('#app');`,
           </>
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-              Write your code, then run tests to see results
-            </p>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run tests to see results</p>
             <button
               onClick={handleRunTests}
               disabled={isRunning}
@@ -556,19 +397,21 @@ createApp(App).mount('#app');`,
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
               }}
             >
               {isRunning ? (
                 <>
-                  <div style={{ 
-                    width: '16px', 
-                    height: '16px', 
-                    border: '2px solid #ffffff40',
-                    borderTop: '2px solid #ffffff',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid #ffffff40',
+                      borderTop: '2px solid #ffffff',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }}
+                  />
                   Running Tests...
                 </>
               ) : (
@@ -579,7 +422,7 @@ createApp(App).mount('#app');`,
         )}
       </div>
 
-      {/* Add CSS animation for spinner */}
+      {/* Spinner animation */}
       <style>
         {`
           @keyframes spin {
@@ -592,7 +435,7 @@ createApp(App).mount('#app');`,
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} rerunKey={rerunKey} />
         </SandpackLayout>
       </div>
     </>
@@ -604,23 +447,36 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
 
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
-    
-    const baseFiles = {
+
+    const baseFiles: SandpackFiles = {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
+
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./setupTests.ts'],
+  },
 });
         `.trim(),
         hidden: true,
       },
-      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
+      '/setupTests.ts': {
+        code: `import '@testing-library/jest-dom';`,
+        hidden: true,
+      },
       '/package.json': {
         code: JSON.stringify(
-          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
+          {
+            name: 'sandpack-tests',
+            version: '1.0.0',
+            private: true,
+            scripts: { test: 'vitest run --reporter=basic' },
+          },
           null,
           2
         ),
@@ -628,7 +484,7 @@ export default defineConfig({
       },
     };
 
-    // Add Vue-specific entry files for vue3 template
+    // Vue 3 template requires index.html + src/main.js to load as ESM
     if (props.framework === 'vue') {
       baseFiles['/index.html'] = {
         code: `<!doctype html>
@@ -645,7 +501,7 @@ export default defineConfig({
 </html>`,
         hidden: true,
       };
-      
+
       baseFiles['/src/main.js'] = {
         code: `import { createApp } from 'vue';
 import App from './App.vue';
@@ -668,7 +524,7 @@ createApp(App).mount('#app');`,
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false,
+        autorun: false, // we trigger builds/tests from the Run Tests button
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
