@@ -8,14 +8,7 @@ import {
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
-// import { supabase } from '../../lib/supabase';
-
-// Mock supabase for testing
-const supabase = {
-  from: () => ({
-    upsert: () => ({ error: null })
-  })
-};
+import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'vanilla';
 
@@ -208,7 +201,10 @@ const TestsAndConsole: React.FC<{
       <style>{`
         .gt-sp .sp-test-actions button,
         .gt-sp [data-testid="test-actions"] button,
-        .gt-sp [class*="sp-preview-actions"] button {
+        .gt-sp [class*="sp-preview-actions"] button,
+        .gt-sp .sp-button,
+        .gt-sp .sp-icon-standalone,
+        .gt-sp .sp-code-editor button {
           display: none !important;
         }
       `}</style>
