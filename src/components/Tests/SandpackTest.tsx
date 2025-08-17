@@ -41,8 +41,9 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
+      // Use 'vue' template (older Sandpack), but run Vue 3 by overriding index.html + src/main.js
       return {
-        template: 'vue3' as SandpackProviderProps['template'],
+        template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -72,14 +73,8 @@ const getSetup = (framework: Framework) => {
 };
 
 function parseSummary(text: string) {
-  console.log('[SandpackTest] Parsing test output:', text);
-
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
-
-  if (!ran) {
-    console.log('[SandpackTest] No test indicators found in output');
-    return { ran: false, suites: undefined, tests: undefined };
-  }
+  if (!ran) return { ran: false, suites: undefined, tests: undefined };
 
   const suitesLine =
     text.match(/Test suites?:([^\n]+)/i)?.[1] ??
@@ -87,12 +82,10 @@ function parseSummary(text: string) {
     '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
 
-  console.log('[SandpackTest] Extracted lines - suites:', suitesLine, 'tests:', testsLine);
-
   const num = (re: RegExp, s: string) => {
     const m = s.match(re);
     return m ? Number(m[1]) : undefined;
-  };
+    };
 
   const suites = suitesLine
     ? {
@@ -110,9 +103,7 @@ function parseSummary(text: string) {
       }
     : undefined;
 
-  const result = { ran, suites, tests };
-  console.log('[SandpackTest] Parsed result:', result);
-  return result;
+  return { ran, suites, tests };
 }
 
 const TestsAndConsole: React.FC<{
@@ -126,34 +117,21 @@ const TestsAndConsole: React.FC<{
     const root = testsRootRef.current;
     if (!root) return;
 
-    console.log('[SandpackTest] Setting up test completion observer');
-
     observerRef.current?.disconnect();
 
-    const observe = () => {
-      const obs = new MutationObserver(() => {
-        const text = root.textContent || '';
-        if (!text) return;
+    const obs = new MutationObserver(() => {
+      const text = root.textContent || '';
+      if (!text) return;
+      const parsed = parseSummary(text);
+      if (parsed.ran) {
+        onTestsComplete(text, parsed);
+        obs.disconnect();
+        observerRef.current = null;
+      }
+    });
 
-        const parsed = parseSummary(text);
-
-        if (parsed.ran) {
-          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
-          onTestsComplete(text, parsed);
-          obs.disconnect();
-          observerRef.current = null;
-        }
-      });
-
-      obs.observe(root, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
-      observerRef.current = obs;
-    };
-
-    observe();
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
+    observerRef.current = obs;
 
     return () => {
       observerRef.current?.disconnect();
@@ -164,7 +142,6 @@ const TestsAndConsole: React.FC<{
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        {/* Remount SandpackTests on rerunKey to trigger a fresh run */}
         <SandpackTests
           key={rerunKey}
           style={{ height: '100%' }}
@@ -173,7 +150,6 @@ const TestsAndConsole: React.FC<{
           showVerboseButton={false}
         />
       </div>
-
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
         <SandpackConsole
           maxMessageCount={200}
@@ -202,7 +178,6 @@ const SandpackTestInner: React.FC<
   const {
     starterCode,
     testCode,
-    framework,
     assignmentId,
     questionId,
     isLastQuestion,
@@ -215,41 +190,30 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
-  const [rerunKey, setRerunKey] = useState(0); // force remount of SandpackTests to trigger run
+  const [rerunKey, setRerunKey] = useState(0);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
 
-  // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
-    console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
   };
 
-  // Run tests without querying DOM buttons; rely on remount-triggered autorun inside SandpackTests
   const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
 
     try {
-      // Ensure sandpack compiles latest code
       await sandpack.runSandpack();
-      // Give a brief delay for bundler to settle, then remount tests to auto-run
       await new Promise((resolve) => setTimeout(resolve, 500));
       setRerunKey((k) => k + 1);
-
-      // Safety timeout to avoid indefinite "running" state
       setTimeout(() => {
-        if (!canSubmit) {
-          console.log('[SandpackTest] Tests seem stuck, resetting running state');
-          setIsRunning(false);
-        }
+        if (!canSubmit) setIsRunning(false);
       }, 20000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
@@ -258,12 +222,7 @@ const SandpackTestInner: React.FC<
   };
 
   const handleSubmit = async () => {
-    if (!lastParsed) {
-      console.log('[SandpackTest] Cannot submit - no test results parsed');
-      return;
-    }
-
-    console.log('[SandpackTest] Submitting results:', lastParsed);
+    if (!lastParsed) return;
 
     const tests = lastParsed.tests || {};
     const total = typeof tests.total === 'number' ? tests.total : undefined;
@@ -272,69 +231,37 @@ const SandpackTestInner: React.FC<
 
     let score = 0;
     if (total && total > 0) {
-      if (typeof failed === 'number') {
-        score = failed === 0 ? 1 : 0;
-      } else if (typeof passed === 'number') {
-        score = passed === total ? 1 : 0;
-      } else {
-        score = 1;
-      }
+      if (typeof failed === 'number') score = failed === 0 ? 1 : 0;
+      else if (typeof passed === 'number') score = passed === total ? 1 : 0;
+      else score = 1;
     }
 
-    console.log('[SandpackTest] Score calculation:', {
-      total,
-      passed,
-      failed,
-      calculatedScore: score,
-    });
+    const { error: upsertError } = await supabase
+      .from('test_results')
+      .upsert(
+        {
+          assignment_id: assignmentId,
+          question_id: questionId,
+          score,
+          passed_test_cases: passed ?? null,
+          total_test_cases: total ?? null,
+          stdout: lastRawText,
+          stderr: '',
+        },
+        { onConflict: 'assignment_id,question_id' }
+      );
 
-    try {
-      const { error: upsertError } = await supabase
-        .from('test_results')
-        .upsert(
-          {
-            assignment_id: assignmentId,
-            question_id: questionId,
-            score,
-            passed_test_cases: passed ?? null,
-            total_test_cases: total ?? null,
-            stdout: lastRawText,
-            stderr: '',
-          },
-          { onConflict: 'assignment_id,question_id' }
-        );
-
-      if (upsertError) {
-        console.error('[SandpackTest] submit upsert error', upsertError);
-        alert('Failed to submit results. Please try again.');
-        return;
-      }
-
-      console.log('[SandpackTest] Successfully submitted results with score:', score);
-      setSubmitted(true);
-
-      try {
-        window.dispatchEvent(
-          new CustomEvent('sandpack:submitted', {
-            detail: { assignmentId, questionId, score, passed, failed, total, rawText: lastRawText },
-          })
-        );
-      } catch (error) {
-        console.log('[SandpackTest] Could not dispatch submitted event:', error);
-      }
-
-      setTimeout(() => {
-        console.log('[SandpackTest] Advancing to next question/completion');
-        if (isLastQuestion) {
-          onComplete();
-        } else {
-          onNext();
-        }
-      }, 2000);
-    } catch (err) {
-      console.error('[SandpackTest] submit exception', err);
-      alert('Unexpected error during submit.');
+    if (upsertError) {
+      console.error('[SandpackTest] submit upsert error', upsertError);
+      alert('Failed to submit results. Please try again.');
+      return;
     }
+
+    setSubmitted(true);
+    setTimeout(() => {
+      if (isLastQuestion) onComplete();
+      else onNext();
+    }, 2000);
   };
 
   if (!testCode) {
@@ -343,7 +270,6 @@ const SandpackTestInner: React.FC<
 
   return (
     <>
-      {/* Action bar */}
       <div
         style={{
           padding: '16px',
@@ -422,7 +348,6 @@ const SandpackTestInner: React.FC<
         )}
       </div>
 
-      {/* Spinner animation */}
       <style>
         {`
           @keyframes spin {
@@ -461,8 +386,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./setupTests.ts'],
   },
-});
-        `.trim(),
+});`.trim(),
         hidden: true,
       },
       '/setupTests.ts': {
@@ -484,7 +408,7 @@ export default defineConfig({
       },
     };
 
-    // Vue 3 template requires index.html + src/main.js to load as ESM
+    // Force an ES-module preview and Vue 3 bootstrap even on the legacy 'vue' template.
     if (props.framework === 'vue') {
       baseFiles['/index.html'] = {
         code: `<!doctype html>
@@ -500,12 +424,19 @@ export default defineConfig({
   </body>
 </html>`,
         hidden: true,
+        active: true,
       };
 
       baseFiles['/src/main.js'] = {
         code: `import { createApp } from 'vue';
 import App from './App.vue';
 createApp(App).mount('#app');`,
+        hidden: true,
+      };
+
+      // Neutralize any legacy root entry the 'vue' template may try to load.
+      baseFiles['/main.js'] = {
+        code: `// noop: prevent non-module script from importing ESM`,
         hidden: true,
       };
     }
@@ -524,7 +455,7 @@ createApp(App).mount('#app');`,
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false, // we trigger builds/tests from the Run Tests button
+        autorun: false,
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
