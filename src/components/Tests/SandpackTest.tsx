@@ -278,66 +278,101 @@ export default defineConfig({
       // First, ensure code is compiled/updated
       await sandpack.runSandpack();
       
-      // Small delay to ensure compilation completes
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait a bit longer for Sandpack to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Try different approaches to find and trigger the test button
       let testButton = null;
+      let attempts = 0;
+      const maxAttempts = 10;
       
-      // Method 1: Look for test run button by common selectors
-      const selectors = [
-        'button[title*="Run"]',
-        'button[aria-label*="Run"]', 
-        '[data-sp-tests] button',
-        '.sp-tests button',
-        'button:has([data-testid*="run"])',
-        'button[data-testid*="run"]'
-      ];
-      
-      for (const selector of selectors) {
-        try {
-          testButton = document.querySelector(selector);
-          if (testButton && !testButton.disabled) {
-            console.log('[SandpackTest] Found test button with selector:', selector);
-            break;
+      // Keep trying to find the test button for up to 5 seconds
+      while (!testButton && attempts < maxAttempts) {
+        attempts++;
+        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
+        
+        // Method 1: More comprehensive selectors
+        const selectors = [
+          'button[title*="Run"]',
+          'button[aria-label*="Run"]',
+          'button[aria-label*="run"]',
+          'button[title*="run"]',
+          '[data-sp-tests] button',
+          '.sp-tests button',
+          '.sp-test button',
+          'button[data-testid*="run"]',
+          'button[class*="run"]',
+          'button[class*="test"]'
+        ];
+        
+        for (const selector of selectors) {
+          try {
+            const buttons = document.querySelectorAll(selector);
+            for (const btn of buttons) {
+              if (btn instanceof HTMLButtonElement && !btn.disabled) {
+                // Check if this button is in the test area
+                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+                if (parentClasses) {
+                  testButton = btn;
+                  console.log('[SandpackTest] Found test button with selector:', selector);
+                  break;
+                }
+              }
+            }
+            if (testButton) break;
+          } catch (e) {
+            // Invalid selector, continue
           }
-        } catch (e) {
-          // Invalid selector, continue
         }
-      }
-      
-      // Method 2: Look for buttons containing "Run" text
-      if (!testButton) {
-        const allButtons = document.querySelectorAll('button');
-        for (const button of allButtons) {
-          const text = button.textContent?.toLowerCase() || '';
-          const title = button.title?.toLowerCase() || '';
-          const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-          
-          if ((text.includes('run') || title.includes('run') || ariaLabel.includes('run')) && 
-              !button.disabled && 
-              button.closest('[class*="test"]')) {
-            testButton = button;
-            console.log('[SandpackTest] Found test button by text content');
-            break;
+        
+        // Method 2: Look for play button or run button by content and SVG
+        if (!testButton) {
+          const allButtons = document.querySelectorAll('button');
+          for (const button of allButtons) {
+            // Check for play icon (triangle/arrow) or run text
+            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
+            const text = button.textContent?.toLowerCase() || '';
+            const title = button.title?.toLowerCase() || '';
+            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+            
+            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+            
+            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
+              testButton = button;
+              console.log('[SandpackTest] Found test button by content/icon');
+              break;
+            }
           }
+        }
+        
+        if (!testButton) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
       if (testButton && testButton instanceof HTMLButtonElement) {
         console.log('[SandpackTest] Clicking test button programmatically');
+        
+        // Try multiple ways to trigger the button
+        testButton.focus();
         testButton.click();
+        
+        // Also try dispatching events
+        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
-          if (isRunning && !canSubmit) {
+          console.log('[SandpackTest] Checking if tests completed...');
+          if (!canSubmit) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
-        }, 10000); // 10 second timeout
+        }, 15000); // 15 second timeout
         
       } else {
-        console.log('[SandpackTest] Could not find test button, resetting state');
+        console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
         setIsRunning(false);
       }
       
