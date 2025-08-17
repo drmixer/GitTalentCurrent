@@ -21,14 +21,10 @@ interface SandpackTestProps {
   assignmentId: string;
   questionId: string;
 
-  // Flow control from parent
-  isLastQuestion?: boolean;
-  onNext?: () => void;
-  onComplete?: () => void;
-
-  // Fallback routes if no callbacks
-  completionUrl?: string; // default: /tests/completed
-  dashboardUrl?: string;  // default: /dashboard
+  // Flow control from parent - MODIFIED to be required callbacks
+  isLastQuestion: boolean;
+  onNext: () => void;
+  onComplete: () => void;
 }
 
 const getSetup = (framework: Framework) => {
@@ -168,7 +164,7 @@ const Toolbar: React.FC<{
 
       <div style={{ fontSize: 12, color: '#475569' }}>
         {submitted
-          ? 'Submitted.'
+          ? 'Submitted. Advancing to next question...'
           : canSubmit
           ? 'Run complete. You can submit.'
           : isRunning
@@ -223,8 +219,6 @@ const SandpackTestInner: React.FC<
     isLastQuestion,
     onNext,
     onComplete,
-    completionUrl = '/tests/completed',
-    dashboardUrl = '/dashboard',
     template,
     codeFile,
     testFile,
@@ -439,33 +433,15 @@ export default defineConfig({
         );
       } catch {}
 
-      // Advance
-      if (isLastQuestion) {
-        if (typeof onComplete === 'function') {
+      // FIXED: Use the parent callbacks to handle navigation
+      setTimeout(() => {
+        if (isLastQuestion) {
           onComplete();
         } else {
-          const doneUrl = props.completionUrl || '/tests/completed';
-          const dashUrl = props.dashboardUrl || '/dashboard';
-          try {
-            window.history.pushState({}, '', doneUrl);
-          } catch {
-            window.location.assign(doneUrl);
-          }
-          setTimeout(() => {
-            try {
-              window.location.assign(dashUrl);
-            } catch {}
-          }, 1500);
-        }
-      } else {
-        if (typeof onNext === 'function') {
           onNext();
-        } else {
-          try {
-            window.dispatchEvent(new CustomEvent('sandpack:next', { detail: { assignmentId, questionId } }));
-          } catch {}
         }
-      }
+      }, 2000); // Give user a moment to see the "Submitted" state
+
     } catch (err) {
       console.error('[SandpackTest] submit exception', err);
       alert('Unexpected error during submit.');
