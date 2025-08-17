@@ -279,19 +279,65 @@ export default defineConfig({
       await sandpack.runSandpack();
       
       // Small delay to ensure compilation completes
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Now trigger the tests by finding and clicking the test run button
-      // We need to find the actual test run button in the DOM
-      const testButton = document.querySelector('[data-sp-tests] button[title="Run tests"], [data-sp-tests] button:contains("Run")');
+      // Try different approaches to find and trigger the test button
+      let testButton = null;
+      
+      // Method 1: Look for test run button by common selectors
+      const selectors = [
+        'button[title*="Run"]',
+        'button[aria-label*="Run"]', 
+        '[data-sp-tests] button',
+        '.sp-tests button',
+        'button:has([data-testid*="run"])',
+        'button[data-testid*="run"]'
+      ];
+      
+      for (const selector of selectors) {
+        try {
+          testButton = document.querySelector(selector);
+          if (testButton && !testButton.disabled) {
+            console.log('[SandpackTest] Found test button with selector:', selector);
+            break;
+          }
+        } catch (e) {
+          // Invalid selector, continue
+        }
+      }
+      
+      // Method 2: Look for buttons containing "Run" text
+      if (!testButton) {
+        const allButtons = document.querySelectorAll('button');
+        for (const button of allButtons) {
+          const text = button.textContent?.toLowerCase() || '';
+          const title = button.title?.toLowerCase() || '';
+          const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+          
+          if ((text.includes('run') || title.includes('run') || ariaLabel.includes('run')) && 
+              !button.disabled && 
+              button.closest('[class*="test"]')) {
+            testButton = button;
+            console.log('[SandpackTest] Found test button by text content');
+            break;
+          }
+        }
+      }
       
       if (testButton && testButton instanceof HTMLButtonElement) {
         console.log('[SandpackTest] Clicking test button programmatically');
         testButton.click();
+        
+        // Set a timeout to reset running state if tests don't complete
+        setTimeout(() => {
+          if (isRunning && !canSubmit) {
+            console.log('[SandpackTest] Tests seem stuck, resetting state');
+            setIsRunning(false);
+          }
+        }, 10000); // 10 second timeout
+        
       } else {
-        // Fallback: try to trigger tests via sandpack API if available
-        console.log('[SandpackTest] Could not find test button, trying sandpack API');
-        // Reset running state if we can't find the button
+        console.log('[SandpackTest] Could not find test button, resetting state');
         setIsRunning(false);
       }
       
