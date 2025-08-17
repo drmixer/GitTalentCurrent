@@ -6,32 +6,29 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
+  type SandpackFiles,
+  type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
-import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
-type Framework = 'react' | 'vue' | 'vanilla';
+type Framework = 'react' | 'vue' | 'javascript';
 
 interface SandpackTestProps {
-  // Code the candidate edits
   starterCode: string;
-  // Tests for this question
   testCode: string | null | undefined;
-  // Which stack to run for this question
-  framework: Framework; // react (TS), vue (Vue 3), vanilla (TS)
+  framework: Framework;
 
-  // IDs for persistence
   assignmentId: string;
   questionId: string;
 
-  // Navigation and flow
+  // Flow control from parent
   isLastQuestion?: boolean;
-  onNext?: () => void;       // called after successful submit when not last
-  onComplete?: () => void;   // called after successful submit when last
+  onNext?: () => void;
+  onComplete?: () => void;
 
-  // Optional route fallbacks if no callbacks wired
-  completionUrl?: string;    // default '/tests/completed'
-  dashboardUrl?: string;     // default '/dashboard'
+  // Fallback routes if no callbacks
+  completionUrl?: string; // default: /tests/completed
+  dashboardUrl?: string;  // default: /dashboard
 }
 
 const getSetup = (framework: Framework) => {
@@ -65,7 +62,8 @@ const getSetup = (framework: Framework) => {
           vitest: '^0.34.6',
         },
       };
-    case 'vanilla':
+    case 'javascript':
+    default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
         codeFile: '/src/index.ts',
@@ -77,38 +75,23 @@ const getSetup = (framework: Framework) => {
           vitest: '^0.34.6',
         },
       };
-    default:
-      return {
-        template: 'react-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/App.tsx',
-        testFile: '/src/App.test.tsx',
-        deps: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
-        },
-      };
   }
 };
 
-// Parse a jest/vitest-style summary from the Tests panel text.
+// Parse a jest/vitest style summary so we can enable Submit after any run.
 function parseSummary(text: string) {
-  // Recognize Vitest's "Test Files:" and Jest's "Test Suites:" plus "Tests:"
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
 
   const suitesLine =
     text.match(/Test suites?:([^\n]+)/i)?.[1] ??
-    text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
+    text.match(/Test files?:([^\n]+)/i)?.[1] ??
+    '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
 
   const num = (re: RegExp, s: string) => {
     const m = s.match(re);
     return m ? Number(m[1]) : undefined;
-  };
-
+    };
   const suites = suitesLine
     ? {
         passed: num(/(\d+)\s*passed/i, suitesLine),
@@ -201,14 +184,9 @@ const TestsAndConsole: React.FC<{
 }> = ({ testsRootRef }) => {
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-      {/* Keep built-in controls visible */}
+      {/* Keep built-in Test controls visible */}
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests
-          style={{ height: '100%' }}
-          watchMode={false}
-          showWatchButton={false}
-          showVerboseButton={false}
-        />
+        <SandpackTests style={{ height: '100%' }} watchMode={false} showWatchButton={false} showVerboseButton={false} />
       </div>
 
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
@@ -258,21 +236,52 @@ const SandpackTestInner: React.FC<
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
 
+  const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const runTimerRef = useRef<number | null>(null);
+  const autoClickIntervalRef = useRef<number | null>(null);
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
     return {
       [codeFile]: { code: starterCode ?? '', active: true },
       [testFile]: { code: testCode ?? '', hidden: false },
+      // Provide vitest config + setup to ensure jsdom/jest-dom in most templates
+      '/vitest.config.ts': {
+        code: `
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./setupTests.ts'],
+  },
+});
+        `.trim(),
+        hidden: true,
+      },
+      '/setupTests.ts': {
+        code: `import '@testing-library/jest-dom';`,
+        hidden: true,
+      },
+      '/package.json': {
+        code: JSON.stringify(
+          {
+            name: 'sandpack-tests',
+            version: '1.0.0',
+            private: true,
+            scripts: { test: 'vitest run --reporter=basic' },
+          },
+          null,
+          2
+        ),
+        hidden: true,
+      },
     };
   }, [starterCode, testCode, codeFile, testFile]);
 
-  const { sandpack } = useSandpack();
-
-  // Detect the first summary after a run; then enable submit.
+  // Observe test panel for summary and enable submit when any run completes
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
@@ -285,35 +294,34 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     observerRef.current?.disconnect();
+    if (autoClickIntervalRef.current) {
+      window.clearInterval(autoClickIntervalRef.current);
+      autoClickIntervalRef.current = null;
+    }
 
-    const check = () => {
-      const text = root.textContent || '';
-      if (!text || text === lastRawText) return;
-
-      setLastRawText(text);
-      const parsed = parseSummary(text);
-      setLastParsed(parsed);
-
-      if (parsed.ran) {
-        setCanSubmit(true);
-        // Stop the "running" state
-        if (runTimerRef.current) {
-          window.clearTimeout(runTimerRef.current);
-          runTimerRef.current = null;
+    const observe = () => {
+      const obs = new MutationObserver(() => {
+        const text = root.textContent || '';
+        if (!text) return;
+        setLastRawText(text);
+        const parsed = parseSummary(text);
+        setLastParsed(parsed);
+        if (parsed.ran) {
+          setCanSubmit(true);
+          setIsRunning(false);
+          obs.disconnect();
+          observerRef.current = null;
+          if (autoClickIntervalRef.current) {
+            window.clearInterval(autoClickIntervalRef.current);
+            autoClickIntervalRef.current = null;
+          }
         }
-        setIsRunning(false);
-
-        // Disconnect to avoid further DOM churn
-        observerRef.current?.disconnect();
-        observerRef.current = null;
-      }
+      });
+      obs.observe(root, { childList: true, subtree: true, characterData: true });
+      observerRef.current = obs;
     };
 
-    const obs = new MutationObserver(() => {
-      window.requestAnimationFrame(check);
-    });
-    obs.observe(root, { childList: true, subtree: true, characterData: true });
-    observerRef.current = obs;
+    observe();
 
     return () => {
       observerRef.current?.disconnect();
@@ -322,85 +330,70 @@ const SandpackTestInner: React.FC<
         window.clearTimeout(runTimerRef.current);
         runTimerRef.current = null;
       }
+      if (autoClickIntervalRef.current) {
+        window.clearInterval(autoClickIntervalRef.current);
+        autoClickIntervalRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framework, codeFile, testFile, starterCode, testCode]);
 
-  const triggerTestsRun = () => {
+  const clickTestsRunIfPresent = () => {
     const host = testsRootRef.current;
     if (!host) return false;
-    // Support both data-testid and class-based selectors
-    const runBtn =
+    const btn =
       (host.querySelector('[data-testid="test-actions"] button') as HTMLButtonElement | null) ||
       (host.querySelector('.sp-test-actions button') as HTMLButtonElement | null);
-    if (runBtn) {
-      runBtn.click();
+    if (btn) {
+      btn.click();
       return true;
     }
     return false;
   };
 
+  const startAutoClickTestsRun = () => {
+    if (autoClickIntervalRef.current) {
+      window.clearInterval(autoClickIntervalRef.current);
+      autoClickIntervalRef.current = null;
+    }
+    let attempts = 0;
+    autoClickIntervalRef.current = window.setInterval(() => {
+      attempts += 1;
+      if (clickTestsRunIfPresent()) {
+        window.clearInterval(autoClickIntervalRef.current!);
+        autoClickIntervalRef.current = null;
+      } else if (attempts > 80) {
+        // stop after ~16s
+        window.clearInterval(autoClickIntervalRef.current!);
+        autoClickIntervalRef.current = null;
+      }
+    }, 200);
+  };
+
   const handleRun = () => {
-    // Reset submit gating and start the run
+    // Reset gating and start run
     setCanSubmit(false);
     setSubmitted(false);
     setIsRunning(true);
     setLastRawText('');
     setLastParsed(null);
 
-    console.log('[SandpackTest] handleRun: start', {
-      framework,
-      template,
-      codeFile,
-      testFile,
-    });
+    // Try to click Tests Run immediately if present
+    const triggered = clickTestsRunIfPresent();
 
-    observerRef.current?.disconnect();
-    observerRef.current = null;
-
-    // Re-attach observer for this run
-    const root = testsRootRef.current;
-    if (root) {
-      const obs = new MutationObserver(() => {
-        const text = root.textContent || '';
-        const parsed = parseSummary(text);
-        if (text) {
-          setLastRawText(text);
-          setLastParsed(parsed);
-        }
-        if (parsed.ran) {
-          setCanSubmit(true);
-          setIsRunning(false);
-          obs.disconnect();
-          observerRef.current = null;
-        }
-      });
-      obs.observe(root, { childList: true, subtree: true, characterData: true });
-      observerRef.current = obs;
-    }
-
-    // Prefer triggering the Tests panel's own Run button
-    const triggered = triggerTestsRun();
-    console.log('[SandpackTest] tests run button triggered =', triggered);
-
-    // Best-effort: also try dispatching a tests run message if available
+    // Also try internal dispatch if available
     try {
       (sandpack as any)?.dispatch?.({ type: 'run-tests' });
-      console.log('[SandpackTest] dispatched run-tests');
     } catch {
       // ignore
     }
 
-    // Fallback to restarting the sandbox (this re-bundles; may help kick the runner)
-    if (!triggered) {
-      console.log('[SandpackTest] fallback runSandpack()');
-      sandpack.runSandpack();
-    }
+    // Always re-bundle to ensure files are fresh; then auto-click when button mounts
+    sandpack.runSandpack();
+    startAutoClickTestsRun();
 
-    // Fallback to prevent stuck "Running…" state
+    // Safety fallback to exit "Running…" state
     runTimerRef.current = window.setTimeout(() => {
       setIsRunning(false);
-      console.warn('[SandpackTest] run timeout fallback fired');
     }, 15000);
   };
 
@@ -415,7 +408,6 @@ const SandpackTestInner: React.FC<
     const score = total && typeof failed === 'number' ? (failed === 0 && total > 0 ? 1 : 0) : 0;
 
     try {
-      // Persist to Supabase
       const { error: upsertError } = await supabase
         .from('test_results')
         .upsert(
@@ -426,13 +418,12 @@ const SandpackTestInner: React.FC<
             passed_test_cases: passed ?? null,
             total_test_cases: total ?? null,
             stdout: lastRawText,
-            stderr: '', // tests panel doesn't separate stderr; keep empty
+            stderr: '',
           },
           { onConflict: 'assignment_id,question_id' }
         );
 
       if (upsertError) {
-        // eslint-disable-next-line no-console
         console.error('[SandpackTest] submit upsert error', upsertError);
         alert('Failed to submit results. Please try again.');
         return;
@@ -440,31 +431,21 @@ const SandpackTestInner: React.FC<
 
       setSubmitted(true);
 
-      // Notify app-level listeners
       try {
         window.dispatchEvent(
           new CustomEvent('sandpack:submitted', {
-            detail: {
-              assignmentId,
-              questionId,
-              score,
-              passed,
-              failed,
-              total,
-              rawText: lastRawText,
-            },
+            detail: { assignmentId, questionId, score, passed, failed, total, rawText: lastRawText },
           })
         );
       } catch {}
 
-      // Navigate based on position in flow
+      // Advance
       if (isLastQuestion) {
         if (typeof onComplete === 'function') {
           onComplete();
         } else {
-          // Fallback: go to completion screen, then to dashboard
-          const doneUrl = completionUrl || '/tests/completed';
-          const dashUrl = dashboardUrl || '/dashboard';
+          const doneUrl = props.completionUrl || '/tests/completed';
+          const dashUrl = props.dashboardUrl || '/dashboard';
           try {
             window.history.pushState({}, '', doneUrl);
           } catch {
@@ -480,18 +461,12 @@ const SandpackTestInner: React.FC<
         if (typeof onNext === 'function') {
           onNext();
         } else {
-          // Fallback event for parent routers
           try {
-            window.dispatchEvent(
-              new CustomEvent('sandpack:next', {
-                detail: { assignmentId, questionId },
-              })
-            );
+            window.dispatchEvent(new CustomEvent('sandpack:next', { detail: { assignmentId, questionId } }));
           } catch {}
         }
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[SandpackTest] submit exception', err);
       alert('Unexpected error during submit.');
     }
@@ -503,19 +478,11 @@ const SandpackTestInner: React.FC<
 
   return (
     <>
-      <Toolbar
-        isRunning={isRunning}
-        canSubmit={canSubmit}
-        submitted={submitted}
-        onRun={handleRun}
-        onSubmit={handleSubmit}
-      />
-
+      <Toolbar isRunning={isRunning} canSubmit={canSubmit} submitted={submitted} onRun={handleRun} onSubmit={handleSubmit} />
       <div className="gt-sp">
         <SandpackLayout>
           {/* Editor */}
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-
           {/* Tests + Console */}
           <TestsAndConsole testsRootRef={testsRootRef} />
         </SandpackLayout>
@@ -524,45 +491,33 @@ const SandpackTestInner: React.FC<
   );
 };
 
-const VITEST_CONFIG = `
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./setupTests.ts'],
-  },
-});
-`.trim();
-
-const SETUP_TESTS = `
-import '@testing-library/jest-dom';
-`.trim();
-
-const PACKAGE_JSON = `
-{
-  "name": "sandpack-tests",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "test": "vitest run --reporter=basic"
-  }
-}
-`.trim();
-
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
-  // Inject vitest config and setup into the sandbox to ensure jsdom + jest-dom are active
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
-      '/vitest.config.ts': { code: VITEST_CONFIG, hidden: true },
-      '/setupTests.ts': { code: SETUP_TESTS, hidden: true },
-      '/package.json': { code: PACKAGE_JSON, hidden: true },
+      // vitest config + setup injected in inner component too (kept here for visibility)
+      '/vitest.config.ts': {
+        code: `
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
+});
+        `.trim(),
+        hidden: true,
+      },
+      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
+      '/package.json': {
+        code: JSON.stringify(
+          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
+          null,
+          2
+        ),
+        hidden: true,
+      },
     };
   }, [props.starterCode, props.testCode, codeFile, testFile]);
 
@@ -577,7 +532,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false, // only our Run button triggers execution
+        autorun: false,
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
