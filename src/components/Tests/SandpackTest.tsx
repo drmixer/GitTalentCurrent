@@ -14,7 +14,6 @@ interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
   framework: Framework; // react (TS), vue (Vue 3), vanilla (TS)
-  // Optional: receive raw summary text and parsed counts when user clicks Submit
   onSubmit?: (result: {
     ran: boolean;
     rawText: string;
@@ -82,8 +81,7 @@ const getSetup = (framework: Framework) => {
   }
 };
 
-// Parse a jest-style summary out of the Tests panel text.
-// We only need to know if a run finished; pass/fail is allowed for submit.
+// Parse a jest-style summary. We only need to know a run happened.
 function parseSummary(text: string) {
   const ran = /Test suites?:|Tests?:|No tests found/i.test(text);
 
@@ -118,8 +116,9 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
   const { template, codeFile, testFile, deps } = getSetup(framework);
 
   const [canSubmit, setCanSubmit] = useState(false);
-  const [lastText, setLastText] = useState('');
   const testsRootRef = useRef<HTMLDivElement>(null);
+  const didEnableSubmitRef = useRef(false); // prevents repeated state churn
+  const observerRef = useRef<MutationObserver | null>(null);
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
@@ -129,33 +128,40 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
     };
   }, [starterCode, testCode, codeFile, testFile]);
 
-  // Watch for a test summary to appear; enable Submit once a run finished (pass or fail).
+  // Watch for the first completed test run, then disconnect the observer.
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
 
+    // Reset state for this question/load
     setCanSubmit(false);
-    setLastText('');
+    didEnableSubmitRef.current = false;
 
     const check = () => {
+      if (didEnableSubmitRef.current) return;
       const text = root.textContent || '';
-      if (!text || text === lastText) return;
-
-      setLastText(text);
+      if (!text) return;
       const { ran } = parseSummary(text);
       if (ran) {
+        didEnableSubmitRef.current = true;
         setCanSubmit(true);
+        // Disconnect to stop further DOM churn and console spam
+        observerRef.current?.disconnect();
+        observerRef.current = null;
       }
     };
 
     const obs = new MutationObserver(() => {
-      // Batch DOM updates
+      // Throttle to next frame
       window.requestAnimationFrame(check);
     });
     obs.observe(root, { childList: true, subtree: true, characterData: true });
+    observerRef.current = obs;
 
-    return () => obs.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    };
   }, [framework, codeFile, testFile, starterCode, testCode]);
 
   if (!testCode) {
@@ -169,7 +175,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false,           // Only run when user clicks the built-in Run button
+        autorun: false,           // Only run when user clicks Run in the Tests panel
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
@@ -185,7 +191,7 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
 
         {/* Right: Tests + Console + Submit */}
         <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-          {/* Submit bar (keeps the built-in Run button untouched) */}
+          {/* Submit bar */}
           <div
             style={{
               display: 'flex',
@@ -221,9 +227,14 @@ const SandpackTest: React.FC<SandpackTestProps> = ({ starterCode, testCode, fram
             </button>
           </div>
 
-          {/* Tests panel with built-in Run button */}
+          {/* Tests panel; disable watch mode for stability/no re-runs */}
           <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-            <SandpackTests style={{ height: '100%' }} />
+            <SandpackTests
+              style={{ height: '100%' }}
+              watchMode={false}
+              showWatchButton={false}
+              showVerboseButton={false}
+            />
           </div>
 
           {/* Console */}
