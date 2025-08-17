@@ -93,11 +93,14 @@ const getSetup = (framework: Framework) => {
   }
 };
 
-// Parse a jest-style summary from the Tests panel text.
+// Parse a jest/vitest-style summary from the Tests panel text.
 function parseSummary(text: string) {
-  const ran = /Test suites?:|Tests?:|No tests found/i.test(text);
+  // Recognize Vitest's "Test Files:" and Jest's "Test Suites:" plus "Tests:"
+  const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
 
-  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? '';
+  const suitesLine =
+    text.match(/Test suites?:([^\n]+)/i)?.[1] ??
+    text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
 
   const num = (re: RegExp, s: string) => {
@@ -197,12 +200,10 @@ const TestsAndConsole: React.FC<{
 }> = ({ testsRootRef }) => {
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-      {/* Hide any built-in run/watch buttons so there is only one Run (ours) */}
+      {/* Hide preview/editor buttons to avoid duplicate controls,
+         but keep the Tests "Run" button visible so tests can actually execute */}
       <style>{`
-        .gt-sp .sp-test-actions button,
-        .gt-sp [data-testid="test-actions"] button,
         .gt-sp [class*="sp-preview-actions"] button,
-        .gt-sp .sp-button,
         .gt-sp .sp-icon-standalone,
         .gt-sp .sp-code-editor button {
           display: none !important;
@@ -334,6 +335,20 @@ const SandpackTestInner: React.FC<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framework, codeFile, testFile, starterCode, testCode]);
 
+  const triggerTestsRun = () => {
+    const host = testsRootRef.current;
+    if (!host) return false;
+    // Support both data-testid and class-based selectors
+    const runBtn =
+      (host.querySelector('[data-testid="test-actions"] button') as HTMLButtonElement | null) ||
+      (host.querySelector('.sp-test-actions button') as HTMLButtonElement | null);
+    if (runBtn) {
+      runBtn.click();
+      return true;
+    }
+    return false;
+  };
+
   const handleRun = () => {
     // Reset submit gating and start the run
     setCanSubmit(false);
@@ -366,8 +381,20 @@ const SandpackTestInner: React.FC<
       observerRef.current = obs;
     }
 
-    // Trigger Sandpack test run
-    sandpack.runSandpack();
+    // Prefer triggering the Tests panel's own Run button
+    const triggered = triggerTestsRun();
+
+    // Best-effort: also try dispatching a tests run message if available
+    try {
+      (sandpack as any)?.dispatch?.({ type: 'run-tests' });
+    } catch {
+      // ignore
+    }
+
+    // Fallback to restarting the sandbox
+    if (!triggered) {
+      sandpack.runSandpack();
+    }
 
     // Fallback to prevent stuck "Running…" state
     runTimerRef.current = window.setTimeout(() => {
