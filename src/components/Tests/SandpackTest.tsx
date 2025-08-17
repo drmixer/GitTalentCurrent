@@ -42,7 +42,7 @@ const getSetup = (framework: Framework) => {
       };
     case 'vue':
       return {
-        template: 'vue3' as SandpackProviderProps['template'],
+        template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -510,14 +510,14 @@ export default defineConfig({
         ) : (
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-              Write your code, then run tests to see results
+              Click the ▶️ "Run" button in the Tests panel on the right to execute your tests
             </p>
             <button
               onClick={handleRunTests}
               disabled={isRunning}
               style={{
                 padding: '10px 20px',
-                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                backgroundColor: isRunning ? '#94a3b8' : '#6366f1',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -540,10 +540,10 @@ export default defineConfig({
                     borderRadius: '50%',
                     animation: 'spin 1s linear infinite'
                   }} />
-                  Running Tests...
+                  Compiling Code...
                 </>
               ) : (
-                '▶️ Run Tests'
+                '🔧 Compile & Prepare'
               )}
             </button>
           </>
