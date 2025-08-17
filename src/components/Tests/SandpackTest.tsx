@@ -42,7 +42,7 @@ const getSetup = (framework: Framework) => {
       };
     case 'vue':
       return {
-        template: 'vue' as SandpackProviderProps['template'],
+        template: 'vue3' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -221,7 +221,8 @@ const SandpackTestInner: React.FC<
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
-    return {
+    
+    const baseFiles = {
       [codeFile]: { code: starterCode ?? '', active: true },
       [testFile]: { code: testCode ?? '', hidden: false },
       '/vitest.config.ts': {
@@ -255,7 +256,35 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [starterCode, testCode, codeFile, testFile]);
+
+    // Add Vue-specific entry files for vue3 template
+    if (framework === 'vue') {
+      baseFiles['/index.html'] = {
+        code: `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Vue 3 App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+        hidden: true,
+      };
+      
+      baseFiles['/src/main.js'] = {
+        code: `import { createApp } from 'vue';
+import App from './App.vue';
+createApp(App).mount('#app');`,
+        hidden: true,
+      };
+    }
+
+    return baseFiles;
+  }, [starterCode, testCode, codeFile, testFile, framework]);
 
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
@@ -575,7 +604,8 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
 
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
-    return {
+    
+    const baseFiles = {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
       '/vitest.config.ts': {
@@ -597,7 +627,35 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [props.starterCode, props.testCode, codeFile, testFile]);
+
+    // Add Vue-specific entry files for vue3 template
+    if (props.framework === 'vue') {
+      baseFiles['/index.html'] = {
+        code: `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Vue 3 App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+        hidden: true,
+      };
+      
+      baseFiles['/src/main.js'] = {
+        code: `import { createApp } from 'vue';
+import App from './App.vue';
+createApp(App).mount('#app');`,
+        hidden: true,
+      };
+    }
+
+    return baseFiles;
+  }, [props.starterCode, props.testCode, codeFile, testFile, props.framework]);
 
   if (!props.testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
