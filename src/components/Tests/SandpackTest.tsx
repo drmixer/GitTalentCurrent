@@ -41,7 +41,6 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' template (older Sandpack), but run Vue 3 by overriding index.html + src/main.js
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -85,7 +84,7 @@ function parseSummary(text: string) {
   const num = (re: RegExp, s: string) => {
     const m = s.match(re);
     return m ? Number(m[1]) : undefined;
-    };
+  };
 
   const suites = suitesLine
     ? {
@@ -408,35 +407,25 @@ export default defineConfig({
       },
     };
 
-    // Force an ES-module preview and Vue 3 bootstrap even on the legacy 'vue' template.
     if (props.framework === 'vue') {
+      // Prevent any preview script execution: no scripts in HTML, and both main files are no-ops.
       baseFiles['/index.html'] = {
         code: `<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Vue 3 App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Vue Sandbox</title></head>
+  <body><div id="app"></div></body>
 </html>`,
         hidden: true,
         active: true,
       };
 
-      baseFiles['/src/main.js'] = {
-        code: `import { createApp } from 'vue';
-import App from './App.vue';
-createApp(App).mount('#app');`,
+      baseFiles['/main.js'] = {
+        code: `// noop: neutralize legacy entry to avoid ESM import execution`,
         hidden: true,
       };
 
-      // Neutralize any legacy root entry the 'vue' template may try to load.
-      baseFiles['/main.js'] = {
-        code: `// noop: prevent non-module script from importing ESM`,
+      baseFiles['/src/main.js'] = {
+        code: `// noop: avoid "import outside module" if template tries to load src/main.js`,
         hidden: true,
       };
     }
