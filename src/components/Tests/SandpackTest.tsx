@@ -57,6 +57,7 @@ const getSetup = (framework: Framework) => {
         testFile: '/src/App.test.ts',
         deps: {
           vue: '^3.4.21',
+          '@vue/test-utils': '^2.4.5',
           '@testing-library/vue': '^8.0.3',
           '@testing-library/dom': '^9.3.4',
           '@testing-library/user-event': '^14.5.2',
@@ -200,16 +201,7 @@ const TestsAndConsole: React.FC<{
 }> = ({ testsRootRef }) => {
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-      {/* Hide preview/editor buttons to avoid duplicate controls,
-         but keep the Tests "Run" button visible so tests can actually execute */}
-      <style>{`
-        .gt-sp [class*="sp-preview-actions"] button,
-        .gt-sp .sp-icon-standalone,
-        .gt-sp .sp-code-editor button {
-          display: none !important;
-        }
-      `}</style>
-
+      {/* Keep built-in controls visible */}
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
         <SandpackTests
           style={{ height: '100%' }}
@@ -258,7 +250,6 @@ const SandpackTestInner: React.FC<
     template,
     codeFile,
     testFile,
-    deps,
   } = props;
 
   const [isRunning, setIsRunning] = useState(false);
@@ -357,6 +348,13 @@ const SandpackTestInner: React.FC<
     setLastRawText('');
     setLastParsed(null);
 
+    console.log('[SandpackTest] handleRun: start', {
+      framework,
+      template,
+      codeFile,
+      testFile,
+    });
+
     observerRef.current?.disconnect();
     observerRef.current = null;
 
@@ -383,22 +381,26 @@ const SandpackTestInner: React.FC<
 
     // Prefer triggering the Tests panel's own Run button
     const triggered = triggerTestsRun();
+    console.log('[SandpackTest] tests run button triggered =', triggered);
 
     // Best-effort: also try dispatching a tests run message if available
     try {
       (sandpack as any)?.dispatch?.({ type: 'run-tests' });
+      console.log('[SandpackTest] dispatched run-tests');
     } catch {
       // ignore
     }
 
-    // Fallback to restarting the sandbox
+    // Fallback to restarting the sandbox (this re-bundles; may help kick the runner)
     if (!triggered) {
+      console.log('[SandpackTest] fallback runSandpack()');
       sandpack.runSandpack();
     }
 
     // Fallback to prevent stuck "Running…" state
     runTimerRef.current = window.setTimeout(() => {
       setIsRunning(false);
+      console.warn('[SandpackTest] run timeout fallback fired');
     }, 15000);
   };
 
@@ -461,8 +463,8 @@ const SandpackTestInner: React.FC<
           onComplete();
         } else {
           // Fallback: go to completion screen, then to dashboard
-          const doneUrl = props.completionUrl || '/tests/completed';
-          const dashUrl = props.dashboardUrl || '/dashboard';
+          const doneUrl = completionUrl || '/tests/completed';
+          const dashUrl = dashboardUrl || '/dashboard';
           try {
             window.history.pushState({}, '', doneUrl);
           } catch {
@@ -522,14 +524,45 @@ const SandpackTestInner: React.FC<
   );
 };
 
+const VITEST_CONFIG = `
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./setupTests.ts'],
+  },
+});
+`.trim();
+
+const SETUP_TESTS = `
+import '@testing-library/jest-dom';
+`.trim();
+
+const PACKAGE_JSON = `
+{
+  "name": "sandpack-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run --reporter=basic"
+  }
+}
+`.trim();
+
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
+  // Inject vitest config and setup into the sandbox to ensure jsdom + jest-dom are active
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
+      '/vitest.config.ts': { code: VITEST_CONFIG, hidden: true },
+      '/setupTests.ts': { code: SETUP_TESTS, hidden: true },
+      '/package.json': { code: PACKAGE_JSON, hidden: true },
     };
   }, [props.starterCode, props.testCode, codeFile, testFile]);
 
