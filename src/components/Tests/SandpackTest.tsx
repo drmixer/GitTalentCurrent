@@ -8,7 +8,14 @@ import {
   useSandpack,
 } from '@codesandbox/sandpack-react';
 import type { SandpackFiles, SandpackProviderProps } from '@codesandbox/sandpack-react';
-import { supabase } from '../../lib/supabase';
+// import { supabase } from '../../lib/supabase';
+
+// Mock supabase for testing
+const supabase = {
+  from: () => ({
+    upsert: () => ({ error: null })
+  })
+};
 
 type Framework = 'react' | 'vue' | 'vanilla';
 
