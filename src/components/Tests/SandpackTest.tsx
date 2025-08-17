@@ -21,7 +21,7 @@ interface SandpackTestProps {
   assignmentId: string;
   questionId: string;
 
-  // Flow control from parent - MODIFIED to be required callbacks
+  // Flow control from parent
   isLastQuestion: boolean;
   onNext: () => void;
   onComplete: () => void;
@@ -234,7 +234,10 @@ const SandpackTestInner: React.FC<
   const testsRootRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const runTimerRef = useRef<number | null>(null);
-  const autoClickIntervalRef = useRef<number | null>(null);
+  const buttonClickIntervalRef = useRef<number | null>(null);
+
+  // Track if we've successfully found and clicked a test button
+  const [testButtonFound, setTestButtonFound] = useState(false);
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
@@ -286,28 +289,40 @@ export default defineConfig({
     setSubmitted(false);
     setLastRawText('');
     setLastParsed(null);
+    setTestButtonFound(false);
 
     observerRef.current?.disconnect();
-    if (autoClickIntervalRef.current) {
-      window.clearInterval(autoClickIntervalRef.current);
-      autoClickIntervalRef.current = null;
+    if (buttonClickIntervalRef.current) {
+      window.clearInterval(buttonClickIntervalRef.current);
+      buttonClickIntervalRef.current = null;
     }
 
     const observe = () => {
       const obs = new MutationObserver(() => {
         const text = root.textContent || '';
+        
+        // Check if test button is available when DOM changes
+        const testButton = findTestButton(root);
+        if (testButton && !testButtonFound) {
+          setTestButtonFound(true);
+          console.log('[SandpackTest] Test button found and ready');
+        }
+        
         if (!text) return;
+        
         setLastRawText(text);
         const parsed = parseSummary(text);
         setLastParsed(parsed);
+        
         if (parsed.ran) {
+          console.log('[SandpackTest] Tests completed, parsed results:', parsed);
           setCanSubmit(true);
           setIsRunning(false);
           obs.disconnect();
           observerRef.current = null;
-          if (autoClickIntervalRef.current) {
-            window.clearInterval(autoClickIntervalRef.current);
-            autoClickIntervalRef.current = null;
+          if (buttonClickIntervalRef.current) {
+            window.clearInterval(buttonClickIntervalRef.current);
+            buttonClickIntervalRef.current = null;
           }
         }
       });
@@ -324,75 +339,155 @@ export default defineConfig({
         window.clearTimeout(runTimerRef.current);
         runTimerRef.current = null;
       }
-      if (autoClickIntervalRef.current) {
-        window.clearInterval(autoClickIntervalRef.current);
-        autoClickIntervalRef.current = null;
+      if (buttonClickIntervalRef.current) {
+        window.clearInterval(buttonClickIntervalRef.current);
+        buttonClickIntervalRef.current = null;
       }
     };
-  }, [framework, codeFile, testFile, starterCode, testCode]);
+  }, [framework, codeFile, testFile, starterCode, testCode, testButtonFound]);
 
-  const clickTestsRunIfPresent = () => {
+  const findTestButton = (root: HTMLElement): HTMLButtonElement | null => {
+    // Try multiple selectors to find the test run button
+    const selectors = [
+      '[data-testid="test-actions"] button',
+      '.sp-test-actions button',
+      'button[title*="run"]',
+      'button[title*="test"]',
+      'button[title*="Run"]',
+      'button[title*="Test"]',
+      '.sp-button:not([disabled])',
+    ];
+    
+    for (const selector of selectors) {
+      const button = root.querySelector(selector) as HTMLButtonElement | null;
+      if (button && !button.disabled) {
+        // Additional check to make sure it's likely a test button
+        const text = button.textContent?.toLowerCase() || '';
+        const title = button.title?.toLowerCase() || '';
+        if (text.includes('run') || text.includes('test') || title.includes('run') || title.includes('test') || selector.includes('test-actions')) {
+          console.log('[SandpackTest] Found test button with selector:', selector, 'text:', text, 'title:', title);
+          return button;
+        }
+      }
+    }
+    
+    // Last resort: find any button in the test area that's not disabled
+    const buttons = root.querySelectorAll('button:not([disabled])');
+    for (const button of buttons) {
+      const btn = button as HTMLButtonElement;
+      const text = btn.textContent?.toLowerCase() || '';
+      if (text && (text.includes('run') || text.includes('test'))) {
+        console.log('[SandpackTest] Found test button via fallback:', text);
+        return btn;
+      }
+    }
+    
+    return null;
+  };
+
+  const clickTestsRunIfPresent = (): boolean => {
     const host = testsRootRef.current;
     if (!host) return false;
-    const btn =
-      (host.querySelector('[data-testid="test-actions"] button') as HTMLButtonElement | null) ||
-      (host.querySelector('.sp-test-actions button') as HTMLButtonElement | null);
+    
+    const btn = findTestButton(host);
     if (btn) {
+      console.log('[SandpackTest] Clicking test button:', btn.textContent);
       btn.click();
       return true;
     }
+    
+    console.log('[SandpackTest] No test button found');
     return false;
   };
 
-  const startAutoClickTestsRun = () => {
-    if (autoClickIntervalRef.current) {
-      window.clearInterval(autoClickIntervalRef.current);
-      autoClickIntervalRef.current = null;
+  const startButtonClickInterval = () => {
+    if (buttonClickIntervalRef.current) {
+      window.clearInterval(buttonClickIntervalRef.current);
+      buttonClickIntervalRef.current = null;
     }
+    
     let attempts = 0;
-    autoClickIntervalRef.current = window.setInterval(() => {
+    console.log('[SandpackTest] Starting button click interval...');
+    
+    buttonClickIntervalRef.current = window.setInterval(() => {
       attempts += 1;
+      
       if (clickTestsRunIfPresent()) {
-        window.clearInterval(autoClickIntervalRef.current!);
-        autoClickIntervalRef.current = null;
-      } else if (attempts > 80) {
-        // stop after ~16s
-        window.clearInterval(autoClickIntervalRef.current!);
-        autoClickIntervalRef.current = null;
+        console.log('[SandpackTest] Successfully clicked test button on attempt', attempts);
+        window.clearInterval(buttonClickIntervalRef.current!);
+        buttonClickIntervalRef.current = null;
+        return;
       }
-    }, 200);
+      
+      if (attempts > 50) { // Reduced from 80 to avoid excessive attempts
+        console.log('[SandpackTest] Giving up on finding test button after', attempts, 'attempts');
+        window.clearInterval(buttonClickIntervalRef.current!);
+        buttonClickIntervalRef.current = null;
+        setIsRunning(false); // Reset running state if we can't find the button
+        return;
+      }
+      
+      if (attempts % 10 === 0) {
+        console.log('[SandpackTest] Still looking for test button, attempt', attempts);
+      }
+    }, 300); // Increased interval to 300ms for better reliability
   };
 
   const handleRun = () => {
+    console.log('[SandpackTest] HandleRun called');
+    
     // Reset gating and start run
     setCanSubmit(false);
     setSubmitted(false);
     setIsRunning(true);
     setLastRawText('');
     setLastParsed(null);
+    setTestButtonFound(false);
 
-    // Try to click Tests Run immediately if present
-    const triggered = clickTestsRunIfPresent();
+    // Try immediate click first
+    const immediateClick = clickTestsRunIfPresent();
+    console.log('[SandpackTest] Immediate click result:', immediateClick);
+
+    // Always restart Sandpack to ensure fresh state
+    try {
+      console.log('[SandpackTest] Restarting Sandpack...');
+      sandpack.runSandpack();
+    } catch (error) {
+      console.error('[SandpackTest] Error restarting Sandpack:', error);
+    }
 
     // Also try internal dispatch if available
     try {
       (sandpack as any)?.dispatch?.({ type: 'run-tests' });
-    } catch {
-      // ignore
+      console.log('[SandpackTest] Dispatched run-tests');
+    } catch (error) {
+      console.log('[SandpackTest] Could not dispatch run-tests:', error);
     }
 
-    // Always re-bundle to ensure files are fresh; then auto-click when button mounts
-    sandpack.runSandpack();
-    startAutoClickTestsRun();
+    // Start the button clicking interval
+    startButtonClickInterval();
 
     // Safety fallback to exit "Running…" state
+    if (runTimerRef.current) {
+      window.clearTimeout(runTimerRef.current);
+    }
     runTimerRef.current = window.setTimeout(() => {
+      console.log('[SandpackTest] Run timeout reached, stopping running state');
       setIsRunning(false);
-    }, 15000);
+      if (buttonClickIntervalRef.current) {
+        window.clearInterval(buttonClickIntervalRef.current);
+        buttonClickIntervalRef.current = null;
+      }
+    }, 20000); // Increased timeout to 20 seconds
   };
 
   const handleSubmit = async () => {
-    if (!lastParsed) return;
+    if (!lastParsed) {
+      console.log('[SandpackTest] Cannot submit - no test results parsed');
+      return;
+    }
+
+    console.log('[SandpackTest] Submitting results:', lastParsed);
 
     const tests = lastParsed.tests || {};
     const total = typeof tests.total === 'number' ? tests.total : undefined;
@@ -423,6 +518,7 @@ export default defineConfig({
         return;
       }
 
+      console.log('[SandpackTest] Successfully submitted results');
       setSubmitted(true);
 
       try {
@@ -431,10 +527,13 @@ export default defineConfig({
             detail: { assignmentId, questionId, score, passed, failed, total, rawText: lastRawText },
           })
         );
-      } catch {}
+      } catch (error) {
+        console.log('[SandpackTest] Could not dispatch submitted event:', error);
+      }
 
-      // FIXED: Use the parent callbacks to handle navigation
+      // Use the parent callbacks to handle navigation
       setTimeout(() => {
+        console.log('[SandpackTest] Advancing to next question/completion');
         if (isLastQuestion) {
           onComplete();
         } else {
@@ -503,7 +602,7 @@ export default defineConfig({
 
   return (
     <SandpackProvider
-      key={`${template}-${codeFile}-${testFile}`}
+      key={`${template}-${codeFile}-${testFile}-${props.questionId}`} // Added questionId to key to force re-render
       template={template}
       customSetup={{ dependencies: deps }}
       files={files}
