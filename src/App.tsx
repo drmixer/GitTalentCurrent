@@ -48,7 +48,7 @@ function App() {
   return (
     <AuthProvider>
       <NotificationsProvider>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 font-sans">
           <Header />
           <Routes>
             {/* Main Routes */}
@@ -138,10 +138,10 @@ function App() {
             <Route path="/u/:slug" element={<PublicDeveloperProfile />} />
 
             {/* Placeholder Pages */}
-            <Route path="/features" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Features Coming Soon</h1></div>} />
-            <Route path="/pricing" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Pricing Coming Soon</h1></div>} />
-            <Route path="/about" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">About Coming Soon</h1></div>} />
-            <Route path="/contact" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl font-bold">Contact Coming Soon</h1></div>} />
+            <Route path="/features" element={<div className="min-h-screen flex items-center justify-center font-sans"><h1 className="text-2xl font-heading font-bold">Features Coming Soon</h1></div>} />
+            <Route path="/pricing" element={<div className="min-h-screen flex items-center justify-center font-sans"><h1 className="text-2xl font-heading font-bold">Pricing Coming Soon</h1></div>} />
+            <Route path="/about" element={<div className="min-h-screen flex items-center justify-center font-sans"><h1 className="text-2xl font-heading font-bold">About Coming Soon</h1></div>} />
+            <Route path="/contact" element={<div className="min-h-screen flex items-center justify-center font-sans"><h1 className="text-2xl font-heading font-bold">Contact Coming Soon</h1></div>} />
 
             {/* Test Sandpack Pages - Demo */}
             <Route path="/test-sandpack" element={<TestSandpackPage />} />
@@ -150,8 +150,8 @@ function App() {
             <Route path="/test-vue" element={<TestVuePage />} />
 
             {/* Fallback 404 Route */}
-            <Route path="*" element={<div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-700">
-              <h1 className="text-4xl font-bold mb-4">404 - Not Found</h1>
+            <Route path="*" element={<div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-700 font-sans">
+              <h1 className="text-4xl font-heading font-bold mb-4">404 - Not Found</h1>
               <p className="text-lg">The page you are looking for does not exist.</p>
               <p className="text-md mt-2">Please check the URL or go back to the <a href="/" className="text-blue-600 hover:underline">homepage</a>.</p>
             </div>} />
