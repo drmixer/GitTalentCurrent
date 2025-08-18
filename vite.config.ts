@@ -4,6 +4,7 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/', // Ensure assets resolve from site root on any route
   plugins: [
     react({
       babel: {
@@ -19,4 +20,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    assetsDir: 'assets', // explicit for clarity; defaults to "assets"
+    sourcemap: false
+  }
 });
