@@ -218,6 +218,25 @@ serve(async (req) => {
         break;
     }
 
+    // If this is a test assignment notification and the target is a recruiter, skip it.
+    if (message && userId && notificationType === 'test_assignment') {
+      const { data: targetUser, error: targetErr } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', userId)
+        .maybeSingle();
+      if (targetErr) {
+        console.warn('Could not load target user role, proceeding with default behavior.', targetErr);
+      } else if (targetUser?.role === 'recruiter') {
+        console.log('Skipping notification: recruiters do not receive test assignment notifications.', { userId, notificationType });
+        return new Response(JSON.stringify({
+          message: 'Skipped recruiter test-assignment notification'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Enforce in_app preference for the target user (developers + recruiters)
     if (message && userId && notificationType) {
       let allowInApp = true;
