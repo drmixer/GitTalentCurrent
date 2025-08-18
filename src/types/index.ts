@@ -17,15 +17,24 @@ export interface SkillCategory {
   [category: string]: {
     skills: string[];
     proficiency: 'beginner' | 'intermediate' | 'expert';
-    company_name: string; // This still seems unusual for a skill category, but kept as per your original file
+    company_name: string; // Kept as in your original file
   };
 }
 
+// UPDATED: Expand preferences to support a per-type map while keeping existing fields
 export interface NotificationPreferences {
   email: boolean;
   in_app: boolean;
-  assignments: boolean;
-  messages: boolean;
+  // Optional granular flags by type; if omitted, treat as allowed (true) by default
+  types?: {
+    message?: boolean;
+    job_application?: boolean;
+    test_assignment?: boolean;
+    test_completion?: boolean;
+    endorsement?: boolean; // NEW: allows opting out of endorsement notifications
+    application_viewed?: boolean;
+    hired?: boolean;
+  };
 }
 
 export interface GitHubUser {
@@ -119,6 +128,9 @@ export interface Developer {
   saved_jobs_count?: number | null;
   applied_jobs_count?: number | null;
   public_profile_enabled?: boolean | null;
+
+  // NEW: used by profile-strength util
+  public_endorsement_count?: number | null;
 }
 
 export interface PortfolioItem {
@@ -146,6 +158,9 @@ export interface Endorsement {
   skill: string;
   is_anonymous: boolean;
   is_public: boolean;
+
+  // NEW: provided name when the endorser isn't logged in
+  endorser_name?: string | null;
 
   endorser_user: {
     name: string;
