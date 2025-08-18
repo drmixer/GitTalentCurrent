@@ -37,11 +37,11 @@ const getSetup = (framework: Framework) => {
           '@testing-library/react': '^14.2.1',
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6'
-        }
+          vitest: '^0.34.6',
+        },
       };
     case 'vue':
-      // Use the official Vue 3 template; SandpackTests will run Vitest.
+      // Vue 3 template + vitest runner provided by Sandpack bundler
       return {
         template: 'vue3' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -54,8 +54,8 @@ const getSetup = (framework: Framework) => {
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
-          jsdom: '^20.0.3'
-        }
+          jsdom: '^20.0.3',
+        },
       };
     case 'javascript':
     default:
@@ -67,8 +67,8 @@ const getSetup = (framework: Framework) => {
           '@testing-library/dom': '^9.3.4',
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6'
-        }
+          vitest: '^0.34.6',
+        },
       };
   }
 };
@@ -151,7 +151,7 @@ const TestsAndConsole: React.FC<{
             height: '100%',
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            fontSize: 12
+            fontSize: 12,
           }}
         />
       </div>
@@ -194,11 +194,9 @@ const SandpackTestInner: React.FC<
 
     try {
       await sandpack.runSandpack();
-      // Touch a dummy file so the tests pane re-runs even if user code hasn't changed
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
-      // Fallback safety timeout
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
       }, 20000);
@@ -233,7 +231,7 @@ const SandpackTestInner: React.FC<
           passed_test_cases: passed ?? null,
           total_test_cases: total ?? null,
           stdout: lastRawText,
-          stderr: ''
+          stderr: '',
         },
         { onConflict: 'assignment_id,question_id' }
       );
@@ -261,7 +259,7 @@ const SandpackTestInner: React.FC<
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px'
+          gap: '16px',
         }}
       >
         {submitted ? (
@@ -282,7 +280,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
               }}
             >
               Submit Results
@@ -304,11 +302,11 @@ const SandpackTestInner: React.FC<
                 borderRadius: '8px',
                 fontWeight: '600',
                 fontSize: '14px',
-                cursor: isRunning ? 'not-allowed' : 'pointer',
+                cursor: 'not-allowed',
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
               }}
             >
               {isRunning ? (
@@ -320,7 +318,7 @@ const SandpackTestInner: React.FC<
                       border: '2px solid #ffffff40',
                       borderTop: '2px solid #ffffff',
                       borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
+                      animation: 'spin 1s linear infinite',
                     }}
                   />
                   Running Tests...
@@ -361,9 +359,12 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     const baseFiles: SandpackFiles = {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
+      '/__trigger__.ts': { code: `export default 0;`, hidden: true },
+    };
 
-      // Provide minimal Vitest setup to ensure JSDOM and jest-dom are active
-      '/vitest.config.ts': {
+    // Only Vue needs our minimal vitest setup; react/js keep using the defaults provided by template
+    if (props.framework === 'vue') {
+      baseFiles['/vitest.config.ts'] = {
         code: `
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
@@ -375,19 +376,13 @@ export default defineConfig({
   },
 });
         `.trim(),
-        hidden: true
-      },
-      '/setupTests.ts': {
+        hidden: true,
+      };
+      baseFiles['/setupTests.ts'] = {
         code: `import '@testing-library/jest-dom';`,
-        hidden: true
-      },
-
-      // Dummy file we touch to force rebuilds via the Run button
-      '/__trigger__.ts': {
-        code: `export default 0;`,
-        hidden: true
-      }
-    };
+        hidden: true,
+      };
+    }
 
     return baseFiles;
   }, [props.starterCode, props.testCode, codeFile, testFile, props.framework]);
@@ -396,12 +391,14 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
+  // Only force the newest bundler for Vue; React/JS keep their current behavior
+  const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
+
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
-      // Force latest bundler (required for vue3 template + vitest runner)
-      bundlerURL="https://sandpack.codesandbox.io"
+      bundlerURL={bundlerURL}
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
@@ -412,7 +409,7 @@ export default defineConfig({
         showInlineErrors: true,
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
-        activeFile: codeFile
+        activeFile: codeFile,
       }}
     >
       <SandpackTestInner
