@@ -41,16 +41,20 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use Vite + plugin-vue to run Vue 3 SFCs on sandpack 2.19.x
+      // Run Vue 3 SFC tests on sandpack 2.19.x without starting a dev server:
+      // - Use 'vanilla-ts' template
+      // - Install vite + @vitejs/plugin-vue only for vitest transforms
       return {
-        template: 'vite' as SandpackProviderProps['template'],
+        template: 'vanilla-ts' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
           vue: '^3.4.21',
           '@vue/compiler-sfc': '^3.4.21',
-          '@vitejs/plugin-vue': '^5.0.4',
-          // testing
+          // Vite + plugin-vue versions compatible with vitest 0.34.x:
+          vite: '^4.5.0',
+          '@vitejs/plugin-vue': '^4.5.2',
+          // Testing
           '@vue/test-utils': '^2.4.5',
           '@testing-library/vue': '^8.0.3',
           '@testing-library/dom': '^9.3.4',
@@ -366,18 +370,6 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     };
 
     if (props.framework === 'vue') {
-      // Vite config for Vue SFC support
-      baseFiles['/vite.config.ts'] = {
-        code: `
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
-export default defineConfig({
-  plugins: [vue()],
-});
-        `.trim(),
-        hidden: true,
-      };
-      // Vitest config with JSDOM
       baseFiles['/vitest.config.ts'] = {
         code: `
 import { defineConfig } from 'vitest/config';
