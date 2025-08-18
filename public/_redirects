@@ -1,5 +1,1 @@
-# Ensure asset requests never hit the SPA fallback
-/assets/*   /assets/:splat   200
-
-# SPA fallback for everything else (client-side routing)
-/*           /index.html     200
+/*  /index.html  200
