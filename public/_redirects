@@ -1,8 +1,7 @@
 # Ensure asset requests never hit the SPA fallback.
-# If the file exists, it's served. If not, Netlify returns a 404 (not index.html).
 /assets/*   /assets/:splat   200
 
-# Pass through other top-level static files as well (optional safety)
+# Pass through other top-level static files as well (optional)
 /:file.:ext  /:file.:ext    200
 
 # SPA fallback for everything else (client-side routing)
