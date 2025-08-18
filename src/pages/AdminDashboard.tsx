@@ -16,16 +16,15 @@ import {
   BarChart,
   PieChart,
   X,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
-// Use shared developer details so admin sees the same structure recruiters do
+// Use the shared components so Admin sees the full detail structure
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
-
-// Admin-only components that do not affect recruiter/developer views
-import { AdminRecruiterPreview } from '../components/Admin/AdminRecruiterPreview';
-import { AdminJobRoleDetails } from '../components/Admin/AdminJobRoleDetails';
+import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
+import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
 
 type AdminTab = 'overview' | 'recruiters' | 'developers' | 'jobs' | 'hires';
 
@@ -46,10 +45,10 @@ interface AdminJobRole {
   description: string;
   location: string;
   job_type: string | null;
-  // Support both schema variants:
-  salary?: string | null;            // New schema (single TEXT column)
-  salary_min?: number | null;        // Legacy schema
-  salary_max?: number | null;        // Legacy schema
+  // Support both schema variants for salary
+  salary?: string | null; // Newer schema (TEXT)
+  salary_min?: number | null; // Legacy schema
+  salary_max?: number | null; // Legacy schema
   is_active: boolean;
   is_featured: boolean | null;
   created_at: string;
@@ -90,24 +89,27 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Determine active tab from query param
   const params = new URLSearchParams(location.search);
   const tabParam = (params.get('tab') || 'overview') as AdminTab;
   const activeTab: AdminTab = ['overview', 'recruiters', 'developers', 'jobs', 'hires'].includes(tabParam)
     ? tabParam
     : 'overview';
 
+  // Global state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Data
   const [pendingRecruiters, setPendingRecruiters] = useState<SimpleRecruiterRow[]>([]);
   const [approvedRecruiters, setApprovedRecruiters] = useState<SimpleRecruiterRow[]>([]);
   const [developers, setDevelopers] = useState<AdminDeveloper[]>([]);
   const [jobs, setJobs] = useState<AdminJobRole[]>([]);
   const [hires, setHires] = useState<AdminHire[]>([]);
 
-  // Modals
+  // Modal state
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
@@ -118,11 +120,15 @@ export const AdminDashboard: React.FC = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   // Stats
-  const recruiterCount = useMemo(() => approvedRecruiters.length + pendingRecruiters.length, [approvedRecruiters, pendingRecruiters]);
+  const recruiterCount = useMemo(
+    () => approvedRecruiters.length + pendingRecruiters.length,
+    [approvedRecruiters, pendingRecruiters],
+  );
   const developerCount = useMemo(() => developers.length, [developers]);
   const hireCount = useMemo(() => hires.length, [hires]);
   const totalRevenue = useMemo(() => hires.reduce((sum, h) => sum + Math.round((h.salary || 0) * 0.15), 0), [hires]);
 
+  // Load per tab
   useEffect(() => {
     if (!userProfile || userProfile.role !== 'admin') return;
 
@@ -163,6 +169,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Fetchers
 
+  // Recruiters: fetch pending + approved, then enrich with company_name
   const fetchRecruiters = async () => {
     const { data: pendingUsers, error: pendingErr } = await supabase
       .from('users')
@@ -216,6 +223,7 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  // Developers: include basic user info for listing
   const fetchDevelopers = async () => {
     const { data, error } = await supabase
       .from('developers')
@@ -226,6 +234,7 @@ export const AdminDashboard: React.FC = () => {
     setDevelopers((data as any) || []);
   };
 
+  // Jobs: safe join on known FK alias to show recruiter name in list
   const fetchJobs = async () => {
     const { data, error } = await supabase
       .from('job_roles')
@@ -236,8 +245,9 @@ export const AdminDashboard: React.FC = () => {
     setJobs((data as any) || []);
   };
 
+  // Hires: multi-step enrichment to avoid fragile joins
   const fetchHires = async () => {
-    // Step 1: get hires
+    // 1) hires
     const { data: hiresData, error: hiresErr } = await supabase
       .from('hires')
       .select('id, salary, hire_date, start_date, created_at, assignment_id');
@@ -248,7 +258,7 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
 
-    // Step 2: assignments referenced
+    // 2) assignments
     const assignmentIds = Array.from(new Set(hiresData.map(h => h.assignment_id).filter(Boolean)));
     let assignments: Array<{ id: string; job_role_id: string; recruiter_id: string; developer_id: string }> = [];
 
@@ -261,7 +271,7 @@ export const AdminDashboard: React.FC = () => {
       assignments = asgData || [];
     }
 
-    // Step 3: job_roles (select '*' to avoid schema mismatch between salary vs salary_min/salary_max)
+    // 3) job_roles: select '*' to be compatible with either salary schema (salary TEXT vs salary_min/max)
     const jobRoleIds = Array.from(new Set(assignments.map(a => a.job_role_id)));
     let jobRoleMap: Record<string, AdminJobRole> = {};
     if (jobRoleIds.length > 0) {
@@ -273,7 +283,7 @@ export const AdminDashboard: React.FC = () => {
       for (const jr of jrData || []) jobRoleMap[(jr as any).id] = jr as any;
     }
 
-    // Step 4: users for devs/recruiters
+    // 4) users for developer and recruiter display names
     const userIds = Array.from(new Set(assignments.flatMap(a => [a.developer_id, a.recruiter_id])));
     let userMap: Record<string, { id: string; name: string }> = {};
     if (userIds.length > 0) {
@@ -285,6 +295,7 @@ export const AdminDashboard: React.FC = () => {
       for (const u of uData || []) userMap[u.id] = { id: u.id, name: u.name };
     }
 
+    // Compose map and final list
     const assignmentMap: Record<string, AdminHire['assignment']> = {};
     for (const a of assignments) {
       assignmentMap[a.id] = {
@@ -306,16 +317,17 @@ export const AdminDashboard: React.FC = () => {
     setHires(final);
   };
 
+  // Actions
   const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
     setError('');
     const { error } = await supabase.from('job_roles').update({ is_featured: !isFeatured }).eq('id', jobId);
     if (error) {
       setError(error.message || 'Failed to update job');
-      return;
+    } else {
+      setSuccessMessage(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchJobs();
     }
-    setSuccessMessage(`Job ${isFeatured ? 'unfeatured' : 'featured'} successfully`);
-    setTimeout(() => setSuccessMessage(''), 3000);
-    fetchJobs();
   };
 
   const handleDeleteJob = async (jobId: string) => {
@@ -324,13 +336,14 @@ export const AdminDashboard: React.FC = () => {
     const { error } = await supabase.from('job_roles').delete().eq('id', jobId);
     if (error) {
       setError(error.message || 'Failed to delete job');
-      return;
+    } else {
+      setSuccessMessage('Job deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchJobs();
     }
-    setSuccessMessage('Job deleted successfully');
-    setTimeout(() => setSuccessMessage(''), 3000);
-    fetchJobs();
   };
 
+  // Filters
   const filteredPendingRecruiters = useMemo(() => {
     const s = searchTerm.toLowerCase();
     return pendingRecruiters.filter(
@@ -373,6 +386,7 @@ export const AdminDashboard: React.FC = () => {
     );
   }, [jobs, searchTerm]);
 
+  // Auth/loading guards
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -393,7 +407,7 @@ export const AdminDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage recruiters, developers, jobs and hires</p>
+          <p className="text-gray-600">Manage recruiters, developers, jobs, hires, and tests</p>
         </div>
 
         {successMessage && (
@@ -513,6 +527,15 @@ export const AdminDashboard: React.FC = () => {
                   <span className="font-semibold text-gray-900">View Hires</span>
                   <span className="text-sm text-gray-600 mt-1">Track placements</span>
                 </button>
+                {/* Restored: Manage Tests */}
+                <button
+                  onClick={() => navigate('/admin/tests')}
+                  className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
+                >
+                  <Code className="w-8 h-8 text-gray-600 mb-3" />
+                  <span className="font-semibold text-gray-900">Manage Tests</span>
+                  <span className="text-sm text-gray-600 mt-1">Create and edit coding tests</span>
+                </button>
               </div>
             </div>
 
@@ -552,7 +575,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <Calendar className="w-6 h-6 text-amber-500 mr-3" />
+                  <Clock className="w-6 h-6 text-amber-500 mr-3" />
                   <h2 className="text-xl font-black text-gray-900">Pending Approval</h2>
                   {pendingRecruiters.length > 0 && (
                     <span className="ml-3 bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full">
@@ -570,7 +593,7 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : pendingRecruiters.length > 0 ? (
+              ) : filteredPendingRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -582,7 +605,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {pendingRecruiters.map(r => (
+                      {filteredPendingRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -595,10 +618,17 @@ export const AdminDashboard: React.FC = () => {
                               {r.name}
                             </button>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <div className="flex items-center">
+                              {r.email}
+                            </div>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.company_name || '—'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(r.created_at).toLocaleDateString()}
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                              {new Date(r.created_at).toLocaleDateString()}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -631,7 +661,7 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : approvedRecruiters.length > 0 ? (
+              ) : filteredApprovedRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -644,7 +674,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {approvedRecruiters.map(r => (
+                      {filteredApprovedRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -660,7 +690,10 @@ export const AdminDashboard: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.company_name || '—'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(r.created_at).toLocaleDateString()}
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                              {new Date(r.created_at).toLocaleDateString()}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -985,7 +1018,9 @@ export const AdminDashboard: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-bold text-gray-900">${(h.salary || 0).toLocaleString()}</div>
+                            <div className="text-sm font-bold text-gray-900">
+                              ${Number(h.salary || 0).toLocaleString()}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-bold text-emerald-600">
@@ -1014,7 +1049,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Modals */}
+        {/* Developer Modal */}
         {showDeveloperModal && selectedDeveloperId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1028,13 +1063,14 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                {/* Use shared component so the layout matches what recruiters see */}
+                {/* Use shared component so Admin sees same structure recruiters do */}
                 <DeveloperProfileDetails developerId={selectedDeveloperId} />
               </div>
             </div>
           </div>
         )}
 
+        {/* Recruiter Modal */}
         {showRecruiterModal && selectedRecruiterId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1048,12 +1084,13 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                <AdminRecruiterPreview recruiterId={selectedRecruiterId} />
+                <RecruiterProfileDetails recruiterId={selectedRecruiterId} />
               </div>
             </div>
           </div>
         )}
 
+        {/* Job Modal */}
         {showJobModal && selectedJobId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1067,7 +1104,7 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                <AdminJobRoleDetails jobRoleId={selectedJobId} />
+                <JobRoleDetails jobRoleId={selectedJobId} />
               </div>
             </div>
           </div>
