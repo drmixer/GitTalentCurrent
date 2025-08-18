@@ -56,6 +56,7 @@ const getSetup = (framework: Framework) => {
           jsdom: '^22.1.0',
           vite: '^4.4.5',
           '@vitejs/plugin-vue': '^4.2.3',
+          '@vue/runtime-dom': '^3.3.4',
         },
       };
     case 'javascript':
@@ -188,6 +189,8 @@ const SandpackTestInner: React.FC<
   };
 
   const handleRunTests = async () => {
+    if (isRunning) return; // Prevent multiple clicks
+    
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
@@ -198,7 +201,7 @@ const SandpackTestInner: React.FC<
       await sandpack.restartSandpack();
       
       // Wait a moment for restart
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Trigger test rerun
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
@@ -206,7 +209,10 @@ const SandpackTestInner: React.FC<
 
       // Longer timeout for Vue compilation
       setTimeout(() => {
-        if (!canSubmit) setIsRunning(false);
+        if (!canSubmit) {
+          console.log('Test timeout - stopping running state');
+          setIsRunning(false);
+        }
       }, 30000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
@@ -383,9 +389,12 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts'],
     reporter: 'verbose',
-    run: true,
+  },
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false,
   },
   esbuild: {
     target: 'node14'
@@ -397,7 +406,15 @@ export default defineConfig({
 
       // Add setup file for tests
       baseFiles['/src/setupTests.ts'] = {
-        code: "import '@testing-library/jest-dom';",
+        code: `
+import '@testing-library/jest-dom';
+import { config } from '@vue/test-utils';
+
+// Make Vue globally available
+config.global.config.globalProperties = {
+  ...config.global.config.globalProperties
+};
+        `.trim(),
         hidden: true,
       };
 
