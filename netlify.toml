@@ -5,15 +5,8 @@
 [build.environment]
   NODE_VERSION = "18"
 
-# Strong caching for versioned build assets
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    X-Content-Type-Options = "nosniff"
-
-# Keep HTML fresh so it always points to current chunk names
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "no-cache"
+# Keep the SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
