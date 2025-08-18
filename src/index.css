@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  /* Apply Rubik as the default body font */
+  body {
+    @apply font-sans;
+  }
+  
+  /* Apply Space Grotesk to all headings */
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
   }
