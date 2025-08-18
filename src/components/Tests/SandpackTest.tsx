@@ -42,18 +42,20 @@ const getSetup = (framework: Framework) => {
       };
     case 'vue':
       return {
-        template: 'vue-ts' as SandpackProviderProps['template'],
+        template: 'vanilla-ts' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
           vue: '^3.3.4',
+          '@vue/compiler-sfc': '^3.3.4',
           '@vue/test-utils': '^2.4.1',
           '@testing-library/vue': '^7.0.0',
           '@testing-library/jest-dom': '^5.16.5',
           '@testing-library/user-event': '^14.4.3',
           vitest: '^0.34.6',
           jsdom: '^22.1.0',
-          'happy-dom': '^10.0.3',
+          vite: '^4.4.5',
+          '@vitejs/plugin-vue': '^4.2.3',
         },
       };
     case 'javascript':
@@ -362,52 +364,59 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     };
 
     if (props.framework === 'vue') {
-      // Use vitest.config.js instead of .ts for better compatibility
-      baseFiles['/vitest.config.js'] = {
+      // Use vitest.config.ts with proper module setup
+      baseFiles['/vitest.config.ts'] = {
         code: `
-import { defineConfig } from 'vitest/config'
-import vue from '@vitejs/plugin-vue'
+import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [vue()],
   test: {
     globals: true,
-    environment: 'happy-dom'
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
-  esbuild: {
-    target: 'node14'
-  }
-})
+});
         `.trim(),
         hidden: true,
       };
 
-      // Add a simpler setup file
-      baseFiles['/src/test-setup.js'] = {
+      // Add setup file for tests
+      baseFiles['/src/setupTests.ts'] = {
+        code: "import '@testing-library/jest-dom';",
+        hidden: true,
+      };
+
+      // Add main.ts entry point for proper module handling
+      baseFiles['/src/main.ts'] = {
         code: `
-import { config } from '@vue/test-utils'
-import { beforeAll } from 'vitest'
+import { createApp } from 'vue';
+import App from './App.vue';
 
-// Global test setup
-beforeAll(() => {
-  // Add any global setup here
-})
+const app = createApp(App);
+app.mount('#app');
         `.trim(),
         hidden: true,
       };
 
-      // Update package.json to include proper scripts and config
-      baseFiles['/package.json'] = {
-        code: JSON.stringify({
-          "name": "vue-sandpack-test",
-          "version": "0.0.0",
-          "scripts": {
-            "test": "vitest run --reporter=verbose",
-            "test:watch": "vitest"
-          },
-          "dependencies": deps,
-          "type": "module"
-        }, null, 2),
+      // Add index.html
+      baseFiles['/index.html'] = {
+        code: `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vue App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+        `.trim(),
         hidden: true,
       };
     }
