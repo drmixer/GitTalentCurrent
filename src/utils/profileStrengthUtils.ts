@@ -44,11 +44,19 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
   let strength = 0;
   const suggestions: string[] = [];
 
-  // Basic Information (45 points total - increased from 40 since projects removed)
-  const bioPoints = data.bio?.trim().length >= 50 ? 18 : (data.bio?.trim() ? 10 : 0);
+  // Basic Information (50 points total)
+  // Bio: 20 points max (15 for having bio, +5 bonus for 50+ chars)
+  let bioPoints = 0;
+  if (data.bio?.trim()) {
+    bioPoints = 15; // Base points for having a bio
+    if (data.bio.trim().length >= 50) {
+      bioPoints = 20; // Full points for detailed bio
+    }
+  }
+  
   const locationPoints = data.location?.trim() ? 12 : 0;
-  const titlePoints = data.preferred_title?.trim() ? 7 : 0;
-  const experiencePoints = data.experience_years > 0 ? 8 : 0;
+  const titlePoints = data.preferred_title?.trim() ? 10 : 0;
+  const experiencePoints = (data.experience_years && data.experience_years > 0) ? 8 : 0;
 
   strength += bioPoints + locationPoints + titlePoints + experiencePoints;
 
@@ -71,9 +79,9 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Add your years of experience');
   }
 
-  // GitHub & Professional Info (28 points total - increased from 25)
+  // GitHub & Professional Info (30 points total)
   const githubHandlePoints = data.github_handle?.trim() ? 12 : 0;
-  const githubAppPoints = data.github_installation_id?.trim() ? 10 : 0;
+  const githubAppPoints = data.github_installation_id?.trim() ? 12 : 0;
   const resumePoints = data.resume_url?.trim() ? 6 : 0;
 
   strength += githubHandlePoints + githubAppPoints + resumePoints;
@@ -91,19 +99,20 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Upload your resume for recruiters to review');
   }
 
-  // Skills & Technical (20 points total - same as before)
+  // Skills & Technical (15 points total)
   const totalSkills = Object.values(data.skills_categories || {}).flat().length;
   let skillsPoints = 0;
-  if (totalSkills >= 8) skillsPoints = 12;
+  if (totalSkills >= 8) skillsPoints = 10;
   else if (totalSkills >= 5) skillsPoints = 8;
-  else if (totalSkills >= 3) skillsPoints = 5;
-  else if (totalSkills > 0) skillsPoints = 2;
+  else if (totalSkills >= 3) skillsPoints = 6;
+  else if (totalSkills >= 1) skillsPoints = 3;
 
-  // Multiple skill categories bonus
+  // Multiple skill categories bonus (5 points max)
   const categoriesWithSkills = Object.values(data.skills_categories || {}).filter(skills => skills.length > 0).length;
   let categoriesBonus = 0;
-  if (categoriesWithSkills >= 3) categoriesBonus = 5;
-  else if (categoriesWithSkills >= 2) categoriesBonus = 3;
+  if (categoriesWithSkills >= 4) categoriesBonus = 5;
+  else if (categoriesWithSkills >= 3) categoriesBonus = 4;
+  else if (categoriesWithSkills >= 2) categoriesBonus = 2;
 
   strength += skillsPoints + categoriesBonus;
 
@@ -120,11 +129,13 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Add skills in multiple categories to show diverse expertise');
   } else if (categoriesWithSkills < 3) {
     suggestions.push('Consider adding skills in a third category for better diversity');
+  } else if (categoriesWithSkills < 4) {
+    suggestions.push('Add skills in a fourth category for maximum diversity points');
   }
 
-  // Profile Presentation (7 points total - increased from 5)
-  const profilePicPoints = data.profile_pic_url?.trim() ? 4 : 0;
-  const salaryPoints = data.desired_salary && data.desired_salary > 0 ? 3 : 0;
+  // Profile Presentation (5 points total)
+  const profilePicPoints = data.profile_pic_url?.trim() ? 3 : 0;
+  const salaryPoints = (data.desired_salary && data.desired_salary > 0) ? 2 : 0;
 
   strength += profilePicPoints + salaryPoints;
 
@@ -137,9 +148,7 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     suggestions.push('Set your desired salary to help match with appropriate roles');
   }
 
-  // Add portfolio-related suggestion
-  suggestions.push('Complete your portfolio in the Portfolio tab to showcase your projects');
-
+  // Ensure we don't exceed 100%
   const finalStrength = Math.min(strength, 100);
   
   const breakdown: ProfileStrengthBreakdown = {
@@ -158,6 +167,11 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
     maxPossible: 100
   };
 
+  // Only add portfolio suggestion if profile strength is already high
+  if (finalStrength >= 85) {
+    suggestions.push('Complete your portfolio in the Portfolio tab to showcase your projects to recruiters');
+  }
+
   return {
     strength: finalStrength,
     breakdown,
@@ -169,8 +183,9 @@ export const calculateProfileStrength = (data: ProfileStrengthData): {
  * Get profile strength status message
  */
 export const getProfileStrengthStatus = (strength: number): string => {
-  if (strength >= 90) return "Outstanding! Your profile is fully optimized for recruiters";
-  if (strength >= 80) return "Excellent! Your profile looks great to recruiters";
+  if (strength >= 95) return "Perfect! Your profile is fully optimized for recruiters";
+  if (strength >= 90) return "Outstanding! Your profile looks excellent to recruiters";
+  if (strength >= 80) return "Excellent! Your profile is very strong";
   if (strength >= 70) return "Very good! Just a few more details to perfect your profile";
   if (strength >= 60) return "Good progress! Add more details to stand out";
   if (strength >= 40) return "Getting there! Complete more sections to improve visibility";
@@ -185,17 +200,17 @@ export const getProfileStrengthColor = (strength: number): {
   bg: string;
   border: string;
 } => {
-  if (strength >= 80) return {
+  if (strength >= 90) return {
     text: 'text-emerald-600',
     bg: 'bg-emerald-600',
     border: 'border-emerald-200'
   };
-  if (strength >= 60) return {
+  if (strength >= 80) return {
     text: 'text-blue-600',
     bg: 'bg-blue-600', 
     border: 'border-blue-200'
   };
-  if (strength >= 40) return {
+  if (strength >= 60) return {
     text: 'text-yellow-600',
     bg: 'bg-yellow-600',
     border: 'border-yellow-200'
