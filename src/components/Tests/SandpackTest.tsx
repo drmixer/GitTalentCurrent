@@ -41,9 +41,9 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Vue 3 template + vitest runner provided by Sandpack bundler
+      // Use 'vue' (not 'vue3') for this Sandpack version
       return {
-        template: 'vue3' as SandpackProviderProps['template'],
+        template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -302,7 +302,7 @@ const SandpackTestInner: React.FC<
                 borderRadius: '8px',
                 fontWeight: '600',
                 fontSize: '14px',
-                cursor: 'not-allowed',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -362,7 +362,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       '/__trigger__.ts': { code: `export default 0;`, hidden: true },
     };
 
-    // Only Vue needs our minimal vitest setup; react/js keep using the defaults provided by template
+    // Minimal Vitest setup for Vue; react/js use defaults
     if (props.framework === 'vue') {
       baseFiles['/vitest.config.ts'] = {
         code: `
