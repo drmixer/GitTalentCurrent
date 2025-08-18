@@ -21,11 +21,10 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
-// Use the shared components so Admin sees the full detail structure
+// Use the shared developer details; admin-only recruiter and job details to avoid schema-join issues
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
-import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
-// Use the admin-safe job details that avoids fragile nested selects
 import { AdminJobRoleDetails } from '../components/Admin/AdminJobRoleDetails';
+import { AdminRecruiterProfileDetails } from '../components/Admin/AdminRecruiterProfileDetails';
 
 type AdminTab = 'overview' | 'recruiters' | 'developers' | 'jobs' | 'hires';
 
@@ -46,10 +45,9 @@ interface AdminJobRole {
   description: string;
   location: string;
   job_type: string | null;
-  // Support both possible DB schemas for salary
-  salary?: string | null; // Newer schema (TEXT)
-  salary_min?: number | null; // Legacy schema
-  salary_max?: number | null; // Legacy schema
+  salary?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
   is_active: boolean;
   is_featured: boolean | null;
   created_at: string;
@@ -90,27 +88,23 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine active tab from query param
   const params = new URLSearchParams(location.search);
   const tabParam = (params.get('tab') || 'overview') as AdminTab;
   const activeTab: AdminTab = ['overview', 'recruiters', 'developers', 'jobs', 'hires'].includes(tabParam)
     ? tabParam
     : 'overview';
 
-  // Global state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Data
   const [pendingRecruiters, setPendingRecruiters] = useState<SimpleRecruiterRow[]>([]);
   const [approvedRecruiters, setApprovedRecruiters] = useState<SimpleRecruiterRow[]>([]);
   const [developers, setDevelopers] = useState<AdminDeveloper[]>([]);
   const [jobs, setJobs] = useState<AdminJobRole[]>([]);
   const [hires, setHires] = useState<AdminHire[]>([]);
 
-  // Modal state
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
@@ -120,7 +114,6 @@ export const AdminDashboard: React.FC = () => {
   const [showJobModal, setShowJobModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  // Stats
   const recruiterCount = useMemo(
     () => approvedRecruiters.length + pendingRecruiters.length,
     [approvedRecruiters, pendingRecruiters],
@@ -129,7 +122,6 @@ export const AdminDashboard: React.FC = () => {
   const hireCount = useMemo(() => hires.length, [hires]);
   const totalRevenue = useMemo(() => hires.reduce((sum, h) => sum + Math.round((h.salary || 0) * 0.15), 0), [hires]);
 
-  // Load per tab
   useEffect(() => {
     if (!userProfile || userProfile.role !== 'admin') return;
 
@@ -161,16 +153,12 @@ export const AdminDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile, activeTab]);
 
-  // Helpers
   const formatSalary = (job: Partial<AdminJobRole>): string => {
     if (job.salary) return job.salary;
     if (job.salary_min != null && job.salary_max != null) return `$${job.salary_min}k - $${job.salary_max}k`;
     return '—';
   };
 
-  // Fetchers
-
-  // Recruiters: fetch pending + approved, then enrich with company_name
   const fetchRecruiters = async () => {
     const { data: pendingUsers, error: pendingErr } = await supabase
       .from('users')
@@ -188,16 +176,10 @@ export const AdminDashboard: React.FC = () => {
       .order('created_at', { ascending: false });
     if (approvedErr) throw approvedErr;
 
-    const allIds = [
-      ...(pendingUsers?.map(u => u.id) || []),
-      ...(approvedUsers?.map(u => u.id) || []),
-    ];
+    const allIds = [...(pendingUsers?.map(u => u.id) || []), ...(approvedUsers?.map(u => u.id) || [])];
     let companyByUser: Record<string, string | null> = {};
     if (allIds.length > 0) {
-      const { data: recs } = await supabase
-        .from('recruiters')
-        .select('user_id, company_name')
-        .in('user_id', allIds);
+      const { data: recs } = await supabase.from('recruiters').select('user_id, company_name').in('user_id', allIds);
       for (const r of recs || []) companyByUser[r.user_id] = r.company_name ?? null;
     }
 
@@ -224,7 +206,6 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
-  // Developers: include basic user info for listing
   const fetchDevelopers = async () => {
     const { data, error } = await supabase
       .from('developers')
@@ -235,7 +216,6 @@ export const AdminDashboard: React.FC = () => {
     setDevelopers((data as any) || []);
   };
 
-  // Jobs: safe join on known FK alias to show recruiter name in list
   const fetchJobs = async () => {
     const { data, error } = await supabase
       .from('job_roles')
@@ -246,9 +226,7 @@ export const AdminDashboard: React.FC = () => {
     setJobs((data as any) || []);
   };
 
-  // Hires: multi-step enrichment to avoid fragile nested joins
   const fetchHires = async () => {
-    // 1) hires
     const { data: hiresData, error: hiresErr } = await supabase
       .from('hires')
       .select('id, salary, hire_date, start_date, created_at, assignment_id');
@@ -259,7 +237,6 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
 
-    // 2) assignments
     const assignmentIds = Array.from(new Set(hiresData.map(h => h.assignment_id).filter(Boolean)));
     let assignments: Array<{ id: string; job_role_id: string; recruiter_id: string; developer_id: string }> = [];
 
@@ -272,31 +249,22 @@ export const AdminDashboard: React.FC = () => {
       assignments = asgData || [];
     }
 
-    // 3) job_roles: select '*' to be compatible with either salary schema (salary TEXT vs salary_min/max)
     const jobRoleIds = Array.from(new Set(assignments.map(a => a.job_role_id)));
     let jobRoleMap: Record<string, AdminJobRole> = {};
     if (jobRoleIds.length > 0) {
-      const { data: jrData, error: jrErr } = await supabase
-        .from('job_roles')
-        .select('*')
-        .in('id', jobRoleIds);
+      const { data: jrData, error: jrErr } = await supabase.from('job_roles').select('*').in('id', jobRoleIds);
       if (jrErr) throw jrErr;
       for (const jr of jrData || []) jobRoleMap[(jr as any).id] = jr as any;
     }
 
-    // 4) users for developer and recruiter display names
     const userIds = Array.from(new Set(assignments.flatMap(a => [a.developer_id, a.recruiter_id])));
     let userMap: Record<string, { id: string; name: string }> = {};
     if (userIds.length > 0) {
-      const { data: uData, error: uErr } = await supabase
-        .from('users')
-        .select('id, name')
-        .in('id', userIds);
+      const { data: uData, error: uErr } = await supabase.from('users').select('id, name').in('id', userIds);
       if (uErr) throw uErr;
       for (const u of uData || []) userMap[u.id] = { id: u.id, name: u.name };
     }
 
-    // Compose map and final list
     const assignmentMap: Record<string, AdminHire['assignment']> = {};
     for (const a of assignments) {
       assignmentMap[a.id] = {
@@ -318,7 +286,6 @@ export const AdminDashboard: React.FC = () => {
     setHires(final);
   };
 
-  // Actions
   const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
     setError('');
     const { error } = await supabase.from('job_roles').update({ is_featured: !isFeatured }).eq('id', jobId);
@@ -344,7 +311,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Filters
   const filteredPendingRecruiters = useMemo(() => {
     const s = searchTerm.toLowerCase();
     return pendingRecruiters.filter(
@@ -387,7 +353,6 @@ export const AdminDashboard: React.FC = () => {
     );
   }, [jobs, searchTerm]);
 
-  // Auth/loading guards
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -425,7 +390,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex flex-wrap space-x-6">
@@ -452,10 +416,8 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
@@ -492,7 +454,6 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
               <div className="grid md:grid-cols-4 gap-6">
@@ -528,7 +489,6 @@ export const AdminDashboard: React.FC = () => {
                   <span className="font-semibold text-gray-900">View Hires</span>
                   <span className="text-sm text-gray-600 mt-1">Track placements</span>
                 </button>
-                {/* Restored: Manage Tests */}
                 <button
                   onClick={() => navigate('/admin/tests')}
                   className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
@@ -540,7 +500,6 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Placeholder analytics */}
             <div className="grid md:grid-cols-2 gap-8">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-center">
                 <div className="text-center">
@@ -558,7 +517,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Recruiters */}
         {activeTab === 'recruiters' && (
           <div className="space-y-8">
             <div className="relative">
@@ -572,7 +530,6 @@ export const AdminDashboard: React.FC = () => {
               />
             </div>
 
-            {/* Pending */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
@@ -594,15 +551,19 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : filteredPendingRecruiters.length > 0 ? (
+              ) : pendingRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Signup Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Company
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Signup Date
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -620,9 +581,7 @@ export const AdminDashboard: React.FC = () => {
                             </button>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            <div className="flex items-center">
-                              {r.email}
-                            </div>
+                            <div className="flex items-center">{r.email}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{r.company_name || '—'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -645,7 +604,6 @@ export const AdminDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Approved */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center mb-6">
                 <CheckCircle className="w-6 h-6 text-emerald-500 mr-3" />
@@ -662,20 +620,24 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : filteredApprovedRecruiters.length > 0 ? (
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Company</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Signup Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Company
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Signup Date
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredApprovedRecruiters.map(r => (
+                      {approvedRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -713,18 +675,11 @@ export const AdminDashboard: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-xl">
-                  <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Approved Recruiters</h3>
-                  <p className="text-gray-600">No recruiters have been approved yet</p>
-                </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Developers */}
         {activeTab === 'developers' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -746,7 +701,7 @@ export const AdminDashboard: React.FC = () => {
                 <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                 <span className="text-gray-600 font-medium">Loading developers...</span>
               </div>
-            ) : filteredDevelopers.length > 0 ? (
+            ) : developers.length > 0 ? (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -756,13 +711,15 @@ export const AdminDashboard: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">GitHub</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Skills</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Experience</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Experience
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredDevelopers.map(dev => (
+                      {developers.map(dev => (
                         <tr key={dev.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-semibold text-gray-900">{dev.user.name}</div>
@@ -796,12 +753,8 @@ export const AdminDashboard: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {dev.location || '—'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {dev.experience_years ?? '—'}
-                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dev.location || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dev.experience_years ?? '—'}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
                               className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -841,7 +794,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Jobs */}
         {activeTab === 'jobs' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -870,8 +822,12 @@ export const AdminDashboard: React.FC = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Recruiter
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Location
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Posted</th>
@@ -895,9 +851,7 @@ export const AdminDashboard: React.FC = () => {
                             {job.recruiter?.name || '—'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{job.location}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatSalary(job)}
-                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatSalary(job)}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
                               className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -963,7 +917,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Hires */}
         {activeTab === 'hires' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -991,13 +944,27 @@ export const AdminDashboard: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Developer</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Title</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recruiter</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Platform Fee</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hire Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Developer
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Job Title
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Recruiter
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Salary
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Platform Fee
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Hire Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Start Date
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1050,7 +1017,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Developer Modal */}
         {showDeveloperModal && selectedDeveloperId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1064,14 +1030,12 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                {/* Use shared component so Admin sees same structure recruiters do */}
                 <DeveloperProfileDetails developerId={selectedDeveloperId} />
               </div>
             </div>
           </div>
         )}
 
-        {/* Recruiter Modal */}
         {showRecruiterModal && selectedRecruiterId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1085,13 +1049,12 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                <RecruiterProfileDetails recruiterId={selectedRecruiterId} />
+                <AdminRecruiterProfileDetails recruiterId={selectedRecruiterId} />
               </div>
             </div>
           </div>
         )}
 
-        {/* Job Modal */}
         {showJobModal && selectedJobId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1105,7 +1068,6 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                {/* Use the admin-safe details to avoid 400 from invalid nested selects */}
                 <AdminJobRoleDetails jobRoleId={selectedJobId} />
               </div>
             </div>
