@@ -56,9 +56,10 @@ interface JobRoleMinimal {
   created_at: string;
   is_active: boolean;
   is_featured?: boolean | null;
-  salary?: string | null; // new schema
-  salary_min?: number | null; // legacy schema
-  salary_max?: number | null; // legacy schema
+  // Support both possible DB schemas for salary
+  salary?: string | null; // Newer schema (TEXT or similar)
+  salary_min?: number | null; // Legacy schema
+  salary_max?: number | null; // Legacy schema
   tech_stack?: string[];
 }
 
@@ -81,7 +82,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
   const activeJobsCount = useMemo(() => jobs.filter(j => j.is_active).length, [jobs]);
 
   const formatSalary = (j: Partial<JobRoleMinimal>) => {
-    if (j.salary) return j.salary;
+    if (j.salary) return j.salary as string;
     if (j.salary_min != null && j.salary_max != null) return `$${j.salary_min}k - $${j.salary_max}k`;
     return '—';
   };
@@ -94,7 +95,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
         setLoading(true);
         setError(null);
 
-        // 1) Recruiter user
+        // 1) Recruiter user (no joins)
         const { data: userRow, error: userErr } = await supabase
           .from('users')
           .select('id, name, email, created_at, is_approved')
@@ -103,7 +104,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
         if (userErr) throw userErr;
         setRecruiterUser(userRow as RecruiterUser);
 
-        // 2) Recruiter profile (company)
+        // 2) Recruiter profile row (company_name, website, etc.)
         const { data: recRow, error: recErr } = await supabase
           .from('recruiters')
           .select('user_id, company_name, website, created_at')
@@ -112,18 +113,17 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
         if (recErr) throw recErr;
         setRecruiterProfile(recRow as RecruiterProfileRow);
 
-        // 3) Jobs
+        // 3) Fetch recruiter's jobs — use '*' to avoid selecting non-existent columns
         const { data: jobRows, error: jobsErr } = await supabase
           .from('job_roles')
-          .select(
-            'id, title, location, job_type, created_at, is_active, is_featured, salary, salary_min, salary_max, tech_stack',
-          )
+          .select('*')
           .eq('recruiter_id', recruiterId)
           .order('created_at', { ascending: false });
         if (jobsErr) throw jobsErr;
         setJobs((jobRows || []) as JobRoleMinimal[]);
 
-        // 4) Assignments (no nested joins to avoid relationship errors)
+        // 4) Fetch assignments with safe columns only (no nested joins)
+        // Try to order by assigned_at, fallback to created_at if assigned_at doesn't exist
         let assignmentsData: AssignmentRow[] = [];
 
         const { data: a1, error: e1 } = await supabase
@@ -133,7 +133,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
           .order('assigned_at', { ascending: false });
 
         if (e1) {
-          // Fallback to created_at if assigned_at not present
+          // Fallback: try ordering by created_at
           const { data: a2, error: e2 } = await supabase
             .from('assignments')
             .select('id, recruiter_id, developer_id, job_role_id, status, assigned_at, created_at, notes')
@@ -145,7 +145,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
           assignmentsData = (a1 || []) as AssignmentRow[];
         }
 
-        // 5) Enrich with developer users and job roles via separate queries
+        // 5) Enrich assignments with developer users and job roles via separate queries
         const developerIds = Array.from(new Set(assignmentsData.map(a => a.developer_id))).filter(Boolean);
         const jobRoleIds = Array.from(new Set(assignmentsData.map(a => a.job_role_id))).filter(Boolean);
 
@@ -161,11 +161,10 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
 
         let jobRoleMap: Record<string, JobRoleMinimal> = {};
         if (jobRoleIds.length > 0) {
+          // Use '*' here as well to avoid selecting dropped columns
           const { data: jrRows, error: jrErr } = await supabase
             .from('job_roles')
-            .select(
-              'id, title, location, job_type, created_at, is_active, is_featured, salary, salary_min, salary_max, tech_stack',
-            )
+            .select('*')
             .in('id', jobRoleIds);
           if (jrErr) throw jrErr;
           for (const jr of jrRows || []) jobRoleMap[(jr as any).id] = jr as any;
@@ -236,8 +235,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
               <div className="flex items-center">
                 <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                 <span>
-                  Joined{' '}
-                  {recruiterUser?.created_at ? new Date(recruiterUser.created_at).toLocaleDateString() : '—'}
+                  Joined {recruiterUser?.created_at ? new Date(recruiterUser.created_at).toLocaleDateString() : '—'}
                 </span>
               </div>
             </div>
@@ -296,9 +294,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Location
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Posted</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
@@ -311,13 +307,11 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
                       <div className="font-semibold text-gray-900">{j.title}</div>
                       {(j.tech_stack || []).length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {(j.tech_stack || [])
-                            .slice(0, 3)
-                            .map((t, i) => (
-                              <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                                {t}
-                              </span>
-                            ))}
+                          {(j.tech_stack || []).slice(0, 3).map((t, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                              {t}
+                            </span>
+                          ))}
                           {(j.tech_stack || []).length > 3 && (
                             <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded">
                               +{(j.tech_stack || []).length - 3}
