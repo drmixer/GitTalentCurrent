@@ -56,7 +56,6 @@ const getSetup = (framework: Framework) => {
           jsdom: '^22.1.0',
           vite: '^4.4.5',
           '@vitejs/plugin-vue': '^4.2.3',
-          '@vue/runtime-dom': '^3.3.4',
         },
       };
     case 'javascript':
@@ -197,23 +196,23 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     try {
-      // Force a restart of the sandbox
-      await sandpack.restartSandpack();
+      // Use runSandpack instead of restartSandpack
+      await sandpack.runSandpack();
       
-      // Wait a moment for restart
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a moment for compilation
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Trigger test rerun
-      sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
+      // Trigger test rerun by updating a file
+      sandpack.updateFile('/__trigger__.ts', `// Test trigger ${Date.now()}\nexport default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
-      // Longer timeout for Vue compilation
+      // Timeout for test completion
       setTimeout(() => {
         if (!canSubmit) {
           console.log('Test timeout - stopping running state');
           setIsRunning(false);
         }
-      }, 30000);
+      }, 25000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
@@ -395,6 +394,7 @@ export default defineConfig({
   define: {
     __VUE_OPTIONS_API__: true,
     __VUE_PROD_DEVTOOLS__: false,
+    global: 'globalThis',
   },
   esbuild: {
     target: 'node14'
@@ -404,13 +404,18 @@ export default defineConfig({
         hidden: true,
       };
 
-      // Add setup file for tests
+      // Add setup file for tests with global Vue
       baseFiles['/src/setupTests.ts'] = {
         code: `
 import '@testing-library/jest-dom';
 import { config } from '@vue/test-utils';
+import * as Vue from 'vue';
 
-// Make Vue globally available
+// Make Vue globally available for tests
+(globalThis as any).Vue = Vue;
+(window as any).Vue = Vue;
+
+// Configure Vue Test Utils
 config.global.config.globalProperties = {
   ...config.global.config.globalProperties
 };
