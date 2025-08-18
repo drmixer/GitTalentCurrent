@@ -190,6 +190,7 @@ serve(async (req) => {
         }
         break;
 
+      // Legacy/unused path kept for compatibility
       case 'INSERT:recruiter_profiles':
         if (record.status === 'pending') {
           const { data: admins, error } = await supabase
@@ -217,17 +218,34 @@ serve(async (req) => {
         break;
     }
 
-    // Enforce in_app preference for the target user (developers only)
+    // Enforce in_app preference for the target user (developers + recruiters)
     if (message && userId && notificationType) {
       let allowInApp = true;
+
       try {
-        const { data: devPref, error: prefErr } = await supabase
+        // Check developer preferences first
+        const { data: devPref, error: devErr } = await supabase
           .from('developers')
           .select('notification_preferences')
           .eq('user_id', userId)
-          .single();
-        if (!prefErr && devPref?.notification_preferences) {
+          .maybeSingle();
+
+        if (!devErr && devPref?.notification_preferences) {
           const inApp = (devPref.notification_preferences as any).in_app;
+          if (typeof inApp === 'boolean') {
+            allowInApp = inApp;
+          }
+        }
+
+        // If still allowed or no dev prefs found, check recruiter preferences
+        const { data: recPref, error: recErr } = await supabase
+          .from('recruiters')
+          .select('notification_preferences')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (!recErr && recPref?.notification_preferences) {
+          const inApp = (recPref.notification_preferences as any).in_app;
           if (typeof inApp === 'boolean') {
             allowInApp = inApp;
           }
@@ -241,6 +259,7 @@ serve(async (req) => {
           userId,
           notificationType
         });
+        // Optional: enqueue email here if you want to send email when in-app is disabled.
         return new Response(JSON.stringify({
           message: 'In-app notification suppressed by user preference'
         }), {
