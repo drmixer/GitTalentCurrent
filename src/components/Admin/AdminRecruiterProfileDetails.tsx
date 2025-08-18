@@ -36,10 +36,10 @@ interface AssignmentRow {
   recruiter_id: string;
   developer_id: string;
   job_role_id: string;
-  status: string;
-  assigned_at?: string | null;
-  created_at?: string;
-  notes?: string | null;
+  status: string | null;
+  assigned_at: string | null;
+  updated_at: string | null;
+  notes: string | null;
 }
 
 interface UserMinimal {
@@ -53,13 +53,10 @@ interface JobRoleMinimal {
   title: string;
   location: string;
   job_type: string | null;
-  created_at: string;
-  is_active: boolean;
+  created_at: string | null;
+  is_active: boolean | null;
   is_featured?: boolean | null;
-  // Support both possible DB schemas for salary
-  salary?: string | null; // Newer schema (TEXT or similar)
-  salary_min?: number | null; // Legacy schema
-  salary_max?: number | null; // Legacy schema
+  salary?: string | null; // Only this exists per your schema
   tech_stack?: string[];
 }
 
@@ -79,11 +76,10 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
   const [jobs, setJobs] = useState<JobRoleMinimal[]>([]);
 
   const totalAssignments = assignments.length;
-  const activeJobsCount = useMemo(() => jobs.filter(j => j.is_active).length, [jobs]);
+  const activeJobsCount = useMemo(() => jobs.filter(j => !!j.is_active).length, [jobs]);
 
   const formatSalary = (j: Partial<JobRoleMinimal>) => {
     if (j.salary) return j.salary as string;
-    if (j.salary_min != null && j.salary_max != null) return `$${j.salary_min}k - $${j.salary_max}k`;
     return '—';
   };
 
@@ -113,37 +109,24 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
         if (recErr) throw recErr;
         setRecruiterProfile(recRow as RecruiterProfileRow);
 
-        // 3) Fetch recruiter's jobs — use '*' to avoid selecting non-existent columns
+        // 3) Fetch recruiter's jobs — select only existing columns and order by created_at (exists)
         const { data: jobRows, error: jobsErr } = await supabase
           .from('job_roles')
-          .select('*')
+          .select('id, title, location, job_type, created_at, is_active, is_featured, salary, tech_stack')
           .eq('recruiter_id', recruiterId)
           .order('created_at', { ascending: false });
         if (jobsErr) throw jobsErr;
         setJobs((jobRows || []) as JobRoleMinimal[]);
 
-        // 4) Fetch assignments with safe columns only (no nested joins)
-        // Try to order by assigned_at, fallback to created_at if assigned_at doesn't exist
-        let assignmentsData: AssignmentRow[] = [];
-
-        const { data: a1, error: e1 } = await supabase
+        // 4) Fetch assignments — select only existing columns and order by assigned_at (exists)
+        const { data: assignmentsRows, error: aErr } = await supabase
           .from('assignments')
-          .select('id, recruiter_id, developer_id, job_role_id, status, assigned_at, created_at, notes')
+          .select('id, recruiter_id, developer_id, job_role_id, status, assigned_at, updated_at, notes')
           .eq('recruiter_id', recruiterId)
           .order('assigned_at', { ascending: false });
+        if (aErr) throw aErr;
 
-        if (e1) {
-          // Fallback: try ordering by created_at
-          const { data: a2, error: e2 } = await supabase
-            .from('assignments')
-            .select('id, recruiter_id, developer_id, job_role_id, status, assigned_at, created_at, notes')
-            .eq('recruiter_id', recruiterId)
-            .order('created_at', { ascending: false });
-          if (e2) throw e2;
-          assignmentsData = (a2 || []) as AssignmentRow[];
-        } else {
-          assignmentsData = (a1 || []) as AssignmentRow[];
-        }
+        const assignmentsData = (assignmentsRows || []) as AssignmentRow[];
 
         // 5) Enrich assignments with developer users and job roles via separate queries
         const developerIds = Array.from(new Set(assignmentsData.map(a => a.developer_id))).filter(Boolean);
@@ -161,10 +144,9 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
 
         let jobRoleMap: Record<string, JobRoleMinimal> = {};
         if (jobRoleIds.length > 0) {
-          // Use '*' here as well to avoid selecting dropped columns
           const { data: jrRows, error: jrErr } = await supabase
             .from('job_roles')
-            .select('*')
+            .select('id, title, location, job_type, created_at, is_active, is_featured, salary, tech_stack')
             .in('id', jobRoleIds);
           if (jrErr) throw jrErr;
           for (const jr of jrRows || []) jobRoleMap[(jr as any).id] = jr as any;
@@ -206,6 +188,12 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
       </div>
     );
   }
+
+  // Helper to display an "assigned" date using existing columns
+  const getAssignedDisplay = (a: EnrichedAssignment) => {
+    const candidate = a.assigned_at || a.updated_at || null;
+    return candidate ? new Date(candidate).toLocaleDateString() : '—';
+  };
 
   return (
     <div className="space-y-8">
@@ -328,7 +316,7 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatSalary(j)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(j.created_at).toLocaleDateString()}
+                      {j.created_at ? new Date(j.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -391,16 +379,10 @@ export const AdminRecruiterProfileDetails: React.FC<Props> = ({ recruiterId }) =
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800">
-                        {a.status}
+                        {a.status || 'New'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {a.assigned_at
-                        ? new Date(a.assigned_at).toLocaleDateString()
-                        : a.created_at
-                        ? new Date(a.created_at).toLocaleDateString()
-                        : '—'}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getAssignedDisplay(a)}</td>
                   </tr>
                 ))}
               </tbody>
