@@ -10,8 +10,9 @@ const EndorsementPage: React.FC = () => {
   const { user } = useAuth(); // Get the currently logged-in user from AuthContext
 
   const [endorsementText, setEndorsementText] = useState('');
-  const [endorserName, setEndorserName] = useState(''); // New state for endorser's name
-  const [endorserEmail, setEndorserEmail] = useState(''); // New state for endorser's email
+  const [endorserName, setEndorserName] = useState(''); // Shown when not logged in
+  const [endorserEmail, setEndorserEmail] = useState(''); // Shown when not logged in
+  const [isAnonymous, setIsAnonymous] = useState(false); // Default: NOT anonymous
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -30,15 +31,15 @@ const EndorsementPage: React.FC = () => {
       return;
     }
 
-    // If user is NOT logged in, name and email are required
+    // If user is NOT logged in, name and email are required for contact/verification
     if (!user && (endorserName.trim() === '' || endorserEmail.trim() === '')) {
-        setSubmitError("Please provide your name and email to submit an anonymous endorsement.");
-        return;
+      setSubmitError("Please provide your name and email to submit an endorsement.");
+      return;
     }
-    // Basic email validation (you might want a more robust one)
+    // Basic email validation
     if (!user && endorserEmail.trim() !== '' && !/\S+@\S+\.\S+/.test(endorserEmail.trim())) {
-        setSubmitError("Please enter a valid email address.");
-        return;
+      setSubmitError("Please enter a valid email address.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -46,27 +47,34 @@ const EndorsementPage: React.FC = () => {
     setSubmitSuccess(false);
 
     try {
+      const payload: Record<string, any> = {
+        developer_id: userId,
+        endorser_id: user?.id || null,
+        comment: endorsementText.trim(),
+        endorser_email: user ? user.email : endorserEmail.trim() || null,
+        endorser_role: null,
+        is_anonymous: !!isAnonymous,   // Respect the checkbox (default false)
+        is_public: true,
+      };
+
+      // Only include endorser_name if not logged in and the value exists
+      if (!user && endorserName.trim()) {
+        // If your table has endorser_name column, this will populate it.
+        // If not, you can remove this field safely.
+        payload.endorser_name = endorserName.trim();
+      }
+
       const { data, error } = await supabase
         .from('endorsements')
-        .insert({
-          developer_id: userId, // The ID of the developer receiving the endorsement
-          endorser_id: user?.id || null, // The ID of the person leaving the endorsement (null if not logged in)
-          comment: endorsementText.trim(), // FIXED: Changed from 'text' to 'comment'
-          endorser_email: user ? user.email : endorserEmail.trim() || null, // Use logged-in user's email or provided email
-          endorser_name: user ? null : endorserName.trim() || null, // CORRECTED: Using endorser_name for the name
-          endorser_role: null, // You can add a role field to the form if needed
-          is_anonymous: !user, // Set to true if not logged in
-          is_public: true, // Default to public, you can change this logic
-        })
-        .select(); // Select the inserted row to confirm
+        .insert(payload)
+        .select();
 
       if (error) {
         console.error('Error submitting endorsement:', error);
-        // Provide more user-friendly messages for common errors if possible
         if (error.code === '23502') { // Not null violation
-            setSubmitError("Missing required information. Please ensure all fields are filled.");
+          setSubmitError("Missing required information. Please ensure all fields are filled.");
         } else {
-            setSubmitError(error.message || "Failed to submit endorsement.");
+          setSubmitError(error.message || "Failed to submit endorsement.");
         }
       } else {
         console.log('Endorsement submitted successfully:', data);
@@ -74,11 +82,12 @@ const EndorsementPage: React.FC = () => {
         setEndorsementText(''); // Clear the form
         setEndorserName('');
         setEndorserEmail('');
+        setIsAnonymous(false);
 
         // Redirect to home/landing page after a delay
         setTimeout(() => {
-          navigate(`/`); // Redirect to the home/landing page
-        }, 3000);
+          navigate(`/`);
+        }, 2000);
       }
     } catch (err) {
       console.error('Unexpected error during submission:', err);
@@ -105,7 +114,7 @@ const EndorsementPage: React.FC = () => {
       {submitSuccess && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
           <strong className="font-bold">Success!</strong>
-          <span className="block sm:inline"> Your endorsement has been submitted. Redirecting to home...</span>
+          <span className="block sm:inline"> Your endorsement has been submitted. Redirecting...</span>
         </div>
       )}
 
@@ -128,7 +137,7 @@ const EndorsementPage: React.FC = () => {
               name="endorsementText"
               rows={6}
               className="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-md p-3 resize-y"
-              placeholder="Share your positive experience with this developer..."
+              placeholder="Share your experience with this developer..."
               value={endorsementText}
               onChange={(e) => setEndorsementText(e.target.value)}
               required
@@ -152,7 +161,7 @@ const EndorsementPage: React.FC = () => {
                 placeholder="e.g., Jane Doe"
                 value={endorserName}
                 onChange={(e) => setEndorserName(e.target.value)}
-                required={!user} // Required only if not logged in
+                required={!user}
                 disabled={isSubmitting || submitSuccess}
               />
             </div>
@@ -168,23 +177,39 @@ const EndorsementPage: React.FC = () => {
                 placeholder="e.g., jane.doe@example.com"
                 value={endorserEmail}
                 onChange={(e) => setEndorserEmail(e.target.value)}
-                required={!user} // Required only if not logged in
+                required={!user}
                 disabled={isSubmitting || submitSuccess}
               />
             </div>
           </div>
         )}
 
+        {/* Anonymity toggle */}
+        <div className="flex items-center gap-2">
+          <input
+            id="postAnonymously"
+            type="checkbox"
+            checked={isAnonymous}
+            onChange={e => setIsAnonymous(e.target.checked)}
+            disabled={isSubmitting || submitSuccess}
+          />
+          <label htmlFor="postAnonymously" className="text-sm text-gray-700">
+            Post anonymously
+          </label>
+        </div>
+
         {/* Submission Info */}
         <p className="mt-2 text-sm text-gray-500 text-center">
-            {user ? `You are submitting this as ${user.email || 'a logged-in user'}.` : "Your name and email will be used for this endorsement. Your identity will not be shared publicly without consent."}
+          {isAnonymous
+            ? "Your endorsement will be shown without your identity."
+            : "Your endorsement will be attributed to you unless you choose to post anonymously."}
         </p>
 
         {/* Submit Button */}
         <div>
           <button
             type="submit"
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
             disabled={isSubmitting || submitSuccess}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Endorsement'}
