@@ -42,17 +42,17 @@ const getSetup = (framework: Framework) => {
       };
     case 'vue':
       return {
-        template: 'vue-ts' as SandpackProviderProps['template'],
+        template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
-        testFile: '/src/App.test.ts',
+        testFile: '/src/App.test.js',
         deps: {
-          vue: '3.3.4',
-          '@vue/test-utils': '2.4.1',
-          '@testing-library/vue': '7.0.0',
+          vue: '3.2.47',
+          '@vue/test-utils': '2.3.2',
+          '@testing-library/vue': '6.6.1',
           '@testing-library/jest-dom': '5.16.5',
-          vitest: '0.34.6',
-          jsdom: '22.1.0',
-          'happy-dom': '10.0.3',
+          '@testing-library/user-event': '14.4.3',
+          vitest: '0.29.8',
+          jsdom: '21.1.1',
         },
       };
     case 'javascript':
@@ -185,7 +185,7 @@ const SandpackTestInner: React.FC<
   };
 
   const handleRunTests = async () => {
-    if (isRunning) return; // Prevent multiple clicks
+    if (isRunning || !sandpack) return;
     
     setIsRunning(true);
     setCanSubmit(false);
@@ -193,26 +193,23 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     try {
-      // For Vue, restart completely to ensure clean compilation
-      if (props.framework === 'vue') {
-        await sandpack.restartSandpack();
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      } else {
-        await sandpack.runSandpack();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      // Simple approach: just trigger a file update to rerun tests
+      const triggerCode = `// Test trigger ${Date.now()}\nexport default ${Date.now()};`;
+      sandpack.updateFile('/trigger-test.js', triggerCode);
       
-      // Trigger test rerun
-      sandpack.updateFile('/__trigger__.ts', `// Test trigger ${Date.now()}\nexport default ${Date.now()};`);
-      setRerunKey((k) => k + 1);
+      // Small delay then remove the trigger file
+      setTimeout(() => {
+        sandpack.deleteFile('/trigger-test.js');
+        setRerunKey((k) => k + 1);
+      }, 500);
 
-      // Extended timeout for Vue
+      // Timeout for test completion
       setTimeout(() => {
         if (!canSubmit) {
           console.log('Test timeout - stopping running state');
           setIsRunning(false);
         }
-      }, props.framework === 'vue' ? 45000 : 25000);
+      }, 30000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
@@ -372,41 +369,22 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     const baseFiles: SandpackFiles = {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
-      '/__trigger__.ts': { code: `export default 0;`, hidden: true },
     };
 
+    // For Vue, convert the test file to .js and simplify the test code
     if (props.framework === 'vue') {
-      // Minimal Vitest configuration for Vue
-      baseFiles['/vitest.config.ts'] = {
-        code: `
-import { defineConfig } from 'vitest/config';
+      // Convert TypeScript test to JavaScript
+      const jsTestCode = props.testCode
+        ?.replace(/import.*from.*['"]/g, (match) => {
+          if (match.includes('.vue')) {
+            return match.replace(/\.vue['"]/, ".vue'");
+          }
+          return match;
+        })
+        .replace(/: any/g, '')
+        .replace(/as any/g, '');
 
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'happy-dom',
-    setupFiles: ['./src/test-setup.ts']
-  },
-  define: {
-    __VUE_OPTIONS_API__: true,
-    __VUE_PROD_DEVTOOLS__: false
-  }
-});
-        `.trim(),
-        hidden: true,
-      };
-
-      // Minimal test setup
-      baseFiles['/src/test-setup.ts'] = {
-        code: `
-import '@testing-library/jest-dom';
-
-// Basic Vue 3 globals for tests
-import * as Vue from 'vue';
-(globalThis as any).Vue = Vue;
-        `.trim(),
-        hidden: true,
-      };
+      baseFiles[testFile] = { code: jsTestCode ?? '', hidden: false };
     }
 
     return baseFiles;
@@ -423,17 +401,15 @@ import * as Vue from 'vue';
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false,
-        initMode: 'lazy',
+        autorun: true,
+        initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
-        showErrorOverlay: true,
+        showErrorOverlay: false,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
-        bundlerURL: 'https://sandpack-bundler.codesandbox.io/',
         logLevel: 'info',
-        experimental_enableServiceWorker: true,
       }}
     >
       <SandpackTestInner
