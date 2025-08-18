@@ -1,7 +1,9 @@
-# Disable caching for assets since filenames are now stable
+# Proper caching for hashed assets
 /assets/*
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=31536000, immutable
   X-Content-Type-Options: nosniff
 
+# No cache for the main HTML file
 /index.html
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
