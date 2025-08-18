@@ -41,6 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
+      // Use legacy 'vue' template, but run Vue 3 SFC tests with Vitest + Vite plugin
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -53,6 +54,10 @@ const getSetup = (framework: Framework) => {
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
+          vite: '^4.5.3',
+          '@vitejs/plugin-vue': '^4.5.2',
+          '@vue/compiler-sfc': '^3.4.21',
+          jsdom: '^20.0.3',
         },
       };
     case 'javascript':
@@ -376,28 +381,38 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
 
-      '/vitest.config.ts': {
+      // Vitest + Vite plugin Vue config so .vue SFCs work in tests
+      '/vite.config.ts': {
         code: `
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+
 export default defineConfig({
+  plugins: [vue()],
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./setupTests.ts'],
+    include: ['src/**/*.test.ts'],
   },
-});`.trim(),
+});
+`.trim(),
         hidden: true,
       },
+
       '/setupTests.ts': {
         code: `import '@testing-library/jest-dom';`,
         hidden: true,
       },
+
+      // SandpackTests runs the "test" script
       '/package.json': {
         code: JSON.stringify(
           {
             name: 'sandpack-tests',
             version: '1.0.0',
             private: true,
+            type: 'module',
             scripts: { test: 'vitest run --reporter=basic' },
           },
           null,
@@ -408,7 +423,7 @@ export default defineConfig({
     };
 
     if (props.framework === 'vue') {
-      // Prevent any preview script execution: no scripts in HTML, and both main files are no-ops.
+      // Prevent any preview script execution.
       baseFiles['/index.html'] = {
         code: `<!doctype html>
 <html lang="en">
@@ -444,7 +459,7 @@ export default defineConfig({
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: false,
+        autorun: true, // allow tests to mount and run after build; preview is inert
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
