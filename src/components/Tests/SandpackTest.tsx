@@ -41,27 +41,19 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Run Vue 3 SFC tests on sandpack 2.19.x without starting a dev server:
-      // - Use 'vanilla-ts' template
-      // - Install vite + @vitejs/plugin-vue only for vitest transforms
       return {
-        template: 'vanilla-ts' as SandpackProviderProps['template'],
+        template: 'vue-ts' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
-          vue: '^3.4.21',
-          '@vue/compiler-sfc': '^3.4.21',
-          // Vite + plugin-vue versions compatible with vitest 0.34.x:
-          vite: '^4.5.0',
-          '@vitejs/plugin-vue': '^4.5.2',
-          // Testing
-          '@vue/test-utils': '^2.4.5',
-          '@testing-library/vue': '^8.0.3',
-          '@testing-library/dom': '^9.3.4',
-          '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2',
+          vue: '^3.3.4',
+          '@vue/test-utils': '^2.4.1',
+          '@testing-library/vue': '^7.0.0',
+          '@testing-library/jest-dom': '^5.16.5',
+          '@testing-library/user-event': '^14.4.3',
           vitest: '^0.34.6',
-          jsdom: '^20.0.3',
+          jsdom: '^22.1.0',
+          'happy-dom': '^10.0.3',
         },
       };
     case 'javascript':
@@ -370,42 +362,67 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     };
 
     if (props.framework === 'vue') {
-      baseFiles['/vitest.config.ts'] = {
+      // Use vitest.config.js instead of .ts for better compatibility
+      baseFiles['/vitest.config.js'] = {
         code: `
-import { defineConfig } from 'vitest/config';
-import vue from '@vitejs/plugin-vue';
+import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
+
 export default defineConfig({
   plugins: [vue()],
   test: {
-    environment: 'jsdom',
     globals: true,
-    setupFiles: ['./setupTests.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.test.js', 'src/**/*.test.jsx'],
+    environment: 'happy-dom'
   },
-});
+  esbuild: {
+    target: 'node14'
+  }
+})
         `.trim(),
         hidden: true,
       };
-      baseFiles['/setupTests.ts'] = {
-        code: "import '@testing-library/jest-dom';",
+
+      // Add a simpler setup file
+      baseFiles['/src/test-setup.js'] = {
+        code: `
+import { config } from '@vue/test-utils'
+import { beforeAll } from 'vitest'
+
+// Global test setup
+beforeAll(() => {
+  // Add any global setup here
+})
+        `.trim(),
+        hidden: true,
+      };
+
+      // Update package.json to include proper scripts and config
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          "name": "vue-sandpack-test",
+          "version": "0.0.0",
+          "scripts": {
+            "test": "vitest run --reporter=verbose",
+            "test:watch": "vitest"
+          },
+          "dependencies": deps,
+          "type": "module"
+        }, null, 2),
         hidden: true,
       };
     }
 
     return baseFiles;
-  }, [props.starterCode, props.testCode, codeFile, testFile, props.framework]);
+  }, [props.starterCode, props.testCode, codeFile, testFile, props.framework, deps]);
 
   if (!props.testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
-
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
-      {...(bundlerURL ? { bundlerURL } : {})}
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
