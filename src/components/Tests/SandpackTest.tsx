@@ -194,13 +194,20 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     try {
-      await sandpack.runSandpack();
+      // Force a restart of the sandbox
+      await sandpack.restartSandpack();
+      
+      // Wait a moment for restart
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Trigger test rerun
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
+      // Longer timeout for Vue compilation
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
-      }, 20000);
+      }, 30000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
@@ -377,7 +384,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    reporter: 'verbose',
+    run: true,
   },
+  esbuild: {
+    target: 'node14'
+  }
 });
         `.trim(),
         hidden: true,
@@ -401,22 +413,19 @@ app.mount('#app');
         hidden: true,
       };
 
-      // Add index.html
-      baseFiles['/index.html'] = {
-        code: `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vue App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-</html>
-        `.trim(),
+      // Add package.json with proper test script
+      baseFiles['/package.json'] = {
+        code: JSON.stringify({
+          "name": "vue-test-app",
+          "version": "0.0.0",
+          "type": "module",
+          "scripts": {
+            "dev": "vite",
+            "build": "vite build",
+            "test": "vitest run --reporter=verbose",
+            "test:watch": "vitest"
+          }
+        }, null, 2),
         hidden: true,
       };
     }
