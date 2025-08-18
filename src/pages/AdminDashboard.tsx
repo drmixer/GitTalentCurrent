@@ -20,8 +20,10 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
-// Admin-only preview components (do not touch shared ones)
-import { AdminDeveloperPreview } from '../components/Admin/AdminDeveloperPreview';
+// Use shared developer details so admin sees the same structure recruiters do
+import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
+
+// Admin-only components that do not affect recruiter/developer views
 import { AdminRecruiterPreview } from '../components/Admin/AdminRecruiterPreview';
 import { AdminJobRoleDetails } from '../components/Admin/AdminJobRoleDetails';
 
@@ -44,8 +46,10 @@ interface AdminJobRole {
   description: string;
   location: string;
   job_type: string | null;
-  salary_min: number | null;
-  salary_max: number | null;
+  // Support both schema variants:
+  salary?: string | null;            // New schema (single TEXT column)
+  salary_min?: number | null;        // Legacy schema
+  salary_max?: number | null;        // Legacy schema
   is_active: boolean;
   is_featured: boolean | null;
   created_at: string;
@@ -103,7 +107,7 @@ export const AdminDashboard: React.FC = () => {
   const [jobs, setJobs] = useState<AdminJobRole[]>([]);
   const [hires, setHires] = useState<AdminHire[]>([]);
 
-  // Modals (admin-only preview components)
+  // Modals
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<string | null>(null);
 
@@ -150,10 +154,16 @@ export const AdminDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile, activeTab]);
 
-  // Safe, admin-only fetchers (no fragile joins, no inline comments in select)
+  // Helpers
+  const formatSalary = (job: Partial<AdminJobRole>): string => {
+    if (job.salary) return job.salary;
+    if (job.salary_min != null && job.salary_max != null) return `$${job.salary_min}k - $${job.salary_max}k`;
+    return '—';
+  };
+
+  // Fetchers
 
   const fetchRecruiters = async () => {
-    // Pending recruiters
     const { data: pendingUsers, error: pendingErr } = await supabase
       .from('users')
       .select('id, email, name, created_at, is_approved, role')
@@ -162,7 +172,6 @@ export const AdminDashboard: React.FC = () => {
       .order('created_at', { ascending: false });
     if (pendingErr) throw pendingErr;
 
-    // Approved recruiters
     const { data: approvedUsers, error: approvedErr } = await supabase
       .from('users')
       .select('id, email, name, created_at, is_approved, role')
@@ -171,22 +180,17 @@ export const AdminDashboard: React.FC = () => {
       .order('created_at', { ascending: false });
     if (approvedErr) throw approvedErr;
 
-    // Company names
     const allIds = [
       ...(pendingUsers?.map(u => u.id) || []),
       ...(approvedUsers?.map(u => u.id) || []),
     ];
     let companyByUser: Record<string, string | null> = {};
     if (allIds.length > 0) {
-      const { data: recs, error: recErr } = await supabase
+      const { data: recs } = await supabase
         .from('recruiters')
         .select('user_id, company_name')
         .in('user_id', allIds);
-      if (!recErr && recs) {
-        for (const r of recs) {
-          companyByUser[r.user_id] = r.company_name ?? null;
-        }
-      }
+      for (const r of recs || []) companyByUser[r.user_id] = r.company_name ?? null;
     }
 
     setPendingRecruiters(
@@ -223,7 +227,6 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const fetchJobs = async () => {
-    // Use safe join on known FK name; no inline comments
     const { data, error } = await supabase
       .from('job_roles')
       .select('*, recruiter:users!job_roles_recruiter_id_fkey(id, name)')
@@ -258,16 +261,16 @@ export const AdminDashboard: React.FC = () => {
       assignments = asgData || [];
     }
 
-    // Step 3: job_roles
+    // Step 3: job_roles (select '*' to avoid schema mismatch between salary vs salary_min/salary_max)
     const jobRoleIds = Array.from(new Set(assignments.map(a => a.job_role_id)));
     let jobRoleMap: Record<string, AdminJobRole> = {};
     if (jobRoleIds.length > 0) {
       const { data: jrData, error: jrErr } = await supabase
         .from('job_roles')
-        .select('id, title, description, location, job_type, salary_min, salary_max, is_active, is_featured, created_at, recruiter_id, tech_stack')
+        .select('*')
         .in('id', jobRoleIds);
       if (jrErr) throw jrErr;
-      for (const jr of jrData || []) jobRoleMap[jr.id] = jr as any;
+      for (const jr of jrData || []) jobRoleMap[(jr as any).id] = jr as any;
     }
 
     // Step 4: users for devs/recruiters
@@ -460,7 +463,9 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="text-2xl font-black text-gray-900 mb-1">{jobs.length}</div>
                 <div className="text-sm text-gray-600">Active Job Listings</div>
-                <div className="text-xs text-emerald-600 font-medium mt-1">{jobs.filter(j => j.is_featured).length} featured</div>
+                <div className="text-xs text-emerald-600 font-medium mt-1">
+                  {jobs.filter(j => j.is_featured).length} featured
+                </div>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
@@ -565,7 +570,7 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : filteredPendingRecruiters.length > 0 ? (
+              ) : pendingRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -577,7 +582,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredPendingRecruiters.map(r => (
+                      {pendingRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -626,7 +631,7 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : filteredApprovedRecruiters.length > 0 ? (
+              ) : approvedRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -639,7 +644,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredApprovedRecruiters.map(r => (
+                      {approvedRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -857,7 +862,7 @@ export const AdminDashboard: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{job.location}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {job.salary_min != null && job.salary_max != null ? `$${job.salary_min}k - $${job.salary_max}k` : '—'}
+                            {formatSalary(job)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
@@ -1009,7 +1014,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Admin-only Modals */}
+        {/* Modals */}
         {showDeveloperModal && selectedDeveloperId && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl">
@@ -1023,7 +1028,8 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                <AdminDeveloperPreview developerId={selectedDeveloperId} />
+                {/* Use shared component so the layout matches what recruiters see */}
+                <DeveloperProfileDetails developerId={selectedDeveloperId} />
               </div>
             </div>
           </div>
