@@ -37,14 +37,13 @@ const getSetup = (framework: Framework) => {
           '@testing-library/react': '^14.2.1',
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
-        },
+          vitest: '^0.34.6'
+        }
       };
     case 'vue':
-      // Use 'vue' template on sandpack-react 2.13.x
-      // Add defensive deps so older cached bundlers don't crash
+      // Use the dedicated Vue 3 template with latest bundler
       return {
-        template: 'vue' as SandpackProviderProps['template'],
+        template: 'vue3' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -56,11 +55,8 @@ const getSetup = (framework: Framework) => {
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
-          jsdom: '^20.0.3',
-          // Defensive deps for old bundlers:
-          '@babel/code-frame': '^7.24.6',
-          picocolors: '^1.0.0',
-        },
+          jsdom: '^20.0.3'
+        }
       };
     case 'javascript':
     default:
@@ -72,8 +68,8 @@ const getSetup = (framework: Framework) => {
           '@testing-library/dom': '^9.3.4',
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
-        },
+          vitest: '^0.34.6'
+        }
       };
   }
 };
@@ -156,7 +152,7 @@ const TestsAndConsole: React.FC<{
             height: '100%',
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            fontSize: 12,
+            fontSize: 12
           }}
         />
       </div>
@@ -236,7 +232,7 @@ const SandpackTestInner: React.FC<
           passed_test_cases: passed ?? null,
           total_test_cases: total ?? null,
           stdout: lastRawText,
-          stderr: '',
+          stderr: ''
         },
         { onConflict: 'assignment_id,question_id' }
       );
@@ -264,7 +260,7 @@ const SandpackTestInner: React.FC<
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px',
+          gap: '16px'
         }}
       >
         {submitted ? (
@@ -285,7 +281,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
               }}
             >
               Submit Results
@@ -311,7 +307,7 @@ const SandpackTestInner: React.FC<
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '8px'
               }}
             >
               {isRunning ? (
@@ -323,7 +319,7 @@ const SandpackTestInner: React.FC<
                       border: '2px solid #ffffff40',
                       borderTop: '2px solid #ffffff',
                       borderRadius: '50%',
-                      animation: 'spin 1s linear infinite',
+                      animation: 'spin 1s linear infinite'
                     }}
                   />
                   Running Tests...
@@ -364,11 +360,10 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     const baseFiles: SandpackFiles = {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
-      '/__trigger__.ts': { code: `export default 0;`, hidden: true },
+      '/__trigger__.ts': { code: `export default 0;`, hidden: true }
     };
 
     if (props.framework === 'vue') {
-      // Minimal Vitest + JSDOM config for Vue tests
       baseFiles['/vitest.config.ts'] = {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -381,16 +376,11 @@ export default defineConfig({
   },
 });
         `.trim(),
-        hidden: true,
+        hidden: true
       };
       baseFiles['/setupTests.ts'] = {
         code: "import '@testing-library/jest-dom';",
-        hidden: true,
-      };
-      // No-op Babel config to avoid JSX plugin path on older bundlers
-      baseFiles['/babel.config.json'] = {
-        code: JSON.stringify({ presets: [], plugins: [] }, null, 2),
-        hidden: true,
+        hidden: true
       };
     }
 
@@ -401,7 +391,7 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  // Force newest bundler for Vue so SFCs work reliably
+  // Force newest bundler domain explicitly
   const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
 
   return (
@@ -419,7 +409,7 @@ export default defineConfig({
         showInlineErrors: true,
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
-        activeFile: codeFile,
+        activeFile: codeFile
       }}
     >
       <SandpackTestInner
