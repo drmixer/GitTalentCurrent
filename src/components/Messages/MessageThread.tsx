@@ -51,35 +51,39 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ENHANCED: Clear message notifications when thread opens or changes
+  // Clear message notifications and mark thread read when the thread opens/changes
   useEffect(() => {
     if (otherUserId && userProfile?.id) {
-      console.log('💬 Clearing message notifications from sender:', otherUserId);
-      
       // Clear message notifications from this specific sender
       markMessageNotificationsAsRead(otherUserId);
-      
-      // Also mark any existing messages from this sender as read in the messages table
+
+      // Also mark any existing unread messages from this sender as read in the messages table
       const markExistingMessagesAsRead = async () => {
         try {
           const { error } = await supabase
             .from('messages')
-            .update({ is_read: true })
+            .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('receiver_id', userProfile.id)
             .eq('sender_id', otherUserId)
             .eq('is_read', false);
+
           if (error) {
             console.error('Error marking existing messages as read:', error);
-          } else {
-            console.log('✅ Existing messages marked as read');
           }
-        } catch (error) {
-          console.error('Error in markExistingMessagesAsRead:', error);
+        } catch (err) {
+          console.error('Error in markExistingMessagesAsRead:', err);
+        } finally {
+          // Refresh the global unread badge
+          fetchUnreadCount?.();
+          // Notify MessageList to zero out this thread's unread count immediately
+          window.dispatchEvent(
+            new CustomEvent('messages:threadRead', { detail: { otherUserId, jobRoleId: jobContext?.id || null } })
+          );
         }
       };
-      markExistingMessagesAsRead();
+      void markExistingMessagesAsRead();
     }
-  }, [otherUserId, userProfile?.id, markMessageNotificationsAsRead]);
+  }, [otherUserId, userProfile?.id, jobContext?.id, markMessageNotificationsAsRead, fetchUnreadCount]);
 
   useEffect(() => {
     if (userProfile && otherUserId) {
@@ -102,7 +106,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           }
         )
         .on('broadcast', { event: 'typing' }, (payload) => {
-          if (payload.senderId === otherUserId) {
+          if ((payload as any).senderId === otherUserId) {
             setIsTyping(true);
             if (typingTimeoutRef.current) {
               clearTimeout(typingTimeoutRef.current);
@@ -123,7 +127,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     }
   }, [userProfile, otherUserId, jobContext, markMessageNotificationsAsRead]);
 
-  // ENHANCED: Mark new messages as read when they're received in real-time
+  // Mark new messages as read when they're received in real-time
   useEffect(() => {
     if (!userProfile?.id || !otherUserId) return;
     
@@ -214,7 +218,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .update({ is_read: true, read_at: new Date().toISOString() })
           .eq('id', messageId);
 
-        // UPDATED: Also clear notifications when new messages arrive
+        // Also clear notifications when new messages arrive
         if (data.sender_id === otherUserId) {
           markMessageNotificationsAsRead(otherUserId);
         }
@@ -300,13 +304,18 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // UPDATED: Also clear notifications when marking messages as read
+        // Also clear notifications when marking messages as read
         markMessageNotificationsAsRead(otherUserId);
         
         setTimeout(() => {
           console.log('🔄 Refreshing notification count after marking messages as read');
           fetchUnreadCount();
         }, 300);
+
+        // Notify MessageList to zero out this thread's unread count immediately
+        window.dispatchEvent(
+          new CustomEvent('messages:threadRead', { detail: { otherUserId, jobRoleId: jobContext?.id || null } })
+        );
       }
     } catch (error) {
       console.error('Error marking messages as read:', error);
@@ -512,7 +521,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           <button
             onClick={sendMessage}
             disabled={!newMessage.trim() || sending || !canSendMessage}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {sending ? <Loader className="animate-spin w-5 h-5" /> : <Send className="w-5 h-5" />}
           </button>
