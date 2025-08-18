@@ -214,6 +214,63 @@ export async function updateEndorsement(
 }
 
 /**
+ * Update only the visibility (is_public) of an endorsement.
+ * This matches the named import used in DeveloperDashboard.tsx.
+ */
+export async function updateEndorsementVisibility(
+  supabase: SupabaseClient,
+  endorsementId: string,
+  isPublic: boolean
+): Promise<EndorsementRow> {
+  const { data, error } = await supabase
+    .from('endorsements')
+    .update({ is_public: isPublic })
+    .eq('id', endorsementId)
+    .select(
+      `
+      id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+      comment, is_anonymous, is_public, endorser_name, skill, skills
+      `
+    )
+    .single();
+
+  if (error) {
+    console.error('[endorsementUtils] updateEndorsementVisibility error:', error.message);
+    throw error;
+  }
+
+  return data as EndorsementRow;
+}
+
+/**
+ * Optional: update anonymity flag if needed elsewhere.
+ */
+export async function updateEndorsementAnonymity(
+  supabase: SupabaseClient,
+  endorsementId: string,
+  isAnonymous: boolean
+): Promise<EndorsementRow> {
+  const { data, error } = await supabase
+    .from('endorsements')
+    .update({ is_anonymous: isAnonymous })
+    .eq('id', endorsementId)
+    .select(
+      `
+      id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+      comment, is_anonymous, is_public, endorser_name, skill, skills
+      `
+    )
+    .single();
+
+  if (error) {
+    console.error('[endorsementUtils] updateEndorsementAnonymity error:', error.message);
+    throw error;
+  }
+
+  return data as EndorsementRow;
+}
+
+/**
  * Optional helper for rendering. Falls back to the single "skill" if present.
  */
 export function skillsDisplay(
