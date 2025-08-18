@@ -24,7 +24,8 @@ import { supabase } from '../lib/supabase';
 // Use the shared components so Admin sees the full detail structure
 import { DeveloperProfileDetails } from '../components/Profile/DeveloperProfileDetails';
 import { RecruiterProfileDetails } from '../components/Profile/RecruiterProfileDetails';
-import { JobRoleDetails } from '../components/JobRoles/JobRoleDetails';
+// Use the admin-safe job details that avoids fragile nested selects
+import { AdminJobRoleDetails } from '../components/Admin/AdminJobRoleDetails';
 
 type AdminTab = 'overview' | 'recruiters' | 'developers' | 'jobs' | 'hires';
 
@@ -45,7 +46,7 @@ interface AdminJobRole {
   description: string;
   location: string;
   job_type: string | null;
-  // Support both schema variants for salary
+  // Support both possible DB schemas for salary
   salary?: string | null; // Newer schema (TEXT)
   salary_min?: number | null; // Legacy schema
   salary_max?: number | null; // Legacy schema
@@ -245,7 +246,7 @@ export const AdminDashboard: React.FC = () => {
     setJobs((data as any) || []);
   };
 
-  // Hires: multi-step enrichment to avoid fragile joins
+  // Hires: multi-step enrichment to avoid fragile nested joins
   const fetchHires = async () => {
     // 1) hires
     const { data: hiresData, error: hiresErr } = await supabase
@@ -605,7 +606,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredPendingRecruiters.map(r => (
+                      {pendingRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -1104,7 +1105,8 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                <JobRoleDetails jobRoleId={selectedJobId} />
+                {/* Use the admin-safe details to avoid 400 from invalid nested selects */}
+                <AdminJobRoleDetails jobRoleId={selectedJobId} />
               </div>
             </div>
           </div>
