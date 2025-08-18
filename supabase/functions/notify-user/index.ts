@@ -12,7 +12,7 @@ type Prefs = {
 };
 
 function isTypeAllowed(prefs: Prefs | null | undefined, type: string) {
-  // If specific type flag exists and is false, block; otherwise allow by default
+  // If a specific type flag exists and is false, block; otherwise allow by default
   if (prefs?.types && Object.prototype.hasOwnProperty.call(prefs.types, type)) {
     return !!prefs.types[type];
   }
@@ -21,7 +21,7 @@ function isTypeAllowed(prefs: Prefs | null | undefined, type: string) {
 
 async function sendEmailViaResend(to: string, subject: string, html: string, text: string) {
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-  const FROM = Deno.env.get('RESEND_FROM_EMAIL') || 'GitTalent <noreply@gittalent.dev>';
+  const FROM = Deno.env.get('EMAIL_FROM') || 'GitTalent <noreply@gittalent.dev>';
 
   if (!RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set; skipping email send.');
@@ -79,7 +79,6 @@ serve(async (req) => {
       record = requestBody.record;
       table = requestBody.table;
     } else if (requestBody.type && requestBody.record) {
-      // Expect type like 'INSERT' and record.table in some setups
       type = requestBody.type;
       record = requestBody.record;
       table = record?.table || record?.schema || undefined;
@@ -244,111 +243,109 @@ serve(async (req) => {
         break;
 
       default:
-        // ignore
+        // ignore unknown events
         break;
     }
 
-    // Skip test-assignment notifications aimed at recruiters
-    if (message && userId && notificationType === 'test_assignment') {
-      const { data: targetUser } = await supabase
-        .from('users')
-        .select('id, role')
-        .eq('id', userId)
-        .maybeSingle();
-      if (targetUser?.role === 'recruiter') {
-        return new Response(JSON.stringify({ message: 'Skipped recruiter test-assignment notification' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
-    // Deliver channels according to preferences
-    if (message && userId && notificationType) {
-      // Load preferences for both roles and merge channel flags
-      let devPrefs: Prefs | null = null;
-      let recPrefs: Prefs | null = null;
-
-      try {
-        const [{ data: d }, { data: r }] = await Promise.all([
-          supabase.from('developers').select('notification_preferences').eq('user_id', userId).maybeSingle(),
-          supabase.from('recruiters').select('notification_preferences').eq('user_id', userId).maybeSingle()
-        ]);
-        devPrefs = (d?.notification_preferences as any) || null;
-        recPrefs = (r?.notification_preferences as any) || null;
-      } catch (e) {
-        console.warn('Could not load preferences; defaulting to allow in-app/email.', e);
-      }
-
-      const allowInApp =
-        (typeof devPrefs?.in_app === 'boolean' ? devPrefs?.in_app : true) &&
-        (typeof recPrefs?.in_app === 'boolean' ? recPrefs?.in_app : true) &&
-        isTypeAllowed(devPrefs, notificationType) &&
-        isTypeAllowed(recPrefs, notificationType);
-
-      const allowEmail =
-        (typeof devPrefs?.email === 'boolean' ? devPrefs?.email : false) ||
-        (typeof recPrefs?.email === 'boolean' ? recPrefs?.email : false);
-
-      // Insert in-app notification if allowed
-      if (allowInApp) {
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          message,
-          type: notificationType,
-          entity_id: entityId,
-          link,
-          title: title || message
-        });
-      } else {
-        console.log('In-app suppressed by user preference', { userId, notificationType });
-      }
-
-      // Send email if allowed
-      if (allowEmail && isTypeAllowed(devPrefs, notificationType) && isTypeAllowed(recPrefs, notificationType)) {
-        const { data: targetUser } = await supabase
-          .from('users')
-          .select('email, name')
-          .eq('id', userId)
-          .maybeSingle();
-
-        const to = targetUser?.email;
-        if (to) {
-          const appUrl =
-            Deno.env.get('PUBLIC_APP_URL') ||
-            Deno.env.get('NEXT_PUBLIC_SITE_URL') ||
-            Deno.env.get('SITE_URL') ||
-            '';
-
-          const fullLink = appUrl
-            ? `${appUrl.replace(/\/+$/, '')}/${link.replace(/^\?/, '') ? `developer${link}` : ''}` // heuristic: default to developer tab paths
-            : '';
-
-          const emailSubject = title || 'Notification';
-          const emailText = `${message}${fullLink ? `\n\nOpen: ${fullLink}` : ''}`;
-          const emailHtml = `
-            <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
-              <p>${message}</p>
-              ${fullLink ? `<p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Open in GitTalent</a></p>` : ''}
-            </div>
-          `;
-
-          try {
-            await sendEmailViaResend(to, emailSubject, emailHtml, emailText);
-            console.log('Notification email sent via Resend to', to, 'type:', notificationType);
-          } catch (e) {
-            console.error('Failed to send notification email via Resend:', e);
-          }
-        } else {
-          console.log('No email on file for user; skipping email notification', { userId });
-        }
-      }
-
-      return new Response(JSON.stringify({ ok: true }), {
+    // If nothing to send, exit early
+    if (!message || !userId || !notificationType) {
+      return new Response(JSON.stringify({ message: 'No-op' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    return new Response(JSON.stringify({ message: 'No-op' }), {
+    // Load target user (role + email) once for downstream logic
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('id, role, email, name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // Skip test-assignment notifications aimed at recruiters
+    if (notificationType === 'test_assignment' && targetUser?.role === 'recruiter') {
+      return new Response(JSON.stringify({ message: 'Skipped recruiter test-assignment notification' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Deliver channels according to preferences
+    // Load preferences once (developer + recruiter tables)
+    let devPrefs: Prefs | null = null;
+    let recPrefs: Prefs | null = null;
+
+    try {
+      const [{ data: d }, { data: r }] = await Promise.all([
+        supabase.from('developers').select('notification_preferences').eq('user_id', userId).maybeSingle(),
+        supabase.from('recruiters').select('notification_preferences').eq('user_id', userId).maybeSingle()
+      ]);
+      devPrefs = (d?.notification_preferences as any) || null;
+      recPrefs = (r?.notification_preferences as any) || null;
+    } catch (e) {
+      console.warn('Could not load preferences; defaulting to allow in-app/email.', e);
+    }
+
+    const allowType =
+      isTypeAllowed(devPrefs, notificationType) &&
+      isTypeAllowed(recPrefs, notificationType);
+
+    const allowInApp =
+      allowType &&
+      (typeof devPrefs?.in_app === 'boolean' ? devPrefs?.in_app : true) &&
+      (typeof recPrefs?.in_app === 'boolean' ? recPrefs?.in_app : true);
+
+    const allowEmail =
+      allowType &&
+      ((typeof devPrefs?.email === 'boolean' ? devPrefs?.email : false) ||
+       (typeof recPrefs?.email === 'boolean' ? recPrefs?.email : false));
+
+    // Insert in-app notification if allowed
+    if (allowInApp) {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        message,
+        type: notificationType,
+        entity_id: entityId,
+        link,
+        title: title || message
+      });
+    } else {
+      console.log('In-app suppressed by user preference', { userId, notificationType });
+    }
+
+    // Send email if allowed and we have an address
+    if (allowEmail && targetUser?.email) {
+      const APP_BASE_URL = Deno.env.get('APP_BASE_URL')?.replace(/\/+$/, '') || '';
+      // Pick a base route by role
+      const routeBase =
+        targetUser.role === 'recruiter' ? 'recruiter' :
+        targetUser.role === 'admin' ? 'admin' : 'developer';
+
+      // link is usually a query string like "?tab=..." to append after /{routeBase}
+      const subPath = link
+        ? (link.startsWith('?') ? `/${routeBase}${link}` :
+           link.startsWith('/') ? link : `/${link}`)
+        : `/${routeBase}`;
+
+      const fullLink = APP_BASE_URL ? `${APP_BASE_URL}${subPath}` : '';
+
+      const emailSubject = title || 'Notification';
+      const emailText = `${message}${fullLink ? `\n\nOpen: ${fullLink}` : ''}`;
+      const emailHtml = `
+        <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
+          <p>${message}</p>
+          ${fullLink ? `<p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Open in GitTalent</a></p>` : ''}
+        </div>
+      `;
+
+      try {
+        await sendEmailViaResend(targetUser.email, emailSubject, emailHtml, emailText);
+        console.log('Notification email sent via Resend to', targetUser.email, 'type:', notificationType);
+      } catch (e) {
+        console.error('Failed to send notification email via Resend:', e);
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error: any) {
