@@ -41,7 +41,8 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' template with sandpack-react 2.13.x and force latest bundler
+      // Use 'vue' template on sandpack-react 2.13.x
+      // Add defensive deps so older cached bundlers don't crash
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -56,8 +57,9 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
           jsdom: '^20.0.3',
-          // Defensive for older cached bundlers that pull @vue/babel-plugin-jsx
+          // Defensive deps for old bundlers:
           '@babel/code-frame': '^7.24.6',
+          picocolors: '^1.0.0',
         },
       };
     case 'javascript':
@@ -197,11 +199,9 @@ const SandpackTestInner: React.FC<
 
     try {
       await sandpack.runSandpack();
-      // Force a re-run by touching a hidden file
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
-      // Safety timeout so the button recovers if tests never finish
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
       }, 20000);
@@ -368,6 +368,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     };
 
     if (props.framework === 'vue') {
+      // Minimal Vitest + JSDOM config for Vue tests
       baseFiles['/vitest.config.ts'] = {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -386,6 +387,11 @@ export default defineConfig({
         code: "import '@testing-library/jest-dom';",
         hidden: true,
       };
+      // No-op Babel config to avoid JSX plugin path on older bundlers
+      baseFiles['/babel.config.json'] = {
+        code: JSON.stringify({ presets: [], plugins: [] }, null, 2),
+        hidden: true,
+      };
     }
 
     return baseFiles;
@@ -395,13 +401,13 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
+  // Force newest bundler for Vue so SFCs work reliably
   const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
 
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
-      // Important: bundlerURL is a top-level prop so we get the newest bundler
       {...(bundlerURL ? { bundlerURL } : {})}
       customSetup={{ dependencies: deps }}
       files={files}
