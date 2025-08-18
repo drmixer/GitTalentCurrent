@@ -1,40 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-import { User } from '../../types';
 
 export const RecruiterProfileForm = () => {
   const { user, userProfile, loading: authLoading, refreshUserProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
   const [companyName, setCompanyName] = useState('');
   const [website, setWebsite] = useState('');
   const [companySize, setCompanySize] = useState('');
   const [industry, setIndustry] = useState('');
+
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [companyLogo, setCompanyLogo] = useState<File | null>(null);
   const [profilePicUrl, setProfilePicUrl] = useState('');
   const [companyLogoUrl, setCompanyLogoUrl] = useState('');
 
+  // Notification preferences (parity with developers)
+  const [notifInApp, setNotifInApp] = useState(true);
+  const [notifEmail, setNotifEmail] = useState(false);
+  const [notifTypes, setNotifTypes] = useState<{ [k: string]: boolean }>({
+    message: true,
+    job_application: true,
+    test_assignment: true,
+    test_completion: true
+  });
+
   useEffect(() => {
     const fetchRecruiterProfile = async () => {
-      if (userProfile) {
-        const { data: recruiterData, error: recruiterError } = await supabase
-          .from('recruiters')
-          .select('company_name, website, company_size, industry')
-          .eq('user_id', userProfile.id)
-          .single();
-        if (recruiterData) {
-          setCompanyName(recruiterData.company_name || '');
-          setWebsite(recruiterData.website || '');
-          setCompanySize(recruiterData.company_size || '');
-          setIndustry(recruiterData.industry || '');
-        }
-        setProfilePicUrl(userProfile.profile_pic_url || '');
-        setCompanyLogoUrl(userProfile.company_logo_url || '');
+      if (!userProfile) return;
+
+      const { data: recruiterData } = await supabase
+        .from('recruiters')
+        .select('company_name, website, company_size, industry, notification_preferences')
+        .eq('user_id', userProfile.id)
+        .maybeSingle();
+
+      if (recruiterData) {
+        setCompanyName(recruiterData.company_name || '');
+        setWebsite(recruiterData.website || '');
+        setCompanySize(recruiterData.company_size || '');
+        setIndustry(recruiterData.industry || '');
+
+        const np = recruiterData.notification_preferences || {};
+        setNotifInApp(typeof np.in_app === 'boolean' ? np.in_app : true);
+        setNotifEmail(typeof np.email === 'boolean' ? np.email : false);
+        const nt = (np.types as any) || {};
+        setNotifTypes({
+          message: nt.message !== false,
+          job_application: nt.job_application !== false,
+          test_assignment: nt.test_assignment !== false,
+          test_completion: nt.test_completion !== false
+        });
       }
+
+      setProfilePicUrl(userProfile.profile_pic_url || '');
+      setCompanyLogoUrl(userProfile.company_logo_url || '');
     };
+
     fetchRecruiterProfile();
   }, [userProfile]);
 
@@ -65,6 +90,17 @@ export const RecruiterProfileForm = () => {
       const newProfilePicUrl = profilePic ? await uploadFile(profilePic, 'profile-pics') : profilePicUrl;
       const newCompanyLogoUrl = companyLogo ? await uploadFile(companyLogo, 'company-logos') : companyLogoUrl;
 
+      const nextPrefs = {
+        in_app: notifInApp,
+        email: notifEmail,
+        types: {
+          message: !!notifTypes.message,
+          job_application: !!notifTypes.job_application,
+          test_assignment: !!notifTypes.test_assignment,
+          test_completion: !!notifTypes.test_completion,
+        },
+      };
+
       const { error: updateRecruiterError } = await supabase
         .from('recruiters')
         .update({
@@ -72,6 +108,7 @@ export const RecruiterProfileForm = () => {
           website: website,
           company_size: companySize,
           industry: industry,
+          notification_preferences: nextPrefs,
         })
         .eq('user_id', user.id);
 
@@ -112,6 +149,7 @@ export const RecruiterProfileForm = () => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
+
         <div>
           <label htmlFor="website" className="block text-sm font-medium text-gray-700">
             Website
@@ -124,6 +162,7 @@ export const RecruiterProfileForm = () => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
+
         <div>
           <label htmlFor="companySize" className="block text-sm font-medium text-gray-700">
             Company Size
@@ -136,6 +175,7 @@ export const RecruiterProfileForm = () => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
+
         <div>
           <label htmlFor="industry" className="block text-sm font-medium text-gray-700">
             Industry
@@ -148,6 +188,54 @@ export const RecruiterProfileForm = () => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
+
+        <div className="mt-8 p-4 border rounded-xl">
+          <h3 className="font-semibold mb-3">Notification settings</h3>
+          <label className="flex items-center gap-2 mb-2">
+            <input type="checkbox" checked={notifInApp} onChange={e => setNotifInApp(e.target.checked)} />
+            In‑app notifications
+          </label>
+          <label className="flex items-center gap-2 mb-4">
+            <input type="checkbox" checked={notifEmail} onChange={e => setNotifEmail(e.target.checked)} />
+            Email notifications
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notifTypes.message}
+                onChange={e => setNotifTypes(s => ({ ...s, message: e.target.checked }))}
+              />
+              Messages
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notifTypes.job_application}
+                onChange={e => setNotifTypes(s => ({ ...s, job_application: e.target.checked }))}
+              />
+              Job applications
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notifTypes.test_assignment}
+                onChange={e => setNotifTypes(s => ({ ...s, test_assignment: e.target.checked }))}
+              />
+              Test assignments
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={notifTypes.test_completion}
+                onChange={e => setNotifTypes(s => ({ ...s, test_completion: e.target.checked }))}
+              />
+              Test completion
+            </label>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="profilePic" className="block text-sm font-medium text-gray-700">
             Profile Picture
@@ -166,6 +254,7 @@ export const RecruiterProfileForm = () => {
           />
           {profilePicUrl && <img src={profilePicUrl} alt="Profile" className="mt-2 h-24 w-24 rounded-full object-cover" />}
         </div>
+
         <div>
           <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
             Company Logo
@@ -184,15 +273,17 @@ export const RecruiterProfileForm = () => {
           />
           {companyLogoUrl && <img src={companyLogoUrl} alt="Company Logo" className="mt-2 h-24 w-auto" />}
         </div>
+
         <div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
           >
             {loading ? 'Updating...' : 'Update Profile'}
           </button>
         </div>
+
         {success && <p className="text-green-600">{success}</p>}
         {error && <p className="text-red-600">{error}</p>}
       </form>
