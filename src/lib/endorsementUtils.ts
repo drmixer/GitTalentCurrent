@@ -9,67 +9,71 @@ import { Endorsement } from '../types';
  * @param publicOnly If true, only fetches public endorsements. Defaults to false.
  * @returns An array of Endorsement objects, or null if an error occurs.
  */
-// CORRECTED: fetchEndorsementsForDeveloper is a default export
-export default async function fetchEndorsementsForDeveloper(developerId: string, publicOnly: boolean = false): Promise<Endorsement[] | null> {
-    try {
-        let query = supabase
-            .from('endorsements')
-            .select(`
-                id,
-                created_at,
-                developer_id,
-                endorser_id,
-                endorser_email,
-                endorser_role,
-                comment,
-                is_anonymous,
-                is_public,
-                endorser_user:endorser_id(
-                    name,
-                    profile_pic_url,
-                    developers(public_profile_slug)
-                )
-            `)
-            .eq('developer_id', developerId)
-            .order('created_at', { ascending: false });
+export default async function fetchEndorsementsForDeveloper(
+  developerId: string,
+  publicOnly: boolean = false
+): Promise<Endorsement[] | null> {
+  try {
+    let query = supabase
+      .from('endorsements')
+      .select(`
+        id,
+        created_at,
+        developer_id,
+        endorser_id,
+        endorser_email,
+        endorser_role,
+        comment,
+        skill,
+        is_anonymous,
+        is_public,
+        endorser_name,
+        endorser_user:endorser_id(
+          name,
+          profile_pic_url,
+          developers(public_profile_slug)
+        )
+      `)
+      .eq('developer_id', developerId)
+      .order('created_at', { ascending: false });
 
-        if (publicOnly) {
-            query = query.eq('is_public', true);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-            console.error('Error fetching endorsements:', error.message);
-            return null;
-        }
-
-        // Map the data to the Endorsement type, handling the nested joins correctly
-        const transformedData: Endorsement[] = data.map((item: any) => ({
-            id: item.id,
-            created_at: item.created_at,
-            developer_id: item.developer_id,
-            endorser_id: item.endorser_id,
-            endorser_email: item.endorser_email,
-            endorser_role: item.endorser_role,
-            comment: item.comment,
-            is_anonymous: item.is_anonymous,
-            is_public: item.is_public,
-            endorser_user: item.endorser_user ? {
-                name: item.endorser_user.name,
-                profile_pic_url: item.endorser_user.profile_pic_url,
-                // Accessing the nested developers array and its first element for public_profile_slug
-                developers: item.endorser_user.developers || [], // Ensure it's an array
-            } : null,
-            // Ensure public_profile_slug is accessed correctly from the nested developers array
-            // This is now handled in the EndorsementDisplay component directly for safer access
-        }));
-
-        return transformedData;
-    } catch (err) {
-        console.error("An unexpected error occurred while fetching endorsements:", err);
-        return null;
+    if (publicOnly) {
+      query = query.eq('is_public', true);
     }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching endorsements:', error.message);
+      return null;
+    }
+
+    // Ensure types
+    const transformedData: Endorsement[] = (data || []).map((item: any) => ({
+      id: item.id,
+      created_at: item.created_at,
+      developer_id: item.developer_id,
+      endorser_id: item.endorser_id,
+      endorser_email: item.endorser_email,
+      endorser_role: item.endorser_role,
+      comment: item.comment,
+      skill: item.skill,
+      is_anonymous: item.is_anonymous,
+      is_public: item.is_public,
+      endorser_name: item.endorser_name ?? null,
+      endorser_user: item.endorser_user
+        ? {
+            name: item.endorser_user.name,
+            developers: item.endorser_user.developers || [],
+          }
+        : null,
+    }));
+
+    return transformedData;
+  } catch (err) {
+    console.error('An unexpected error occurred while fetching endorsements:', err);
+    return null;
+  }
 }
 
 /**
@@ -78,7 +82,6 @@ export default async function fetchEndorsementsForDeveloper(developerId: string,
  * @param isPublic The new public status (true for public, false for hidden).
  * @returns A promise that resolves to true if successful, false otherwise.
  */
-// CORRECTED: Re-added 'export' keyword
 export async function updateEndorsementVisibility(endorsementId: string, isPublic: boolean): Promise<boolean> {
   const { error } = await supabase
     .from('endorsements')
