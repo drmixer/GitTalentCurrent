@@ -41,7 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use legacy 'vue' template, but run Vue 3 SFC tests with Vitest + Vite plugin
+      // Legacy 'vue' template in your Sandpack, but we run Vue 3 tests with Vitest + plugin-vue
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -92,19 +92,11 @@ function parseSummary(text: string) {
   };
 
   const suites = suitesLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, suitesLine),
-        failed: num(/(\d+)\s*failed/i, suitesLine),
-        total: num(/(\d+)\s*total/i, suitesLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, suitesLine), failed: num(/(\d+)\s*failed/i, suitesLine), total: num(/(\d+)\s*total/i, suitesLine) }
     : undefined;
 
   const tests = testsLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, testsLine),
-        failed: num(/(\d+)\s*failed/i, testsLine),
-        total: num(/(\d+)\s*total/i, testsLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, testsLine), failed: num(/(\d+)\s*failed/i, testsLine), total: num(/(\d+)\s*total/i, testsLine) }
     : undefined;
 
   return { ran, suites, tests };
@@ -120,7 +112,6 @@ const TestsAndConsole: React.FC<{
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
-
     observerRef.current?.disconnect();
 
     const obs = new MutationObserver(() => {
@@ -180,8 +171,6 @@ const SandpackTestInner: React.FC<
   }
 > = (props) => {
   const {
-    starterCode,
-    testCode,
     assignmentId,
     questionId,
     isLastQuestion,
@@ -213,9 +202,14 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     try {
+      // Force a rebuild to pick up latest files (esp. Vue plugin + SFCs)
       await sandpack.runSandpack();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Touch a dummy file to guarantee a fresh compile cycle
+      sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
+      // Remount the tests component to trigger a new run
       setRerunKey((k) => k + 1);
+
+      // Safety timeout
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
       }, 20000);
@@ -267,10 +261,6 @@ const SandpackTestInner: React.FC<
       else onNext();
     }, 2000);
   };
-
-  if (!testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
 
   return (
     <>
@@ -381,10 +371,10 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
 
-      // Vitest + Vite plugin Vue config so .vue SFCs work in tests
-      '/vite.config.ts': {
+      // Vitest config that loads Vue SFC plugin
+      '/vitest.config.ts': {
         code: `
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
@@ -405,14 +395,13 @@ export default defineConfig({
         hidden: true,
       },
 
-      // SandpackTests runs the "test" script
+      // Test script only; avoid "type":"module" to keep plugin resolution simple
       '/package.json': {
         code: JSON.stringify(
           {
             name: 'sandpack-tests',
             version: '1.0.0',
             private: true,
-            type: 'module',
             scripts: { test: 'vitest run --reporter=basic' },
           },
           null,
@@ -420,29 +409,24 @@ export default defineConfig({
         ),
         hidden: true,
       },
+
+      // Dummy file we touch to force rebuilds from the custom Run button
+      '/__trigger__.ts': {
+        code: `export default 0;`,
+        hidden: true,
+      },
     };
 
     if (props.framework === 'vue') {
-      // Prevent any preview script execution.
+      // Make preview inert: no scripts; neutralize both main entry points
       baseFiles['/index.html'] = {
-        code: `<!doctype html>
-<html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Vue Sandbox</title></head>
-  <body><div id="app"></div></body>
-</html>`,
+        code: `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Vue Sandbox</title></head><body><div id="app"></div></body></html>`,
         hidden: true,
         active: true,
       };
-
-      baseFiles['/main.js'] = {
-        code: `// noop: neutralize legacy entry to avoid ESM import execution`,
-        hidden: true,
-      };
-
-      baseFiles['/src/main.js'] = {
-        code: `// noop: avoid "import outside module" if template tries to load src/main.js`,
-        hidden: true,
-      };
+      baseFiles['/main.js'] = { code: `// noop`, hidden: true };
+      baseFiles['/src/main.js'] = { code: `// noop`, hidden: true };
+      baseFiles['/src/main.ts'] = { code: `// noop`, hidden: true };
     }
 
     return baseFiles;
@@ -459,7 +443,7 @@ export default defineConfig({
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true, // allow tests to mount and run after build; preview is inert
+        autorun: true, // allows tests to start after compile; we still drive re-run via the button
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
