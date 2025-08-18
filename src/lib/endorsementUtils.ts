@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabase as supabaseSingleton } from './supabase';
 
 export type EndorsementRow = {
   id: string;
@@ -36,6 +37,23 @@ export type CreateEndorsementInput = {
 
 export type UpdateEndorsementInput = Partial<Omit<CreateEndorsementInput, 'developer_id'>>;
 
+// Internal: resolve a usable Supabase client from flexible args
+function isSupabaseClient(x: any): x is SupabaseClient {
+  return x && typeof x === 'object' && typeof x.from === 'function';
+}
+
+function resolveClient(a?: any, b?: any): SupabaseClient {
+  if (isSupabaseClient(a)) return a;
+  if (isSupabaseClient(b)) return b;
+  return supabaseSingleton as unknown as SupabaseClient;
+}
+
+function resolveDeveloperId(a?: any, b?: any): string {
+  if (typeof a === 'string') return a;
+  if (typeof b === 'string') return b;
+  throw new Error('[endorsementUtils] Missing developer_id argument');
+}
+
 /**
  * Normalizes skills the same way the DB trigger does:
  * - lowercase
@@ -65,10 +83,13 @@ export function normalizeSkills(skills: string[] | null | undefined, max = 10): 
  * Returns [] if missing.
  */
 export async function getDeveloperSkills(
-  supabase: SupabaseClient,
-  developerUserId: string
+  supabaseOrDeveloperUserId: SupabaseClient | string,
+  maybeDeveloperUserId?: string
 ): Promise<string[]> {
-  const { data, error } = await supabase
+  const client = resolveClient(supabaseOrDeveloperUserId, maybeDeveloperUserId);
+  const developerUserId = resolveDeveloperId(supabaseOrDeveloperUserId, maybeDeveloperUserId);
+
+  const { data, error } = await client
     .from('developers')
     .select('skills')
     .eq('user_id', developerUserId)
@@ -87,11 +108,11 @@ export async function getDeveloperSkills(
  * Prioritizes developer’s own skills. Optionally filters by query substring.
  */
 export async function getSkillOptionsForDeveloper(
-  supabase: SupabaseClient,
-  developerUserId: string,
+  supabaseOrDeveloperUserId: SupabaseClient | string,
+  maybeDeveloperUserId?: string,
   query?: string
 ): Promise<string[]> {
-  const devSkills = await getDeveloperSkills(supabase, developerUserId);
+  const devSkills = await getDeveloperSkills(supabaseOrDeveloperUserId as any, maybeDeveloperUserId as any);
   const base = devSkills.length ? devSkills : COMMON_SKILLS;
   if (!query) return base;
 
@@ -100,22 +121,31 @@ export async function getSkillOptionsForDeveloper(
 }
 
 /**
+ * Core select for endorsements, including back-compat 'skill' and new 'skills'.
+ */
+const ENDORSEMENTS_SELECT = `
+  id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+  comment, is_anonymous, is_public, endorser_name, skill, skills,
+  endorser_user:endorser_id(name, profile_pic_url, developers(public_profile_slug))
+`;
+
+/**
  * Fetch endorsements for a developer.
- * Includes both skill (back-compat, first item) and skills (array).
+ * Flexible signature:
+ * - fetchEndorsements(client, developerId)
+ * - fetchEndorsements(developerId)
+ * - fetchEndorsements(developerId, client)
  */
 export async function fetchEndorsements(
-  supabase: SupabaseClient,
-  developerUserId: string
+  a: SupabaseClient | string,
+  b?: string
 ): Promise<EndorsementRow[]> {
-  const select = `
-    id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
-    comment, is_anonymous, is_public, endorser_name, skill, skills,
-    endorser_user:endorser_id(name, profile_pic_url, developers(public_profile_slug))
-  `;
+  const client = resolveClient(a, b);
+  const developerUserId = resolveDeveloperId(a, b);
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('endorsements')
-    .select(select)
+    .select(ENDORSEMENTS_SELECT)
     .eq('developer_id', developerUserId)
     .order('created_at', { ascending: false });
 
@@ -125,7 +155,7 @@ export async function fetchEndorsements(
   }
 
   // Ensure skills is always an array for consumers
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map((row: any) => ({
     ...row,
     skills: Array.isArray(row.skills) ? row.skills : row.skills ? [row.skills] : [],
   })) as EndorsementRow[];
@@ -134,22 +164,32 @@ export async function fetchEndorsements(
 /**
  * Default-exported wrapper to match existing imports:
  * import fetchEndorsementsForDeveloper from '../lib/endorsementUtils'
+ * Accepts:
+ * - (client, developerId)
+ * - (developerId)
+ * - (developerId, client)
  */
 export async function fetchEndorsementsForDeveloper(
-  supabase: SupabaseClient,
-  developerUserId: string
+  a: SupabaseClient | string,
+  b?: string
 ) {
-  return fetchEndorsements(supabase, developerUserId);
+  return fetchEndorsements(a as any, b as any);
 }
 
 /**
  * Create a new endorsement (with optional skills).
- * DB trigger creates a notification; your notify-user function emails the developer.
+ * Flexible signature for convenience:
+ * - createEndorsement(client, input)
+ * - createEndorsement(input)  // uses singleton client
+ * - createEndorsement(input, client)
  */
 export async function createEndorsement(
-  supabase: SupabaseClient,
-  input: CreateEndorsementInput
+  a: SupabaseClient | CreateEndorsementInput,
+  b?: CreateEndorsementInput | SupabaseClient
 ): Promise<EndorsementRow> {
+  const client = resolveClient(a, b);
+  const input = (isSupabaseClient(a) ? b : a) as CreateEndorsementInput;
+
   const payload = {
     developer_id: input.developer_id,
     comment: input.comment,
@@ -161,7 +201,7 @@ export async function createEndorsement(
     skills: normalizeSkills(input.skills),
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('endorsements')
     .insert(payload)
     .select(
@@ -181,19 +221,43 @@ export async function createEndorsement(
 }
 
 /**
- * Update an endorsement. You can pass skills to change the set.
+ * Update an endorsement (including skills).
+ * Flexible signatures:
+ * - updateEndorsement(client, endorsementId, updates)
+ * - updateEndorsement(endorsementId, updates)
+ * - updateEndorsement(endorsementId, updates, client)
  */
 export async function updateEndorsement(
-  supabase: SupabaseClient,
-  endorsementId: string,
-  updates: UpdateEndorsementInput
+  a: SupabaseClient | string,
+  b: string | UpdateEndorsementInput,
+  c?: UpdateEndorsementInput | SupabaseClient,
+  d?: SupabaseClient
 ): Promise<EndorsementRow> {
+  // Normalize arguments
+  let client: SupabaseClient;
+  let endorsementId: string;
+  let updates: UpdateEndorsementInput;
+
+  if (isSupabaseClient(a)) {
+    client = a;
+    endorsementId = b as string;
+    updates = c as UpdateEndorsementInput;
+  } else if (isSupabaseClient(c)) {
+    client = c;
+    endorsementId = a as string;
+    updates = b as UpdateEndorsementInput;
+  } else {
+    client = resolveClient();
+    endorsementId = a as string;
+    updates = b as UpdateEndorsementInput;
+  }
+
   const patch: Record<string, unknown> = { ...updates };
   if (updates.skills) {
     patch.skills = normalizeSkills(updates.skills);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('endorsements')
     .update(patch)
     .eq('id', endorsementId)
@@ -215,14 +279,34 @@ export async function updateEndorsement(
 
 /**
  * Update only the visibility (is_public) of an endorsement.
- * This matches the named import used in DeveloperDashboard.tsx.
+ * Flexible signatures like updateEndorsement.
  */
 export async function updateEndorsementVisibility(
-  supabase: SupabaseClient,
-  endorsementId: string,
-  isPublic: boolean
+  a: SupabaseClient | string,
+  b: string | boolean,
+  c?: boolean | SupabaseClient,
+  d?: SupabaseClient
 ): Promise<EndorsementRow> {
-  const { data, error } = await supabase
+  // Normalize arguments
+  let client: SupabaseClient;
+  let endorsementId: string;
+  let isPublic: boolean;
+
+  if (isSupabaseClient(a)) {
+    client = a;
+    endorsementId = b as string;
+    isPublic = c as boolean;
+  } else if (isSupabaseClient(c)) {
+    client = c;
+    endorsementId = a as string;
+    isPublic = b as boolean;
+  } else {
+    client = resolveClient();
+    endorsementId = a as string;
+    isPublic = b as boolean;
+  }
+
+  const { data, error } = await client
     .from('endorsements')
     .update({ is_public: isPublic })
     .eq('id', endorsementId)
@@ -244,13 +328,34 @@ export async function updateEndorsementVisibility(
 
 /**
  * Optional: update anonymity flag if needed elsewhere.
+ * Flexible signatures like updateEndorsement.
  */
 export async function updateEndorsementAnonymity(
-  supabase: SupabaseClient,
-  endorsementId: string,
-  isAnonymous: boolean
+  a: SupabaseClient | string,
+  b: string | boolean,
+  c?: boolean | SupabaseClient,
+  d?: SupabaseClient
 ): Promise<EndorsementRow> {
-  const { data, error } = await supabase
+  // Normalize arguments
+  let client: SupabaseClient;
+  let endorsementId: string;
+  let isAnonymous: boolean;
+
+  if (isSupabaseClient(a)) {
+    client = a;
+    endorsementId = b as string;
+    isAnonymous = c as boolean;
+  } else if (isSupabaseClient(c)) {
+    client = c;
+    endorsementId = a as string;
+    isAnonymous = b as boolean;
+  } else {
+    client = resolveClient();
+    endorsementId = a as string;
+    isAnonymous = b as boolean;
+  }
+
+  const { data, error } = await client
     .from('endorsements')
     .update({ is_anonymous: isAnonymous })
     .eq('id', endorsementId)
