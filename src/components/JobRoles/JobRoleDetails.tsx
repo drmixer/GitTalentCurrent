@@ -21,27 +21,23 @@ import {
   Lock,
   ExternalLink
 } from 'lucide-react';
-import { JobRole, Assignment, User, Developer } from '../../types'; // Assuming JobRole and other types are from here
+import { JobRole, Assignment, User, Developer } from '../../types';
 import { RecruiterProfileDetails } from '../Profile/RecruiterProfileDetails';
 import { DeveloperProfileDetails } from '../Profile/DeveloperProfileDetails';
 
-// --- NEW/UPDATED INTERFACE FOR CORRECT TYPE SAFETY ---
-// This extends your existing JobRole type to correctly represent the fetched data structure
+// Data shape for fetched job role
 interface JobRoleWithRecruiterAndUser extends JobRole {
-  // 'recruiter' here will contain properties from the 'users' table
   recruiter: {
     id: string;
     name: string;
     email: string;
-    // 'company_name' will now be directly on this 'recruiter' object after transformation
-    company_name: string | null; // company_name is nullable in recruiters table
+    company_name: string | null;
   };
 }
-// --- END NEW/UPDATED INTERFACE ---
 
 interface JobRoleDetailsProps {
   jobRoleId: string;
-  jobRole?: JobRole; // Still accepts original JobRole if passed initially
+  jobRole?: JobRole;
   onEdit?: () => void;
   onSendMessage?: (developerId: string, developerName: string, jobRoleId: string, jobRoleTitle: string) => void;
   onViewDeveloper?: (developerId: string) => void;
@@ -63,11 +59,9 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   isDeveloperView = false
 }) => {
   const { user, userProfile } = useAuth();
-  // --- UPDATED: Use the new interface for the jobRole state ---
   const [jobRole, setJobRole] = useState<JobRoleWithRecruiterAndUser | null>(
     (initialJobRole as JobRoleWithRecruiterAndUser) || null
   );
-  // --- END UPDATED ---
   const [loading, setLoading] = useState(!initialJobRole);
   const [error, setError] = useState<string | null>(null);
   const [showRecruiterProfile, setShowRecruiterProfile] = useState(false);
@@ -83,44 +77,46 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   const fetchJobRole = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('job_roles')
         .select(`
           *,
-          recruiter:users!job_roles_recruiter_id_fkey( // This joins the users table
+          recruiter:users!job_roles_recruiter_id_fkey(
             id,
             name,
             email,
-            recruiter_profile:recruiters!users_id_fkey( // <--- NEW: Join the recruiters table through the user's ID
-                company_name // <--- NEW: Select company_name from the joined recruiters table
+            recruiter_profile:recruiters!users_id_fkey(
+              company_name
             )
           )
         `)
         .eq('id', jobRoleId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        setError('Job role not found');
+        setJobRole(null);
+        return;
+      }
 
-      // --- NEW: Data Transformation for nested relationships ---
-      // Supabase's PostgREST API returns nested foreign key joins as arrays,
-      // even if there's only one related record. We need to flatten it.
       const transformedData: JobRoleWithRecruiterAndUser = {
         ...data,
         recruiter: {
-          ...data.recruiter, // Copy basic user data (id, name, email)
-          // Access the first (and only) item in the recruiter_profile array to get company_name
-          company_name: data.recruiter.recruiter_profile?.[0]?.company_name || null
+          ...data.recruiter,
+          company_name: data.recruiter?.recruiter_profile?.[0]?.company_name || null
         }
       };
-      // Remove the temporary 'recruiter_profile' array from the transformed object
-      // as its data is now merged directly into 'recruiter'
-      delete (transformedData.recruiter as any).recruiter_profile; // Use 'any' for deletion for simplicity, or refine type
+      if (transformedData?.recruiter) {
+        delete (transformedData.recruiter as any).recruiter_profile;
+      }
 
-      setJobRole(transformedData); // Set the transformed and correctly typed data
-      // --- END NEW ---
-
+      setJobRole(transformedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch job role');
+      setJobRole(null);
     } finally {
       setLoading(false);
     }
@@ -138,7 +134,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
   };
 
   const handleViewRecruiterProfile = () => {
-    if (jobRole?.recruiter_id) { // Still use recruiter_id to check if a recruiter is associated
+    if (jobRole?.recruiter_id) {
       setShowRecruiterProfile(true);
     }
   };
@@ -166,7 +162,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                                        (userProfile?.role === 'recruiter' && jobRole.recruiter_id === userProfile.id));
   const canAssign = !isDeveloperView && userProfile?.role === 'admin';
 
-  if (showRecruiterProfile && jobRole.recruiter) { // Added defensive check: jobRole.recruiter must exist
+  if (showRecruiterProfile && jobRole.recruiter) {
     return (
       <div>
         <button
@@ -302,7 +298,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
         </div>
 
         {/* Company Info - Only show in developer view */}
-        {isDeveloperView && jobRole.recruiter && ( // <--- jobRole.recruiter check is important here
+        {isDeveloperView && jobRole.recruiter && (
           <div className="mb-6 p-4 bg-gray-50 rounded-xl">
             <div className="flex items-center">
               <Building className="w-5 h-5 text-gray-500 mr-3" />
@@ -312,9 +308,7 @@ export const JobRoleDetails: React.FC<JobRoleDetailsProps> = ({
                   onClick={handleViewRecruiterProfile}
                   className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
                 >
-                  {/* --- THIS LINE IS NOW CORRECT --- */}
                   {jobRole.recruiter.company_name || jobRole.recruiter.name}
-                  {/* --- END CORRECTED LINE --- */}
                   <ExternalLink className="w-3 h-3 ml-1" />
                 </button>
               </div>
