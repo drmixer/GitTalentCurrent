@@ -41,7 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Important: do NOT use the legacy 'vue' template (Vue 2). Use 'vanilla' and inject Vue 3 + Vitest/Vite.
+      // Use a neutral template and inject Vue 3 + Vitest/Vite; avoids legacy Vue 2 globals.
       return {
         template: 'vanilla' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -92,11 +92,19 @@ function parseSummary(text: string) {
   };
 
   const suites = suitesLine
-    ? { passed: num(/(\d+)\s*passed/i, suitesLine), failed: num(/(\d+)\s*failed/i, suitesLine), total: num(/(\d+)\s*total/i, suitesLine) }
+    ? {
+        passed: num(/(\d+)\s*passed/i, suitesLine),
+        failed: num(/(\d+)\s*failed/i, suitesLine),
+        total: num(/(\d+)\s*total/i, suitesLine),
+      }
     : undefined;
 
   const tests = testsLine
-    ? { passed: num(/(\d+)\s*passed/i, testsLine), failed: num(/(\d+)\s*failed/i, testsLine), total: num(/(\d+)\s*total/i, testsLine) }
+    ? {
+        passed: num(/(\d+)\s*passed/i, testsLine),
+        failed: num(/(\d+)\s*failed/i, testsLine),
+        total: num(/(\d+)\s*total/i, testsLine),
+      }
     : undefined;
 
   return { ran, suites, tests };
@@ -112,6 +120,7 @@ const TestsAndConsole: React.FC<{
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
+
     observerRef.current?.disconnect();
 
     const obs = new MutationObserver(() => {
@@ -152,7 +161,8 @@ const TestsAndConsole: React.FC<{
           standalone
           style={{
             height: '100%',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
           }}
         />
@@ -257,7 +267,7 @@ const SandpackTestInner: React.FC<
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
-          borderBottom: '1px solid '#e5e7eb',
+          borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -265,7 +275,9 @@ const SandpackTestInner: React.FC<
         }}
       >
         {submitted ? (
-          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>✅ Submitted! Advancing to next question...</p>
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
+            ✅ Submitted! Advancing to next question...
+          </p>
         ) : canSubmit ? (
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>✅ Tests completed!</p>
@@ -280,7 +292,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
               }}
             >
               Submit Results
@@ -288,7 +300,9 @@ const SandpackTestInner: React.FC<
           </>
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run tests to see results</p>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+              Write your code, then run tests to see results
+            </p>
             <button
               onClick={handleRunTests}
               disabled={isRunning}
@@ -301,7 +315,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: isRunning ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -330,7 +344,12 @@ const SandpackTestInner: React.FC<
       </div>
 
       <style>
-        {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
       </style>
 
       <div className="gt-sp">
@@ -353,7 +372,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
 
-      // Vitest config: use Vite + plugin-vue so .vue SFCs compile in tests
+      // Vitest config: use Vite + plugin-vue so .vue SFCs compile in tests (used for Vue)
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -430,7 +449,13 @@ export default defineConfig({
         activeFile: codeFile,
       }}
     >
-      <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
+      <SandpackTestInner
+        {...props}
+        template={template}
+        codeFile={codeFile}
+        testFile={testFile}
+        deps={deps}
+      />
     </SandpackProvider>
   );
 };
