@@ -41,8 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' template on sandpack-react 2.13.x
-      // Add @babel/code-frame to avoid the JSX plugin crash on older cached bundlers
+      // Use 'vue' template on sandpack-react 2.13.x and force latest bundler
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -57,6 +56,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
           jsdom: '^20.0.3',
+          // Defensive: avoids JSX plugin crash on older cached bundlers
           '@babel/code-frame': '^7.24.6',
         },
       };
@@ -191,7 +191,7 @@ const SandpackTestInner: React.FC<
 
   const handleRunTests = async () => {
     setIsRunning(true);
-    setCanSubmit(false);
+       setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
 
@@ -260,7 +260,7 @@ const SandpackTestInner: React.FC<
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
-          borderBottom: '1px solid '#e5e7eb',
+          borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -399,9 +399,9 @@ export default defineConfig({
 
   return (
     <SandpackProvider
-      key={\`\${template}-\${codeFile}-\${testFile}-\${props.questionId}\`}
+      key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
-      // Important: bundlerURL must be a top-level prop so we get the newest bundler
+      // Important: bundlerURL is a top-level prop so we get the newest bundler
       {...(bundlerURL ? { bundlerURL } : {})}
       customSetup={{ dependencies: deps }}
       files={files}
