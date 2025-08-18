@@ -114,7 +114,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         
         if (!existingThread || new Date(message.sent_at) > new Date(existingThread.lastMessage.sent_at)) {
           // Count unread messages for this thread
-          const unreadCount = messages.filter(m => 
+          const unreadCount = (messages || []).filter(m => 
             m.receiver_id === userProfile.id && 
             !m.is_read &&
             ((m.sender_id === otherUser.id && m.job_role_id === message.job_role_id) ||
@@ -151,7 +151,29 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
     }
   };
 
-  // ENHANCED: Add real-time subscription with notification refresh
+  // React immediately when a thread is marked read by the thread view
+  useEffect(() => {
+    const onThreadRead = (e: Event) => {
+      const detail = (e as CustomEvent<{ otherUserId: string; jobRoleId: string | null }>).detail;
+      if (!detail) return;
+      setThreads(prev =>
+        prev.map(t => {
+          const sameUser = t.otherUserId === detail.otherUserId;
+          const sameContext = detail.jobRoleId ? t.jobContext?.id === detail.jobRoleId : !t.jobContext?.id;
+          if (sameUser && sameContext) {
+            return { ...t, unreadCount: 0 };
+          }
+          return t;
+        })
+      );
+    };
+    window.addEventListener('messages:threadRead', onThreadRead as EventListener);
+    return () => {
+      window.removeEventListener('messages:threadRead', onThreadRead as EventListener);
+    };
+  }, []);
+
+  // Real-time updates for threads and notification counts
   useEffect(() => {
     if (!userProfile?.id) return;
     
@@ -170,7 +192,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         // Refresh message threads
         fetchMessageThreads();
         
-        // ENHANCED: Also refresh notifications to update counts
+        // Also refresh notifications to update counts
         fetchNotifications();
       })
       .subscribe();
