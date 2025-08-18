@@ -51,11 +51,14 @@ export const AdminDashboard = () => {
   const { user, userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
   const { tabCounts, markAsReadByType } = useNotifications();
   const location = useLocation();
+  const navigate = useNavigate();
   
-  // URL-based tab management (similar to other dashboards)
+  // URL-based tab management
   const params = new URLSearchParams(location.search);
-  const validTabs = ['overview', 'recruiters', 'developers', 'jobs', 'hires', 'messages'];
-  const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
+  const validTabs = ['overview', 'recruiters', 'developers', 'jobs', 'hires', 'messages'] as const;
+  const paramTab = (params.get('tab') || 'overview') as typeof validTabs[number];
+  const activeTab: typeof validTabs[number] = validTabs.includes(paramTab) ? paramTab : 'overview';
+
   const [developers, setDevelopers] = useState<(Developer & { user: any })[]>([]);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [hires, setHires] = useState<(Hire & { assignment: any })[]>([]);
@@ -77,12 +80,10 @@ export const AdminDashboard = () => {
   const [showRecruiterDetailsModal, setShowRecruiterDetailsModal] = useState(false);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<string | null>(null);
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
-  const navigate = useNavigate();
 
   // Clear notifications when accessing relevant tabs
   useEffect(() => {
     if (userProfile?.id && activeTab) {
-      // Clear notifications when visiting specific tabs
       if (activeTab === 'messages') {
         // Messages notifications will be cleared when specific message threads are opened
       } else if (activeTab === 'recruiters') {
@@ -176,7 +177,7 @@ export const AdminDashboard = () => {
       setLoading(true);
       setError('');
 
-      // Fetch pending recruiters
+      // Pending recruiters
       const { data: pendingData, error: pendingError } = await supabase
         .from('users')
         .select(`
@@ -192,7 +193,7 @@ export const AdminDashboard = () => {
 
       if (pendingError) throw pendingError;
 
-      // Fetch approved recruiters
+      // Approved recruiters
       const { data: approvedData, error: approvedError } = await supabase
         .from('users')
         .select(`
@@ -208,7 +209,6 @@ export const AdminDashboard = () => {
 
       if (approvedError) throw approvedError;
 
-      // Format the data
       const formattedPending = pendingData?.map(item => ({
         user_id: item.id,
         email: item.email,
@@ -388,13 +388,8 @@ export const AdminDashboard = () => {
           setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
           setApprovedRecruiters(prev => [approvedRecruiter, ...prev]);
         }
-        
-        // Optional: refresh from DB to ensure consistency
-        // fetchRecruiters();
-
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
-        // The error is logged in the context, but we can set a UI error here
         setError('Failed to approve recruiter. Please check the logs.');
       }
     } catch (error: any) {
@@ -409,19 +404,12 @@ export const AdminDashboard = () => {
     setProcessingIds(prev => [...prev, userId]);
     setError('');
     try {
-      // For now, we are just deleting the user record upon rejection.
-      // A "soft delete" or a "rejected" status might be better in a real app.
       const { error: deleteError } = await supabase.from('users').delete().eq('id', userId);
-
-      if (deleteError) {
-        throw deleteError;
-      }
+      if (deleteError) throw deleteError;
 
       setSuccessMessage('Recruiter rejected and removed successfully');
       setPendingRecruiters(prev => prev.filter(r => r.user_id !== userId));
-
       setTimeout(() => setSuccessMessage(''), 3000);
-
     } catch (error: any) {
       console.error('Error rejecting recruiter:', error);
       setError(error.message || 'Failed to reject recruiter. Please check logs.');
@@ -488,7 +476,7 @@ export const AdminDashboard = () => {
         <h2 className="text-xl font-black text-gray-900 mb-6">Quick Actions</h2>
         <div className="grid md:grid-cols-4 gap-6">
           <button
-            onClick={() => setActiveTab('recruiters')}
+            onClick={() => navigate('/admin?tab=recruiters')}
             className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
           >
             <Building className="w-8 h-8 text-blue-600 mb-3" />
@@ -497,7 +485,7 @@ export const AdminDashboard = () => {
           </button>
           
           <button
-            onClick={() => setActiveTab('developers')}
+            onClick={() => navigate('/admin?tab=developers')}
             className="flex flex-col items-center justify-center p-6 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors"
           >
             <Code className="w-8 h-8 text-purple-600 mb-3" />
@@ -506,7 +494,7 @@ export const AdminDashboard = () => {
           </button>
           
           <button
-            onClick={() => setActiveTab('jobs')}
+            onClick={() => navigate('/admin?tab=jobs')}
             className="flex flex-col items-center justify-center p-6 bg-emerald-50 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
           >
             <Briefcase className="w-8 h-8 text-emerald-600 mb-3" />
@@ -515,13 +503,14 @@ export const AdminDashboard = () => {
           </button>
           
           <button
-            onClick={() => setActiveTab('hires')}
+            onClick={() => navigate('/admin?tab=hires')}
             className="flex flex-col items-center justify-center p-6 bg-orange-50 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors"
           >
             <DollarSign className="w-8 h-8 text-orange-600 mb-3" />
             <span className="font-semibold text-gray-900">View Hires</span>
             <span className="text-sm text-gray-600 mt-1">Track successful placements</span>
           </button>
+
           <button
             onClick={() => navigate('/admin/tests')}
             className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors"
@@ -572,7 +561,7 @@ export const AdminDashboard = () => {
               ))}
               {pendingRecruiters.length > 3 && (
                 <button
-                  onClick={() => setActiveTab('recruiters')}
+                  onClick={() => navigate('/admin?tab=recruiters')}
                   className="w-full text-center text-blue-600 hover:text-blue-800 text-sm font-medium py-2"
                 >
                   View all {pendingRecruiters.length} pending recruiters
@@ -614,7 +603,7 @@ export const AdminDashboard = () => {
               ))}
               {hires.length > 3 && (
                 <button
-                  onClick={() => setActiveTab('hires')}
+                  onClick={() => navigate('/admin?tab=hires')}
                   className="w-full text-center text-blue-600 hover:text-blue-800 text-sm font-medium py-2"
                 >
                   View all {hires.length} hires
@@ -705,7 +694,10 @@ export const AdminDashboard = () => {
         </div>
         
         <MessageList
-          onThreadSelect={setSelectedThread}
+          onThreadSelect={(t) => {
+            setSelectedThread(t);
+            navigate('/admin?tab=messages');
+          }}
           searchTerm={searchTerm}
         />
       </div>
@@ -1029,7 +1021,7 @@ export const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Developers Tab Placeholder */}
+        {/* Developers Tab */}
         {activeTab === 'developers' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-6">
@@ -1146,7 +1138,7 @@ export const AdminDashboard = () => {
                                     otherUserRole: 'developer',
                                     otherUserProfilePicUrl: developer.profile_pic_url
                                   });
-                                  setActiveTab('messages');
+                                  navigate('/admin?tab=messages');
                                 }}
                                 className="text-purple-600 hover:text-purple-900"
                                 title="Message Developer"
@@ -1429,7 +1421,7 @@ export const AdminDashboard = () => {
                       otherUserProfilePicUrl: selectedDeveloperForDetails.profile_pic_url
                     });
                     setShowDeveloperDetailsModal(false);
-                    setActiveTab('messages');
+                    navigate('/admin?tab=messages');
                   }}
                 />
               </div>
