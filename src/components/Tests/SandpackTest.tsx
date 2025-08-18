@@ -41,7 +41,8 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' template on sandpack-react 2.13.x and force the latest bundler via options.bundlerURL
+      // Use 'vue' template on sandpack-react 2.13.x
+      // Add @babel/code-frame to avoid the JSX plugin crash on older cached bundlers
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -56,6 +57,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
           jsdom: '^20.0.3',
+          '@babel/code-frame': '^7.24.6',
         },
       };
     case 'javascript':
@@ -195,9 +197,11 @@ const SandpackTestInner: React.FC<
 
     try {
       await sandpack.runSandpack();
+      // Force a re-run by touching a hidden file
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
+      // Safety timeout so the button recovers if tests never finish
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
       }, 20000);
@@ -256,7 +260,7 @@ const SandpackTestInner: React.FC<
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid '#e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -363,7 +367,6 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       '/__trigger__.ts': { code: `export default 0;`, hidden: true },
     };
 
-    // Minimal Vitest setup for Vue; react/js use defaults
     if (props.framework === 'vue') {
       baseFiles['/vitest.config.ts'] = {
         code: `
@@ -380,7 +383,7 @@ export default defineConfig({
         hidden: true,
       };
       baseFiles['/setupTests.ts'] = {
-        code: `import '@testing-library/jest-dom';`,
+        code: \`import '@testing-library/jest-dom';\`,
         hidden: true,
       };
     }
@@ -392,13 +395,14 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  // Only force the newest bundler for Vue; React/JS keep their current behavior.
   const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
 
   return (
     <SandpackProvider
-      key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
+      key={\`\${template}-\${codeFile}-\${testFile}-\${props.questionId}\`}
       template={template}
+      // Important: bundlerURL must be a top-level prop so we get the newest bundler
+      {...(bundlerURL ? { bundlerURL } : {})}
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
@@ -410,8 +414,6 @@ export default defineConfig({
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
-        // Important: bundlerURL must be inside options for sandpack-react 2.13.x
-        ...(bundlerURL ? { bundlerURL } : {}),
       }}
     >
       <SandpackTestInner
