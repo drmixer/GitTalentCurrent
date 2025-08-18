@@ -41,13 +41,14 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' (not 'vue3') for this Sandpack version
+      // Use 'vue' template on sandpack-react 2.13.x and force the latest bundler via options.bundlerURL
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
           vue: '^3.4.21',
+          '@vue/compiler-sfc': '^3.4.21',
           '@vue/test-utils': '^2.4.5',
           '@testing-library/vue': '^8.0.3',
           '@testing-library/dom': '^9.3.4',
@@ -391,14 +392,13 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  // Only force the newest bundler for Vue; React/JS keep their current behavior
+  // Only force the newest bundler for Vue; React/JS keep their current behavior.
   const bundlerURL = props.framework === 'vue' ? 'https://sandpack.codesandbox.io' : undefined;
 
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
-      bundlerURL={bundlerURL}
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
@@ -410,6 +410,8 @@ export default defineConfig({
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
+        // Important: bundlerURL must be inside options for sandpack-react 2.13.x
+        ...(bundlerURL ? { bundlerURL } : {}),
       }}
     >
       <SandpackTestInner
