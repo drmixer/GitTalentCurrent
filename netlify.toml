@@ -2,6 +2,7 @@
   command = "npm run build"
   publish = "dist"
 
+# SPA fallback for client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -9,3 +10,16 @@
 
 [build.environment]
   NODE_VERSION = "18"
+
+# Strong caching for versioned build assets produced by Vite
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    X-Content-Type-Options = "nosniff"
+
+# Keep HTML fresh so it always points to current chunk names
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
