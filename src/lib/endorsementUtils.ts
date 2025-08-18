@@ -34,9 +34,7 @@ export type CreateEndorsementInput = {
   skills?: string[]; // new: multi-select skills
 };
 
-export type UpdateEndorsementInput = Partial<
-  Omit<CreateEndorsementInput, 'developer_id'>
->;
+export type UpdateEndorsementInput = Partial<Omit<CreateEndorsementInput, 'developer_id'>>;
 
 /**
  * Normalizes skills the same way the DB trigger does:
@@ -87,7 +85,6 @@ export async function getDeveloperSkills(
 /**
  * Suggest skill options for an endorsement form.
  * Prioritizes developer’s own skills. Optionally filters by query substring.
- * You can extend this to union with platform-wide popular skills if needed.
  */
 export async function getSkillOptionsForDeveloper(
   supabase: SupabaseClient,
@@ -105,7 +102,6 @@ export async function getSkillOptionsForDeveloper(
 /**
  * Fetch endorsements for a developer.
  * Includes both skill (back-compat, first item) and skills (array).
- * Keeps your prior nested select for endorser_user if the FK exists.
  */
 export async function fetchEndorsements(
   supabase: SupabaseClient,
@@ -128,7 +124,7 @@ export async function fetchEndorsements(
     throw error;
   }
 
-  // Ensure skills is always an array for consumers.
+  // Ensure skills is always an array for consumers
   return (data ?? []).map((row) => ({
     ...row,
     skills: Array.isArray(row.skills) ? row.skills : row.skills ? [row.skills] : [],
@@ -136,9 +132,19 @@ export async function fetchEndorsements(
 }
 
 /**
+ * Default-exported wrapper to match existing imports:
+ * import fetchEndorsementsForDeveloper from '../lib/endorsementUtils'
+ */
+export async function fetchEndorsementsForDeveloper(
+  supabase: SupabaseClient,
+  developerUserId: string
+) {
+  return fetchEndorsements(supabase, developerUserId);
+}
+
+/**
  * Create a new endorsement (with optional skills).
- * Will automatically normalize skills and rely on DB trigger for a notification,
- * which your notify-user function can email.
+ * DB trigger creates a notification; your notify-user function emails the developer.
  */
 export async function createEndorsement(
   supabase: SupabaseClient,
@@ -210,14 +216,16 @@ export async function updateEndorsement(
 /**
  * Optional helper for rendering. Falls back to the single "skill" if present.
  */
-export function skillsDisplay(skills: string[] | null | undefined, fallbackSkill?: string | null): string {
+export function skillsDisplay(
+  skills: string[] | null | undefined,
+  fallbackSkill?: string | null
+): string {
   const arr = normalizeSkills(skills ?? (fallbackSkill ? [fallbackSkill] : []));
   return arr.join(', ');
 }
 
 /**
  * A small curated fallback list used when a developer has no declared skills.
- * Feel free to expand or replace with your canonical set.
  */
 export const COMMON_SKILLS: string[] = normalizeSkills([
   'javascript',
@@ -245,11 +253,16 @@ export const COMMON_SKILLS: string[] = normalizeSkills([
 /**
  * Convenience validator for the endorsement form.
  */
-export function validateEndorsementInput(input: CreateEndorsementInput): { ok: true } | { ok: false; message: string } {
+export function validateEndorsementInput(
+  input: CreateEndorsementInput
+): { ok: true } | { ok: false; message: string } {
   if (!input?.developer_id) return { ok: false, message: 'Missing developer_id' };
-  if (!input?.comment || !input.comment.trim()) return { ok: false, message: 'Please add a short comment.' };
+  if (!input?.comment || !input.comment.trim())
+    return { ok: false, message: 'Please add a short comment.' };
   if (input.skills && normalizeSkills(input.skills).length > 10) {
     return { ok: false, message: 'A maximum of 10 skills can be selected.' };
   }
   return { ok: true };
 }
+
+export default fetchEndorsementsForDeveloper;
