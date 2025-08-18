@@ -5,16 +5,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-serve(async (req) => {
-  console.log("notify-user function invoked");
+type Prefs = {
+  in_app?: boolean;
+  email?: boolean;
+  types?: Record<string, boolean>;
+};
 
+function isTypeAllowed(prefs: Prefs | null | undefined, type: string) {
+  // If specific type flag exists and is false, block; otherwise allow by default
+  if (prefs?.types && Object.prototype.hasOwnProperty.call(prefs.types, type)) {
+    return !!prefs.types[type];
+  }
+  return true;
+}
+
+async function sendEmailViaResend(to: string, subject: string, html: string, text: string) {
+  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+  const FROM = Deno.env.get('RESEND_FROM_EMAIL') || 'GitTalent <noreply@gittalent.dev>';
+
+  if (!RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set; skipping email send.');
+    return { skipped: true, reason: 'missing_api_key' };
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: FROM,
+      to: [to],
+      subject,
+      html,
+      text
+    })
+  });
+
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => '');
+    console.error('Resend API error:', res.status, errTxt);
+    throw new Error(`Resend API returned ${res.status}`);
+  }
+
+  return await res.json().catch(() => ({}));
+}
+
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const requestBody = await req.json();
-    console.log("Request body:", requestBody);
 
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
@@ -27,43 +71,34 @@ serve(async (req) => {
     let title = '';
     let type = '';
     let record: any = null;
+    let table: string | undefined;
 
-    // Handle both trigger formats
+    // Support multiple trigger formats
     if (requestBody.table && requestBody.operation) {
       type = requestBody.operation;
       record = requestBody.record;
-
-      switch (requestBody.table) {
-        case 'assignments':
-          record.table = 'assignments';
-          break;
-        case 'applied_jobs':
-          record.table = 'applied_jobs';
-          break;
-        case 'messages':
-          record.table = 'messages';
-          break;
-        default:
-          record.table = requestBody.table;
-      }
+      table = requestBody.table;
     } else if (requestBody.type && requestBody.record) {
+      // Expect type like 'INSERT' and record.table in some setups
       type = requestBody.type;
       record = requestBody.record;
+      table = record?.table || record?.schema || undefined;
     }
 
     if (!record) {
-      console.error("Invalid request format - no record found");
-      throw new Error("Invalid request format");
+      throw new Error('Invalid request: missing record');
     }
 
-    entityId = record.id; // default
+    entityId = record.id;
 
-    // Build notification payload by case
-    switch (`${type}:${record.table}`) {
+    // Normalize table when possible
+    if (!table && record.table) table = record.table;
+
+    // Router
+    switch (`${type}:${table || record.table || ''}`) {
       case 'INSERT:assignments':
-        console.log("Processing assignment notification for developer:", record.developer_id);
-        title = `New Coding Test Assigned`;
-        message = `You have been assigned a new coding test.`;
+        title = 'New Coding Test Assigned';
+        message = 'You have been assigned a new coding test.';
         userId = record.developer_id;
         notificationType = 'test_assignment';
         link = '?tab=tests';
@@ -71,32 +106,26 @@ serve(async (req) => {
 
       case 'UPDATE:assignments':
         if (record.status === 'completed') {
-          console.log("Processing assignment completion notification");
           const { data: assignment, error: assignmentError } = await supabase
             .from('assignments')
             .select(`*, job_role:job_roles(recruiter_id, title)`)
             .eq('id', record.id)
             .single();
-          if (assignmentError) {
-            console.error("Error fetching assignment for completion notification:", assignmentError);
-            break;
-          }
+          if (assignmentError) break;
           if (assignment?.job_role?.recruiter_id) {
-            title = `Test Completed`;
+            title = 'Test Completed';
             message = `A developer has completed a coding test you assigned for "${assignment.job_role.title}".`;
             userId = assignment.job_role.recruiter_id;
             notificationType = 'test_completion';
             entityId = record.id;
             link = '?tab=tracker';
-            console.log("Test completion notification will be sent to recruiter:", userId);
           }
         }
         break;
 
       case 'INSERT:test_assignments':
-        console.log("Processing test assignment notification for developer:", record.developer_id);
-        title = `New Coding Test Assigned`;
-        message = `You have been assigned a new coding test.`;
+        title = 'New Coding Test Assigned';
+        message = 'You have been assigned a new coding test.';
         userId = record.developer_id;
         notificationType = 'test_assignment';
         link = '?tab=tests';
@@ -104,50 +133,43 @@ serve(async (req) => {
 
       case 'UPDATE:test_assignments':
         if (record.status === 'Completed') {
-          console.log("Processing test completion notification");
           const { data: jobRole, error: jobError } = await supabase
             .from('job_roles')
             .select('recruiter_id, title')
             .eq('id', record.job_role_id)
             .single();
-          if (jobError) {
-            console.error("Error fetching job role for test completion:", jobError);
-            throw jobError;
-          }
+          if (jobError) break;
           if (jobRole?.recruiter_id) {
-            title = `Test Completed`;
-            message = `A developer has completed a coding test you assigned.`;
+            title = 'Test Completed';
+            message = 'A developer has completed a coding test you assigned.';
             userId = jobRole.recruiter_id;
             notificationType = 'test_completion';
             entityId = record.id;
             link = '?tab=tracker';
-            console.log("Test completion notification will be sent to recruiter:", userId);
           }
         }
         break;
 
       case 'INSERT:messages':
-        title = `New Message`;
-        message = `You have a new message.`;
+        title = 'New Message';
+        message = 'You have a new message.';
         userId = record.receiver_id;
         notificationType = 'message';
         link = '?tab=messages';
-        // Group by sender for read-tracking
         entityId = record.sender_id;
 
-        // Also notify admins (unchanged behavior)
+        // Also notify admins (existing behavior)
         {
-          const { data: admins, error } = await supabase
+          const { data: admins } = await supabase
             .from('user_profiles')
             .select('id')
             .eq('role', 'admin');
-          if (error) console.error("Error fetching admins:", error);
           if (admins && admins.length > 0) {
             for (const admin of admins) {
               if (admin.id !== userId) {
                 await supabase.from('notifications').insert({
                   user_id: admin.id,
-                  message: `New message between users.`,
+                  message: 'New message between users.',
                   type: 'admin_message',
                   entity_id: record.id,
                   link: '?tab=messages',
@@ -160,14 +182,14 @@ serve(async (req) => {
         break;
 
       case 'INSERT:applied_jobs': {
-        const { data: job, error: jobError } = await supabase
+        const { data: job } = await supabase
           .from('job_roles')
           .select('recruiter_id')
           .eq('id', record.job_id)
           .single();
-        if (jobError) throw jobError;
-        title = `New Job Application`;
-        message = `A developer has applied for one of your jobs.`;
+        if (!job) break;
+        title = 'New Job Application';
+        message = 'A developer has applied for one of your jobs.';
         userId = job.recruiter_id;
         notificationType = 'job_application';
         link = '?tab=my-jobs';
@@ -176,29 +198,37 @@ serve(async (req) => {
 
       case 'UPDATE:applied_jobs':
         if (record.status === 'viewed') {
-          title = `Application Viewed`;
-          message = `Your application for a job has been viewed.`;
+          title = 'Application Viewed';
+          message = 'Your application for a job has been viewed.';
           userId = record.developer_id;
           notificationType = 'application_viewed';
           link = '?tab=jobs';
         } else if (record.status === 'hired') {
           title = `You've been hired!`;
-          message = `Congratulations! You have been hired for a position.`;
+          message = 'Congratulations! You have been hired for a position.';
           userId = record.developer_id;
           notificationType = 'hired';
           link = '?tab=jobs';
         }
         break;
 
-      // Legacy/unused path kept for compatibility
+      // New: Endorsements -> notify developer
+      case 'INSERT:endorsements':
+        title = 'New Endorsement';
+        message = 'You received a new endorsement.';
+        userId = record.developer_id;
+        notificationType = 'endorsement';
+        link = '?tab=overview';
+        break;
+
+      // Legacy compatibility
       case 'INSERT:recruiter_profiles':
         if (record.status === 'pending') {
           const { data: admins, error } = await supabase
             .from('user_profiles')
             .select('id')
             .eq('role', 'admin');
-          if (error) throw error;
-          if (admins && admins.length > 0) {
+          if (!error && admins?.length) {
             for (const admin of admins) {
               await supabase.from('notifications').insert({
                 user_id: admin.id,
@@ -214,116 +244,116 @@ serve(async (req) => {
         break;
 
       default:
-        console.log(`No handler for: ${type}:${record.table}`);
+        // ignore
         break;
     }
 
-    // If this is a test assignment notification and the target is a recruiter, skip it.
+    // Skip test-assignment notifications aimed at recruiters
     if (message && userId && notificationType === 'test_assignment') {
-      const { data: targetUser, error: targetErr } = await supabase
+      const { data: targetUser } = await supabase
         .from('users')
         .select('id, role')
         .eq('id', userId)
         .maybeSingle();
-      if (targetErr) {
-        console.warn('Could not load target user role, proceeding with default behavior.', targetErr);
-      } else if (targetUser?.role === 'recruiter') {
-        console.log('Skipping notification: recruiters do not receive test assignment notifications.', { userId, notificationType });
-        return new Response(JSON.stringify({
-          message: 'Skipped recruiter test-assignment notification'
-        }), {
+      if (targetUser?.role === 'recruiter') {
+        return new Response(JSON.stringify({ message: 'Skipped recruiter test-assignment notification' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }
 
-    // Enforce in_app preference for the target user (developers + recruiters)
+    // Deliver channels according to preferences
     if (message && userId && notificationType) {
-      let allowInApp = true;
+      // Load preferences for both roles and merge channel flags
+      let devPrefs: Prefs | null = null;
+      let recPrefs: Prefs | null = null;
 
       try {
-        // Check developer preferences first
-        const { data: devPref, error: devErr } = await supabase
-          .from('developers')
-          .select('notification_preferences')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (!devErr && devPref?.notification_preferences) {
-          const inApp = (devPref.notification_preferences as any).in_app;
-          if (typeof inApp === 'boolean') {
-            allowInApp = inApp;
-          }
-        }
-
-        // If still allowed or no dev prefs found, check recruiter preferences
-        const { data: recPref, error: recErr } = await supabase
-          .from('recruiters')
-          .select('notification_preferences')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (!recErr && recPref?.notification_preferences) {
-          const inApp = (recPref.notification_preferences as any).in_app;
-          if (typeof inApp === 'boolean') {
-            allowInApp = inApp;
-          }
-        }
+        const [{ data: d }, { data: r }] = await Promise.all([
+          supabase.from('developers').select('notification_preferences').eq('user_id', userId).maybeSingle(),
+          supabase.from('recruiters').select('notification_preferences').eq('user_id', userId).maybeSingle()
+        ]);
+        devPrefs = (d?.notification_preferences as any) || null;
+        recPrefs = (r?.notification_preferences as any) || null;
       } catch (e) {
-        console.warn('Could not load in_app preference; defaulting to allow.', e);
+        console.warn('Could not load preferences; defaulting to allow in-app/email.', e);
       }
 
-      if (!allowInApp) {
-        console.log('Skipping in-app notification due to user in_app preference', {
-          userId,
-          notificationType
+      const allowInApp =
+        (typeof devPrefs?.in_app === 'boolean' ? devPrefs?.in_app : true) &&
+        (typeof recPrefs?.in_app === 'boolean' ? recPrefs?.in_app : true) &&
+        isTypeAllowed(devPrefs, notificationType) &&
+        isTypeAllowed(recPrefs, notificationType);
+
+      const allowEmail =
+        (typeof devPrefs?.email === 'boolean' ? devPrefs?.email : false) ||
+        (typeof recPrefs?.email === 'boolean' ? recPrefs?.email : false);
+
+      // Insert in-app notification if allowed
+      if (allowInApp) {
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          message,
+          type: notificationType,
+          entity_id: entityId,
+          link,
+          title: title || message
         });
-        // Optional: enqueue email here if you want to send email when in-app is disabled.
-        return new Response(JSON.stringify({
-          message: 'In-app notification suppressed by user preference'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+      } else {
+        console.log('In-app suppressed by user preference', { userId, notificationType });
       }
 
-      // Insert notification
-      console.log("Inserting notification:", {
-        user_id: userId,
-        message,
-        type: notificationType,
-        entity_id: entityId,
-        link,
-        title: title || message
-      });
+      // Send email if allowed
+      if (allowEmail && isTypeAllowed(devPrefs, notificationType) && isTypeAllowed(recPrefs, notificationType)) {
+        const { data: targetUser } = await supabase
+          .from('users')
+          .select('email, name')
+          .eq('id', userId)
+          .maybeSingle();
 
-      const { data, error } = await supabase.from('notifications').insert({
-        user_id: userId,
-        message,
-        type: notificationType,
-        entity_id: entityId,
-        link,
-        title: title || message
-      });
+        const to = targetUser?.email;
+        if (to) {
+          const appUrl =
+            Deno.env.get('PUBLIC_APP_URL') ||
+            Deno.env.get('NEXT_PUBLIC_SITE_URL') ||
+            Deno.env.get('SITE_URL') ||
+            '';
 
-      if (error) {
-        console.error("Error inserting notification:", error);
-        throw error;
+          const fullLink = appUrl
+            ? `${appUrl.replace(/\/+$/, '')}/${link.replace(/^\?/, '') ? `developer${link}` : ''}` // heuristic: default to developer tab paths
+            : '';
+
+          const emailSubject = title || 'Notification';
+          const emailText = `${message}${fullLink ? `\n\nOpen: ${fullLink}` : ''}`;
+          const emailHtml = `
+            <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
+              <p>${message}</p>
+              ${fullLink ? `<p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Open in GitTalent</a></p>` : ''}
+            </div>
+          `;
+
+          try {
+            await sendEmailViaResend(to, emailSubject, emailHtml, emailText);
+            console.log('Notification email sent via Resend to', to, 'type:', notificationType);
+          } catch (e) {
+            console.error('Failed to send notification email via Resend:', e);
+          }
+        } else {
+          console.log('No email on file for user; skipping email notification', { userId });
+        }
       }
-      console.log("Notification inserted successfully:", data);
-    } else {
-      console.log("No notification to send - missing required fields:", {
-        message: !!message,
-        userId: !!userId,
-        notificationType: !!notificationType
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    return new Response(JSON.stringify({ message: 'Notification processed' }), {
+    return new Response(JSON.stringify({ message: 'No-op' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error: any) {
-    console.error("Error in notify-user function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('notify-user error:', error);
+    return new Response(JSON.stringify({ error: error?.message || 'Unknown error' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500
     });
