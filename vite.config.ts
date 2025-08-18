@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   build: {
-    assetsDir: 'assets', // explicit for clarity; defaults to "assets"
-    sourcemap: false
-  }
+    assetsDir: 'assets',
+    sourcemap: false,
+  },
 });
