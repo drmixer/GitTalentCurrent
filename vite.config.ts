@@ -27,17 +27,10 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       output: {
-        // Stable filenames to avoid 404 after deploys
-        entryFileNames: 'assets/app.js',
-        chunkFileNames: 'assets/chunk-[name].js',
-        assetFileNames: (assetInfo) => {
-          // Give the main CSS a stable name
-          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
-            return 'assets/app.css';
-          }
-          // Keep other assets using their source names
-          return 'assets/[name][extname]';
-        },
+        // Use content-based hashes for cache busting, but ensure proper asset handling
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
   },
