@@ -1,96 +1,255 @@
-// src/lib/endorsementUtils.ts
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { supabase } from './supabase';
-import { Endorsement } from '../types';
+export type EndorsementRow = {
+  id: string;
+  created_at: string;
+  developer_id: string;
+  endorser_id: string | null;
+  endorser_email: string | null;
+  endorser_role: string | null;
+  comment: string | null;
+  is_anonymous: boolean | null;
+  is_public: boolean | null;
+  endorser_name: string | null;
+  // Back-compat single skill (generated column in DB)
+  skill: string | null;
+  // New multi-skill support
+  skills: string[] | null;
+  // Nested endorser info (if FK exists)
+  endorser_user?: {
+    name: string | null;
+    profile_pic_url: string | null;
+    developers?: { public_profile_slug: string | null } | null;
+  } | null;
+};
+
+export type CreateEndorsementInput = {
+  developer_id: string;
+  comment: string;
+  endorser_name?: string | null;
+  endorser_email?: string | null;
+  endorser_role?: string | null;
+  is_public?: boolean;
+  is_anonymous?: boolean;
+  skills?: string[]; // new: multi-select skills
+};
+
+export type UpdateEndorsementInput = Partial<
+  Omit<CreateEndorsementInput, 'developer_id'>
+>;
 
 /**
- * Fetches endorsements for a given developer.
- * @param developerId The ID of the developer to fetch endorsements for.
- * @param publicOnly If true, only fetches public endorsements. Defaults to false.
- * @returns An array of Endorsement objects, or null if an error occurs.
+ * Normalizes skills the same way the DB trigger does:
+ * - lowercase
+ * - trim
+ * - remove blanks
+ * - de-duplicate (stable order)
+ * - cap list to max 10
  */
-export default async function fetchEndorsementsForDeveloper(
-  developerId: string,
-  publicOnly: boolean = false
-): Promise<Endorsement[] | null> {
-  try {
-    let query = supabase
-      .from('endorsements')
-      .select(`
-        id,
-        created_at,
-        developer_id,
-        endorser_id,
-        endorser_email,
-        endorser_role,
-        comment,
-        skill,
-        is_anonymous,
-        is_public,
-        endorser_name,
-        endorser_user:endorser_id(
-          name,
-          profile_pic_url,
-          developers(public_profile_slug)
-        )
-      `)
-      .eq('developer_id', developerId)
-      .order('created_at', { ascending: false });
-
-    if (publicOnly) {
-      query = query.eq('is_public', true);
+export function normalizeSkills(skills: string[] | null | undefined, max = 10): string[] {
+  if (!skills || skills.length === 0) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of skills) {
+    const s = (raw ?? '').toLowerCase().trim();
+    if (!s) continue;
+    if (!seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+      if (out.length >= max) break;
     }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching endorsements:', error.message);
-      return null;
-    }
-
-    // Ensure types
-    const transformedData: Endorsement[] = (data || []).map((item: any) => ({
-      id: item.id,
-      created_at: item.created_at,
-      developer_id: item.developer_id,
-      endorser_id: item.endorser_id,
-      endorser_email: item.endorser_email,
-      endorser_role: item.endorser_role,
-      comment: item.comment,
-      skill: item.skill,
-      is_anonymous: item.is_anonymous,
-      is_public: item.is_public,
-      endorser_name: item.endorser_name ?? null,
-      endorser_user: item.endorser_user
-        ? {
-            name: item.endorser_user.name,
-            developers: item.endorser_user.developers || [],
-          }
-        : null,
-    }));
-
-    return transformedData;
-  } catch (err) {
-    console.error('An unexpected error occurred while fetching endorsements:', err);
-    return null;
   }
+  return out;
 }
 
 /**
- * Updates the visibility status (is_public) of a specific endorsement.
- * @param endorsementId The ID of the endorsement to update.
- * @param isPublic The new public status (true for public, false for hidden).
- * @returns A promise that resolves to true if successful, false otherwise.
+ * Fetch developer’s skills from public.developers.skills (text[]).
+ * Returns [] if missing.
  */
-export async function updateEndorsementVisibility(endorsementId: string, isPublic: boolean): Promise<boolean> {
-  const { error } = await supabase
-    .from('endorsements')
-    .update({ is_public: isPublic })
-    .eq('id', endorsementId);
+export async function getDeveloperSkills(
+  supabase: SupabaseClient,
+  developerUserId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('developers')
+    .select('skills')
+    .eq('user_id', developerUserId)
+    .maybeSingle();
 
   if (error) {
-    console.error(`Error updating endorsement (ID: ${endorsementId}) visibility to ${isPublic}:`, error);
-    return false;
+    console.error('[endorsementUtils] getDeveloperSkills error:', error.message);
+    return [];
   }
-  return true;
+  const skills = (data?.skills as string[] | null) ?? [];
+  return normalizeSkills(skills);
+}
+
+/**
+ * Suggest skill options for an endorsement form.
+ * Prioritizes developer’s own skills. Optionally filters by query substring.
+ * You can extend this to union with platform-wide popular skills if needed.
+ */
+export async function getSkillOptionsForDeveloper(
+  supabase: SupabaseClient,
+  developerUserId: string,
+  query?: string
+): Promise<string[]> {
+  const devSkills = await getDeveloperSkills(supabase, developerUserId);
+  const base = devSkills.length ? devSkills : COMMON_SKILLS;
+  if (!query) return base;
+
+  const q = query.toLowerCase().trim();
+  return base.filter((s) => s.includes(q));
+}
+
+/**
+ * Fetch endorsements for a developer.
+ * Includes both skill (back-compat, first item) and skills (array).
+ * Keeps your prior nested select for endorser_user if the FK exists.
+ */
+export async function fetchEndorsements(
+  supabase: SupabaseClient,
+  developerUserId: string
+): Promise<EndorsementRow[]> {
+  const select = `
+    id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+    comment, is_anonymous, is_public, endorser_name, skill, skills,
+    endorser_user:endorser_id(name, profile_pic_url, developers(public_profile_slug))
+  `;
+
+  const { data, error } = await supabase
+    .from('endorsements')
+    .select(select)
+    .eq('developer_id', developerUserId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[endorsementUtils] fetchEndorsements error:', error.message);
+    throw error;
+  }
+
+  // Ensure skills is always an array for consumers.
+  return (data ?? []).map((row) => ({
+    ...row,
+    skills: Array.isArray(row.skills) ? row.skills : row.skills ? [row.skills] : [],
+  })) as EndorsementRow[];
+}
+
+/**
+ * Create a new endorsement (with optional skills).
+ * Will automatically normalize skills and rely on DB trigger for a notification,
+ * which your notify-user function can email.
+ */
+export async function createEndorsement(
+  supabase: SupabaseClient,
+  input: CreateEndorsementInput
+): Promise<EndorsementRow> {
+  const payload = {
+    developer_id: input.developer_id,
+    comment: input.comment,
+    endorser_name: input.endorser_name ?? null,
+    endorser_email: input.endorser_email ?? null,
+    endorser_role: input.endorser_role ?? null,
+    is_public: input.is_public ?? true,
+    is_anonymous: input.is_anonymous ?? false,
+    skills: normalizeSkills(input.skills),
+  };
+
+  const { data, error } = await supabase
+    .from('endorsements')
+    .insert(payload)
+    .select(
+      `
+      id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+      comment, is_anonymous, is_public, endorser_name, skill, skills
+      `
+    )
+    .single();
+
+  if (error) {
+    console.error('[endorsementUtils] createEndorsement error:', error.message);
+    throw error;
+  }
+
+  return data as EndorsementRow;
+}
+
+/**
+ * Update an endorsement. You can pass skills to change the set.
+ */
+export async function updateEndorsement(
+  supabase: SupabaseClient,
+  endorsementId: string,
+  updates: UpdateEndorsementInput
+): Promise<EndorsementRow> {
+  const patch: Record<string, unknown> = { ...updates };
+  if (updates.skills) {
+    patch.skills = normalizeSkills(updates.skills);
+  }
+
+  const { data, error } = await supabase
+    .from('endorsements')
+    .update(patch)
+    .eq('id', endorsementId)
+    .select(
+      `
+      id, created_at, developer_id, endorser_id, endorser_email, endorser_role,
+      comment, is_anonymous, is_public, endorser_name, skill, skills
+      `
+    )
+    .single();
+
+  if (error) {
+    console.error('[endorsementUtils] updateEndorsement error:', error.message);
+    throw error;
+  }
+
+  return data as EndorsementRow;
+}
+
+/**
+ * Optional helper for rendering. Falls back to the single "skill" if present.
+ */
+export function skillsDisplay(skills: string[] | null | undefined, fallbackSkill?: string | null): string {
+  const arr = normalizeSkills(skills ?? (fallbackSkill ? [fallbackSkill] : []));
+  return arr.join(', ');
+}
+
+/**
+ * A small curated fallback list used when a developer has no declared skills.
+ * Feel free to expand or replace with your canonical set.
+ */
+export const COMMON_SKILLS: string[] = normalizeSkills([
+  'javascript',
+  'typescript',
+  'react',
+  'svelte',
+  'node.js',
+  'python',
+  'go',
+  'java',
+  'ruby',
+  'sql',
+  'postgresql',
+  'aws',
+  'docker',
+  'kubernetes',
+  'graphql',
+  'next.js',
+  'vue',
+  'c#',
+  'php',
+  'swift',
+]);
+
+/**
+ * Convenience validator for the endorsement form.
+ */
+export function validateEndorsementInput(input: CreateEndorsementInput): { ok: true } | { ok: false; message: string } {
+  if (!input?.developer_id) return { ok: false, message: 'Missing developer_id' };
+  if (!input?.comment || !input.comment.trim()) return { ok: false, message: 'Please add a short comment.' };
+  if (input.skills && normalizeSkills(input.skills).length > 10) {
+    return { ok: false, message: 'A maximum of 10 skills can be selected.' };
+  }
+  return { ok: true };
 }
