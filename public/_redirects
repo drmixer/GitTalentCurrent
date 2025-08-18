@@ -1,8 +1,5 @@
-# Ensure asset requests never hit the SPA fallback.
+# Ensure asset requests never hit the SPA fallback
 /assets/*   /assets/:splat   200
-
-# Pass through other top-level static files as well (optional)
-/:file.:ext  /:file.:ext    200
 
 # SPA fallback for everything else (client-side routing)
 /*           /index.html     200
