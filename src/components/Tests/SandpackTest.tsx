@@ -41,7 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use 'vue' template on sandpack-react 2.13.x and force latest bundler
+      // Use 'vue' template with sandpack-react 2.13.x and force latest bundler
       return {
         template: 'vue' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -56,7 +56,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2',
           vitest: '^0.34.6',
           jsdom: '^20.0.3',
-          // Defensive: avoids JSX plugin crash on older cached bundlers
+          // Defensive for older cached bundlers that pull @vue/babel-plugin-jsx
           '@babel/code-frame': '^7.24.6',
         },
       };
@@ -191,7 +191,7 @@ const SandpackTestInner: React.FC<
 
   const handleRunTests = async () => {
     setIsRunning(true);
-       setCanSubmit(false);
+    setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
 
@@ -383,7 +383,7 @@ export default defineConfig({
         hidden: true,
       };
       baseFiles['/setupTests.ts'] = {
-        code: \`import '@testing-library/jest-dom';\`,
+        code: "import '@testing-library/jest-dom';",
         hidden: true,
       };
     }
