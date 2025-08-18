@@ -278,7 +278,9 @@ export interface Notification {
   type: string;
   entity_id: string;
   entity_type: string;
-  message: string;
+  // Align with live schema: prefer message_preview, keep message optional for backward compat
+  message?: string;
+  message_preview?: string;
   is_read: boolean;
   created_at: string;
 }
