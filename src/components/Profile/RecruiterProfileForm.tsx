@@ -18,13 +18,12 @@ export const RecruiterProfileForm = () => {
   const [profilePicUrl, setProfilePicUrl] = useState('');
   const [companyLogoUrl, setCompanyLogoUrl] = useState('');
 
-  // Notification preferences (parity with developers)
+  // Notification preferences (no "test_assignment" toggle for recruiters)
   const [notifInApp, setNotifInApp] = useState(true);
   const [notifEmail, setNotifEmail] = useState(false);
   const [notifTypes, setNotifTypes] = useState<{ [k: string]: boolean }>({
     message: true,
     job_application: true,
-    test_assignment: true,
     test_completion: true
   });
 
@@ -51,7 +50,7 @@ export const RecruiterProfileForm = () => {
         setNotifTypes({
           message: nt.message !== false,
           job_application: nt.job_application !== false,
-          test_assignment: nt.test_assignment !== false,
+          // test_assignment intentionally omitted for recruiters
           test_completion: nt.test_completion !== false
         });
       }
@@ -96,7 +95,7 @@ export const RecruiterProfileForm = () => {
         types: {
           message: !!notifTypes.message,
           job_application: !!notifTypes.job_application,
-          test_assignment: !!notifTypes.test_assignment,
+          // Do not persist test_assignment in recruiter prefs
           test_completion: !!notifTypes.test_completion,
         },
       };
@@ -216,14 +215,6 @@ export const RecruiterProfileForm = () => {
                 onChange={e => setNotifTypes(s => ({ ...s, job_application: e.target.checked }))}
               />
               Job applications
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={notifTypes.test_assignment}
-                onChange={e => setNotifTypes(s => ({ ...s, test_assignment: e.target.checked }))}
-              />
-              Test assignments
             </label>
             <label className="flex items-center gap-2">
               <input
