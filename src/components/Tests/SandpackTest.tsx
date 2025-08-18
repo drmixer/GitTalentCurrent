@@ -41,9 +41,9 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Legacy 'vue' template in your Sandpack, but we run Vue 3 tests with Vitest + plugin-vue
+      // Important: do NOT use the legacy 'vue' template (Vue 2). Use 'vanilla' and inject Vue 3 + Vitest/Vite.
       return {
-        template: 'vue' as SandpackProviderProps['template'],
+        template: 'vanilla' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
@@ -152,8 +152,7 @@ const TestsAndConsole: React.FC<{
           standalone
           style={{
             height: '100%',
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
           }}
         />
@@ -170,13 +169,7 @@ const SandpackTestInner: React.FC<
     deps: Record<string, string>;
   }
 > = (props) => {
-  const {
-    assignmentId,
-    questionId,
-    isLastQuestion,
-    onNext,
-    onComplete,
-  } = props;
+  const { assignmentId, questionId, isLastQuestion, onNext, onComplete } = props;
 
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -202,14 +195,10 @@ const SandpackTestInner: React.FC<
     setLastParsed(null);
 
     try {
-      // Force a rebuild to pick up latest files (esp. Vue plugin + SFCs)
       await sandpack.runSandpack();
-      // Touch a dummy file to guarantee a fresh compile cycle
       sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
-      // Remount the tests component to trigger a new run
       setRerunKey((k) => k + 1);
 
-      // Safety timeout
       setTimeout(() => {
         if (!canSubmit) setIsRunning(false);
       }, 20000);
@@ -268,7 +257,7 @@ const SandpackTestInner: React.FC<
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid '#e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -276,9 +265,7 @@ const SandpackTestInner: React.FC<
         }}
       >
         {submitted ? (
-          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
-            ✅ Submitted! Advancing to next question...
-          </p>
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>✅ Submitted! Advancing to next question...</p>
         ) : canSubmit ? (
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>✅ Tests completed!</p>
@@ -293,7 +280,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)',
               }}
             >
               Submit Results
@@ -314,7 +301,7 @@ const SandpackTestInner: React.FC<
                 fontWeight: '600',
                 fontSize: '14px',
                 cursor: isRunning ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -343,12 +330,7 @@ const SandpackTestInner: React.FC<
       </div>
 
       <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
+        {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
       </style>
 
       <div className="gt-sp">
@@ -371,7 +353,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
 
-      // Vitest config that loads Vue SFC plugin
+      // Vitest config: use Vite + plugin-vue so .vue SFCs compile in tests
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -395,11 +377,11 @@ export default defineConfig({
         hidden: true,
       },
 
-      // Test script only; avoid "type":"module" to keep plugin resolution simple
+      // Minimal package.json: vitest script only
       '/package.json': {
         code: JSON.stringify(
           {
-            name: 'sandpack-tests',
+            name: 'sandpack-vue3-tests',
             version: '1.0.0',
             private: true,
             scripts: { test: 'vitest run --reporter=basic' },
@@ -410,24 +392,19 @@ export default defineConfig({
         hidden: true,
       },
 
-      // Dummy file we touch to force rebuilds from the custom Run button
+      // Dummy file to force rebuilds from the custom Run button
       '/__trigger__.ts': {
         code: `export default 0;`,
         hidden: true,
       },
-    };
 
-    if (props.framework === 'vue') {
-      // Make preview inert: no scripts; neutralize both main entry points
-      baseFiles['/index.html'] = {
+      // Inert preview (no scripts)
+      '/index.html': {
         code: `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Vue Sandbox</title></head><body><div id="app"></div></body></html>`,
         hidden: true,
         active: true,
-      };
-      baseFiles['/main.js'] = { code: `// noop`, hidden: true };
-      baseFiles['/src/main.js'] = { code: `// noop`, hidden: true };
-      baseFiles['/src/main.ts'] = { code: `// noop`, hidden: true };
-    }
+      },
+    };
 
     return baseFiles;
   }, [props.starterCode, props.testCode, codeFile, testFile, props.framework]);
@@ -443,7 +420,7 @@ export default defineConfig({
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true, // allows tests to start after compile; we still drive re-run via the button
+        autorun: true, // build immediately so tests can run upon remount
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
