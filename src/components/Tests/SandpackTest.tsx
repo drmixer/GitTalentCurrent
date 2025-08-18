@@ -46,16 +46,20 @@ const getSetup = (framework: Framework) => {
         codeFile: '/src/App.vue',
         testFile: '/src/App.test.ts',
         deps: {
-          vue: '^3.3.4',
-          '@vue/compiler-sfc': '^3.3.4',
-          '@vue/test-utils': '^2.4.1',
-          '@testing-library/vue': '^7.0.0',
-          '@testing-library/jest-dom': '^5.16.5',
-          '@testing-library/user-event': '^14.4.3',
-          vitest: '^0.34.6',
-          jsdom: '^22.1.0',
-          vite: '^4.4.5',
-          '@vitejs/plugin-vue': '^4.2.3',
+          vue: '^3.4.0',
+          '@vue/compiler-sfc': '^3.4.0',
+          '@vue/test-utils': '^2.4.6',
+          '@testing-library/vue': '^8.0.2',
+          '@testing-library/jest-dom': '^6.4.2',
+          '@testing-library/user-event': '^14.5.2',
+          vitest: '^1.6.0',
+          jsdom: '^24.1.0',
+          vite: '^5.2.0',
+          '@vitejs/plugin-vue': '^5.0.0',
+          '@vue/runtime-core': '^3.4.0',
+          '@vue/runtime-dom': '^3.4.0',
+          '@vue/reactivity': '^3.4.0',
+          '@vue/shared': '^3.4.0',
         },
       };
     case 'javascript':
@@ -200,19 +204,19 @@ const SandpackTestInner: React.FC<
       await sandpack.runSandpack();
       
       // Wait a moment for compilation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Trigger test rerun by updating a file
       sandpack.updateFile('/__trigger__.ts', `// Test trigger ${Date.now()}\nexport default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
-      // Timeout for test completion
+      // Extended timeout for Vue compilation
       setTimeout(() => {
         if (!canSubmit) {
           console.log('Test timeout - stopping running state');
           setIsRunning(false);
         }
-      }, 25000);
+      }, 35000);
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
@@ -376,77 +380,215 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     };
 
     if (props.framework === 'vue') {
-      // Use vitest.config.ts with proper module setup
-      baseFiles['/vitest.config.ts'] = {
+      // Vite configuration with proper Vue SFC support
+      baseFiles['/vite.config.ts'] = {
         code: `
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
-  plugins: [vue()],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/setupTests.ts'],
-    include: ['src/**/*.test.ts'],
-    reporter: 'verbose',
-  },
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag) => tag.startsWith('custom-')
+      }
+    }
+  })],
   define: {
     __VUE_OPTIONS_API__: true,
     __VUE_PROD_DEVTOOLS__: false,
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+    'process.env.NODE_ENV': '"test"',
     global: 'globalThis',
   },
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  },
   esbuild: {
-    target: 'node14'
+    target: 'esnext',
+    format: 'esm'
+  },
+  optimizeDeps: {
+    include: ['vue', '@vue/runtime-core', '@vue/runtime-dom', '@vue/reactivity']
   }
 });
         `.trim(),
         hidden: true,
       };
 
-      // Add setup file for tests with global Vue
+      // Vitest configuration
+      baseFiles['/vitest.config.ts'] = {
+        code: `
+import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
+
+export default defineConfig({
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag) => tag.startsWith('custom-')
+      }
+    }
+  })],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.js'],
+    reporter: 'verbose',
+    deps: {
+      inline: ['@vue', '@testing-library/vue']
+    }
+  },
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false,
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+    'process.env.NODE_ENV': '"test"',
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  },
+  esbuild: {
+    target: 'esnext',
+    format: 'esm'
+  }
+});
+        `.trim(),
+        hidden: true,
+      };
+
+      // Enhanced setup file with proper Vue globals
       baseFiles['/src/setupTests.ts'] = {
         code: `
 import '@testing-library/jest-dom';
 import { config } from '@vue/test-utils';
 import * as Vue from 'vue';
+import { createApp } from 'vue';
 
-// Make Vue globally available for tests
+// Make Vue globally available
 (globalThis as any).Vue = Vue;
+(globalThis as any).createApp = createApp;
 (window as any).Vue = Vue;
+(window as any).createApp = createApp;
 
-// Configure Vue Test Utils
+// Configure Vue Test Utils globally
 config.global.config.globalProperties = {
   ...config.global.config.globalProperties
 };
+
+config.global.config.compilerOptions = {
+  isCustomElement: (tag: string) => tag.startsWith('custom-')
+};
+
+// Export for direct imports
+export { Vue, createApp };
+export default Vue;
         `.trim(),
         hidden: true,
       };
 
-      // Add main.ts entry point for proper module handling
+      // Main entry point
       baseFiles['/src/main.ts'] = {
         code: `
 import { createApp } from 'vue';
 import App from './App.vue';
 
+// Create and mount the app
 const app = createApp(App);
 app.mount('#app');
+
+export { app };
         `.trim(),
         hidden: true,
       };
 
-      // Add package.json with proper test script
+      // Enhanced package.json with proper module configuration
       baseFiles['/package.json'] = {
         code: JSON.stringify({
-          "name": "vue-test-app",
-          "version": "0.0.0",
+          "name": "vue-test-environment",
+          "version": "1.0.0",
           "type": "module",
           "scripts": {
             "dev": "vite",
             "build": "vite build",
-            "test": "vitest run --reporter=verbose",
-            "test:watch": "vitest"
-          }
+            "test": "vitest run --reporter=verbose --no-coverage",
+            "test:watch": "vitest --reporter=verbose"
+          },
+          "dependencies": deps,
+          "main": "./src/main.ts"
+        }, null, 2),
+        hidden: true,
+      };
+
+      // HTML template
+      baseFiles['/index.html'] = {
+        code: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue Test App</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
+        `.trim(),
+        hidden: true,
+      };
+
+      // TypeScript configuration
+      baseFiles['/tsconfig.json'] = {
+        code: JSON.stringify({
+          "compilerOptions": {
+            "target": "ESNext",
+            "useDefineForClassFields": true,
+            "lib": ["DOM", "DOM.Iterable", "ESNext"],
+            "allowJs": false,
+            "skipLibCheck": true,
+            "esModuleInterop": false,
+            "allowSyntheticDefaultImports": true,
+            "strict": true,
+            "forceConsistentCasingInFileNames": true,
+            "module": "ESNext",
+            "moduleResolution": "bundler",
+            "resolveJsonModule": true,
+            "isolatedModules": true,
+            "noEmit": true,
+            "jsx": "preserve",
+            "types": ["vitest/globals", "@testing-library/jest-dom"],
+            "baseUrl": ".",
+            "paths": {
+              "@/*": ["./src/*"]
+            }
+          },
+          "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+          "references": [{ "path": "./tsconfig.node.json" }]
+        }, null, 2),
+        hidden: true,
+      };
+
+      // Node TypeScript configuration
+      baseFiles['/tsconfig.node.json'] = {
+        code: JSON.stringify({
+          "compilerOptions": {
+            "composite": true,
+            "skipLibCheck": true,
+            "module": "ESNext",
+            "moduleResolution": "bundler",
+            "allowSyntheticDefaultImports": true,
+            "strict": true,
+            "types": ["node"]
+          },
+          "include": ["vite.config.ts", "vitest.config.ts"]
         }, null, 2),
         hidden: true,
       };
@@ -466,14 +608,16 @@ app.mount('#app');
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true,
-        initMode: 'immediate',
+        autorun: false,
+        initMode: 'lazy',
         showTabs: true,
         showNavigator: false,
         showInlineErrors: true,
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
+        bundlerURL: 'https://sandpack-bundler.codesandbox.io/',
+        logLevel: props.framework === 'vue' ? 'verbose' : 'info',
       }}
     >
       <SandpackTestInner
