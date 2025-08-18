@@ -41,7 +41,7 @@ const getSetup = (framework: Framework) => {
         },
       };
     case 'vue':
-      // Use a neutral template and inject Vue 3 + Vitest/Vite; avoids legacy Vue 2 globals.
+      // Use a neutral template; we’ll wire Jest + vue-jest v5 for Vue 3 SFCs.
       return {
         template: 'vanilla' as SandpackProviderProps['template'],
         codeFile: '/src/App.vue',
@@ -53,11 +53,13 @@ const getSetup = (framework: Framework) => {
           '@testing-library/dom': '^9.3.4',
           '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
-          vite: '^4.5.3',
-          '@vitejs/plugin-vue': '^4.5.2',
-          '@vue/compiler-sfc': '^3.4.21',
-          jsdom: '^20.0.3',
+          jest: '^29.7.0',
+          'jest-environment-jsdom': '^29.7.0',
+          'vue-jest': '^5.0.0-alpha.10',
+          'babel-jest': '^29.7.0',
+          '@babel/core': '^7.25.2',
+          '@babel/preset-env': '^7.25.4',
+          '@babel/preset-typescript': '^7.24.7',
         },
       };
     case 'javascript':
@@ -92,19 +94,11 @@ function parseSummary(text: string) {
   };
 
   const suites = suitesLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, suitesLine),
-        failed: num(/(\d+)\s*failed/i, suitesLine),
-        total: num(/(\d+)\s*total/i, suitesLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, suitesLine), failed: num(/(\d+)\s*failed/i, suitesLine), total: num(/(\d+)\s*total/i, suitesLine) }
     : undefined;
 
   const tests = testsLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, testsLine),
-        failed: num(/(\d+)\s*failed/i, testsLine),
-        total: num(/(\d+)\s*total/i, testsLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, testsLine), failed: num(/(\d+)\s*failed/i, testsLine), total: num(/(\d+)\s*total/i, testsLine) }
     : undefined;
 
   return { ran, suites, tests };
@@ -120,7 +114,6 @@ const TestsAndConsole: React.FC<{
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
-
     observerRef.current?.disconnect();
 
     const obs = new MutationObserver(() => {
@@ -206,7 +199,7 @@ const SandpackTestInner: React.FC<
 
     try {
       await sandpack.runSandpack();
-      sandpack.updateFile('/__trigger__.ts', `export default ${Date.now()};`);
+      sandpack.updateFile('/__trigger__.js', `export default ${Date.now()};`);
       setRerunKey((k) => k + 1);
 
       setTimeout(() => {
@@ -372,58 +365,100 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
 
-      // Vitest config: use Vite + plugin-vue so .vue SFCs compile in tests (used for Vue)
-      '/vitest.config.ts': {
+      // Dummy file to force rebuilds from the custom Run button
+      '/__trigger__.js': { code: `export default 0;`, hidden: true },
+
+      // Inert preview (no scripts)
+      '/index.html': {
+        code: `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Sandbox</title></head><body><div id="app"></div></body></html>`,
+        hidden: true,
+        active: true,
+      },
+    };
+
+    if (props.framework === 'vue') {
+      // Jest config for Vue 3 SFCs
+      baseFiles['/jest.config.js'] = {
+        code: `
+module.exports = {
+  testEnvironment: 'jsdom',
+  transform: {
+    '^.+\\\\.vue$': 'vue-jest',
+    '^.+\\\\.(ts|tsx|js|jsx)$': 'babel-jest',
+  },
+  moduleFileExtensions: ['vue', 'js', 'jsx', 'ts', 'tsx', 'json'],
+  setupFilesAfterEnv: ['<rootDir>/setupTests.js'],
+  testMatch: ['**/src/**/*.test.(ts|js)'],
+};
+`.trim(),
+        hidden: true,
+      };
+
+      baseFiles['/babel.config.js'] = {
+        code: `
+module.exports = {
+  presets: [
+    ['@babel/preset-env', { targets: { esmodules: true } }],
+    ['@babel/preset-typescript', { allExtensions: true, isTSX: true }],
+  ],
+};
+`.trim(),
+        hidden: true,
+      };
+
+      baseFiles['/setupTests.js'] = {
+        code: `import '@testing-library/jest-dom';`,
+        hidden: true,
+      };
+
+      baseFiles['/package.json'] = {
+        code: JSON.stringify(
+          {
+            name: 'sandpack-vue3-jest',
+            private: true,
+            version: '1.0.0',
+            scripts: { test: 'jest --runInBand --colors' },
+          },
+          null,
+          2
+        ),
+        hidden: true,
+      };
+    } else {
+      // Keep your existing Vitest setup for React/JS
+      baseFiles['/vitest.config.ts'] = {
         code: `
 import { defineConfig } from 'vitest/config';
-import vue from '@vitejs/plugin-vue';
-
 export default defineConfig({
-  plugins: [vue()],
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./setupTests.ts'],
-    include: ['src/**/*.test.ts'],
   },
 });
 `.trim(),
         hidden: true,
-      },
+      };
 
-      '/setupTests.ts': {
+      baseFiles['/setupTests.ts'] = {
         code: `import '@testing-library/jest-dom';`,
         hidden: true,
-      },
+      };
 
-      // Minimal package.json: vitest script only
-      '/package.json': {
+      baseFiles['/package.json'] = {
         code: JSON.stringify(
           {
-            name: 'sandpack-vue3-tests',
-            version: '1.0.0',
+            name: 'sandpack-tests',
             private: true,
+            version: '1.0.0',
             scripts: { test: 'vitest run --reporter=basic' },
           },
           null,
           2
         ),
         hidden: true,
-      },
-
-      // Dummy file to force rebuilds from the custom Run button
-      '/__trigger__.ts': {
-        code: `export default 0;`,
-        hidden: true,
-      },
-
-      // Inert preview (no scripts)
-      '/index.html': {
-        code: `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Vue Sandbox</title></head><body><div id="app"></div></body></html>`,
-        hidden: true,
-        active: true,
-      },
-    };
+      };
+    }
 
     return baseFiles;
   }, [props.starterCode, props.testCode, codeFile, testFile, props.framework]);
@@ -439,7 +474,7 @@ export default defineConfig({
       customSetup={{ dependencies: deps }}
       files={files}
       options={{
-        autorun: true, // build immediately so tests can run upon remount
+        autorun: true,
         initMode: 'immediate',
         showTabs: true,
         showNavigator: false,
