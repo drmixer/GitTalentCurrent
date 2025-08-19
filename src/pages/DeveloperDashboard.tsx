@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useNotifications } from '../contexts/NotificationsContext'; // MODIFIED: Corrected import path
+import { useNotifications } from '../contexts/NotificationsContext';
 import { supabase } from '../lib/supabase';
-// CORRECTED: fetchEndorsementsForDeveloper is now a default import
 import fetchEndorsementsForDeveloper, { updateEndorsementVisibility } from '../lib/endorsementUtils';
 import {
   DeveloperProfileForm,
@@ -20,7 +19,7 @@ import {
   OverviewTab,
   JobsTab,
 } from '../components';
-import EndorsementDisplay from '../components/EndorsementDisplay'; // Corrected: Imported as default
+import EndorsementDisplay from '../components/EndorsementDisplay';
 
 import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
@@ -131,17 +130,14 @@ export const DeveloperDashboard: React.FC = () => {
     loading: authContextLoading,
     refreshProfile,
   } = useAuth();
-  const { tabCounts, markAsReadByType } = useNotifications();
+  const { notifications: ctxNotifications, markAsReadByType } = useNotifications();
 
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as DashboardLocationState | null;
 
-  // MODIFIED: All state and effects for managing activeTab are removed.
-  // The activeTab is now derived directly from the URL on every render, making it the single source of truth.
   const params = new URLSearchParams(location.search);
   const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
-
 
   const [developerData, setDeveloperData] = useState<Developer | null>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
@@ -154,8 +150,6 @@ export const DeveloperDashboard: React.FC = () => {
 
   const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
   const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
-  const [unreadTestAssignmentCount, setUnreadTestAssignmentCount] = useState(0);
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
@@ -169,6 +163,24 @@ export const DeveloperDashboard: React.FC = () => {
 
   // NEW: State to track calendar year contributions for YTD display
   const [calendarYearContributions, setCalendarYearContributions] = useState<number>(0);
+
+  // Badge: derive unread test assignments directly from NotificationsContext so it clears instantly
+  const unreadTestsBadge = useMemo(
+    () =>
+      (ctxNotifications || []).filter(
+        (n: any) => !n.is_read && (n.type || '').toLowerCase() === 'test_assignment'
+      ).length,
+    [ctxNotifications]
+  );
+
+  // Badge: derive unread messages directly (if you want to display it on the messages tab)
+  const unreadMessagesBadge = useMemo(
+    () =>
+      (ctxNotifications || []).filter(
+        (n: any) => !n.is_read && (n.type || '').toLowerCase().includes('message')
+      ).length,
+    [ctxNotifications]
+  );
 
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
@@ -240,7 +252,6 @@ export const DeveloperDashboard: React.FC = () => {
       // --- ENDORSEMENT FETCH LOGIC (using updated utility) ---
       setIsLoadingEndorsements(true);
       setEndorsementError(null);
-      // Pass 'false' for publicOnly to fetch ALL endorsements for the dashboard view
       const fetchedEndorsements = await fetchEndorsementsForDeveloper(authUser.id, false);
       if (fetchedEndorsements) {
         setEndorsements(fetchedEndorsements);
@@ -279,32 +290,6 @@ export const DeveloperDashboard: React.FC = () => {
       }
       setAppliedJobs([]);
 
-      const { count: unreadTestAssignmentCount, error: unreadTestAssignmentCountError } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('type', 'test_assignment')
-        .eq('is_read', false);
-
-      if (unreadTestAssignmentCountError) {
-        console.error('[Dashboard] Error fetching unread test assignment count:', unreadTestAssignmentCountError);
-      } else {
-        setUnreadTestAssignmentCount(unreadTestAssignmentCount ?? 0);
-      }
-
-      const { count: unreadMessageCount, error: unreadMessageCountError } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .eq('type', 'message')
-        .eq('is_read', false);
-
-      if (unreadMessageCountError) {
-        console.error('[Dashboard] Error fetching unread message count:', unreadMessageCountError);
-      } else {
-        setUnreadMessageCount(unreadMessageCount ?? 0);
-      }
-
     } catch (error) {
       console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
       setIsLoadingEndorsements(false);
@@ -317,12 +302,11 @@ export const DeveloperDashboard: React.FC = () => {
 
   // Handler for toggling endorsement visibility
   const handleToggleEndorsementVisibility = useCallback(async (endorsementId: string, currentIsPublic: boolean) => {
-    setIsLoadingEndorsements(true); // Show loading while updating
+    setIsLoadingEndorsements(true);
     setEndorsementError(null);
 
     const success = await updateEndorsementVisibility(endorsementId, !currentIsPublic);
     if (success) {
-      // Optimistically update the state or refetch to reflect the change
       setEndorsements(prev => prev.map(e =>
         e.id === endorsementId ? { ...e, is_public: !currentIsPublic } : e
       ));
@@ -334,7 +318,6 @@ export const DeveloperDashboard: React.FC = () => {
     setIsLoadingEndorsements(false);
   }, []);
 
-
   useEffect(() => {
     if (!authContextLoading && authUser?.id) {
         fetchDeveloperPageData();
@@ -345,38 +328,53 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
-  useEffect(() => {
-    if (shouldUseFreshDataSource && !freshGitHubLoading && dashboardPageLoading) setDashboardPageLoading(false);
-  }, [shouldUseFreshDataSource, freshGitHubLoading, dashboardPageLoading]);
-
   // Clear notifications when accessing relevant tabs
   useEffect(() => {
     if (userProfile?.id && activeTab) {
       console.log('🔄 DeveloperDashboard: Clearing notifications for tab:', activeTab);
       
-      // Clear notifications based on the active tab
       if (activeTab === 'tests') {
         // Clear test assignment notifications
         markAsReadByType('test_assignment');
       } else if (activeTab === 'messages') {
-        // Messages notifications will be cleared when specific message threads are opened
+        // Messages notifications are cleared when specific message threads are opened
       } else if (activeTab === 'jobs') {
-        // Clear job-related notifications for developers
+        // Clear job-related notifications for developers (if used)
         markAsReadByType('job_application');
         markAsReadByType('application_viewed'); 
         markAsReadByType('hired');
       }
     }
   }, [activeTab, userProfile, markAsReadByType]);
-  
-  // REMOVED: All conflicting useEffects that managed tab state have been removed to prevent infinite loops.
-  
-  // UPDATED: GitHub data processing useEffect - fixed to avoid circular dependency
+
+  const {
+    gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
+  } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId });
+
+  const {
+    gitHubData: standardGitHubData, loading: standardGitHubLoading, error: standardGitHubError
+  } = useGitHub();
+
+  const shouldUseFreshDataSource = !!freshLoadParams;
+  let finalGitHubDataToShow = standardGitHubData;
+  let gitHubDataLoadingToShow = standardGitHubLoading;
+  let gitHubDataErrorToShow = standardGitHubError;
+
+  if (latchedSuccessfullyFetchedFreshData) {
+      finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
+      gitHubDataLoadingToShow = false;
+      gitHubDataErrorToShow = null;
+  } else if (shouldUseFreshDataSource) {
+      finalGitHubDataToShow = freshGitHubDataFromHook;
+      gitHubDataLoadingToShow = freshGitHubLoading;
+      gitHubDataErrorToShow = freshGitHubError;
+  }
+
+  // GitHub recent commits derivation
   useEffect(() => {
     if (finalGitHubDataToShow) {
       console.log('[Dashboard] Processing GitHub data:', finalGitHubDataToShow);
       
-      // Handle recent commits from the recentCommits array
       if (finalGitHubDataToShow.recentCommits && Array.isArray(finalGitHubDataToShow.recentCommits)) {
         const formattedCommits = finalGitHubDataToShow.recentCommits.slice(0, 3).map((commit: any) => ({
           sha: commit.sha || Math.random().toString(36).substring(7),
@@ -387,9 +385,7 @@ export const DeveloperDashboard: React.FC = () => {
         }));
         setRecentCommits(formattedCommits);
         console.log('[Dashboard] Set recent commits:', formattedCommits);
-      }
-      // Fallback: try to get commits from contributions.recentActivity
-      else if (finalGitHubDataToShow.contributions?.recentActivity && Array.isArray(finalGitHubDataToShow.contributions.recentActivity)) {
+      } else if (finalGitHubDataToShow.contributions?.recentActivity && Array.isArray(finalGitHubDataToShow.contributions.recentActivity)) {
         const commitActivities = finalGitHubDataToShow.contributions.recentActivity
           .filter((activity: any) => activity.type === 'commit')
           .slice(0, 3)
@@ -402,9 +398,7 @@ export const DeveloperDashboard: React.FC = () => {
           }));
         setRecentCommits(commitActivities);
         console.log('[Dashboard] Set commits from recentActivity:', commitActivities);
-      }
-      // Legacy fallback: try original contributions array format
-      else if (finalGitHubDataToShow.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
+      } else if (finalGitHubDataToShow.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
         const formattedCommits = finalGitHubDataToShow.contributions.slice(0, 3).map((contrib: any) => ({
           sha: contrib.oid || contrib.id || Math.random().toString(36).substring(7),
           message: contrib.messageHeadline || contrib.message || 'Commit message unavailable',
@@ -414,15 +408,14 @@ export const DeveloperDashboard: React.FC = () => {
         }));
         setRecentCommits(formattedCommits);
         console.log('[Dashboard] Set commits from legacy contributions:', formattedCommits);
-      }
-      else {
+      } else {
         console.log('[Dashboard] No recent commits data found');
         setRecentCommits([]);
       }
     }
   }, [finalGitHubDataToShow]);
 
-  // NEW: Calculate calendar year contributions for YTD display (SEPARATE from database sync)
+  // NEW: Calculate calendar year contributions for YTD display
   useEffect(() => {
     if (finalGitHubDataToShow) {
       const ytdContributions = calculateCalendarYearContributions(finalGitHubDataToShow);
@@ -431,8 +424,7 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow]);
 
-  // UPDATED: Annual contributions processing - now syncs the ROLLING YEAR total to database
-  // This keeps the database updated but doesn't affect YTD display
+  // UPDATED: Annual contributions processing - sync ROLLING YEAR total to database
   useEffect(() => {
     if (finalGitHubDataToShow && developerData?.id) {
       let totalContributions = 0;
@@ -445,13 +437,10 @@ export const DeveloperDashboard: React.FC = () => {
         currentAnnualContributions: developerData.annual_contributions
       });
       
-      // Priority 1: Use the totalContributions from the new data structure
       if (finalGitHubDataToShow.contributions?.totalContributions && typeof finalGitHubDataToShow.contributions.totalContributions === 'number') {
         totalContributions = finalGitHubDataToShow.contributions.totalContributions;
         console.log('[Dashboard] Using totalContributions from API (rolling year):', totalContributions);
-      }
-      // Priority 2: Calculate from calendar data (GraphQL format)
-      else if (finalGitHubDataToShow.contributions?.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
+      } else if (finalGitHubDataToShow.contributions?.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
         totalContributions = finalGitHubDataToShow.contributions.calendar.reduce(
           (sum: number, day: any) => {
             const count = day.contributionCount || day.count || 0;
@@ -459,9 +448,7 @@ export const DeveloperDashboard: React.FC = () => {
           }, 0
         );
         console.log('[Dashboard] Calculated from calendar data (rolling year):', totalContributions, 'days:', finalGitHubDataToShow.contributions.calendar.length);
-      }
-      // Priority 3: Legacy format - direct contributions array
-      else if (Array.isArray(finalGitHubDataToShow.contributions)) {
+      } else if (Array.isArray(finalGitHubDataToShow.contributions)) {
         totalContributions = finalGitHubDataToShow.contributions.reduce(
           (sum: number, day: any) => {
             const count = day.contributionCount || day.count || 0;
@@ -469,22 +456,14 @@ export const DeveloperDashboard: React.FC = () => {
           }, 0
         );
         console.log('[Dashboard] Calculated from legacy contributions array (rolling year):', totalContributions);
-      }
-      else {
+      } else {
         console.warn('[Dashboard] No valid contribution data found for annual contributions calculation');
       }
 
-      // Update database with rolling year total if it differs from current value
       if (totalContributions >= 0 && totalContributions !== (developerData.annual_contributions || 0)) {
         console.log('[Dashboard] Updating annual_contributions (rolling year) from', developerData.annual_contributions, 'to', totalContributions);
-        
-        // Update local state immediately
-        setDeveloperData(prev => prev ? {
-          ...prev,
-          annual_contributions: totalContributions
-        } : prev);
+        setDeveloperData(prev => prev ? { ...prev, annual_contributions: totalContributions } : prev);
 
-        // Also update the database to persist the change
         const updateAnnualContributions = async () => {
           try {
             const { error } = await supabase
@@ -505,7 +484,6 @@ export const DeveloperDashboard: React.FC = () => {
           }
         };
 
-        // Execute the database update
         updateAnnualContributions();
       } else if (totalContributions >= 0) {
         console.log('[Dashboard] Annual contributions (rolling year) already up to date:', totalContributions);
@@ -519,7 +497,6 @@ export const DeveloperDashboard: React.FC = () => {
     }
     return developerData;
   }, [contextDeveloperProfile, developerData]);
-
 
   const renderOverview = () => {
     if (!currentDeveloperProfile) {
@@ -541,7 +518,6 @@ export const DeveloperDashboard: React.FC = () => {
         githubProfileUrl={currentDeveloperProfile.github_handle ? `https://github.com/${currentDeveloperProfile.github_handle}` : undefined}
         loading={dashboardPageLoading || authContextLoading || gitHubDataLoadingToShow}
         onNavigateToTab={(tab) => navigate(`/developer?tab=${tab}`)}
-        // NEW: Pass the calendar year contributions for YTD display
         calendarYearContributions={calendarYearContributions}
       />
     );
@@ -573,27 +549,33 @@ export const DeveloperDashboard: React.FC = () => {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-screen-xl mx-auto">
-      {showGitHubConnectModal && currentDeveloperProfile?.github_handle && ( <GitHubConnectPrompt githubHandle={currentDeveloperProfile.github_handle} onClose={() => setShowGitHubConnectModal(false)} onConnect={() => navigate('/github-setup')} /> )}
+      {showGitHubConnectModal && currentDeveloperProfile?.github_handle && (
+        <GitHubConnectPrompt
+          githubHandle={currentDeveloperProfile.github_handle}
+          onClose={() => setShowGitHubConnectModal(false)}
+          onConnect={() => navigate('/github-setup')}
+        />
+      )}
+
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
-            // MODIFIED: onClick handler now uses navigate to change the URL
-            <button key={tabName} onClick={() => navigate(`/developer?tab=${tabName}`)}
-              className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+            <button
+              key={tabName}
+              onClick={() => navigate(`/developer?tab=${tabName}`)}
+              className={`whitespace-nowrap py-4 px-1 sm:px-3 border-b-2 font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${
+                activeTab === tabName ? 'border-blue-600 text-blue-700 bg-gray-100' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
               {tabName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-              {tabName === 'tests' && tabCounts.tests > 0 && (
+              {tabName === 'tests' && unreadTestsBadge > 0 && (
                 <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {tabCounts.tests}
+                  {unreadTestsBadge}
                 </span>
               )}
-              {tabName === 'messages' && tabCounts.messages > 0 && (
+              {tabName === 'messages' && unreadMessagesBadge > 0 && (
                 <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {tabCounts.messages}
-                </span>
-              )}
-              {tabName === 'jobs' && tabCounts.jobs > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {tabCounts.jobs}
+                  {unreadMessagesBadge}
                 </span>
               )}
             </button>
@@ -602,27 +584,101 @@ export const DeveloperDashboard: React.FC = () => {
       </div>
 
       {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'profile' && (displayDeveloperProfileForForm ? <DeveloperProfileForm initialData={displayDeveloperProfileForForm} onSuccess={async () => { if(refreshProfile) await refreshProfile(); await fetchDeveloperPageData();}} isOnboarding={false} /> : <div className="text-center p-8">Loading...</div>)}
+      {activeTab === 'profile' && (
+        displayDeveloperProfileForForm ? (
+          <DeveloperProfileForm
+            initialData={displayDeveloperProfileForForm}
+            onSuccess={async () => { if (refreshProfile) await refreshProfile(); await fetchDeveloperPageData(); }}
+            isOnboarding={false}
+          />
+        ) : (
+          <div className="text-center p-8">Loading...</div>
+        )
+      )}
       {activeTab === 'portfolio' && <PortfolioManager developerId={authUser?.id || ''} />}
       {activeTab === 'github-activity' && (
         currentDeveloperProfile?.github_handle && currentDeveloperProfile?.github_installation_id ? (
           <div className="flex flex-col lg:flex-row gap-6">
-            <div className="lg:w-2/5 flex-shrink-0"><div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-                <RealGitHubChart githubHandle={currentDeveloperProfile.github_handle} gitHubData={finalGitHubDataToShow} loading={gitHubDataLoadingToShow} error={gitHubDataErrorToShow as Error | null} className="w-full" displayMode='dashboardSnippet' isGitHubAppInstalled={!!currentDeveloperProfile?.github_installation_id} />
-            </div></div>
+            <div className="lg:w-2/5 flex-shrink-0">
+              <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
+                <RealGitHubChart
+                  githubHandle={currentDeveloperProfile.github_handle}
+                  gitHubData={finalGitHubDataToShow}
+                  loading={gitHubDataLoadingToShow}
+                  error={gitHubDataErrorToShow as Error | null}
+                  className="w-full"
+                  displayMode='dashboardSnippet'
+                  isGitHubAppInstalled={!!currentDeveloperProfile?.github_installation_id}
+                />
+              </div>
+            </div>
             <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-              {gitHubDataLoadingToShow && (<div className="flex flex-col items-center justify-center h-64"><Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" /><p className="text-gray-600">{shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}</p></div>)}
-              {!gitHubDataLoadingToShow && gitHubDataErrorToShow && (<div className="text-center py-10 px-6 bg-red-50 border border-red-200 rounded-lg"><AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" /><h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3><p className="text-red-600 mt-2 text-sm">{typeof gitHubDataErrorToShow === 'string' ? gitHubDataErrorToShow : (gitHubDataErrorToShow as Error)?.message || 'An unknown error occurred.'}</p><button onClick={() => navigate('/github-setup')} className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600">Re-check</button></div>)}
+              {gitHubDataLoadingToShow && (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" />
+                  <p className="text-gray-600">
+                    {shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}
+                  </p>
+                </div>
+              )}
+              {!gitHubDataLoadingToShow && gitHubDataErrorToShow && (
+                <div className="text-center py-10 px-6 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3>
+                  <p className="text-red-600 mt-2 text-sm">
+                    {typeof gitHubDataErrorToShow === 'string' ? gitHubDataErrorToShow : (gitHubDataErrorToShow as Error)?.message || 'An unknown error occurred.'}
+                  </p>
+                  <button
+                    onClick={() => navigate('/github-setup')}
+                    className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
+                  >
+                    Re-check
+                  </button>
+                </div>
+              )}
               {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && finalGitHubDataToShow?.user && (
                 <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
               )}
-              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (<div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg"><Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" /><h3 className="text-lg font-semibold">No GitHub Data Available</h3><p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p><button onClick={async () => { setLatchedSuccessfullyFetchedFreshData(null); setHasFreshDataBeenProcessed(false); if(refreshProfile) await refreshProfile();}} className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Refresh</button></div>)}
+              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (
+                <div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold">No GitHub Data Available</h3>
+                  <p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p>
+                  <button
+                    onClick={async () => {
+                      setLatchedSuccessfullyFetchedFreshData(null);
+                      setHasFreshDataBeenProcessed(false);
+                      if (refreshProfile) await refreshProfile();
+                    }}
+                    className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        ) : (<div className="text-center p-8"><Github className="w-16 h-16 text-gray-300 mx-auto mb-6" /><h3 className="text-2xl font-semibold">Connect GitHub Account</h3><button onClick={() => { if (!currentDeveloperProfile?.github_handle) { navigate(`/developer?tab=profile`, { state: { ...(locationState || {}), focusGitHubHandle: true } }); } else { navigate('/github-setup');}}} className="px-8 py-3 bg-blue-600 text-white rounded-lg"> {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'} </button></div>)
+        ) : (
+          <div className="text-center p-8">
+            <Github className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-2xl font-semibold">Connect GitHub Account</h3>
+            <button
+              onClick={() => {
+                if (!currentDeveloperProfile?.github_handle) {
+                  navigate(`/developer?tab=profile`, { state: { ...(locationState || {}), focusGitHubHandle: true } });
+                } else {
+                  navigate('/github-setup');
+                }
+              }}
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg"
+            >
+              {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'}
+            </button>
+          </div>
+        )
       )}
       {activeTab === 'messages' && (
-        <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]">
+        <div className="flex flex-col md:flex-row gap-6 min-h=[calc(100vh-250px)]">
           <div className="md:w-1/3 h-full">
             <MessageList
               onThreadSelect={(threadDetails) => {
@@ -655,13 +711,13 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'tests' && <DeveloperTests />}
       {activeTab === 'endorsements' && (
         <section className="endorsements-tab-content">
-            <EndorsementDisplay
-                endorsements={endorsements}
-                isLoading={isLoadingEndorsements}
-                error={endorsementError}
-                canManageVisibility={true}
-                onToggleVisibility={handleToggleEndorsementVisibility}
-            />
+          <EndorsementDisplay
+            endorsements={endorsements}
+            isLoading={isLoadingEndorsements}
+            error={endorsementError}
+            canManageVisibility={true}
+            onToggleVisibility={handleToggleEndorsementVisibility}
+          />
         </section>
       )}
     </div>
