@@ -12,22 +12,6 @@ interface NotificationsDropdownContentProps {
   getDashboardPath?: () => string;
 }
 
-// Helper: show readable message summaries
-function isMessageSummary(n: any): boolean {
-  const type = (n?.type || "").toLowerCase();
-  const isMessageType =
-    type === "message" ||
-    type === "message:new" ||
-    type === "message_received" ||
-    type === "chat_message";
-
-  if (!isMessageType) return true;
-
-  const title = (n?.title || "").toLowerCase().trim();
-  const hasPreview = Boolean(n?.message_preview);
-  return hasPreview || title.startsWith("new message from");
-}
-
 // Decide which tab to open for a given notification
 function getTabForNotification(n: any): string {
   const t = (n?.type || "").toLowerCase();
@@ -35,6 +19,19 @@ function getTabForNotification(n: any): string {
   if (t === "job_application") return "jobs";
   if (t === "test_completion") return "pipeline";
   return "overview";
+}
+
+// Only show concise message-type summaries in the dropdown
+function isMessageSummary(n: any): boolean {
+  const type = (n?.type || "").toLowerCase();
+  const isMessageType =
+    type === "message" ||
+    type === "message:new" ||
+    type === "message_received" ||
+    type === "chat_message";
+  if (!isMessageType) return true;
+  // Always keep message notifications, but we'll render a normalized title (not the content)
+  return true;
 }
 
 export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
@@ -114,6 +111,16 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     }
   }, [ctxMarkAllAsRead, legacyMarkAllAsRead, fetchUnreadCount, onClose]);
 
+  const renderTitle = (n: any) => {
+    const t = (n?.type || "").toLowerCase();
+    if (t.includes("message")) {
+      // Normalize message-type title; do not show raw content
+      // If you can provide sender display names here, replace with "New message from <name>"
+      return "New message received";
+    }
+    return n.title || "New notification";
+  };
+
   return (
     <div className="w-80 max-h-96 overflow-y-auto p-2">
       <div className="flex items-center justify-between mb-2">
@@ -140,8 +147,9 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
                 className="w-full text-left p-2 rounded hover:bg-gray-50 border border-transparent hover:border-gray-200"
                 onClick={() => handleItemClick(n)}
               >
-                <div className="text-sm font-medium">{n.title || "New notification"}</div>
-                {n.message_preview && (
+                <div className="text-sm font-medium">{renderTitle(n)}</div>
+                {/* Hide preview for message-type to enforce summary style */}
+                {!((n?.type || "").toLowerCase().includes("message")) && n?.message_preview && (
                   <div className="text-xs text-gray-600 truncate">{n.message_preview}</div>
                 )}
                 <div className="text-[11px] text-gray-400">
