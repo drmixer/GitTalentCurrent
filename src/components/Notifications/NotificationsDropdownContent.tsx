@@ -2,85 +2,119 @@ import React, { useMemo, useCallback } from "react";
 import { useNotifications } from "../../contexts/NotificationsContext";
 
 interface NotificationsDropdownContentProps {
-  onClose: () => void;
-  // Legacy props kept for compatibility with parent:
+  onClose?: () => void;
+  // Kept for compatibility with existing header usage:
   onNavigate?: (tab: string) => void;
   fetchUnreadCount?: () => void;
-  markAllAsRead?: () => void; // will be ignored; we use context impl
+  markAllAsRead?: () => void; // legacy prop; context version preferred
   getDashboardPath?: () => string;
 }
 
-function isSummaryTitle(title?: string | null) {
-  if (!title) return false;
-  return /^new message from /i.test(title.trim());
+// Helper: only keep the user-facing summary items like "New message from ..."
+function isMessageSummary(n: any): boolean {
+  const type = (n?.type || "").toLowerCase();
+  const isMessageType =
+    type === "message" ||
+    type === "message:new" ||
+    type === "message_received" ||
+    type === "chat_message";
+
+  if (!isMessageType) return true;
+
+  const title = (n?.title || "").toLowerCase().trim();
+  const hasPreview = Boolean(n?.message_preview);
+  return hasPreview || title.startsWith("new message from");
 }
 
-export default function NotificationsDropdownContent({
+const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
   onClose,
-}: NotificationsDropdownContentProps) {
+  fetchUnreadCount,
+  markAllAsRead: legacyMarkAllAsRead, // not used unless context missing
+}) => {
+  // Cast to any for maximum compatibility with the existing context shape in your repo
   const {
+    notifications,
     displayNotifications,
     markAsRead,
     markAllAsRead: ctxMarkAllAsRead,
-  } = useNotifications();
+  } = (useNotifications() as any) || {};
 
-  // Show up to 20 for the dropdown
-  const items = useMemo(
-    () => displayNotifications.slice(0, 20),
-    [displayNotifications]
-  );
+  // Fallback to raw notifications if the context doesn't provide displayNotifications
+  const unreadToShow = useMemo(() => {
+    const baseList: any[] =
+      (Array.isArray(displayNotifications) && displayNotifications) ||
+      (Array.isArray(notifications) && notifications) ||
+      [];
+    return baseList
+      .filter((n) => !n.is_read)
+      .filter(isMessageSummary)
+      .slice(0, 20);
+  }, [displayNotifications, notifications]);
 
   const handleClick = useCallback(
     async (id: string) => {
-      await markAsRead(id);
-      onClose?.();
+      try {
+        if (typeof markAsRead === "function") {
+          await markAsRead(id);
+        }
+      } finally {
+        onClose?.();
+      }
     },
     [markAsRead, onClose]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
-    await ctxMarkAllAsRead();
-    onClose?.();
-  }, [ctxMarkAllAsRead, onClose]);
+    try {
+      if (typeof ctxMarkAllAsRead === "function") {
+        await ctxMarkAllAsRead();
+      } else if (typeof legacyMarkAllAsRead === "function") {
+        await legacyMarkAllAsRead();
+      }
+      fetchUnreadCount?.();
+    } finally {
+      onClose?.();
+    }
+  }, [ctxMarkAllAsRead, legacyMarkAllAsRead, fetchUnreadCount, onClose]);
 
   return (
-    <div className="w-96 max-h-96 overflow-y-auto">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="text-base font-semibold">Notifications</div>
+    <div className="w-80 max-h-96 overflow-y-auto p-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-semibold">Notifications</div>
         <button
-          type="button"
-          className="text-sm text-blue-600 hover:underline"
+          className="text-xs text-blue-600 hover:underline"
           onClick={handleMarkAllAsRead}
+          type="button"
         >
           Mark all as read
         </button>
       </div>
 
-      {items.length === 0 ? (
-        <div className="px-4 pb-6 text-sm text-gray-500">No new notifications</div>
+      {unreadToShow.length === 0 ? (
+        <div className="p-6 text-center text-gray-500">
+          No new notifications
+        </div>
       ) : (
-        <ul className="px-2 pb-2">
-          {items.map((n) => (
-            <li key={n.id} className="mb-1">
+        <ul className="space-y-1">
+          {unreadToShow.map((n: any) => (
+            <li key={n.id}>
               <button
-                type="button"
+                className="w-full text-left p-2 rounded hover:bg-gray-50 border border-transparent hover:border-gray-200"
                 onClick={() => handleClick(n.id)}
-                className={`w-full rounded-md px-3 py-2 text-left hover:bg-gray-50 ${
-                  n.is_read ? "opacity-70" : ""
-                }`}
+                type="button"
               >
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">
-                      {isSummaryTitle(n.title) ? n.title : n.title || "Notification"}
+                <div className="flex items-start">
+                  <span className="mt-1 mr-2 inline-block h-2 w-2 rounded-full bg-blue-500" />
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-900">
+                      {n.title?.startsWith("New message from")
+                        ? n.title
+                        : n.message_preview || n.title || "Notification"}
                     </div>
-                    <div className="mt-0.5 text-xs text-gray-500">
+                    <div className="text-xs text-gray-500">
                       {new Date(n.created_at).toLocaleString()}
                     </div>
                   </div>
-                  {!n.is_read && (
-                    <span className="mt-1 inline-block h-2 w-2 rounded-full bg-blue-500" />
-                  )}
                 </div>
               </button>
             </li>
@@ -89,4 +123,8 @@ export default function NotificationsDropdownContent({
       )}
     </div>
   );
-}
+};
+
+// Export both named and default so existing imports keep working
+export { NotificationsDropdownContent };
+export default NotificationsDropdownContent;
