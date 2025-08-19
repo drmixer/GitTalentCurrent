@@ -20,7 +20,7 @@ export type NotificationRow = {
   created_at: string;
   sender_id?: string | null;
   conversation_id?: string | null;
-  // Optional fields sometimes present in your app
+  // Some rows may include this in your app
   message_preview?: string | null;
 };
 
@@ -32,28 +32,22 @@ type TabCounts = {
 };
 
 type Ctx = {
-  // Raw notifications from DB
   notifications: NotificationRow[];
-  // List prepared for the dropdown (filtered to message summaries + others)
   displayNotifications: NotificationRow[];
-  // Unread count for the dropdown (based on displayNotifications)
-  unreadCount: number;
-  // Total unread count (all notifications)
-  unreadTotal: number;
-  // Counts used by RecruiterDashboard tabs
+  unreadCount: number;   // filtered dropdown count
+  unreadTotal: number;   // all unread
   tabCounts: TabCounts;
 
-  // Refresh from server
   refresh: () => Promise<void>;
-
-  // Mark a single notification as read
   markAsRead: (id: string) => Promise<void>;
-
-  // Mark all notifications for the user as read
   markAllAsRead: () => Promise<void>;
-
-  // Mark all notifications of a given type as read (back-compat API)
   markAsReadByType: (type: string) => Promise<void>;
+
+  // Legacy API expected by Messages and Header
+  fetchUnreadCount: () => Promise<void>;
+  fetchNotifications: () => Promise<void>;
+  markMessageNotificationsAsRead: (senderId: string) => Promise<void>;
+  markAsReadByEntity: (entity: "sender" | string, id: string) => Promise<void>;
 };
 
 const NotificationsContext = createContext<Ctx | undefined>(undefined);
@@ -68,21 +62,16 @@ function isSummaryTitle(title?: string | null): boolean {
   return /^new message from /i.test(title.trim());
 }
 
-/**
- * Returns the list that should be shown in the dropdown:
- * - For message-type notifications, only keep those whose title starts with "New message from".
- * - For non-message notifications, keep as-is.
- * Also ensures a stable sort by created_at desc, deduping near-duplicate message summaries.
- */
+// Filter used by dropdown: keep message summaries and all non-message notifications
 function filterForDisplay(notifications: NotificationRow[]): NotificationRow[] {
   const filtered = notifications.filter((n) => {
     if (isMessageType(n)) {
       return isSummaryTitle(n.title);
     }
-    return true; // keep non-message notifications
+    return true;
   });
 
-  // Dedupe by (conversation_id || sender_id) per minute bucket
+  // Dedupe near-duplicates by conversation/sender per minute
   const seen = new Set<string>();
   const result: NotificationRow[] = [];
   for (const n of filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
@@ -147,7 +136,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     });
   }, [userProfile?.id, refresh]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!userProfile?.id) return;
     const channel = supabase
@@ -181,7 +169,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [notifications]
   );
 
-  // Badge count used by the dropdown and (optionally) header bell
   const unreadCount = useMemo(
     () => displayNotifications.filter((n) => !n.is_read).length,
     [displayNotifications]
@@ -255,7 +242,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
         setNotifications((prev) =>
           prev.map((n) =>
-            n.type?.toLowerCase() === type.toLowerCase() ? { ...n, is_read: true } : n
+            (n.type || "").toLowerCase() === type.toLowerCase() ? { ...n, is_read: true } : n
           )
         );
       } catch (e) {
@@ -263,6 +250,59 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       }
     },
     [userProfile?.id]
+  );
+
+  // Legacy alias: reload notifications and recompute counts
+  const fetchUnreadCount = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+
+  // Legacy alias: reload notifications
+  const fetchNotifications = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+
+  // Legacy function: clear message-type notifications for a given sender_id
+  const markMessageNotificationsAsRead = useCallback(
+    async (senderId: string) => {
+      if (!userProfile?.id || !senderId) return;
+      try {
+        const { error } = await supabase
+          .from("notifications")
+          .update({ is_read: true })
+          .eq("user_id", userProfile.id)
+          .eq("is_read", false)
+          .eq("sender_id", senderId)
+          .in("type", ["message", "message:new", "message_received", "chat_message"]);
+
+        if (error) {
+          console.error("Failed to mark message notifications as read:", error);
+          return;
+        }
+
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.sender_id === senderId && isMessageType(n) ? { ...n, is_read: true } : n
+          )
+        );
+      } catch (e) {
+        console.error("Unexpected error in markMessageNotificationsAsRead:", e);
+      }
+    },
+    [userProfile?.id]
+  );
+
+  // Legacy catch-all: currently supports only entity === 'sender' to avoid DB errors
+  const markAsReadByEntity = useCallback(
+    async (entity: "sender" | string, id: string) => {
+      if (entity === "sender") {
+        await markMessageNotificationsAsRead(id);
+      } else {
+        // No-op for unsupported entities to avoid column errors
+        console.warn(`[Notifications] markAsReadByEntity unsupported entity "${entity}". No action taken.`);
+      }
+    },
+    [markMessageNotificationsAsRead]
   );
 
   const value: Ctx = {
@@ -275,6 +315,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     markAsRead,
     markAllAsRead,
     markAsReadByType,
+    // legacy:
+    fetchUnreadCount,
+    fetchNotifications,
+    markMessageNotificationsAsRead,
+    markAsReadByEntity,
   };
 
   return (
@@ -287,7 +332,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 export function useNotifications(): Ctx {
   const ctx = useContext(NotificationsContext);
   if (!ctx) {
-    // Provide a non-crashing fallback if used outside provider
+    // Fallback to prevent crashes if used outside provider
     return {
       notifications: [],
       displayNotifications: [],
@@ -298,6 +343,10 @@ export function useNotifications(): Ctx {
       markAsRead: async () => {},
       markAllAsRead: async () => {},
       markAsReadByType: async () => {},
+      fetchUnreadCount: async () => {},
+      fetchNotifications: async () => {},
+      markMessageNotificationsAsRead: async () => {},
+      markAsReadByEntity: async () => {},
     };
   }
   return ctx;
