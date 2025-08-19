@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../contexts/NotificationsContext'; 
 import { supabase } from '../lib/supabase';
-// MODIFIED: Import useNavigate
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
     Users,
@@ -12,15 +11,12 @@ import {
     MessageSquare,
     TrendingUp,
     Search,
-    Bell,
     DollarSign,
     Clock,
-    ArrowLeft,
     RefreshCw,
     AlertCircle,
     CheckCircle,
     Loader,
-    Eye,
 } from 'lucide-react';
 
 // === CUSTOM COMPONENTS ===
@@ -53,20 +49,6 @@ import {
     SavedCandidate,
 } from '../types';
 
-// Re-defining internal interfaces that are not exported from types/index.ts
-interface LocalMessageThread {
-    otherUserId: string;
-    otherUserName: string;
-    otherUserRole: string;
-    otherUserProfilePicUrl?: string;
-    lastMessage: Message;
-    unreadCount: number;
-    jobContext?: {
-        id: string;
-        title: string;
-    };
-}
-
 interface MessageThreadInfo {
     otherUserId: string;
     otherUserName: string;
@@ -85,14 +67,17 @@ interface DashboardStats {
 
 const validTabs = ['overview', 'my-jobs', 'tracker', 'search-devs', 'messages', 'hires', 'profile', 'job-details'];
 
+// Variants seen historically in the notifications table
+const JOB_APPLICATION_TYPES = ['job_application', 'job_interest'];
+const TEST_COMPLETION_TYPES = ['test_completion', 'test_completed', 'test_result', 'test_complete'];
+
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
-    const { tabCounts, markAsReadByType } = useNotifications();
-    // MODIFIED: Add useNavigate hook
+    const { markAsReadByType } = useNotifications();
+
     const location = useLocation();
     const navigate = useNavigate();
 
-    // MODIFIED: Replace activeTab state with URL-based approach
     const params = new URLSearchParams(location.search);
     const activeTab = validTabs.includes(params.get('tab') || '') ? params.get('tab') : 'overview';
 
@@ -117,7 +102,7 @@ const RecruiterDashboard: React.FC = () => {
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [selectedThread, setSelectedThread] = useState<MessageThreadInfo | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [isRefreshing, setIsRefreshing] = useState(false); // For approval check
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // --- Developer Profile Modal States ---
     const [isDeveloperProfileModalOpen, setIsDeveloperProfileModalOpen] = useState(false);
@@ -128,7 +113,8 @@ const RecruiterDashboard: React.FC = () => {
     const [assignmentToHire, setAssignmentToHire] = useState<SavedCandidate | null>(null);
 
     const isApproved = userProfile?.is_approved === true;
-    const unreadNotifications = notifications.filter(n => !n.is_read).length;
+
+    // Local unread counts for tab badges (decoupled from NotificationsContext)
     const [unreadJobApplicationCount, setUnreadJobApplicationCount] = useState(0);
     const [unreadTestCompletionCount, setUnreadTestCompletionCount] = useState(0);
 
@@ -201,26 +187,26 @@ const RecruiterDashboard: React.FC = () => {
 
             if (messagesCountError) throw messagesCountError;
 
-            // Fetch unread job application notifications count
-            const { count: unreadJobApplicationCount, error: unreadJobApplicationCountError } = await supabase
+            // Unread counts for tab badges (accept historical type variants)
+            const { count: unreadJobApp, error: unreadJobAppErr } = await supabase
                 .from('notifications')
                 .select('id', { count: 'exact', head: true })
                 .eq('user_id', currentUserId)
                 .eq('is_read', false)
-                .eq('type', 'job_application');
+                .in('type', JOB_APPLICATION_TYPES);
 
-            if (unreadJobApplicationCountError) throw unreadJobApplicationCountError;
-            setUnreadJobApplicationCount(unreadJobApplicationCount || 0);
+            if (unreadJobAppErr) throw unreadJobAppErr;
+            setUnreadJobApplicationCount(unreadJobApp || 0);
 
-            const { count: unreadTestCompletionCount, error: unreadTestCompletionCountError } = await supabase
+            const { count: unreadTestComp, error: unreadTestCompErr } = await supabase
                 .from('notifications')
                 .select('id', { count: 'exact', head: true })
                 .eq('user_id', currentUserId)
                 .eq('is_read', false)
-                .eq('type', 'test_completion');
+                .in('type', TEST_COMPLETION_TYPES);
 
-            if (unreadTestCompletionCountError) throw unreadTestCompletionCountError;
-            setUnreadTestCompletionCount(unreadTestCompletionCount || 0);
+            if (unreadTestCompErr) throw unreadTestCompErr;
+            setUnreadTestCompletionCount(unreadTestComp || 0);
 
             // Calculate Dashboard Stats
             const totalJobs = jobRolesData?.length || 0;
@@ -310,7 +296,7 @@ const RecruiterDashboard: React.FC = () => {
                         .eq('is_read', false);
 
                     if (newMessagesCountError) {
-                        console.error("Error updating unread messages count via subscription:", newUnreadMessagesCount);
+                        console.error("Error updating unread messages count via subscription:", newMessagesCountError);
                     } else {
                         setStats(prev => ({ ...prev, unreadMessages: newUnreadMessagesCount || 0 }));
                     }
@@ -328,6 +314,13 @@ const RecruiterDashboard: React.FC = () => {
                         .order('created_at', { ascending: false });
                     if (newNotificationsData) {
                         setNotifications(newNotificationsData);
+
+                        // Recompute local unread counts from the updated list
+                        const unread = (newNotificationsData as Notification[]).filter(n => !n.is_read);
+                        const unreadJobs = unread.filter(n => JOB_APPLICATION_TYPES.includes((n.type || '').toLowerCase())).length;
+                        const unreadTests = unread.filter(n => TEST_COMPLETION_TYPES.includes((n.type || '').toLowerCase())).length;
+                        setUnreadJobApplicationCount(unreadJobs);
+                        setUnreadTestCompletionCount(unreadTests);
                     } else if (newNotificationsError) {
                         console.error("Error updating notifications via subscription:", newNotificationsError);
                         setDashboardError("Failed to update notifications via live data.");
@@ -349,16 +342,24 @@ const RecruiterDashboard: React.FC = () => {
         if (userProfile?.id && activeTab) {
             console.log('🔄 RecruiterDashboard: Clearing notifications for tab:', activeTab);
             
-            // Clear notifications based on the active tab
+            const clearTypes = async (types: string[]) => {
+                for (const t of types) {
+                    try {
+                        await markAsReadByType(t);
+                    } catch (e) {
+                        // continue on best effort
+                    }
+                }
+            };
+
             if (activeTab === 'my-jobs') {
-                // Clear job application notifications
-                markAsReadByType('job_application');
+                // Clear job application notifications (support both legacy and current types)
+                clearTypes(JOB_APPLICATION_TYPES);
             } else if (activeTab === 'tracker') {
-                // Clear test completion notifications 
-                markAsReadByType('test_completion');
+                // Clear test completion notifications (support common variants)
+                clearTypes(TEST_COMPLETION_TYPES);
             } else if (activeTab === 'messages') {
-                // Messages notifications will be cleared when specific message threads are opened
-                // Don't clear here as it's handled by MessageThread component
+                // Messages notifications clear when threads open; do nothing here
             }
         }
     }, [activeTab, userProfile, markAsReadByType]);
@@ -366,7 +367,6 @@ const RecruiterDashboard: React.FC = () => {
     // --- Handlers ---
     const handleViewApplicants = useCallback((jobId: string) => {
         setSelectedJobId(jobId);
-        // MODIFIED: Use navigate instead of setActiveTab
         navigate(`/recruiter?tab=job-details`);
     }, [navigate]);
 
@@ -385,7 +385,7 @@ const RecruiterDashboard: React.FC = () => {
         let threadJobContext: JobRole | null = null;
         if (jobRoleId && jobRoleTitle) {
             const fullJobRole = jobRoles.find(job => job.id === jobRoleId);
-            threadJobContext = fullJobRole || { id: jobRoleId, title: jobRoleTitle, description: '' /* add other necessary fields if not found */ };
+            threadJobContext = fullJobRole || { id: jobRoleId, title: jobRoleTitle, description: '' } as any;
 
             if (userProfile.recruiters?.company_name && (!threadJobContext.recruiter?.company_name)) {
                 threadJobContext = {
@@ -394,7 +394,7 @@ const RecruiterDashboard: React.FC = () => {
                         ...threadJobContext.recruiter,
                         company_name: userProfile.recruiters.company_name
                     }
-                };
+                } as any;
             }
         }
 
@@ -408,6 +408,7 @@ const RecruiterDashboard: React.FC = () => {
                 .single();
 
             if (!appliedJobError && appliedJobData?.developer) {
+                // @ts-ignore
                 otherUserProfilePicUrl = appliedJobData.developer.profile_pic_url || appliedJobData.developer.user?.avatar_url;
             }
         }
@@ -419,12 +420,10 @@ const RecruiterDashboard: React.FC = () => {
             otherUserProfilePicUrl: otherUserProfilePicUrl,
             jobContext: threadJobContext,
         });
-        // MODIFIED: Use navigate instead of setActiveTab
         navigate(`/recruiter?tab=messages`);
     }, [userProfile, jobRoles, navigate]);
 
     const handleCloseMessageThread = useCallback(() => {
-        // MODIFIED: Use navigate instead of setActiveTab
         navigate(`/recruiter?tab=messages`);
         setSelectedThread(null);
     }, [navigate]);
@@ -433,19 +432,20 @@ const RecruiterDashboard: React.FC = () => {
         const job = jobRoles.find(jr => jr.id === jobRoleId);
         if (job) {
             setSelectedJobId(jobRoleId);
-            // MODIFIED: Use navigate instead of setActiveTab
             navigate(`/recruiter?tab=job-details`);
         } else {
             setDashboardError("Job role not found for this notification.");
         }
     }, [jobRoles, navigate]);
 
-    const filteredHires = hires.filter(hire => {
-        const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
-        const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
-        const search = searchTerm.toLowerCase();
-        return developerName.includes(search) || jobTitle.includes(search);
-    });
+    const filteredHires = useMemo(() => {
+        return hires.filter(hire => {
+            const developerName = hire.assignment?.developer?.user?.name?.toLowerCase() || '';
+            const jobTitle = hire.assignment?.job_role?.title?.toLowerCase() || '';
+            const search = searchTerm.toLowerCase();
+            return developerName.includes(search) || jobTitle.includes(search);
+        });
+    }, [hires, searchTerm]);
 
     const handleViewDeveloperProfile = useCallback((developer: Developer) => {
         setSelectedDeveloperForModal(developer);
@@ -570,38 +570,38 @@ const RecruiterDashboard: React.FC = () => {
     ), [handleMessageDeveloper, handleViewDeveloperProfile]);
 
     const renderMessages = useCallback(() => {
-    return (
-        <div className="flex flex-col md:flex-row gap-6 flex-grow">
-            {/* Left Pane */}
-            <div className="md:w-1/3 flex flex-col">
-              <MessageList 
-                onThreadSelect={setSelectedThread} 
-                searchTerm={searchTerm} 
-              />
-            </div>
+        return (
+            <div className="flex flex-col md:flex-row gap-6 flex-grow">
+                {/* Left Pane */}
+                <div className="md:w-1/3 flex flex-col">
+                  <MessageList 
+                    onThreadSelect={setSelectedThread} 
+                    searchTerm={searchTerm} 
+                  />
+                </div>
 
-            {/* Right Pane */}
-            <div className="md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
-                {selectedThread ? (
-                    <MessageThread
-                        otherUserId={selectedThread.otherUserId}
-                        otherUserName={selectedThread.otherUserName}
-                        otherUserRole={selectedThread.otherUserRole}
-                        otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
-                        jobContext={selectedThread.jobContext}
-                        onBack={() => setSelectedThread(null)}
-                    />
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
-                        <MessageSquare size={48} className="mb-4 text-gray-300" />
-                        <h3 className="text-xl font-semibold">Select a conversation</h3>
-                        <p className="text-sm">Choose a conversation from the list to view messages.</p>
-                    </div>
-                )}
+                {/* Right Pane */}
+                <div className="md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+                    {selectedThread ? (
+                        <MessageThread
+                            otherUserId={selectedThread.otherUserId}
+                            otherUserName={selectedThread.otherUserName}
+                            otherUserRole={selectedThread.otherUserRole}
+                            otherUserProfilePicUrl={selectedThread.otherUserProfilePicUrl}
+                            jobContext={selectedThread.jobContext}
+                            onBack={() => setSelectedThread(null)}
+                        />
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
+                            <MessageSquare size={48} className="mb-4 text-gray-300" />
+                            <h3 className="text-xl font-semibold">Select a conversation</h3>
+                            <p className="text-sm">Choose a conversation from the list to view messages.</p>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
-    );
-}, [selectedThread, searchTerm]);
+        );
+    }, [selectedThread, searchTerm]);
 
     const renderHires = useCallback(() => (
         <div className="space-y-6">
@@ -796,10 +796,10 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
-                                {/* FIXED: Show notification badge for job applications */}
-                                {tabCounts.jobs > 0 && (
+                                {/* Badge uses local unread job application count including type variants */}
+                                {unreadJobApplicationCount > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {tabCounts.jobs}
+                                        {unreadJobApplicationCount}
                                     </span>
                                 )}
                             </button>
@@ -813,10 +813,10 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Users className="w-5 h-5 mr-2" />
                                 Hiring Pipeline
-                                {/* FIXED: Show notification badge for test completions */}
-                                {tabCounts.pipeline > 0 && (
+                                {/* Badge uses local unread test completion count including variants */}
+                                {unreadTestCompletionCount > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {tabCounts.pipeline}
+                                        {unreadTestCompletionCount}
                                     </span>
                                 )}
                             </button>
@@ -841,11 +841,6 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <MessageSquare className="w-5 h-5 mr-2" />
                                 Messages
-                                {tabCounts.messages > 0 && (
-                                    <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                        {tabCounts.messages}
-                                    </span>
-                                )}
                             </button>
                             <button
                                 onClick={() => navigate('/recruiter?tab=hires')}
