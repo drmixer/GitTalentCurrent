@@ -4,16 +4,15 @@ import { useNotifications } from "../../contexts/NotificationsContext";
 
 interface NotificationsDropdownContentProps {
   onClose?: () => void;
-  // Provided by Header; preferred way to change dashboard tab
+  // Preferred navigation hook provided by Header
   onNavigate?: (tab: string) => void;
-  // Legacy/fallback props
+  // Fallbacks/legacy
   fetchUnreadCount?: () => void;
   markAllAsRead?: () => void;
-  // Provided by Header for direct path fallback
   getDashboardPath?: () => string;
 }
 
-// Helper: only keep the user-facing summary items like "New message from ..." or items with a preview
+// Helper: show readable message summaries
 function isMessageSummary(n: any): boolean {
   const type = (n?.type || "").toLowerCase();
   const isMessageType =
@@ -22,13 +21,20 @@ function isMessageSummary(n: any): boolean {
     type === "message_received" ||
     type === "chat_message";
 
-  // For message-like rows, only show those that have a preview or a conventional title;
-  // for other types, keep as-is.
   if (!isMessageType) return true;
 
   const title = (n?.title || "").toLowerCase().trim();
   const hasPreview = Boolean(n?.message_preview);
   return hasPreview || title.startsWith("new message from");
+}
+
+// Decide which tab to open for a given notification
+function getTabForNotification(n: any): string {
+  const t = (n?.type || "").toLowerCase();
+  if (t.includes("message")) return "messages";
+  if (t === "job_application") return "jobs";
+  if (t === "test_completion") return "pipeline";
+  return "overview";
 }
 
 const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
@@ -40,7 +46,6 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
 }) => {
   const navigate = useNavigate();
 
-  // Cast to any for compatibility with the context shape
   const {
     notifications,
     displayNotifications,
@@ -48,7 +53,6 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
     markAllAsRead: ctxMarkAllAsRead,
   } = (useNotifications() as any) || {};
 
-  // Fallback to raw notifications if the context doesn't provide displayNotifications
   const unreadToShow = useMemo(() => {
     const baseList: any[] =
       (Array.isArray(displayNotifications) && displayNotifications) ||
@@ -60,45 +64,41 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
       .slice(0, 20);
   }, [displayNotifications, notifications]);
 
-  // Fire-and-forget read; never block navigation on network errors
+  // Never block navigation on network
   const fireMarkAsRead = useCallback(
     (id: string) => {
       try {
         if (typeof markAsRead === "function") {
           const p = markAsRead(id);
-          // Avoid unhandled rejections in dev
           if (p && typeof p.catch === "function") p.catch(() => {});
         }
       } catch {
-        // no-op
+        // ignore
       }
     },
     [markAsRead]
   );
 
-  const goToMessagesTab = useCallback(() => {
-    // Prefer the provided onNavigate API from Header
-    if (typeof onNavigate === "function") {
-      onNavigate("messages");
-      return;
-    }
-    // Fallback: compute path and push with router
-    const base = (typeof getDashboardPath === "function" && getDashboardPath()) || "/";
-    navigate(`${base}?tab=messages`);
-  }, [onNavigate, getDashboardPath, navigate]);
+  const navigateToTab = useCallback(
+    (tab: string) => {
+      if (typeof onNavigate === "function") {
+        onNavigate(tab);
+        return;
+      }
+      const base = (typeof getDashboardPath === "function" && getDashboardPath()) || "/";
+      navigate(`${base}?tab=${encodeURIComponent(tab)}`);
+    },
+    [onNavigate, getDashboardPath, navigate]
+  );
 
   const handleItemClick = useCallback(
     (n: any) => {
-      // Mark read in the background
       fireMarkAsRead(n?.id);
-
-      // Close dropdown first for snappy UX
       onClose?.();
-
-      // Route to Messages tab
-      goToMessagesTab();
+      const tab = getTabForNotification(n);
+      navigateToTab(tab);
     },
-    [fireMarkAsRead, onClose, goToMessagesTab]
+    [fireMarkAsRead, onClose, navigateToTab]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
