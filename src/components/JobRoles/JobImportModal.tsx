@@ -11,7 +11,6 @@ import {
   Info
 } from 'lucide-react';
 import Papa from 'papaparse';
-import { JobRole } from '../../types';
 
 interface JobImportModalProps {
   isOpen: boolean;
@@ -19,16 +18,18 @@ interface JobImportModalProps {
   onSuccess?: () => void;
 }
 
+// Updated CSV row shape: single salary is primary; keep salary_min/max optional for backward compatibility
 interface CSVJobData {
-  title: string;
-  description: string;
-  location: string;
-  job_type: string;
-  tech_stack: string;
-  salary_min: string | number;
-  salary_max: string | number;
-  experience_required: string;
-  is_active: string | boolean;
+  title?: string;
+  description?: string;
+  location?: string;
+  job_type?: string;
+  tech_stack?: string;
+  salary?: string | number;
+  salary_min?: string | number;
+  salary_max?: string | number;
+  experience_required?: string;
+  is_active?: string | boolean;
 }
 
 export const JobImportModal: React.FC<JobImportModalProps> = ({
@@ -77,12 +78,67 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
     parseCSV(selectedFile);
   };
 
+  // Normalize/alias headers for robustness
+  const normalizeHeader = (h: string) => {
+    if (!h) return h;
+    // Strip BOM and trim
+    let n = h.replace(/^\uFEFF/, '').trim().toLowerCase();
+    // Replace spaces and hyphens with underscores
+    n = n.replace(/[\s\-]+/g, '_');
+
+    // Aliases to canonical fields
+    const aliasMap: Record<string, string> = {
+      job_title: 'title',
+      role: 'title',
+      jobname: 'title',
+
+      job_description: 'description',
+      details: 'description',
+
+      city: 'location',
+      region: 'location',
+      country: 'location',
+
+      employment_type: 'job_type',
+      type: 'job_type',
+
+      technologies: 'tech_stack',
+      skills: 'tech_stack',
+      stack: 'tech_stack',
+      tech: 'tech_stack',
+
+      compensation: 'salary',
+      pay: 'salary',
+      rate: 'salary',
+      // Keep salary_min/salary_max unmapped so we can fallback if no single "salary" is present
+    };
+
+    return aliasMap[n] || n;
+  };
+
+  // Parse a numeric salary from strings like "$120,000" or "120k"
+  const parseSalaryNumber = (v: string | number | undefined): number | null => {
+    if (v === undefined || v === null || v === '') return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const cleaned = v.toString().trim().toLowerCase();
+    // Support formats like "120k"
+    if (/^\d+(\.\d+)?k$/.test(cleaned)) {
+      const num = parseFloat(cleaned.replace('k', ''));
+      return Math.round(num * 1000);
+    }
+    // Strip everything except digits and dot
+    const numeric = cleaned.replace(/[^0-9.]/g, '');
+    if (numeric === '' || isNaN(Number(numeric))) return null;
+    return Math.round(Number(numeric));
+  };
+
   const parseCSV = (file: File) => {
     setLoading(true);
     
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: normalizeHeader,
       complete: (results) => {
         setLoading(false);
         
@@ -98,12 +154,26 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           return;
         }
         
-        // Validate required headers
-        const requiredHeaders = ['title', 'description', 'location', 'job_type', 'tech_stack', 'salary_min', 'salary_max'];
-        const missingHeaders = requiredHeaders.filter(header => 
-          !results.meta.fields?.includes(header)
-        );
-        
+        // Required headers (primary)
+        const fields = results.meta.fields || [];
+        const fieldsSet = new Set((fields || []).map(normalizeHeader));
+
+        // Must have these always:
+        const mustHave = ['title', 'description', 'location', 'job_type', 'tech_stack'];
+
+        // Salary is required, but can be satisfied by: salary OR (salary_min and/or salary_max)
+        const missingPrimary = mustHave.filter((h) => !fieldsSet.has(h));
+
+        const hasSalary = fieldsSet.has('salary');
+        const hasSalaryMin = fieldsSet.has('salary_min');
+        const hasSalaryMax = fieldsSet.has('salary_max');
+
+        const salarySatisfied = hasSalary || hasSalaryMin || hasSalaryMax;
+
+        const missingHeaders: string[] = [];
+        if (missingPrimary.length > 0) missingPrimary.forEach((h) => missingHeaders.push(h));
+        if (!salarySatisfied) missingHeaders.push('salary');
+
         if (missingHeaders.length > 0) {
           setError(`Missing required columns: ${missingHeaders.join(', ')}`);
           return;
@@ -120,22 +190,31 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           
           if (!row.job_type) {
             rowErrors.push('Job type is required');
-          } else if (!['Full-time', 'Part-time', 'Contract', 'Freelance'].includes(row.job_type)) {
+          } else if (!['Full-time', 'Part-time', 'Contract', 'Freelance'].includes(String(row.job_type))) {
             rowErrors.push('Job type must be one of: Full-time, Part-time, Contract, Freelance');
           }
-          
-          if (!row.salary_min) {
-            rowErrors.push('Minimum salary is required');
-          } else if (isNaN(Number(row.salary_min))) {
-            rowErrors.push('Minimum salary must be a number');
+
+          // Determine effective salary
+          const salaryParsed = parseSalaryNumber(row.salary as any);
+          const minParsed = parseSalaryNumber(row.salary_min as any);
+          const maxParsed = parseSalaryNumber(row.salary_max as any);
+
+          let effectiveSalary: number | null = null;
+
+          if (salaryParsed !== null) {
+            effectiveSalary = salaryParsed;
+          } else if (minParsed !== null || maxParsed !== null) {
+            // If both present, prefer max; else whichever exists
+            effectiveSalary = maxParsed !== null ? maxParsed : (minParsed !== null ? minParsed : null);
           }
-          
-          if (!row.salary_max) {
-            rowErrors.push('Maximum salary is required');
-          } else if (isNaN(Number(row.salary_max))) {
-            rowErrors.push('Maximum salary must be a number');
-          } else if (Number(row.salary_min) > Number(row.salary_max)) {
-            rowErrors.push('Minimum salary cannot be greater than maximum salary');
+
+          if (effectiveSalary === null) {
+            rowErrors.push('Salary is required and must be a number (provide "salary", or "salary_min" and/or "salary_max")');
+          }
+
+          // Tech stack presence
+          if (!row.tech_stack || String(row.tech_stack).trim() === '') {
+            rowErrors.push('Tech stack is required (comma-separated list)');
           }
           
           if (rowErrors.length > 0) {
@@ -180,19 +259,36 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
       const row = parsedData[i];
       
       try {
-        // Convert CSV data to JobRole format
-        const jobData: Partial<JobRole> = {
+        // Derive fields
+        const techs = (row.tech_stack || '')
+          .toString()
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+
+        const salaryParsed = parseSalaryNumber(row.salary as any);
+        const minParsed = parseSalaryNumber(row.salary_min as any);
+        const maxParsed = parseSalaryNumber(row.salary_max as any);
+        // Choose effective salary (as string to match DB text column)
+        const effectiveSalaryNum = salaryParsed !== null
+          ? salaryParsed
+          : (maxParsed !== null ? maxParsed : (minParsed !== null ? minParsed : null));
+
+        const effectiveSalary = effectiveSalaryNum !== null ? String(effectiveSalaryNum) : undefined;
+
+        // Build jobData for creation
+        // Do NOT include salary_min/salary_max; DB no longer has these columns
+        const jobData: any = {
           title: row.title,
           description: row.description,
           location: row.location,
           job_type: row.job_type as 'Full-time' | 'Part-time' | 'Contract' | 'Freelance',
-          tech_stack: row.tech_stack.split(',').map(tech => tech.trim()),
-          salary_min: Number(row.salary_min),
-          salary_max: Number(row.salary_max),
+          tech_stack: techs,
+          salary: effectiveSalary,
           experience_required: row.experience_required || '',
           is_active: typeof row.is_active === 'string' 
             ? row.is_active.toLowerCase() === 'true'
-            : Boolean(row.is_active)
+            : (row.is_active === undefined ? true : Boolean(row.is_active))
         };
         
         const result = await createJobRole(jobData);
@@ -233,8 +329,7 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
         location: 'Remote',
         job_type: 'Full-time',
         tech_stack: 'React, TypeScript, Tailwind',
-        salary_min: 100000,
-        salary_max: 130000,
+        salary: 125000,
         experience_required: '3+ years with React',
         is_active: true
       },
@@ -244,8 +339,7 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
         location: 'New York, NY',
         job_type: 'Full-time',
         tech_stack: 'Node.js, Express, PostgreSQL',
-        salary_min: 110000,
-        salary_max: 140000,
+        salary: 135000,
         experience_required: '2+ years with Node.js',
         is_active: true
       }
@@ -313,8 +407,7 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
                 <li><span className="font-semibold">location</span> - Job location (required)</li>
                 <li><span className="font-semibold">job_type</span> - One of: Full-time, Part-time, Contract, Freelance (required)</li>
                 <li><span className="font-semibold">tech_stack</span> - Comma-separated list of technologies (required)</li>
-                <li><span className="font-semibold">salary_min</span> - Minimum salary in USD (required)</li>
-                <li><span className="font-semibold">salary_max</span> - Maximum salary in USD (required)</li>
+                <li><span className="font-semibold">salary</span> - Numbers only (e.g., 125000). Older files with salary_min/salary_max still work.</li>
                 <li><span className="font-semibold">experience_required</span> - Experience requirements (optional)</li>
                 <li><span className="font-semibold">is_active</span> - true or false (optional, defaults to true)</li>
               </ul>
@@ -400,38 +493,49 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Job Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary Range</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Salary</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {parsedData.slice(0, 5).map((job, index) => (
-                      <tr key={index} className={validationErrors[index] ? 'bg-red-50' : ''}>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {job.title || <span className="text-red-500">Missing</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {job.location || <span className="text-red-500">Missing</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {job.job_type || <span className="text-red-500">Missing</span>}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          ${job.salary_min || 0} - ${job.salary_max || 0}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {validationErrors[index] ? (
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                              Error
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              Valid
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {parsedData.slice(0, 5).map((job, index) => {
+                      const salaryParsed = parseSalaryNumber(job.salary as any);
+                      const minParsed = parseSalaryNumber(job.salary_min as any);
+                      const maxParsed = parseSalaryNumber(job.salary_max as any);
+                      const displaySalary = salaryParsed !== null
+                        ? `$${salaryParsed.toLocaleString()}`
+                        : (minParsed !== null || maxParsed !== null
+                            ? `$${(minParsed ?? 0).toLocaleString()}${maxParsed !== null ? ` - $${maxParsed.toLocaleString()}` : ''}`
+                            : 'Missing');
+
+                      return (
+                        <tr key={index} className={validationErrors[index] ? 'bg-red-50' : ''}>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {job.title || <span className="text-red-500">Missing</span>}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {job.location || <span className="text-red-500">Missing</span>}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {job.job_type || <span className="text-red-500">Missing</span>}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {displaySalary}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {validationErrors[index] ? (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                Error
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                Valid
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {parsedData.length > 5 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-3 text-sm text-gray-500 text-center">
@@ -501,7 +605,7 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           <button
             onClick={handleImport}
             disabled={parsedData.length === 0 || Object.keys(validationErrors).length > 0 || importing || loading}
-            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300"
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {importing ? (
               <div className="flex items-center">
