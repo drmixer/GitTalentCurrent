@@ -9,6 +9,14 @@ interface RecruiterProfileProps {
   recruiterId: string;
 }
 
+function normalizeWebsite(url?: string | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
   // Corrected type: recruiters should be RecruiterType (an object) or null/undefined, not an array.
   const [recruiter, setRecruiter] = useState<(User & { recruiters?: RecruiterType | null }) | null>(null);
@@ -217,6 +225,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     navigate(`/apply/job/${jobId}`);
   };
 
+  const websiteHref = normalizeWebsite((recruiter.recruiters as RecruiterType)?.website);
+
   return (
     <div className="container mx-auto p-4">
       <div className="bg-white shadow-lg rounded-lg overflow-hidden border border-gray-200/80">
@@ -259,10 +269,27 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
           </div>
         </div>
 
-        <div className="pt-20 pb-8 px-8">
+        <div className="pt-20 pb-4 px-8">
           <h1 className="text-3xl font-bold text-gray-800">{recruiter.name}</h1>
           {/* Display company name from recruiter's recruiters table, fallback */}
-          <p className="text-gray-600 text-lg">{(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}</p>
+          <p className="text-gray-600 text-lg">
+            {(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}
+          </p>
+
+          {/* Website: clickable */}
+          {websiteHref && (
+            <p className="mt-2 text-blue-600">
+              <a
+                href={websiteHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline break-all"
+                title="Company Website"
+              >
+                {(recruiter.recruiters as RecruiterType)?.website}
+              </a>
+            </p>
+          )}
         </div>
 
         <div className="px-8 pb-8">
