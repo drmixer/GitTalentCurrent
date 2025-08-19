@@ -32,6 +32,8 @@ interface CSVJobData {
   is_active?: string | boolean;
 }
 
+const allowedJobTypes = ['Full-time', 'Part-time', 'Contract', 'Freelance'] as const;
+
 export const JobImportModal: React.FC<JobImportModalProps> = ({
   isOpen,
   onClose,
@@ -116,6 +118,29 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
     return aliasMap[n] || n;
   };
 
+  // Normalize job type variants to canonical allowed values
+  const normalizeJobType = (jt?: string): (typeof allowedJobTypes)[number] | null => {
+    if (!jt) return null;
+    const raw = jt.toString().trim().toLowerCase();
+    // Remove punctuation except letters/numbers and spaces
+    const simplified = raw.replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Map common variants
+    if (['full time', 'fulltime', 'ft', 'f/t'].includes(simplified)) return 'Full-time';
+    if (['part time', 'parttime', 'pt', 'p/t'].includes(simplified)) return 'Part-time';
+    if (['contract', 'contractor', 'temp', 'temporary', 'contract role'].includes(simplified)) return 'Contract';
+    if (['freelance', 'freelancer', 'independent contractor'].includes(simplified)) return 'Freelance';
+
+    // Direct match tolerance for casing/hyphen differences like "Full-Time", "Part-Time"
+    const camel = simplified.replace(/\b\w/g, (c) => c.toUpperCase()); // "Full Time"
+    if (camel === 'Full Time') return 'Full-time';
+    if (camel === 'Part Time') return 'Part-time';
+    if (camel === 'Contract') return 'Contract';
+    if (camel === 'Freelance') return 'Freelance';
+
+    return null;
+  };
+
   // Parse a numeric salary from strings like "$120,000" or "120k"
   const parseSalaryNumber = (v: string | number | undefined): number | null => {
     if (v === undefined || v === null || v === '') return null;
@@ -147,9 +172,9 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           return;
         }
         
-        const data = results.data as CSVJobData[];
+        const rawData = results.data as CSVJobData[];
         
-        if (data.length === 0) {
+        if (rawData.length === 0) {
           setError('The CSV file is empty');
           return;
         }
@@ -178,6 +203,12 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           setError(`Missing required columns: ${missingHeaders.join(', ')}`);
           return;
         }
+
+        // Normalize job_type values to canonical for preview and validation
+        const data = rawData.map((row) => {
+          const canonical = normalizeJobType(row.job_type);
+          return canonical ? { ...row, job_type: canonical } : row;
+        });
         
         // Validate each row
         const errors: {[key: number]: string[]} = {};
@@ -190,8 +221,14 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
           
           if (!row.job_type) {
             rowErrors.push('Job type is required');
-          } else if (!['Full-time', 'Part-time', 'Contract', 'Freelance'].includes(String(row.job_type))) {
-            rowErrors.push('Job type must be one of: Full-time, Part-time, Contract, Freelance');
+          } else if (!allowedJobTypes.includes(row.job_type as any)) {
+            const normalized = normalizeJobType(row.job_type);
+            if (normalized) {
+              // If it normalizes, adopt canonical value for downstream use
+              (row as any).job_type = normalized;
+            } else {
+              rowErrors.push('Job type must be one of: Full-time, Part-time, Contract, Freelance');
+            }
           }
 
           // Determine effective salary
@@ -276,13 +313,16 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
 
         const effectiveSalary = effectiveSalaryNum !== null ? String(effectiveSalaryNum) : undefined;
 
+        // Final canonical job_type
+        const canonicalJobType = normalizeJobType(row.job_type) || row.job_type;
+
         // Build jobData for creation
         // Do NOT include salary_min/salary_max; DB no longer has these columns
         const jobData: any = {
           title: row.title,
           description: row.description,
           location: row.location,
-          job_type: row.job_type as 'Full-time' | 'Part-time' | 'Contract' | 'Freelance',
+          job_type: canonicalJobType as 'Full-time' | 'Part-time' | 'Contract' | 'Freelance',
           tech_stack: techs,
           salary: effectiveSalary,
           experience_required: row.experience_required || '',
@@ -405,7 +445,7 @@ export const JobImportModal: React.FC<JobImportModalProps> = ({
                 <li><span className="font-semibold">title</span> - Job title (required)</li>
                 <li><span className="font-semibold">description</span> - Job description (required)</li>
                 <li><span className="font-semibold">location</span> - Job location (required)</li>
-                <li><span className="font-semibold">job_type</span> - One of: Full-time, Part-time, Contract, Freelance (required)</li>
+                <li><span className="font-semibold">job_type</span> - One of: Full-time, Part-time, Contract, Freelance (required; variants like "Full-Time" are accepted)</li>
                 <li><span className="font-semibold">tech_stack</span> - Comma-separated list of technologies (required)</li>
                 <li><span className="font-semibold">salary</span> - Numbers only (e.g., 125000). Older files with salary_min/salary_max still work.</li>
                 <li><span className="font-semibold">experience_required</span> - Experience requirements (optional)</li>
