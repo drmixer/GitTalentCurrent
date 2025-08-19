@@ -148,9 +148,6 @@ export const DeveloperDashboard: React.FC = () => {
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
   const [recentCommits, setRecentCommits] = useState<Commit[]>([]);
 
-  const [fetchedSavedJobsCount, setFetchedSavedJobsCount] = useState<number | null>(null);
-  const [fetchedAppliedJobsCount, setFetchedAppliedJobsCount] = useState<number | null>(null);
-
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobRole | null>(null);
@@ -164,7 +161,7 @@ export const DeveloperDashboard: React.FC = () => {
   // NEW: State to track calendar year contributions for YTD display
   const [calendarYearContributions, setCalendarYearContributions] = useState<number>(0);
 
-  // Badge: derive unread test assignments directly from NotificationsContext so it clears instantly
+  // Badge counts derived directly from NotificationsContext so they clear instantly
   const unreadTestsBadge = useMemo(
     () =>
       (ctxNotifications || []).filter(
@@ -173,7 +170,6 @@ export const DeveloperDashboard: React.FC = () => {
     [ctxNotifications]
   );
 
-  // Badge: derive unread messages directly (if you want to display it on the messages tab)
   const unreadMessagesBadge = useMemo(
     () =>
       (ctxNotifications || []).filter(
@@ -182,6 +178,7 @@ export const DeveloperDashboard: React.FC = () => {
     [ctxNotifications]
   );
 
+  // Determine if we should fetch "fresh" GitHub data (e.g., right after a new install)
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
       const handle = contextDeveloperProfile?.github_handle || locationState.freshGitHubHandle;
@@ -190,6 +187,7 @@ export const DeveloperDashboard: React.FC = () => {
     return null;
   }, [locationState?.isFreshGitHubSetup, locationState?.freshGitHubInstallationId, locationState?.freshGitHubHandle, contextDeveloperProfile?.github_handle]);
 
+  // Fetch GitHub data (fresh vs standard)
   const {
     gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
   } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId });
@@ -199,18 +197,19 @@ export const DeveloperDashboard: React.FC = () => {
   } = useGitHub();
 
   const shouldUseFreshDataSource = !!freshLoadParams;
+
   let finalGitHubDataToShow = standardGitHubData;
   let gitHubDataLoadingToShow = standardGitHubLoading;
   let gitHubDataErrorToShow = standardGitHubError;
 
   if (latchedSuccessfullyFetchedFreshData) {
-      finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
-      gitHubDataLoadingToShow = false;
-      gitHubDataErrorToShow = null;
+    finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
+    gitHubDataLoadingToShow = false;
+    gitHubDataErrorToShow = null;
   } else if (shouldUseFreshDataSource) {
-      finalGitHubDataToShow = freshGitHubDataFromHook;
-      gitHubDataLoadingToShow = freshGitHubLoading;
-      gitHubDataErrorToShow = freshGitHubError;
+    finalGitHubDataToShow = freshGitHubDataFromHook;
+    gitHubDataLoadingToShow = freshGitHubLoading;
+    gitHubDataErrorToShow = freshGitHubError;
   }
 
   const fetchDeveloperPageData = useCallback(async () => {
@@ -269,9 +268,7 @@ export const DeveloperDashboard: React.FC = () => {
 
       if (savedJobsError) {
         console.error('[Dashboard] Error fetching saved jobs count:', savedJobsError);
-        setFetchedSavedJobsCount(0);
       } else {
-        setFetchedSavedJobsCount(savedCount ?? 0);
         console.log('[Dashboard] Saved jobs count fetched:', savedCount);
       }
       setSavedJobs([]);
@@ -283,9 +280,7 @@ export const DeveloperDashboard: React.FC = () => {
 
       if (appliedJobsError) {
         console.error('[Dashboard] Error fetching applied jobs count:', appliedJobsError);
-        setFetchedAppliedJobsCount(0);
       } else {
-        setFetchedAppliedJobsCount(appliedCount ?? 0);
         console.log('[Dashboard] Applied jobs count fetched:', appliedCount);
       }
       setAppliedJobs([]);
@@ -346,29 +341,6 @@ export const DeveloperDashboard: React.FC = () => {
       }
     }
   }, [activeTab, userProfile, markAsReadByType]);
-
-  const {
-    gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
-  } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId });
-
-  const {
-    gitHubData: standardGitHubData, loading: standardGitHubLoading, error: standardGitHubError
-  } = useGitHub();
-
-  const shouldUseFreshDataSource = !!freshLoadParams;
-  let finalGitHubDataToShow = standardGitHubData;
-  let gitHubDataLoadingToShow = standardGitHubLoading;
-  let gitHubDataErrorToShow = standardGitHubError;
-
-  if (latchedSuccessfullyFetchedFreshData) {
-      finalGitHubDataToShow = latchedSuccessfullyFetchedFreshData;
-      gitHubDataLoadingToShow = false;
-      gitHubDataErrorToShow = null;
-  } else if (shouldUseFreshDataSource) {
-      finalGitHubDataToShow = freshGitHubDataFromHook;
-      gitHubDataLoadingToShow = freshGitHubLoading;
-      gitHubDataErrorToShow = freshGitHubError;
-  }
 
   // GitHub recent commits derivation
   useEffect(() => {
@@ -507,8 +479,8 @@ export const DeveloperDashboard: React.FC = () => {
         developer={currentDeveloperProfile}
         portfolioItems={portfolioItems}
         messages={[]}
-        savedJobsCountOverride={fetchedSavedJobsCount}
-        appliedJobsCountOverride={fetchedAppliedJobsCount}
+        savedJobsCountOverride={null}
+        appliedJobsCountOverride={null}
         savedJobs={[]}
         appliedJobs={[]}
         endorsements={endorsements}
@@ -678,7 +650,7 @@ export const DeveloperDashboard: React.FC = () => {
         )
       )}
       {activeTab === 'messages' && (
-        <div className="flex flex-col md:flex-row gap-6 min-h=[calc(100vh-250px)]">
+        <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]">
           <div className="md:w-1/3 h-full">
             <MessageList
               onThreadSelect={(threadDetails) => {
