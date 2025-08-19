@@ -1,17 +1,15 @@
 import { Notification } from '../types';
 
-// Maps a notification to a route/tab based on type/entity
-export function resolveNotificationTarget(n: Notification, role?: string) {
+// Maps a notification to a route/tab based on type/entity and role
+export function resolveNotificationTarget(n: Notification | any, role?: string) {
   const base =
     role === 'recruiter' ? '/recruiter' :
     role === 'developer' ? '/developer' :
     role === 'admin' ? '/admin' :
     '/dashboard';
 
-  // Normalize defensively (some installs use slight variations)
-  const type = (n.type || '').toLowerCase();
+  const type = (n?.type || '').toLowerCase();
 
-  // Treat these as "test completion" for recruiters
   const testCompletionTypes = new Set([
     'test_completion',
     'test_completed',
@@ -19,40 +17,53 @@ export function resolveNotificationTarget(n: Notification, role?: string) {
     'test_complete'
   ]);
 
+  // Normalize job application naming (some installs used "job_interest")
+  const isJobApplication = type === 'job_application' || type === 'job_interest';
+
+  // Prefer explicit link if present on row
+  if (n?.link && typeof n.link === 'string') {
+    // If link is absolute, keep it; if it's a tab param, append to base
+    if (n.link.startsWith('/')) {
+      return { path: n.link, state: { fromNotification: true } };
+    }
+    return { path: `${base}${n.link}`, state: { fromNotification: true } };
+  }
+
   switch (true) {
-    case type === 'message':
+    case type.includes('message'):
       return {
         path: `${base}?tab=messages`,
         state: { fromNotification: true, messageId: n.entity_id }
       };
 
-    case type === 'job_interest':
-      // Recruiter "My Jobs" tab
+    case isJobApplication:
+      // Recruiter "My Jobs" tab is the typical landing spot
       return {
         path: `${base}?tab=my-jobs`,
         state: { fromNotification: true, jobRoleId: n.entity_id }
       };
 
     case type === 'test_assignment':
-      // Developer taking the test (adjust if your flow is different)
-      if (role === 'developer') {
+      // Developer taking the test: deep-link if entity_id is the assignment/test id
+      if (role === 'developer' && n?.entity_id) {
+        // Adjust if your test-taking route is different
         return { path: `/test/${n.entity_id}`, state: { fromNotification: true } };
       }
-      // For non-developers, fall back to tracker
+      // Fallback to tests tab
       return {
-        path: `${base}?tab=tracker`,
+        path: `${base}?tab=tests`,
         state: { fromNotification: true, assignmentId: n.entity_id }
       };
 
     case testCompletionTypes.has(type):
-      // Recruiter sees test results/tracker
+      // Recruiter sees test results / tracker
       return {
         path: `${base}?tab=tracker`,
         state: { fromNotification: true, assignmentId: n.entity_id }
       };
 
     default:
-      // Safe fallback: land user on their dashboard; add tab if you like
+      // Safe fallback
       return { path: base, state: { fromNotification: true } };
   }
 }
