@@ -37,15 +37,11 @@ import { DeveloperProfileModal } from '../components/DeveloperProfileModal';
 
 // === IMPORTING TYPES FROM src/types/index.ts ===
 import {
-    User,
     JobRole,
     Hire,
     Message,
     Developer,
-    AppliedJob,
     Notification,
-    Recruiter,
-    Assignment,
     SavedCandidate,
 } from '../types';
 
@@ -73,7 +69,7 @@ const TEST_COMPLETION_TYPES = ['test_completion', 'test_completed', 'test_result
 
 const RecruiterDashboard: React.FC = () => {
     const { user, userProfile, authLoading, refreshProfile } = useAuth();
-    const { markAsReadByType } = useNotifications();
+    const { notifications: ctxNotifications, markAsReadByType } = useNotifications();
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -114,9 +110,26 @@ const RecruiterDashboard: React.FC = () => {
 
     const isApproved = userProfile?.is_approved === true;
 
-    // Local unread counts for tab badges (decoupled from NotificationsContext)
-    const [unreadJobApplicationCount, setUnreadJobApplicationCount] = useState(0);
-    const [unreadTestCompletionCount, setUnreadTestCompletionCount] = useState(0);
+    // Derive tab badge counts directly from NotificationsContext so they clear immediately on markAsRead
+    const unreadJobApplicationCount = useMemo(
+        () =>
+            (ctxNotifications || []).filter(
+                (n) =>
+                    !n.is_read &&
+                    JOB_APPLICATION_TYPES.includes((n.type || '').toLowerCase())
+            ).length,
+        [ctxNotifications]
+    );
+
+    const unreadTestCompletionCount = useMemo(
+        () =>
+            (ctxNotifications || []).filter(
+                (n) =>
+                    !n.is_read &&
+                    TEST_COMPLETION_TYPES.includes((n.type || '').toLowerCase())
+            ).length,
+        [ctxNotifications]
+    );
 
     // --- Consolidated Data Fetching Function ---
     const fetchDashboardData = useCallback(async () => {
@@ -168,7 +181,7 @@ const RecruiterDashboard: React.FC = () => {
             if (hiresError) throw hiresError;
             setHires(hiresData || []);
 
-            // Fetch Notifications
+            // Fetch Notifications (for list rendering if you use it somewhere on this page)
             const { data: notificationsData, error: notificationsError } = await supabase
                 .from('notifications')
                 .select('*, user:users(name, avatar_url, profile_pic_url)')
@@ -186,27 +199,6 @@ const RecruiterDashboard: React.FC = () => {
                 .eq('is_read', false);
 
             if (messagesCountError) throw messagesCountError;
-
-            // Unread counts for tab badges (accept historical type variants)
-            const { count: unreadJobApp, error: unreadJobAppErr } = await supabase
-                .from('notifications')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', currentUserId)
-                .eq('is_read', false)
-                .in('type', JOB_APPLICATION_TYPES);
-
-            if (unreadJobAppErr) throw unreadJobAppErr;
-            setUnreadJobApplicationCount(unreadJobApp || 0);
-
-            const { count: unreadTestComp, error: unreadTestCompErr } = await supabase
-                .from('notifications')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', currentUserId)
-                .eq('is_read', false)
-                .in('type', TEST_COMPLETION_TYPES);
-
-            if (unreadTestCompErr) throw unreadTestCompErr;
-            setUnreadTestCompletionCount(unreadTestComp || 0);
 
             // Calculate Dashboard Stats
             const totalJobs = jobRolesData?.length || 0;
@@ -303,7 +295,7 @@ const RecruiterDashboard: React.FC = () => {
                 })
                 .subscribe();
 
-            // Notifications Subscription
+            // Notifications Subscription (kept to refresh local list if used elsewhere)
             const notificationsSubscription = supabase
                 .channel('notifications_updates')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, async payload => {
@@ -314,13 +306,6 @@ const RecruiterDashboard: React.FC = () => {
                         .order('created_at', { ascending: false });
                     if (newNotificationsData) {
                         setNotifications(newNotificationsData);
-
-                        // Recompute local unread counts from the updated list
-                        const unread = (newNotificationsData as Notification[]).filter(n => !n.is_read);
-                        const unreadJobs = unread.filter(n => JOB_APPLICATION_TYPES.includes((n.type || '').toLowerCase())).length;
-                        const unreadTests = unread.filter(n => TEST_COMPLETION_TYPES.includes((n.type || '').toLowerCase())).length;
-                        setUnreadJobApplicationCount(unreadJobs);
-                        setUnreadTestCompletionCount(unreadTests);
                     } else if (newNotificationsError) {
                         console.error("Error updating notifications via subscription:", newNotificationsError);
                         setDashboardError("Failed to update notifications via live data.");
@@ -346,8 +331,8 @@ const RecruiterDashboard: React.FC = () => {
                 for (const t of types) {
                     try {
                         await markAsReadByType(t);
-                    } catch (e) {
-                        // continue on best effort
+                    } catch {
+                        // best-effort; ignore individual failures
                     }
                 }
             };
@@ -359,7 +344,7 @@ const RecruiterDashboard: React.FC = () => {
                 // Clear test completion notifications (support common variants)
                 clearTypes(TEST_COMPLETION_TYPES);
             } else if (activeTab === 'messages') {
-                // Messages notifications clear when threads open; do nothing here
+                // Message notifications are cleared at the thread level; do nothing here.
             }
         }
     }, [activeTab, userProfile, markAsReadByType]);
@@ -407,9 +392,9 @@ const RecruiterDashboard: React.FC = () => {
                 .eq('developer_id', developerId)
                 .single();
 
-            if (!appliedJobError && appliedJobData?.developer) {
+            if (!appliedJobError && (appliedJobData as any)?.developer) {
                 // @ts-ignore
-                otherUserProfilePicUrl = appliedJobData.developer.profile_pic_url || appliedJobData.developer.user?.avatar_url;
+                otherUserProfilePicUrl = (appliedJobData as any).developer.profile_pic_url || (appliedJobData as any).developer.user?.avatar_url;
             }
         }
 
@@ -796,7 +781,7 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Briefcase className="w-5 h-5 mr-2" />
                                 My Job Listings
-                                {/* Badge uses local unread job application count including type variants */}
+                                {/* Tab badge derives from NotificationsContext so it clears instantly on read */}
                                 {unreadJobApplicationCount > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                         {unreadJobApplicationCount}
@@ -813,7 +798,7 @@ const RecruiterDashboard: React.FC = () => {
                             >
                                 <Users className="w-5 h-5 mr-2" />
                                 Hiring Pipeline
-                                {/* Badge uses local unread test completion count including variants */}
+                                {/* Tab badge derives from NotificationsContext so it clears instantly on read */}
                                 {unreadTestCompletionCount > 0 && (
                                     <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                         {unreadTestCompletionCount}
