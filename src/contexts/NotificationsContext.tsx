@@ -20,7 +20,6 @@ export type NotificationRow = {
   created_at: string;
   sender_id?: string | null;
   conversation_id?: string | null;
-  // Some rows may include this in your app
   message_preview?: string | null;
 };
 
@@ -43,7 +42,7 @@ type Ctx = {
   markAllAsRead: () => Promise<void>;
   markAsReadByType: (type: string) => Promise<void>;
 
-  // Legacy API expected by Messages and Header
+  // Legacy APIs expected by Messages and Header
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
   markMessageNotificationsAsRead: (senderId: string) => Promise<void>;
@@ -52,35 +51,26 @@ type Ctx = {
 
 const NotificationsContext = createContext<Ctx | undefined>(undefined);
 
+// Robust message classification: any type containing "message" is considered message-like
 function isMessageType(n: NotificationRow): boolean {
   const t = (n.type || "").toLowerCase();
-  return ["message", "message:new", "message_received", "chat_message"].includes(t);
+  return t.includes("message");
 }
 
-function isSummaryTitle(title?: string | null): boolean {
-  if (!title) return false;
-  return /^new message from /i.test(title.trim());
-}
-
-// Filter used by dropdown: keep message summaries and all non-message notifications
 function filterForDisplay(notifications: NotificationRow[]): NotificationRow[] {
-  const filtered = notifications.filter((n) => {
-    if (isMessageType(n)) {
-      return isSummaryTitle(n.title);
-    }
-    return true;
-  });
+  // Keep all message notifications (no title requirement), and all non-message notifications
+  const filtered = notifications.slice();
 
-  // Dedupe near-duplicates by conversation/sender per minute
+  // Dedupe common near-duplicates by conversation/sender per minute
   const seen = new Set<string>();
   const result: NotificationRow[] = [];
   for (const n of filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
-    const key =
+    const dedupeKey =
       (n.conversation_id || n.sender_id || "unknown") +
       ":" +
       new Date(n.created_at).toISOString().slice(0, 16);
-    if (!seen.has(key)) {
-      seen.add(key);
+    if (!seen.has(dedupeKey)) {
+      seen.add(dedupeKey);
       result.push(n);
     }
   }
@@ -95,7 +85,7 @@ function computeTabCounts(unread: NotificationRow[]): TabCounts {
       counts.jobs++;
     } else if (t === "test_completion") {
       counts.pipeline++;
-    } else if (["message", "message:new", "message_received", "chat_message"].includes(t)) {
+    } else if (t.includes("message")) {
       counts.messages++;
     } else {
       counts.other++;
@@ -169,6 +159,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [notifications]
   );
 
+  // Badge for the bell/dropdown: use filtered list to avoid overcounting dupes,
+  // but include all message notifications (we no longer drop those with non-standard titles)
   const unreadCount = useMemo(
     () => displayNotifications.filter((n) => !n.is_read).length,
     [displayNotifications]
@@ -262,7 +254,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     await refresh();
   }, [refresh]);
 
-  // Legacy function: clear message-type notifications for a given sender_id
+  // Clear all notifications from a specific sender (no type filter to avoid 400s)
   const markMessageNotificationsAsRead = useCallback(
     async (senderId: string) => {
       if (!userProfile?.id || !senderId) return;
@@ -272,8 +264,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           .update({ is_read: true })
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
-          .eq("sender_id", senderId)
-          .in("type", ["message", "message:new", "message_received", "chat_message"]);
+          .eq("sender_id", senderId);
 
         if (error) {
           console.error("Failed to mark message notifications as read:", error);
@@ -282,7 +273,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
         setNotifications((prev) =>
           prev.map((n) =>
-            n.sender_id === senderId && isMessageType(n) ? { ...n, is_read: true } : n
+            n.sender_id === senderId ? { ...n, is_read: true } : n
           )
         );
       } catch (e) {
@@ -292,13 +283,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [userProfile?.id]
   );
 
-  // Legacy catch-all: currently supports only entity === 'sender' to avoid DB errors
   const markAsReadByEntity = useCallback(
     async (entity: "sender" | string, id: string) => {
       if (entity === "sender") {
         await markMessageNotificationsAsRead(id);
       } else {
-        // No-op for unsupported entities to avoid column errors
+        // No-op for unsupported entities
         console.warn(`[Notifications] markAsReadByEntity unsupported entity "${entity}". No action taken.`);
       }
     },
