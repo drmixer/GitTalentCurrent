@@ -37,7 +37,7 @@ function getTabForNotification(n: any): string {
   return "overview";
 }
 
-const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
+export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
   onClose,
   onNavigate,
   fetchUnreadCount,
