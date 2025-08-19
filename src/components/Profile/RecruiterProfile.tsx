@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { JobRole, User, Recruiter as RecruiterType, EnrichedJobRole } from '../../types'; // Ensure EnrichedJobRole is imported
+import { User, Recruiter as RecruiterType, EnrichedJobRole } from '../../types'; // Ensure EnrichedJobRole is imported
 import { JobDetailsModal } from '../Jobs/JobsTab'; // Import the common JobDetailsModal
-import { Star, Loader, CheckCircle, Send, XCircle } from 'lucide-react';
+import { Star, Loader } from 'lucide-react';
 
 interface RecruiterProfileProps {
   recruiterId: string;
@@ -32,18 +32,17 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("------------------------------------------");
-    console.log("RecruiterProfile component (Re)Rendered/Updated.");
+    console.log('------------------------------------------');
+    console.log('RecruiterProfile component (Re)Rendered/Updated.');
     // This log confirms the recruiterId being used from props
-    console.log("Recruiter ID received by RecruiterProfile (from props):", recruiterId);
-    console.log("Current Supabase auth session:", supabase.auth.getSession()); // Check current session status
+    console.log('Recruiter ID received by RecruiterProfile (from props):', recruiterId);
 
     const fetchProfileData = async () => {
       setLoading(true); // Always set loading to true at the start of fetch
       // No explicit error state managed for the component, but we will log errors
 
       if (!recruiterId) {
-        console.error("RecruiterProfile: recruiterId is missing.");
+        console.error('RecruiterProfile: recruiterId is missing.');
         setLoading(false);
         return;
       }
@@ -56,11 +55,18 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
       }
 
       try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn('Supabase auth getSession error:', sessionError);
+        }
+        console.log('Current Supabase auth session:', session);
+
         console.log(`[RecruiterProfile] Attempting to fetch profile for ID: ${recruiterId}`);
 
         const { data: recruiterData, error: recruiterError } = await supabase
           .from('users')
-          .select(`
+          .select(
+            `
             id,
             role,
             name,
@@ -76,43 +82,45 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               company_size,
               industry
             )
-          `)
+          `
+          )
           .eq('id', recruiterId)
           .single();
 
         // --- CRITICAL NEW LOGS FOR DEBUGGING ---
-        console.log("[RecruiterProfile Debug] Supabase query executed for profile data.");
-        console.log("[RecruiterProfile Debug] Supabase data received:", recruiterData);
-        console.log("[RecruiterProfile Debug] Supabase error received:", recruiterError);
+        console.log('[RecruiterProfile Debug] Supabase query executed for profile data.');
+        console.log('[RecruiterProfile Debug] Supabase data received:', recruiterData);
+        console.log('[RecruiterProfile Debug] Supabase error received:', recruiterError);
         if (recruiterError) {
-          console.error("Supabase Error Details for Profile Fetch:",
-            "Message:", recruiterError.message,
-            "Code:", recruiterError.code, // This is often "PGRST116" if no rows found
-            "Details:", recruiterError.details,
-            "Hint:", recruiterError.hint
+          console.error(
+            'Supabase Error Details for Profile Fetch:',
+            'Message:',
+            recruiterError.message,
+            'Code:',
+            recruiterError.code, // This is often "PGRST116" if no rows found
+            'Details:',
+            recruiterError.details,
+            'Hint:',
+            recruiterError.hint
           );
         }
         // --- END CRITICAL NEW LOGS ---
 
         if (recruiterError) {
-          // You had 'throw recruiterError;' here, which skips the setRecruiter(null)
-          // and directly goes to the outer catch.
-          // Let's explicitly set recruiter to null here for clarity in logic.
           setRecruiter(null);
-          // If you want to show a specific error message on the UI, set an error state here.
-          // For now, the `if (!recruiter)` block will handle the "not found" message.
           return; // Exit if there's an error
         }
-        
+
         // If no error, set the recruiter data.
-        setRecruiter(recruiterData);
+        setRecruiter(recruiterData as any);
 
         // --- Fetch Jobs Data (only if recruiterData was successfully fetched) ---
         // This part seems to be working for JobsTab, but let's add logs here too.
         console.log(`[RecruiterProfile] Attempting to fetch jobs for recruiter ID: ${recruiterId}`);
         const { data: jobsData, error: jobsError } = await supabase
           .from('job_roles')
-          .select(`
+          .select(
+            `
             *,
             recruiter:users!job_roles_recruiter_id_fkey (
               id,
@@ -124,35 +132,45 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 company_name
               )
             )
-          `)
+          `
+          )
           .eq('recruiter_id', recruiterId)
           .order('created_at', { ascending: false });
 
-        console.log("[RecruiterProfile Debug] Supabase query executed for jobs data.");
-        console.log("[RecruiterProfile Debug] Supabase jobs data received:", jobsData);
-        console.log("[RecruiterProfile Debug] Supabase jobs error received:", jobsError);
+        console.log('[RecruiterProfile Debug] Supabase query executed for jobs data.');
+        console.log('[RecruiterProfile Debug] Supabase jobs data received:', jobsData);
+        console.log('[RecruiterProfile Debug] Supabase jobs error received:', jobsError);
         if (jobsError) {
-            console.error("Supabase Error Details for Jobs Fetch:",
-                "Message:", jobsError.message,
-                "Code:", jobsError.code,
-                "Details:", jobsError.details,
-                "Hint:", jobsError.hint
-            );
+          console.error(
+            'Supabase Error Details for Jobs Fetch:',
+            'Message:',
+            jobsError.message,
+            'Code:',
+            jobsError.code,
+            'Details:',
+            jobsError.details,
+            'Hint:',
+            jobsError.hint
+          );
         }
 
         if (jobsError) {
           console.error(`Error fetching jobs for recruiter ID ${recruiterId}:`, jobsError);
           setJobs([]); // Set to empty array on error
         } else {
-          const transformedJobs: EnrichedJobRole[] = (jobsData || []).map(job => {
-            const companyName = (job.recruiter?.recruiters as RecruiterType)?.company_name || 'Company Confidential';
+          const transformedJobs: EnrichedJobRole[] = (jobsData || []).map((job) => {
+            const companyName =
+              (job.recruiter?.recruiters as RecruiterType | undefined)?.company_name ||
+              'Company Confidential';
             return {
               ...job,
               company_name: companyName,
-              recruiter: job.recruiter ? {
-                  ...job.recruiter,
-                  recruiters: (job.recruiter.recruiters as RecruiterType) || undefined,
-              } : undefined,
+              recruiter: job.recruiter
+                ? {
+                    ...job.recruiter,
+                    recruiters: (job.recruiter.recruiters as RecruiterType) || undefined,
+                  }
+                : undefined,
             };
           });
           setJobs(transformedJobs);
@@ -160,38 +178,47 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         // --- End Fetch Jobs Data ---
 
         // Fetch Hires Count
-        console.log(`[RecruiterProfile] Attempting to fetch hires count for recruiter ID: ${recruiterId}`);
+        console.log(
+          `[RecruiterProfile] Attempting to fetch hires count for recruiter ID: ${recruiterId}`
+        );
         const { count: hiresCount, error: hiresError } = await supabase
           .from('hires')
           .select('*', { count: 'exact', head: true })
           .eq('marked_by', recruiterId);
 
-        console.log("[RecruiterProfile Debug] Supabase hires count data received:", hiresCount);
-        console.log("[RecruiterProfile Debug] Supabase hires error received:", hiresError);
+        console.log('[RecruiterProfile Debug] Supabase hires count data received:', hiresCount);
+        console.log('[RecruiterProfile Debug] Supabase hires error received:', hiresError);
         if (hiresError) {
-            console.error("Supabase Error Details for Hires Fetch:",
-                "Message:", hiresError.message,
-                "Code:", hiresError.code,
-                "Details:", hiresError.details,
-                "Hint:", hiresError.hint
-            );
+          console.error(
+            'Supabase Error Details for Hires Fetch:',
+            'Message:',
+            hiresError.message,
+            'Code:',
+            hiresError.code,
+            'Details:',
+            hiresError.details,
+            'Hint:',
+            hiresError.hint
+          );
         }
 
         if (hiresError) {
           console.error(`Error fetching hires count for recruiter ID ${recruiterId}:`, hiresError);
           // Stats will default to 0 for hires if error
         }
-        console.log("Hires count:", hiresCount);
+        console.log('Hires count:', hiresCount);
 
-        const totalApplicants = (jobsData || []).reduce((acc, job) => acc + (job.applicant_count || 0), 0);
+        const totalApplicants = (jobsData || []).reduce(
+          (acc, job) => acc + (job.applicant_count || 0),
+          0
+        );
 
         setStats({
           totalJobs: jobsData?.length || 0,
-          openJobs: jobsData?.filter(job => job.is_active).length || 0,
+          openJobs: jobsData?.filter((job) => job.is_active).length || 0,
           totalApplicants: totalApplicants,
           totalHires: hiresCount || 0,
         });
-
       } catch (error: any) {
         console.error('Error in fetchProfileData (outer catch):', error);
         setRecruiter(null); // Ensure recruiter is null on any unexpected error
@@ -216,7 +243,9 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     return (
       <div className="text-center py-10">
         <h3 className="text-xl font-semibold text-gray-700">Recruiter profile not found.</h3>
-        <p className="text-gray-500">The recruiter ID may be invalid or the profile does not exist.</p>
+        <p className="text-gray-500">
+          The recruiter ID may be invalid or the profile does not exist.
+        </p>
       </div>
     );
   }
@@ -225,7 +254,8 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
     navigate(`/apply/job/${jobId}`);
   };
 
-  const websiteHref = normalizeWebsite((recruiter.recruiters as RecruiterType)?.website);
+  const companyName = recruiter.recruiters?.company_name || 'Company';
+  const websiteHref = normalizeWebsite(recruiter.recruiters?.website);
 
   return (
     <div className="container mx-auto p-4">
@@ -236,7 +266,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
             {recruiter.company_logo_url && (
               <img
                 src={recruiter.company_logo_url}
-                alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} Cover`}
+                alt={`${companyName} Cover`}
                 className="w-full h-full object-cover"
               />
             )}
@@ -259,11 +289,11 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
               <img
                 className="h-16 w-auto object-contain rounded-lg shadow-sm bg-white p-1"
                 src={recruiter.company_logo_url}
-                alt={`${(recruiter.recruiters as RecruiterType)?.company_name || 'Company'} logo`}
+                alt={`${companyName} logo`}
               />
-            ) : (recruiter.recruiters as RecruiterType)?.company_name ? (
+            ) : recruiter.recruiters?.company_name ? (
               <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm">
-                {(recruiter.recruiters as RecruiterType).company_name[0].toUpperCase()}
+                {companyName[0].toUpperCase()}
               </div>
             ) : null}
           </div>
@@ -272,9 +302,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         <div className="pt-20 pb-4 px-8">
           <h1 className="text-3xl font-bold text-gray-800">{recruiter.name}</h1>
           {/* Display company name from recruiter's recruiters table, fallback */}
-          <p className="text-gray-600 text-lg">
-            {(recruiter.recruiters as RecruiterType)?.company_name || 'Company Name Not Available'}
-          </p>
+          <p className="text-gray-600 text-lg">{companyName || 'Company Name Not Available'}</p>
 
           {/* Website: clickable */}
           {websiteHref && (
@@ -286,7 +314,7 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
                 className="hover:underline break-all"
                 title="Company Website"
               >
-                {(recruiter.recruiters as RecruiterType)?.website}
+                {recruiter.recruiters?.website}
               </a>
             </p>
           )}
@@ -317,26 +345,41 @@ const RecruiterProfile: React.FC<RecruiterProfileProps> = ({ recruiterId }) => {
         <div className="px-8 pb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-800">Open Positions</h2>
           <div className="space-y-4">
-            {jobs.filter(j => j.is_active).length > 0 ? (
-              jobs.filter(j => j.is_active).map(job => (
-                <div key={job.id} onClick={() => setSelectedJob(job)} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow block cursor-pointer bg-white">
-                  <h3 className="text-lg font-semibold text-blue-700">{job.title}</h3>
-                  <p className="text-gray-700">{job.description?.substring(0, 150)}...</p>
-                  {/* Salary Display */}
-                  <p className="text-sm text-gray-500 mt-2 flex items-center">
-                    <Star size={14} className="mr-1 text-gray-400" />
-                    {job.salary || 'N/A'}
-                  </p>
-                  {job.tech_stack && job.tech_stack.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {job.tech_stack.slice(0, 3).map(tech => (
-                        <span key={tech} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full font-medium">{tech}</span>
-                      ))}
-                      {job.tech_stack.length > 3 && <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full font-medium">+{job.tech_stack.length - 3}</span>}
-                    </div>
-                  )}
-                </div>
-              ))
+            {jobs.filter((j) => j.is_active).length > 0 ? (
+              jobs
+                .filter((j) => j.is_active)
+                .map((job) => (
+                  <div
+                    key={job.id}
+                    onClick={() => setSelectedJob(job)}
+                    className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow block cursor-pointer bg-white"
+                  >
+                    <h3 className="text-lg font-semibold text-blue-700">{job.title}</h3>
+                    <p className="text-gray-700">{job.description?.substring(0, 150)}...</p>
+                    {/* Salary Display */}
+                    <p className="text-sm text-gray-500 mt-2 flex items-center">
+                      <Star size={14} className="mr-1 text-gray-400" />
+                      {job.salary || 'N/A'}
+                    </p>
+                    {job.tech_stack && job.tech_stack.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {job.tech_stack.slice(0, 3).map((tech) => (
+                          <span
+                            key={tech}
+                            className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full font-medium"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                        {job.tech_stack.length > 3 && (
+                          <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full font-medium">
+                            +{job.tech_stack.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
             ) : (
               <div className="text-center py-6 text-gray-500">
                 <p>No active job listings from this recruiter at the moment.</p>
