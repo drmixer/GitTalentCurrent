@@ -1,16 +1,19 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../../contexts/NotificationsContext";
 
 interface NotificationsDropdownContentProps {
   onClose?: () => void;
-  // Kept for compatibility with existing header usage:
+  // Provided by Header; preferred way to change dashboard tab
   onNavigate?: (tab: string) => void;
+  // Legacy/fallback props
   fetchUnreadCount?: () => void;
-  markAllAsRead?: () => void; // legacy prop; context version preferred
+  markAllAsRead?: () => void;
+  // Provided by Header for direct path fallback
   getDashboardPath?: () => string;
 }
 
-// Helper: only keep the user-facing summary items like "New message from ..."
+// Helper: only keep the user-facing summary items like "New message from ..." or items with a preview
 function isMessageSummary(n: any): boolean {
   const type = (n?.type || "").toLowerCase();
   const isMessageType =
@@ -19,6 +22,8 @@ function isMessageSummary(n: any): boolean {
     type === "message_received" ||
     type === "chat_message";
 
+  // For message-like rows, only show those that have a preview or a conventional title;
+  // for other types, keep as-is.
   if (!isMessageType) return true;
 
   const title = (n?.title || "").toLowerCase().trim();
@@ -28,10 +33,14 @@ function isMessageSummary(n: any): boolean {
 
 const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
   onClose,
+  onNavigate,
   fetchUnreadCount,
-  markAllAsRead: legacyMarkAllAsRead, // not used unless context missing
+  markAllAsRead: legacyMarkAllAsRead,
+  getDashboardPath,
 }) => {
-  // Cast to any for maximum compatibility with the existing context shape in your repo
+  const navigate = useNavigate();
+
+  // Cast to any for compatibility with the context shape
   const {
     notifications,
     displayNotifications,
@@ -51,17 +60,45 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
       .slice(0, 20);
   }, [displayNotifications, notifications]);
 
-  const handleClick = useCallback(
-    async (id: string) => {
+  // Fire-and-forget read; never block navigation on network errors
+  const fireMarkAsRead = useCallback(
+    (id: string) => {
       try {
         if (typeof markAsRead === "function") {
-          await markAsRead(id);
+          const p = markAsRead(id);
+          // Avoid unhandled rejections in dev
+          if (p && typeof p.catch === "function") p.catch(() => {});
         }
-      } finally {
-        onClose?.();
+      } catch {
+        // no-op
       }
     },
-    [markAsRead, onClose]
+    [markAsRead]
+  );
+
+  const goToMessagesTab = useCallback(() => {
+    // Prefer the provided onNavigate API from Header
+    if (typeof onNavigate === "function") {
+      onNavigate("messages");
+      return;
+    }
+    // Fallback: compute path and push with router
+    const base = (typeof getDashboardPath === "function" && getDashboardPath()) || "/";
+    navigate(`${base}?tab=messages`);
+  }, [onNavigate, getDashboardPath, navigate]);
+
+  const handleItemClick = useCallback(
+    (n: any) => {
+      // Mark read in the background
+      fireMarkAsRead(n?.id);
+
+      // Close dropdown first for snappy UX
+      onClose?.();
+
+      // Route to Messages tab
+      goToMessagesTab();
+    },
+    [fireMarkAsRead, onClose, goToMessagesTab]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
@@ -99,22 +136,16 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
           {unreadToShow.map((n: any) => (
             <li key={n.id}>
               <button
-                className="w-full text-left p-2 rounded hover:bg-gray-50 border border-transparent hover:border-gray-200"
-                onClick={() => handleClick(n.id)}
                 type="button"
+                className="w-full text-left p-2 rounded hover:bg-gray-50 border border-transparent hover:border-gray-200"
+                onClick={() => handleItemClick(n)}
               >
-                <div className="flex items-start">
-                  <span className="mt-1 mr-2 inline-block h-2 w-2 rounded-full bg-blue-500" />
-                  <div className="flex-1">
-                    <div className="text-sm text-gray-900">
-                      {n.title?.startsWith("New message from")
-                        ? n.title
-                        : n.message_preview || n.title || "Notification"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(n.created_at).toLocaleString()}
-                    </div>
-                  </div>
+                <div className="text-sm font-medium">{n.title || "New notification"}</div>
+                {n.message_preview && (
+                  <div className="text-xs text-gray-600 truncate">{n.message_preview}</div>
+                )}
+                <div className="text-[11px] text-gray-400">
+                  {new Date(n.created_at).toLocaleString()}
                 </div>
               </button>
             </li>
@@ -125,6 +156,4 @@ const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> 
   );
 };
 
-// Export both named and default so existing imports keep working
-export { NotificationsDropdownContent };
 export default NotificationsDropdownContent;
