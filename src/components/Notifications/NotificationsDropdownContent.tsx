@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../../contexts/NotificationsContext";
+import { resolveNotificationTarget } from "../../utils/notificationRoutes";
+import { useAuth } from "../../hooks/useAuth";
 
 interface NotificationsDropdownContentProps {
   onClose?: () => void;
@@ -12,15 +14,6 @@ interface NotificationsDropdownContentProps {
   getDashboardPath?: () => string;
 }
 
-// Decide which tab to open for a given notification
-function getTabForNotification(n: any): string {
-  const t = (n?.type || "").toLowerCase();
-  if (t.includes("message")) return "messages";
-  if (t === "job_application") return "jobs";
-  if (t === "test_completion") return "pipeline";
-  return "overview";
-}
-
 // Only show concise message-type summaries in the dropdown
 function isMessageSummary(n: any): boolean {
   const type = (n?.type || "").toLowerCase();
@@ -30,8 +23,26 @@ function isMessageSummary(n: any): boolean {
     type === "message_received" ||
     type === "chat_message";
   if (!isMessageType) return true;
-  // Always keep message notifications, but we'll render a normalized title (not the content)
+  // Always keep message notifications, but we will render a normalized title (not raw content)
   return true;
+}
+
+// Fallback titles by type when backend title is missing
+function getDefaultTitleByType(n: any): string {
+  const t = (n?.type || "").toLowerCase();
+  if (t.includes("message")) return "New message received";
+  if (t === "job_application" || t === "job_interest")
+    return 'A developer has applied for your job role';
+  if (t === "test_assignment")
+    return "You have a new coding test assignment";
+  if (
+    t === "test_completion" ||
+    t === "test_completed" ||
+    t === "test_result" ||
+    t === "test_complete"
+  )
+    return "Test completed";
+  return "New notification";
 }
 
 export const NotificationsDropdownContent: React.FC<NotificationsDropdownContentProps> = ({
@@ -42,6 +53,7 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
   getDashboardPath,
 }) => {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
 
   const {
     notifications,
@@ -76,26 +88,43 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
     [markAsRead]
   );
 
-  const navigateToTab = useCallback(
-    (tab: string) => {
-      if (typeof onNavigate === "function") {
-        onNavigate(tab);
+  const navigateToTarget = useCallback(
+    (n: any) => {
+      const role = userProfile?.role || undefined;
+      const target = resolveNotificationTarget(n, role);
+      if (target?.path) {
+        // Prefer strongly-typed target
+        navigate(target.path, { state: target.state });
         return;
       }
+      // Fallback: basic tab routing if target not resolved
       const base = (typeof getDashboardPath === "function" && getDashboardPath()) || "/";
+      const type = (n?.type || "").toLowerCase();
+      let tab = "overview";
+      if (type.includes("message")) tab = "messages";
+      else if (type === "job_application" || type === "job_interest") tab = "my-jobs";
+      else if (
+        type === "test_completion" ||
+        type === "test_completed" ||
+        type === "test_result" ||
+        type === "test_complete"
+      )
+        tab = "tracker";
+      else if (type === "test_assignment" && role === "developer")
+        tab = "tests";
+
       navigate(`${base}?tab=${encodeURIComponent(tab)}`);
     },
-    [onNavigate, getDashboardPath, navigate]
+    [navigate, getDashboardPath, userProfile?.role]
   );
 
   const handleItemClick = useCallback(
     (n: any) => {
       fireMarkAsRead(n?.id);
       onClose?.();
-      const tab = getTabForNotification(n);
-      navigateToTab(tab);
+      navigateToTarget(n);
     },
-    [fireMarkAsRead, onClose, navigateToTab]
+    [fireMarkAsRead, onClose, navigateToTarget]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
@@ -114,11 +143,11 @@ export const NotificationsDropdownContent: React.FC<NotificationsDropdownContent
   const renderTitle = (n: any) => {
     const t = (n?.type || "").toLowerCase();
     if (t.includes("message")) {
-      // Normalize message-type title; do not show raw content
-      // If you can provide sender display names here, replace with "New message from <name>"
+      // Normalize message-type title; avoid showing raw content
+      // If sender display names are available, use: `New message from ${sender}`
       return "New message received";
     }
-    return n.title || "New notification";
+    return n.title || getDefaultTitleByType(n);
   };
 
   return (
