@@ -45,22 +45,20 @@ type Ctx = {
   // Legacy APIs expected by Messages and Header
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
-  markMessageNotificationsAsRead: (senderId: string) => Promise<void>;
+  markMessageNotificationsAsRead: (senderId: string, conversationId?: string) => Promise<void>;
   markAsReadByEntity: (entity: "sender" | string, id: string) => Promise<void>;
 };
 
 const NotificationsContext = createContext<Ctx | undefined>(undefined);
 
-// Treat any type containing "message" as message-like
 function isMessageType(n: NotificationRow): boolean {
   const t = (n.type || "").toLowerCase();
   return t.includes("message");
 }
 
-// Keep all notifications, then dedupe near-duplicates by conversation/sender per minute
+// Dedupe near-duplicates by conversation/sender per minute for display/badge usage
 function filterForDisplay(notifications: NotificationRow[]): NotificationRow[] {
   const filtered = notifications.slice();
-
   const seen = new Set<string>();
   const result: NotificationRow[] = [];
   for (const n of filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
@@ -164,10 +162,19 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [displayNotifications]
   );
 
+  // Deduped unread count for message-type notifications (used to align Messages tab)
+  const dedupedUnreadMessages = useMemo(
+    () =>
+      displayNotifications.filter((n) => !n.is_read && isMessageType(n)).length,
+    [displayNotifications]
+  );
+
+  // Keep legacy tab counts but override messages with deduped count
   const tabCounts = useMemo(() => {
     const unread = notifications.filter((n) => !n.is_read);
-    return computeTabCounts(unread);
-  }, [notifications]);
+    const base = computeTabCounts(unread);
+    return { ...base, messages: dedupedUnreadMessages };
+  }, [notifications, dedupedUnreadMessages]);
 
   const markAsRead = useCallback(
     async (id: string) => {
@@ -242,37 +249,82 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [userProfile?.id]
   );
 
-  // Legacy alias: reload notifications and recompute counts
   const fetchUnreadCount = useCallback(async () => {
     await refresh();
   }, [refresh]);
 
-  // Legacy alias: reload notifications
   const fetchNotifications = useCallback(async () => {
     await refresh();
   }, [refresh]);
 
-  // Robust clear for a specific sender: simple update (avoid select to prevent 400s)
+  // Clear notifications for a specific message thread/sender with robust fallbacks
   const markMessageNotificationsAsRead = useCallback(
-    async (senderId: string) => {
-      if (!userProfile?.id || !senderId) return;
+    async (senderId: string, conversationId?: string) => {
+      if (!userProfile?.id) return;
       try {
-        const { error } = await supabase
+        // Prefer conversation_id if we have it
+        if (conversationId) {
+          const { error: convErr } = await supabase
+            .from("notifications")
+            .update({ is_read: true })
+            .eq("user_id", userProfile.id)
+            .eq("is_read", false)
+            .eq("conversation_id", conversationId);
+
+          if (!convErr) {
+            setNotifications((prev) =>
+              prev.map((n) =>
+                n.conversation_id === conversationId ? { ...n, is_read: true } : n
+              )
+            );
+            return;
+          }
+          console.error("Failed to mark by conversation_id, falling back:", convErr);
+        }
+
+        // Select matching IDs (sender-based)
+        const { data: rows, error: selErr } = await supabase
           .from("notifications")
-          .update({ is_read: true })
+          .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
           .eq("sender_id", senderId);
 
-        if (error) {
-          console.error("Failed to mark message notifications as read:", error);
+        if (selErr) {
+          console.error("Failed to select message notifications by sender:", selErr);
+        }
+
+        const ids = (rows || []).map((r: any) => r.id);
+        if (ids.length > 0) {
+          const { error: updErr } = await supabase
+            .from("notifications")
+            .update({ is_read: true })
+            .in("id", ids);
+
+          if (!updErr) {
+            setNotifications((prev) =>
+              prev.map((n) => (ids.includes(n.id) ? { ...n, is_read: true } : n))
+            );
+            return;
+          }
+          console.error("Failed to update message notifications by IDs:", updErr);
+        }
+
+        // Last-resort fallback: mark all message-type notifications as read for this user
+        const { error: typeErr } = await supabase
+          .from("notifications")
+          .update({ is_read: true })
+          .eq("user_id", userProfile.id)
+          .eq("is_read", false)
+          .ilike("type", "%message%");
+
+        if (typeErr) {
+          console.error("Failed to mark message notifications by type as read:", typeErr);
           return;
         }
 
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.sender_id === senderId ? { ...n, is_read: true } : n
-          )
+          prev.map((n) => (isMessageType(n) ? { ...n, is_read: true } : n))
         );
       } catch (e) {
         console.error("Unexpected error in markMessageNotificationsAsRead:", e);
@@ -319,7 +371,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 export function useNotifications(): Ctx {
   const ctx = useContext(NotificationsContext);
   if (!ctx) {
-    // Fallback to prevent crashes if used outside provider
     return {
       notifications: [],
       displayNotifications: [],
