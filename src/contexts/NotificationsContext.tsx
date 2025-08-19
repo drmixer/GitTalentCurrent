@@ -164,19 +164,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [displayNotifications]
   );
 
-  // Deduped unread count for message-type notifications (used to align Messages tab)
-  const dedupedUnreadMessages = useMemo(
-    () =>
-      displayNotifications.filter((n) => !n.is_read && isMessageType(n)).length,
-    [displayNotifications]
-  );
-
   const tabCounts = useMemo(() => {
     const unread = notifications.filter((n) => !n.is_read);
-    const base = computeTabCounts(unread);
-    // Align messages tab with bell by using deduped unread message count
-    return { ...base, messages: dedupedUnreadMessages };
-  }, [notifications, dedupedUnreadMessages]);
+    return computeTabCounts(unread);
+  }, [notifications]);
 
   const markAsRead = useCallback(
     async (id: string) => {
@@ -261,38 +252,27 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     await refresh();
   }, [refresh]);
 
-  // Robust clear for a specific sender: select IDs first, then update by primary key
+  // Robust clear for a specific sender: simple update (avoid select to prevent 400s)
   const markMessageNotificationsAsRead = useCallback(
     async (senderId: string) => {
       if (!userProfile?.id || !senderId) return;
       try {
-        const { data: rows, error: selErr } = await supabase
+        const { error } = await supabase
           .from("notifications")
-          .select("id")
+          .update({ is_read: true })
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
           .eq("sender_id", senderId);
 
-        if (selErr) {
-          console.error("Failed to select message notifications to mark as read:", selErr);
-          return;
-        }
-
-        const ids = (rows || []).map((r: any) => r.id);
-        if (ids.length === 0) return;
-
-        const { error: updErr } = await supabase
-          .from("notifications")
-          .update({ is_read: true })
-          .in("id", ids);
-
-        if (updErr) {
-          console.error("Failed to mark message notifications as read:", updErr);
+        if (error) {
+          console.error("Failed to mark message notifications as read:", error);
           return;
         }
 
         setNotifications((prev) =>
-          prev.map((n) => (ids.includes(n.id) ? { ...n, is_read: true } : n))
+          prev.map((n) =>
+            n.sender_id === senderId ? { ...n, is_read: true } : n
+          )
         );
       } catch (e) {
         console.error("Unexpected error in markMessageNotificationsAsRead:", e);
