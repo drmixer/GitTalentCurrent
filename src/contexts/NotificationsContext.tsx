@@ -51,17 +51,16 @@ type Ctx = {
 
 const NotificationsContext = createContext<Ctx | undefined>(undefined);
 
-// Robust message classification: any type containing "message" is considered message-like
+// Treat any type containing "message" as message-like
 function isMessageType(n: NotificationRow): boolean {
   const t = (n.type || "").toLowerCase();
   return t.includes("message");
 }
 
+// Keep all notifications, then dedupe near-duplicates by conversation/sender per minute
 function filterForDisplay(notifications: NotificationRow[]): NotificationRow[] {
-  // Keep all message notifications (no title requirement), and all non-message notifications
   const filtered = notifications.slice();
 
-  // Dedupe common near-duplicates by conversation/sender per minute
   const seen = new Set<string>();
   const result: NotificationRow[] = [];
   for (const n of filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
@@ -159,17 +158,25 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [notifications]
   );
 
-  // Badge for the bell/dropdown: use filtered list to avoid overcounting dupes,
-  // but include all message notifications (we no longer drop those with non-standard titles)
+  // Bell badge: unread in the deduped list
   const unreadCount = useMemo(
     () => displayNotifications.filter((n) => !n.is_read).length,
     [displayNotifications]
   );
 
+  // Deduped unread count for message-type notifications (used to align Messages tab)
+  const dedupedUnreadMessages = useMemo(
+    () =>
+      displayNotifications.filter((n) => !n.is_read && isMessageType(n)).length,
+    [displayNotifications]
+  );
+
   const tabCounts = useMemo(() => {
     const unread = notifications.filter((n) => !n.is_read);
-    return computeTabCounts(unread);
-  }, [notifications]);
+    const base = computeTabCounts(unread);
+    // Align messages tab with bell by using deduped unread message count
+    return { ...base, messages: dedupedUnreadMessages };
+  }, [notifications, dedupedUnreadMessages]);
 
   const markAsRead = useCallback(
     async (id: string) => {
@@ -254,27 +261,38 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     await refresh();
   }, [refresh]);
 
-  // Clear all notifications from a specific sender (no type filter to avoid 400s)
+  // Robust clear for a specific sender: select IDs first, then update by primary key
   const markMessageNotificationsAsRead = useCallback(
     async (senderId: string) => {
       if (!userProfile?.id || !senderId) return;
       try {
-        const { error } = await supabase
+        const { data: rows, error: selErr } = await supabase
           .from("notifications")
-          .update({ is_read: true })
+          .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
           .eq("sender_id", senderId);
 
-        if (error) {
-          console.error("Failed to mark message notifications as read:", error);
+        if (selErr) {
+          console.error("Failed to select message notifications to mark as read:", selErr);
+          return;
+        }
+
+        const ids = (rows || []).map((r: any) => r.id);
+        if (ids.length === 0) return;
+
+        const { error: updErr } = await supabase
+          .from("notifications")
+          .update({ is_read: true })
+          .in("id", ids);
+
+        if (updErr) {
+          console.error("Failed to mark message notifications as read:", updErr);
           return;
         }
 
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.sender_id === senderId ? { ...n, is_read: true } : n
-          )
+          prev.map((n) => (ids.includes(n.id) ? { ...n, is_read: true } : n))
         );
       } catch (e) {
         console.error("Unexpected error in markMessageNotificationsAsRead:", e);
@@ -288,7 +306,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       if (entity === "sender") {
         await markMessageNotificationsAsRead(id);
       } else {
-        // No-op for unsupported entities
         console.warn(`[Notifications] markAsReadByEntity unsupported entity "${entity}". No action taken.`);
       }
     },
