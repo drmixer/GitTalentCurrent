@@ -24,19 +24,16 @@ import EndorsementDisplay from '../components/EndorsementDisplay';
 import { useGitHub } from '../hooks/useGitHub';
 import { useFreshGitHubDataOnce } from '../hooks/useFreshGitHubDataOnce';
 import {
-  User, Briefcase, MessageSquare, Search, Github, Star, TrendingUp, Calendar,
-  DollarSign, MapPin, Clock, Send, ExternalLink, Building, Eye, SearchCheck, Loader, AlertCircle, Code,
+  MessageSquare, Github, Loader, AlertCircle,
 } from 'lucide-react';
 import DeveloperTests from './DeveloperTests';
 import {
   Developer,
   JobRole,
-  MessageThread as MessageThreadType,
   PortfolioItem,
   Endorsement,
   SavedJob,
   AppliedJob,
-  Message
 } from '../types';
 
 // Helper function to calculate calendar year contributions (YTD)
@@ -45,13 +42,9 @@ const calculateCalendarYearContributions = (gitHubData: any): number => {
     console.log('[GitHubUtils] No contributions data available for calendar year calculation');
     return 0;
   }
-
   const currentYear = new Date().getFullYear();
   const yearStart = `${currentYear}-01-01`;
-  
   console.log('[GitHubUtils] Calculating calendar year contributions for year:', currentYear);
-
-  // Handle the new data structure with contributions.calendar
   if (gitHubData.contributions.calendar && Array.isArray(gitHubData.contributions.calendar)) {
     const calendarYearContributions = gitHubData.contributions.calendar
       .filter((day: any) => {
@@ -62,12 +55,9 @@ const calculateCalendarYearContributions = (gitHubData: any): number => {
         const count = day.contributionCount || day.count || 0;
         return sum + count;
       }, 0);
-    
     console.log('[GitHubUtils] Calendar year contributions from calendar data:', calendarYearContributions);
     return calendarYearContributions;
   }
-  
-  // Handle legacy contributions array format
   if (Array.isArray(gitHubData.contributions)) {
     const calendarYearContributions = gitHubData.contributions
       .filter((day: any) => {
@@ -78,11 +68,9 @@ const calculateCalendarYearContributions = (gitHubData: any): number => {
         const count = day.contributionCount || day.count || 0;
         return sum + count;
       }, 0);
-    
     console.log('[GitHubUtils] Calendar year contributions from legacy data:', calendarYearContributions);
     return calendarYearContributions;
   }
-  
   console.warn('[GitHubUtils] No valid contribution data structure found for calendar year calculation');
   return 0;
 };
@@ -94,10 +82,7 @@ interface SelectedMessageThreadDetails {
   otherUserProfilePicUrl?: string;
   lastMessage: any;
   unreadCount: number;
-  jobContext?: {
-    id: string;
-    title: string;
-  };
+  jobContext?: { id: string; title: string; };
 }
 
 interface Commit {
@@ -130,7 +115,7 @@ export const DeveloperDashboard: React.FC = () => {
     loading: authContextLoading,
     refreshProfile,
   } = useAuth();
-  const { notifications: ctxNotifications, markAsReadByType } = useNotifications();
+  const { notifications: ctxNotifications, displayNotifications, markAsReadByType } = useNotifications();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -144,14 +129,10 @@ export const DeveloperDashboard: React.FC = () => {
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [isLoadingEndorsements, setIsLoadingEndorsements] = useState(true);
   const [endorsementError, setEndorsementError] = useState<string | null>(null);
-  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
-  const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
   const [recentCommits, setRecentCommits] = useState<Commit[]>([]);
 
   const [selectedMessageThreadDetails, setSelectedMessageThreadDetails] = useState<SelectedMessageThreadDetails | null>(null);
 
-  const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobRole | null>(null);
-  const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [showGitHubConnectModal, setShowGitHubConnectModal] = useState(false);
 
   const [dashboardPageLoading, setDashboardPageLoading] = useState(true);
@@ -161,24 +142,24 @@ export const DeveloperDashboard: React.FC = () => {
   // NEW: State to track calendar year contributions for YTD display
   const [calendarYearContributions, setCalendarYearContributions] = useState<number>(0);
 
-  // Badge counts derived directly from NotificationsContext so they clear instantly
+  // Badge: derive unread test assignments from deduped list so it matches the bell
   const unreadTestsBadge = useMemo(
     () =>
-      (ctxNotifications || []).filter(
+      (displayNotifications || []).filter(
         (n: any) => !n.is_read && (n.type || '').toLowerCase() === 'test_assignment'
       ).length,
-    [ctxNotifications]
+    [displayNotifications]
   );
 
+  // Badge: derive unread messages (optional)
   const unreadMessagesBadge = useMemo(
     () =>
-      (ctxNotifications || []).filter(
+      (displayNotifications || []).filter(
         (n: any) => !n.is_read && (n.type || '').toLowerCase().includes('message')
       ).length,
-    [ctxNotifications]
+    [displayNotifications]
   );
 
-  // Determine if we should fetch "fresh" GitHub data (e.g., right after a new install)
   const freshLoadParams = useMemo(() => {
     if (locationState?.isFreshGitHubSetup && locationState?.freshGitHubInstallationId) {
       const handle = contextDeveloperProfile?.github_handle || locationState.freshGitHubHandle;
@@ -187,7 +168,6 @@ export const DeveloperDashboard: React.FC = () => {
     return null;
   }, [locationState?.isFreshGitHubSetup, locationState?.freshGitHubInstallationId, locationState?.freshGitHubHandle, contextDeveloperProfile?.github_handle]);
 
-  // Fetch GitHub data (fresh vs standard)
   const {
     gitHubData: freshGitHubDataFromHook, loading: freshGitHubLoading, error: freshGitHubError
   } = useFreshGitHubDataOnce({ handle: freshLoadParams?.handle, installationId: freshLoadParams?.installId });
@@ -244,11 +224,11 @@ export const DeveloperDashboard: React.FC = () => {
         .order('created_at', { ascending: false });
       if (portfolioError) console.error('[Dashboard] Error fetching portfolio items:', portfolioError);
       else {
-        setPortfolioItems(portfolioData || []);
         console.log('[Dashboard] Portfolio items fetched:', portfolioData);
+        setPortfolioItems(portfolioData || []);
       }
 
-      // --- ENDORSEMENT FETCH LOGIC (using updated utility) ---
+      // Endorsements
       setIsLoadingEndorsements(true);
       setEndorsementError(null);
       const fetchedEndorsements = await fetchEndorsementsForDeveloper(authUser.id, false);
@@ -259,32 +239,6 @@ export const DeveloperDashboard: React.FC = () => {
         setEndorsementError("Failed to load endorsements.");
       }
       setIsLoadingEndorsements(false);
-      // --- END ENDORSEMENT FETCH LOGIC ---
-
-      const { count: savedCount, error: savedJobsError } = await supabase
-        .from('saved_jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('developer_id', authUser.id);
-
-      if (savedJobsError) {
-        console.error('[Dashboard] Error fetching saved jobs count:', savedJobsError);
-      } else {
-        console.log('[Dashboard] Saved jobs count fetched:', savedCount);
-      }
-      setSavedJobs([]);
-
-      const { count: appliedCount, error: appliedJobsError } = await supabase
-        .from('applied_jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('developer_id', authUser.id);
-
-      if (appliedJobsError) {
-        console.error('[Dashboard] Error fetching applied jobs count:', appliedJobsError);
-      } else {
-        console.log('[Dashboard] Applied jobs count fetched:', appliedCount);
-      }
-      setAppliedJobs([]);
-
     } catch (error) {
       console.error('[Dashboard] Critical error in fetchDeveloperPageData:', error);
       setIsLoadingEndorsements(false);
@@ -295,11 +249,10 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [authUser?.id]);
 
-  // Handler for toggling endorsement visibility
+  // Toggle endorsement visibility
   const handleToggleEndorsementVisibility = useCallback(async (endorsementId: string, currentIsPublic: boolean) => {
     setIsLoadingEndorsements(true);
     setEndorsementError(null);
-
     const success = await updateEndorsementVisibility(endorsementId, !currentIsPublic);
     if (success) {
       setEndorsements(prev => prev.map(e =>
@@ -327,14 +280,11 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (userProfile?.id && activeTab) {
       console.log('🔄 DeveloperDashboard: Clearing notifications for tab:', activeTab);
-      
       if (activeTab === 'tests') {
-        // Clear test assignment notifications
         markAsReadByType('test_assignment');
       } else if (activeTab === 'messages') {
-        // Messages notifications are cleared when specific message threads are opened
+        // Message notifications are cleared when the specific thread opens
       } else if (activeTab === 'jobs') {
-        // Clear job-related notifications for developers (if used)
         markAsReadByType('job_application');
         markAsReadByType('application_viewed'); 
         markAsReadByType('hired');
@@ -346,7 +296,6 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (finalGitHubDataToShow) {
       console.log('[Dashboard] Processing GitHub data:', finalGitHubDataToShow);
-      
       if (finalGitHubDataToShow.recentCommits && Array.isArray(finalGitHubDataToShow.recentCommits)) {
         const formattedCommits = finalGitHubDataToShow.recentCommits.slice(0, 3).map((commit: any) => ({
           sha: commit.sha || Math.random().toString(36).substring(7),
@@ -400,42 +349,26 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (finalGitHubDataToShow && developerData?.id) {
       let totalContributions = 0;
-      
       console.log('[Dashboard] Processing GitHub data for annual contributions (rolling year for DB sync):', {
         hasContributions: !!finalGitHubDataToShow.contributions,
         contributionsType: typeof finalGitHubDataToShow.contributions,
         hasCalendar: !!finalGitHubDataToShow.contributions?.calendar,
         hasTotalContributions: !!finalGitHubDataToShow.contributions?.totalContributions,
-        currentAnnualContributions: developerData.annual_contributions
+        currentAnnualContributions: developerData?.annual_contributions
       });
-      
       if (finalGitHubDataToShow.contributions?.totalContributions && typeof finalGitHubDataToShow.contributions.totalContributions === 'number') {
         totalContributions = finalGitHubDataToShow.contributions.totalContributions;
-        console.log('[Dashboard] Using totalContributions from API (rolling year):', totalContributions);
       } else if (finalGitHubDataToShow.contributions?.calendar && Array.isArray(finalGitHubDataToShow.contributions.calendar)) {
         totalContributions = finalGitHubDataToShow.contributions.calendar.reduce(
-          (sum: number, day: any) => {
-            const count = day.contributionCount || day.count || 0;
-            return sum + count;
-          }, 0
+          (sum: number, day: any) => sum + (day.contributionCount || day.count || 0), 0
         );
-        console.log('[Dashboard] Calculated from calendar data (rolling year):', totalContributions, 'days:', finalGitHubDataToShow.contributions.calendar.length);
       } else if (Array.isArray(finalGitHubDataToShow.contributions)) {
         totalContributions = finalGitHubDataToShow.contributions.reduce(
-          (sum: number, day: any) => {
-            const count = day.contributionCount || day.count || 0;
-            return sum + count;
-          }, 0
+          (sum: number, day: any) => sum + (day.contributionCount || day.count || 0), 0
         );
-        console.log('[Dashboard] Calculated from legacy contributions array (rolling year):', totalContributions);
-      } else {
-        console.warn('[Dashboard] No valid contribution data found for annual contributions calculation');
       }
-
       if (totalContributions >= 0 && totalContributions !== (developerData.annual_contributions || 0)) {
-        console.log('[Dashboard] Updating annual_contributions (rolling year) from', developerData.annual_contributions, 'to', totalContributions);
         setDeveloperData(prev => prev ? { ...prev, annual_contributions: totalContributions } : prev);
-
         const updateAnnualContributions = async () => {
           try {
             const { error } = await supabase
@@ -445,20 +378,12 @@ export const DeveloperDashboard: React.FC = () => {
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', developerData.user_id || authUser?.id);
-            
-            if (error) {
-              console.error('[Dashboard] Failed to update annual_contributions in database:', error);
-            } else {
-              console.log('[Dashboard] Successfully updated annual_contributions (rolling year) in database:', totalContributions);
-            }
+            if (error) console.error('[Dashboard] Failed to update annual_contributions in database:', error);
           } catch (updateError) {
             console.error('[Dashboard] Error updating annual_contributions:', updateError);
           }
         };
-
         updateAnnualContributions();
-      } else if (totalContributions >= 0) {
-        console.log('[Dashboard] Annual contributions (rolling year) already up to date:', totalContributions);
       }
     }
   }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
