@@ -91,6 +91,7 @@ export const SignupForm = () => {
       
       if (formData.role === 'recruiter') {
         setSuccess('Please check your email to confirm your account.');
+        window.scrollTo(0, 0);
       } else {
         setSuccess('Account created successfully! Redirecting to dashboard...');
       }
