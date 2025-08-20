@@ -415,13 +415,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             `[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`,
           );
 
-        // Redirect unapproved recruiters to the pending approval page
-        if (profile.role === 'recruiter' && !profile.is_approved) {
-          console.log(`[AuthContext] Unapproved recruiter ${profile.id} attempting to log in. Redirecting to /pending-approval.`);
-          // We can't use useNavigate here, so a hard redirect is the cleanest way.
-          window.location.pathname = '/pending-approval';
-          return null; // Halt further processing
-        }
+          // Redirect unapproved recruiters to the pending approval page
+          if (newProfile.role === 'recruiter' && !newProfile.is_approved && window.location.pathname !== '/pending-approval') {
+            console.log(`[AuthContext] New unapproved recruiter ${newProfile.id}. Redirecting to /pending-approval.`);
+            window.location.pathname = '/pending-approval';
+            return null; // Halt further processing
+          }
 
           setUserProfile(newProfile);
           if (newProfile.role === 'developer') {
@@ -452,9 +451,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
 
         // Redirect unapproved recruiters to the pending approval page
-        if (profile.role === 'recruiter' && !profile.is_approved) {
-          console.log(`[AuthContext] Unapproved recruiter ${profile.id} attempting to log in. Redirecting to /pending-approval.`);
-          // We can't use useNavigate here, so a hard redirect is the cleanest way.
+        if (profile.role === 'recruiter' && !profile.is_approved && window.location.pathname !== '/pending-approval') {
+          console.log(`[AuthContext] Existing unapproved recruiter ${profile.id}. Redirecting to /pending-approval.`);
           window.location.pathname = '/pending-approval';
           return null; // Halt further processing
         }
@@ -753,7 +751,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string,
     password: string,
     userData: Partial<User>,
-    options?: { emailRedirectTo?: string }
   ): Promise<{ data?: any; error: any | null }> => {
     try {
       setAuthError(null);
@@ -761,10 +758,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { name: userData.name, role: userData.role },
-          emailRedirectTo: options?.emailRedirectTo,
-        },
+        options: { data: { name: userData.name, role: userData.role } },
       });
       if (error) {
         setAuthError(error.message);
@@ -774,7 +768,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
-      setLoading(false); // Fix: Ensure loading is set to false on success
       return { data, error: null };
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
