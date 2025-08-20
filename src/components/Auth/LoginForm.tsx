@@ -243,9 +243,9 @@ export const LoginForm = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+                <Link to="/forgot-password" className="font-semibold text-blue-600 hover:text-blue-500 transition-colors">
                   Forgot password?
-                </a>
+                </Link>
               </div>
             </div>
 

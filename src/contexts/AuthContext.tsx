@@ -414,6 +414,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log(
             `[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`,
           );
+
+        // Redirect unapproved recruiters to the pending approval page
+        if (profile.role === 'recruiter' && !profile.is_approved) {
+          console.log(`[AuthContext] Unapproved recruiter ${profile.id} attempting to log in. Redirecting to /pending-approval.`);
+          // We can't use useNavigate here, so a hard redirect is the cleanest way.
+          window.location.pathname = '/pending-approval';
+          return null; // Halt further processing
+        }
+
           setUserProfile(newProfile);
           if (newProfile.role === 'developer') {
             console.log(
@@ -441,6 +450,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log(
           `[AuthContext] fetchUserProfile: Profile existed and fetched successfully for ${authUser.id}.`,
         );
+
+        // Redirect unapproved recruiters to the pending approval page
+        if (profile.role === 'recruiter' && !profile.is_approved) {
+          console.log(`[AuthContext] Unapproved recruiter ${profile.id} attempting to log in. Redirecting to /pending-approval.`);
+          // We can't use useNavigate here, so a hard redirect is the cleanest way.
+          window.location.pathname = '/pending-approval';
+          return null; // Halt further processing
+        }
+
         setUserProfile(profile);
         if (profile.role === 'developer') {
           console.log(

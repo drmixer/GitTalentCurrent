@@ -13,6 +13,10 @@ import { DeveloperOnboarding } from './components/Onboarding/DeveloperOnboarding
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Pages: Mixed exports - Pay close attention!
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import EmailConfirmPage from './pages/EmailConfirmPage';
+import PendingApprovalPage from './pages/PendingApprovalPage';
 import { LandingPage } from './pages/LandingPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import RecruiterDashboard from './pages/RecruiterDashboard';
@@ -55,6 +59,8 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginForm />} />
             <Route path="/signup" element={<SignupForm />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
             
             {/* Dashboard redirect */}
             <Route 
@@ -122,6 +128,8 @@ function App() {
             <Route path="/dashboard/jobs" element={<Navigate to="/developer?tab=jobs" />} />
 
             {/* Authentication & GitHub Setup */}
+            <Route path="/auth/confirm" element={<EmailConfirmPage />} />
+            <Route path="/pending-approval" element={<PendingApprovalPage />} />
             <Route path="/github-setup" element={<GitHubAppSetup />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             {/* UPDATED: GitHub App callback with better error handling */}
