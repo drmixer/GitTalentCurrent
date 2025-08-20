@@ -17,6 +17,8 @@ import {
   PieChart,
   X,
   Clock,
+  Check,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -113,6 +115,8 @@ export const AdminDashboard: React.FC = () => {
 
   const [showJobModal, setShowJobModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const [processingRecruiter, setProcessingRecruiter] = useState<string | null>(null);
 
   const recruiterCount = useMemo(
     () => approvedRecruiters.length + pendingRecruiters.length,
@@ -284,6 +288,61 @@ export const AdminDashboard: React.FC = () => {
     }));
 
     setHires(final);
+  };
+
+  const handleApproveRecruiter = async (recruiterId: string) => {
+    setProcessingRecruiter(recruiterId);
+    setError('');
+    
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: true })
+        .eq('id', recruiterId);
+
+      if (error) throw error;
+
+      setSuccessMessage('Recruiter approved successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchRecruiters();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to approve recruiter');
+    } finally {
+      setProcessingRecruiter(null);
+    }
+  };
+
+  const handleDenyRecruiter = async (recruiterId: string) => {
+    if (!confirm('Are you sure you want to deny this recruiter? This action cannot be undone.')) return;
+    
+    setProcessingRecruiter(recruiterId);
+    setError('');
+    
+    try {
+      // Delete the recruiter record first
+      const { error: recruiterError } = await supabase
+        .from('recruiters')
+        .delete()
+        .eq('user_id', recruiterId);
+
+      if (recruiterError) throw recruiterError;
+
+      // Delete the user record
+      const { error: userError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', recruiterId);
+
+      if (userError) throw userError;
+
+      setSuccessMessage('Recruiter denied and removed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchRecruiters();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to deny recruiter');
+    } finally {
+      setProcessingRecruiter(null);
+    }
   };
 
   const handleFeatureJob = async (jobId: string, isFeatured: boolean) => {
@@ -551,7 +610,7 @@ export const AdminDashboard: React.FC = () => {
                   <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                   <span className="text-gray-600 font-medium">Loading recruiters...</span>
                 </div>
-              ) : pendingRecruiters.length > 0 ? (
+              ) : filteredPendingRecruiters.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -564,10 +623,11 @@ export const AdminDashboard: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                           Signup Date
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {pendingRecruiters.map(r => (
+                      {filteredPendingRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -588,6 +648,44 @@ export const AdminDashboard: React.FC = () => {
                             <div className="flex items-center">
                               <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                               {new Date(r.created_at).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleApproveRecruiter(r.user_id)}
+                                disabled={processingRecruiter === r.user_id}
+                                className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {processingRecruiter === r.user_id ? (
+                                  <Loader className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <Check className="w-3 h-3 mr-1" />
+                                )}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleDenyRecruiter(r.user_id)}
+                                disabled={processingRecruiter === r.user_id}
+                                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {processingRecruiter === r.user_id ? (
+                                  <Loader className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <XCircle className="w-3 h-3 mr-1" />
+                                )}
+                                Deny
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedRecruiterId(r.user_id);
+                                  setShowRecruiterModal(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 p-1 rounded-lg hover:bg-blue-50"
+                                title="View recruiter"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -637,7 +735,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {approvedRecruiters.map(r => (
+                      {filteredApprovedRecruiters.map(r => (
                         <tr key={r.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -701,7 +799,7 @@ export const AdminDashboard: React.FC = () => {
                 <Loader className="animate-spin h-8 w-8 text-blue-600 mr-3" />
                 <span className="text-gray-600 font-medium">Loading developers...</span>
               </div>
-            ) : developers.length > 0 ? (
+            ) : filteredDevelopers.length > 0 ? (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -719,7 +817,7 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {developers.map(dev => (
+                      {filteredDevelopers.map(dev => (
                         <tr key={dev.user_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-semibold text-gray-900">{dev.user.name}</div>
