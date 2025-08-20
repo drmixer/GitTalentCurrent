@@ -86,7 +86,7 @@ interface SimpleRecruiterRow {
 }
 
 export const AdminDashboard: React.FC = () => {
-  const { userProfile, loading: authLoading } = useAuth();
+  const { userProfile, loading: authLoading, updateUserApprovalStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -295,20 +295,14 @@ export const AdminDashboard: React.FC = () => {
     setError('');
     
     try {
-      console.log('Attempting to approve recruiter:', recruiterId);
-      
-      const { data, error } = await supabase.rpc('approve_recruiter', {
-        recruiter_id: recruiterId
-      });
+      const success = await updateUserApprovalStatus(recruiterId, true);
 
-      if (error) {
-        console.error('RPC Error:', error);
-        throw error;
+      if (!success) {
+        throw new Error('The approval process failed in the Edge Function.');
       }
 
-      console.log('Recruiter approved successfully:', data);
-      setSuccessMessage('Recruiter approved successfully');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage('Recruiter approved successfully. They will be notified by email.');
+      setTimeout(() => setSuccessMessage(''), 4000);
       await fetchRecruiters();
     } catch (e: any) {
       console.error('Approve recruiter error:', e);
