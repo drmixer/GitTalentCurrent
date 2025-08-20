@@ -922,8 +922,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw error;
       }
       setDeveloperProfile(data as any);
-      return { data, error: null };
-    } catch (error: any) {
       return { data: null, error };
     }
   };
@@ -1102,6 +1100,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     createAssignment,
     createHire,
     updateAssignmentStatus,
+    updateUserApprovalStatus,
     updateProfileStrength,
     refreshProfile,
     refreshUserProfile: refreshProfile,
