@@ -414,6 +414,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log(
             `[AuthContext] fetchUserProfile: Profile created and fetched successfully for ${authUser.id}.`,
           );
+
+          // Redirect unapproved recruiters to the pending approval page
+          if (newProfile.role === 'recruiter' && !newProfile.is_approved && window.location.pathname !== '/pending-approval') {
+            console.log(`[AuthContext] New unapproved recruiter ${newProfile.id}. Redirecting to /pending-approval.`);
+            window.location.pathname = '/pending-approval';
+            return null; // Halt further processing
+          }
+
           setUserProfile(newProfile);
           if (newProfile.role === 'developer') {
             console.log(
@@ -441,6 +449,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log(
           `[AuthContext] fetchUserProfile: Profile existed and fetched successfully for ${authUser.id}.`,
         );
+
+        // Redirect unapproved recruiters to the pending approval page
+        if (profile.role === 'recruiter' && !profile.is_approved && window.location.pathname !== '/pending-approval') {
+          console.log(`[AuthContext] Existing unapproved recruiter ${profile.id}. Redirecting to /pending-approval.`);
+          window.location.pathname = '/pending-approval';
+          return null; // Halt further processing
+        }
+
         setUserProfile(profile);
         if (profile.role === 'developer') {
           console.log(
@@ -530,35 +546,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { error };
     }
   }, []);
-
-  const updateUserApprovalStatus = async (userId: string, isApproved: boolean): Promise<boolean> => {
-    try {
-      if (!user) {
-        throw new Error('User must be authenticated to update approval status');
-      }
-
-      if (isApproved) {
-        const { data, error } = await supabase.functions.invoke('approve-recruiter', {
-          body: { userId },
-        });
-
-        if (error) throw error;
-        if ((data as any).error) throw new Error((data as any).error);
-
-        return (data as any).success;
-      } else {
-        const { error } = await supabase.from('users').delete().eq('id', userId);
-        if (error) {
-          console.error('Error deleting user:', error);
-          return false;
-        }
-        return true;
-      }
-    } catch (error: any) {
-      console.error('Caught error in updateUserApprovalStatus:', error);
-      return false;
-    }
-  };
 
   const updateProfileStrength = async (
     userId: string,
@@ -735,6 +722,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string,
     password: string,
     userData: Partial<User>,
+    options?: { emailRedirectTo?: string }
   ): Promise<{ data?: any; error: any | null }> => {
     try {
       setAuthError(null);
@@ -742,7 +730,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name: userData.name, role: userData.role } },
+        options: {
+          data: { name: userData.name, role: userData.role },
+          emailRedirectTo: options?.emailRedirectTo,
+        },
       });
       if (error) {
         setAuthError(error.message);
@@ -752,6 +743,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
+      setLoading(false); // Fix: Ensure loading is set to false on success
       return { data, error: null };
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -1110,7 +1102,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     createAssignment,
     createHire,
     updateAssignmentStatus,
-    updateUserApprovalStatus,
     updateProfileStrength,
     refreshProfile,
     refreshUserProfile: refreshProfile,
