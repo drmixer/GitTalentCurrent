@@ -85,14 +85,14 @@ export const SignupForm = () => {
         company_name: formData.role === 'recruiter' ? formData.company_name.trim() : undefined,
       };
 
-      await signUp(formData.email.trim(), formData.password, userData);
+      await signUp(formData.email.trim(), formData.password, userData, {
+        emailRedirectTo: `${window.location.origin}/auth/confirm`
+      });
       
       if (formData.role === 'recruiter') {
-        setSuccess('Your account has been created and is pending admin approval.');
-        // Navigation will happen automatically via useEffect when user loads
+        setSuccess('Please check your email to confirm your account.');
       } else {
         setSuccess('Account created successfully! Redirecting to dashboard...');
-        // Navigation will happen automatically via useEffect when user loads
       }
     } catch (error: any) {
       console.error('Signup error:', error);
