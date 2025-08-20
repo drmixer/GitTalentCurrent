@@ -751,6 +751,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string,
     password: string,
     userData: Partial<User>,
+    options?: { emailRedirectTo?: string }
   ): Promise<{ data?: any; error: any | null }> => {
     try {
       setAuthError(null);
@@ -758,7 +759,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name: userData.name, role: userData.role } },
+        options: {
+          data: { name: userData.name, role: userData.role },
+          emailRedirectTo: options?.emailRedirectTo,
+        },
       });
       if (error) {
         setAuthError(error.message);
@@ -768,6 +772,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
+      setLoading(false); // Fix: Ensure loading is set to false on success
       return { data, error: null };
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
