@@ -295,17 +295,23 @@ export const AdminDashboard: React.FC = () => {
     setError('');
     
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ is_approved: true })
-        .eq('id', recruiterId);
+      console.log('Attempting to approve recruiter:', recruiterId);
+      
+      const { data, error } = await supabase.rpc('approve_recruiter', {
+        recruiter_id: recruiterId
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
 
+      console.log('Recruiter approved successfully:', data);
       setSuccessMessage('Recruiter approved successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
       await fetchRecruiters();
     } catch (e: any) {
+      console.error('Approve recruiter error:', e);
       setError(e?.message || 'Failed to approve recruiter');
     } finally {
       setProcessingRecruiter(null);
@@ -319,26 +325,23 @@ export const AdminDashboard: React.FC = () => {
     setError('');
     
     try {
-      // Delete the recruiter record first
-      const { error: recruiterError } = await supabase
-        .from('recruiters')
-        .delete()
-        .eq('user_id', recruiterId);
+      console.log('Attempting to deny recruiter:', recruiterId);
+      
+      const { data, error } = await supabase.rpc('deny_recruiter', {
+        recruiter_id: recruiterId
+      });
 
-      if (recruiterError) throw recruiterError;
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
 
-      // Delete the user record
-      const { error: userError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', recruiterId);
-
-      if (userError) throw userError;
-
+      console.log('Recruiter denied successfully:', data);
       setSuccessMessage('Recruiter denied and removed successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
       await fetchRecruiters();
     } catch (e: any) {
+      console.error('Deny recruiter error:', e);
       setError(e?.message || 'Failed to deny recruiter');
     } finally {
       setProcessingRecruiter(null);
