@@ -25,28 +25,37 @@ async function sendApprovalEmail(to: string, name: string) {
   const subject = "Your GitTalent account has been approved!";
   const loginUrl = `${APP_BASE_URL}/login`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height:1.5;">
-      <h2 style="margin:0 0 12px;">Welcome to GitTalent, ${name}!</h2>
-      <p style="margin:0 0 16px; color:#333;">
-        We're excited to let you know that your recruiter account has been approved by our admin team.
+  const html = `<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+    <div style="max-width: 500px; margin: auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center;">
+
+      <img src="https://gittalent.dev/logo.png" alt="GitTalent" style="max-width: 150px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
+
+      <h2 style="color: #4f46e5; margin-bottom: 16px;">Welcome to GitTalent, ${name}!</h2>
+
+      <p style="color: #374151;">
+        We're excited to let you know that your recruiter account has been approved. You can now log in to your account to start finding top developer talent.
       </p>
-      <p style="margin:0 0 20px; color:#333;">
-        You can now log in to your account to start finding top developer talent.
-      </p>
-      <p>
-        <a href="${loginUrl}" style="display:inline-block; background:#111827; color:#fff; text-decoration:none; padding:10px 16px; border-radius:8px;">
+
+      <p style="margin: 24px 0;">
+        <a href="${loginUrl}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; display: inline-block;">
           Login to Your Account
         </a>
       </p>
-      <p style="margin-top:28px; font-size:12px; color:#666;">
-        If the button doesn't work, copy and paste this link into your browser:<br/>
-        <a href="${loginUrl}" style="color:#2563EB;">${loginUrl}</a>
-      </p>
-    </div>
-  `;
 
-  const text = `Welcome to GitTalent, ${name}!\nYour recruiter account has been approved. You can now log in to start finding top developer talent.\nLogin here: ${loginUrl}`;
+      <p style="color: #6b7280; font-size: 14px;">
+        If you have any questions, please don't hesitate to contact our support team.
+      </p>
+      <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
+        © 2025 GitTalent · <a href="https://gittalent.dev" style="color: #4f46e5; text-decoration: none;">Visit our site</a>
+      </p>
+
+    </div>
+  </body>
+</html>`;
+
+  const text = `Welcome to GitTalent, ${name}! Your recruiter account has been approved. You can now log in to your account to start finding top developer talent. Login here: ${loginUrl}`;
 
   const resendResponse = await fetch("https://api.resend.com/emails", {
     method: "POST",
