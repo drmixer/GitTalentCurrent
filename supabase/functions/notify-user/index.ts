@@ -75,14 +75,17 @@ serve(async (req) => {
 
     // Support multiple trigger formats
     if (requestBody.table && requestBody.operation) {
+      // This handles the old format (from a manual trigger) just in case
       type = requestBody.operation;
       record = requestBody.record;
       table = requestBody.table;
     } else if (requestBody.type && requestBody.record) {
+      // ✅ FIX APPLIED HERE: This now correctly handles the Webhook format
       type = requestBody.type;
       record = requestBody.record;
-      table = record?.table || record?.schema || undefined;
+      table = requestBody.table; // Correctly reads 'table' from the top level
     }
+
 
     if (!record) {
       throw new Error('Invalid request: missing record');
@@ -94,7 +97,7 @@ serve(async (req) => {
     if (!table && record.table) table = record.table;
 
     // Router
-    switch (`${type}:${table || record.table || ''}`) {
+    switch (`${type}:${table || ''}`) {
       case 'INSERT:assignments':
         title = 'New Coding Test Assigned';
         message = 'You have been assigned a new coding test.';
