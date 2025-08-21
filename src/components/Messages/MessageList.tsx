@@ -62,8 +62,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         .from('messages')
         .select(`
           *,
-          sender:users!sender_id(*),
-          receiver:users!receiver_id(*),
+          sender:users!messages_sender_id_fkey(*),
+          receiver:users!messages_receiver_id_fkey(*),
           job_role:job_roles(id, title)
         `)
         .or(`sender_id.eq.${userProfile.id},receiver_id.eq.${userProfile.id}`)
@@ -222,7 +222,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         const { data: recruitersWhoMessaged } = await supabase
           .from('messages')
           .select(`
-            sender:users!sender_id(*)
+            sender:users!messages_sender_id_fkey(*)
           `)
           .eq('receiver_id', userProfile.id)
           .eq('sender.role', 'recruiter');
