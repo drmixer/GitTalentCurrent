@@ -282,14 +282,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           console.error("Failed to mark by conversation_id, falling back:", convErr);
         }
 
-        // Select matching IDs (sender-based using entity_id)
+        // Select matching IDs (sender-based)
         const { data: rows, error: selErr } = await supabase
           .from("notifications")
           .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
-          .eq("entity_id", senderId)
-          .eq("type", "message");
+          .eq("sender_id", senderId);
 
         if (selErr) {
           console.error("Failed to select message notifications by sender:", selErr);
