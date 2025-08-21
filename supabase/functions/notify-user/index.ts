@@ -123,24 +123,26 @@ serve(async (req)=>{
         const { data: assignment } = await supabase.from('assignments').select('*').eq('id', record.id).single();
         if (assignment) {
           const { data: jobRole } = await supabase.from('job_roles').select('title, recruiter_id').eq('id', assignment.job_role_id).single();
-          const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', jobRole.recruiter_id).single();
-          const { data: recruiterUser } = await supabase.from('users').select('name').eq('id', jobRole.recruiter_id).single();
+          if (jobRole) {
+            const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', jobRole.recruiter_id).single();
+            const { data: recruiterUser } = await supabase.from('users').select('name').eq('id', jobRole.recruiter_id).single();
 
-          title = 'New Coding Test Assigned';
-          message = `You have been assigned a new coding test for "${jobRole?.title || 'a position'}".`;
-          preview = message;
-          userId = record.developer_id;
-          notificationType = 'test_assignment';
-          entityId = record.id;
-          link = '?tab=tests';
-          emailSubject = `New Coding Test: ${jobRole?.title || 'Position'}`;
-          emailContent = `
-            <p>You have been assigned a new coding test!</p>
-            <p><strong>Position:</strong> ${jobRole?.title || 'N/A'}</p>
-            <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
-            <p><strong>From:</strong> ${recruiterUser?.name || 'Recruiter'}</p>
-            <p>Complete your test to proceed with the application process.</p>
-          `;
+            title = 'New Coding Test Assigned';
+            message = `You have been assigned a new coding test for "${jobRole.title || 'a position'}".`;
+            preview = message;
+            userId = record.developer_id;
+            notificationType = 'test_assignment';
+            entityId = record.id;
+            link = '?tab=tests';
+            emailSubject = `New Coding Test: ${jobRole.title || 'Position'}`;
+            emailContent = `
+              <p>You have been assigned a new coding test!</p>
+              <p><strong>Position:</strong> ${jobRole.title || 'N/A'}</p>
+              <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
+              <p><strong>From:</strong> ${recruiterUser?.name || 'Recruiter'}</p>
+              <p>Complete your test to proceed with the application process.</p>
+            `;
+          }
         }
         break;
       }
@@ -149,26 +151,26 @@ serve(async (req)=>{
           const { data: assignment } = await supabase.from('assignments').select('*').eq('id', record.id).single();
           if (assignment) {
              const { data: jobRole } = await supabase.from('job_roles').select('title, recruiter_id').eq('id', assignment.job_role_id).single();
-             const { data: developer } = await supabase.from('users').select('name').eq('id', assignment.developer_id).single();
-             const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', jobRole.recruiter_id).single();
+             if (jobRole) {
+                const { data: developer } = await supabase.from('users').select('name').eq('id', assignment.developer_id).single();
+                const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', jobRole.recruiter_id).single();
 
-            if (jobRole?.recruiter_id) {
-              title = 'Test Completed';
-              message = `${developer?.name || 'A developer'} has completed a coding test for "${jobRole.title}".`;
-              preview = message;
-              userId = jobRole.recruiter_id;
-              notificationType = 'test_completion';
-              entityId = record.id;
-              link = '?tab=tracker';
-              emailSubject = `Test Completed: ${jobRole.title}`;
-              emailContent = `
-                <p>Great news! A developer has completed the coding test you assigned.</p>
-                <p><strong>Developer:</strong> ${developer?.name || 'N/A'}</p>
-                <p><strong>Position:</strong> ${jobRole.title}</p>
-                <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
-                <p>Review their submission and next steps in your recruiter dashboard.</p>
-              `;
-            }
+                title = 'Test Completed';
+                message = `${developer?.name || 'A developer'} has completed a coding test for "${jobRole.title}".`;
+                preview = message;
+                userId = jobRole.recruiter_id;
+                notificationType = 'test_completion';
+                entityId = record.id;
+                link = '?tab=tracker';
+                emailSubject = `Test Completed: ${jobRole.title}`;
+                emailContent = `
+                  <p>Great news! A developer has completed the coding test you assigned.</p>
+                  <p><strong>Developer:</strong> ${developer?.name || 'N/A'}</p>
+                  <p><strong>Position:</strong> ${jobRole.title}</p>
+                  <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
+                  <p>Review their submission and next steps in your recruiter dashboard.</p>
+                `;
+             }
           }
         }
         break;
@@ -205,8 +207,8 @@ serve(async (req)=>{
           const { data: testAssignment } = await supabase.from('test_assignments').select('*').eq('id', record.id).single();
           if(testAssignment) {
             const { data: jobRole } = await supabase.from('job_roles').select('recruiter_id, title').eq('id', testAssignment.job_id).single();
-            const { data: developer } = await supabase.from('users').select('name').eq('id', testAssignment.developer_id).single();
-            if (jobRole?.recruiter_id) {
+            if (jobRole) {
+              const { data: developer } = await supabase.from('users').select('name').eq('id', testAssignment.developer_id).single();
               const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', jobRole.recruiter_id).single();
               title = 'Test Completed';
               message = `${developer?.name || 'A developer'} has completed a coding test for "${jobRole.title}".`;
@@ -233,47 +235,47 @@ serve(async (req)=>{
           supabase.from('users').select('name, email').eq('id', record.sender_id).single(),
           supabase.from('messages').select('body, subject').eq('id', record.id).single()
         ]);
-        title = 'New Message';
-        message = `You have a new message from ${sender?.name || 'a user'}.`;
-        userId = record.receiver_id;
-        notificationType = 'message';
-        entityId = record.sender_id;
-        link = '?tab=messages';
-        emailSubject = messageData?.subject || `New message from ${sender?.name || 'a user'}`;
-        preview = messageData?.body ? messageData.body.substring(0, 150) + (messageData.body.length > 150 ? '...' : '') : '';
-        emailContent = `
-          <p>You have received a new message from <strong>${sender?.name || 'a user'}</strong>.</p>
-          ${messageData?.body ? `
-            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0; text-align: left;">
-              <p style="margin: 0; color: #374151; font-style: italic;">"${escapeHtml(preview)}"</p>
-            </div>
-          ` : ''}
-          <p>Click below to read the full message and reply.</p>
-        `;
+        if(sender && messageData) {
+            title = 'New Message';
+            message = `You have a new message from ${sender.name || 'a user'}.`;
+            userId = record.receiver_id;
+            notificationType = 'message';
+            entityId = record.sender_id;
+            link = '?tab=messages';
+            emailSubject = messageData.subject || `New message from ${sender.name || 'a user'}`;
+            preview = messageData.body ? messageData.body.substring(0, 150) + (messageData.body.length > 150 ? '...' : '') : '';
+            emailContent = `
+              <p>You have received a new message from <strong>${sender.name || 'a user'}</strong>.</p>
+              ${messageData.body ? `
+                <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0; text-align: left;">
+                  <p style="margin: 0; color: #374151; font-style: italic;">"${escapeHtml(preview)}"</p>
+                </div>
+              ` : ''}
+              <p>Click below to read the full message and reply.</p>
+            `;
 
-        const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin');
-        if (admins && admins.length > 0) {
-          for (const admin of admins){
-            if (admin.id !== userId) {
-              await supabase.from('notifications').insert({
-                user_id: admin.id,
-                message: `New message from ${sender?.name || 'a user'} to ${messageData?.subject ? 'regarding ' + messageData.subject : 'another user'}.`,
-                type: 'admin_message',
-                entity_id: record.id,
-                link: '?tab=messages',
-                title: 'New Message Activity'
-              });
+            const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin');
+            if (admins && admins.length > 0) {
+              for (const admin of admins){
+                if (admin.id !== userId) {
+                  await supabase.from('notifications').insert({
+                    user_id: admin.id,
+                    message: `New message from ${sender.name || 'a user'} to ${messageData.subject ? 'regarding ' + messageData.subject : 'another user'}.`,
+                    type: 'admin_message',
+                    entity_id: record.id,
+                    link: '?tab=messages',
+                    title: 'New Message Activity'
+                  });
+                }
+              }
             }
-          }
         }
         break;
       }
       case 'INSERT:applied_jobs': {
-        const [{ data: job }, { data: developer }] = await Promise.all([
-          supabase.from('job_roles').select('recruiter_id, title, location').eq('id', record.job_id).single(),
-          supabase.from('users').select('name').eq('id', record.developer_id).single()
-        ]);
+        const { data: job } = await supabase.from('job_roles').select('recruiter_id, title, location').eq('id', record.job_id).single();
         if (job) {
+          const { data: developer } = await supabase.from('users').select('name').eq('id', record.developer_id).single();
           const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', job.recruiter_id).single();
           title = 'New Job Application';
           message = `${developer?.name || 'A developer'} has applied for "${job.title}".`;
@@ -300,16 +302,16 @@ serve(async (req)=>{
           if(job) {
             const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', job.recruiter_id).single();
             title = 'Application Viewed';
-            message = `Your application for "${job?.title || 'a position'}" has been viewed by the recruiter.`;
+            message = `Your application for "${job.title || 'a position'}" has been viewed by the recruiter.`;
             preview = message;
             userId = record.developer_id;
             notificationType = 'application_viewed';
             entityId = record.id;
             link = '?tab=jobs';
-            emailSubject = `Application Viewed: ${job?.title || 'Position'}`;
+            emailSubject = `Application Viewed: ${job.title || 'Position'}`;
             emailContent = `
               <p>Great news! Your job application has been viewed.</p>
-              <p><strong>Position:</strong> ${job?.title || 'N/A'}</p>
+              <p><strong>Position:</strong> ${job.title || 'N/A'}</p>
               <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
               <p>The recruiter is reviewing your profile. Keep an eye out for further updates!</p>
             `;
@@ -319,16 +321,16 @@ serve(async (req)=>{
            if(job) {
             const { data: recruiter } = await supabase.from('recruiters').select('company_name').eq('user_id', job.recruiter_id).single();
             title = 'Congratulations - You\'re Hired!';
-            message = `Congratulations! You have been hired for "${job?.title || 'a position'}".`;
+            message = `Congratulations! You have been hired for "${job.title || 'a position'}".`;
             preview = message;
             userId = record.developer_id;
             notificationType = 'hired';
             entityId = record.id;
             link = '?tab=jobs';
-            emailSubject = `🎉 You're Hired: ${job?.title || 'Position'}`;
+            emailSubject = `🎉 You're Hired: ${job.title || 'Position'}`;
             emailContent = `
               <p>🎉 <strong>Congratulations!</strong> You have been hired!</p>
-              <p><strong>Position:</strong> ${job?.title || 'N/A'}</p>
+              <p><strong>Position:</strong> ${job.title || 'N/A'}</p>
               <p><strong>Company:</strong> ${recruiter?.company_name || 'N/A'}</p>
               <p>Welcome to your new role! The recruiter will be in touch with next steps.</p>
             `;
@@ -338,40 +340,44 @@ serve(async (req)=>{
       }
       case 'INSERT:endorsements': {
         const { data: endorsement } = await supabase.from('endorsements').select('*, endorser:users!endorser_id(name)').eq('id', record.id).single();
-        title = 'New Endorsement Received';
-        message = `You received a new endorsement from ${endorsement?.endorser?.name || 'someone'}.`;
-        preview = endorsement?.content ? endorsement.content.substring(0, 200) + (endorsement.content.length > 200 ? '...' : '') : message;
-        userId = record.developer_id;
-        notificationType = 'endorsement';
-        entityId = record.id;
-        link = '?tab=overview';
-        emailSubject = 'New Endorsement Received';
-        emailContent = `
-          <p>You have received a new endorsement!</p>
-          <p><strong>From:</strong> ${endorsement?.endorser?.name || 'Anonymous'}</p>
-          ${endorsement?.content ? `
-            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0; text-align: left;">
-              <p style="margin: 0; color: #374151; font-style: italic;">"${escapeHtml(preview)}"</p>
-            </div>
-          ` : ''}
-          <p>View your complete endorsement profile in your dashboard.</p>
-        `;
+        if (endorsement) {
+            title = 'New Endorsement Received';
+            message = `You received a new endorsement from ${endorsement.endorser?.name || 'someone'}.`;
+            preview = endorsement.content ? endorsement.content.substring(0, 200) + (endorsement.content.length > 200 ? '...' : '') : message;
+            userId = record.developer_id;
+            notificationType = 'endorsement';
+            entityId = record.id;
+            link = '?tab=overview';
+            emailSubject = 'New Endorsement Received';
+            emailContent = `
+              <p>You have received a new endorsement!</p>
+              <p><strong>From:</strong> ${endorsement.endorser?.name || 'Anonymous'}</p>
+              ${endorsement.content ? `
+                <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0; text-align: left;">
+                  <p style="margin: 0; color: #374151; font-style: italic;">"${escapeHtml(preview)}"</p>
+                </div>
+              ` : ''}
+              <p>View your complete endorsement profile in your dashboard.</p>
+            `;
+        }
         break;
       }
       case 'INSERT:recruiter_profiles': {
         if (record.status === 'pending') {
           const { data: recruiter } = await supabase.from('users').select('name').eq('id', record.user_id).single();
-          const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin');
-          if (admins?.length) {
-            for (const admin of admins){
-              await supabase.from('notifications').insert({
-                user_id: admin.id,
-                message: `${recruiter?.name || 'A new recruiter'} is pending approval.`,
-                type: 'pending_recruiter',
-                entity_id: record.id,
-                link: '?tab=recruiters',
-                title: 'Recruiter Pending Approval'
-              });
+          if (recruiter) {
+            const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin');
+            if (admins?.length) {
+              for (const admin of admins){
+                await supabase.from('notifications').insert({
+                  user_id: admin.id,
+                  message: `${recruiter.name || 'A new recruiter'} is pending approval.`,
+                  type: 'pending_recruiter',
+                  entity_id: record.id,
+                  link: '?tab=recruiters',
+                  title: 'Recruiter Pending Approval'
+                });
+              }
             }
           }
         }
@@ -387,7 +393,11 @@ serve(async (req)=>{
 
     const { data: targetUser } = await supabase.from('users').select('id, role, email, name').eq('id', userId).maybeSingle();
 
-    if (notificationType === 'test_assignment' && targetUser?.role === 'recruiter') {
+    if (!targetUser) {
+        return new Response(JSON.stringify({ message: 'No-op: target user not found' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (notificationType === 'test_assignment' && targetUser.role === 'recruiter') {
       return new Response(JSON.stringify({ message: 'Skipped recruiter test-assignment notification' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -418,7 +428,7 @@ serve(async (req)=>{
       });
     }
 
-    if (allowEmail && targetUser?.email) {
+    if (allowEmail && targetUser.email) {
       const APP_BASE_URL = Deno.env.get('APP_BASE_URL')?.replace(/\/+$/, '') || 'https://gittalent.dev';
       const routeBase = targetUser.role === 'recruiter' ? 'recruiter' : targetUser.role === 'admin' ? 'admin' : 'developer';
       const subPath = link ? link.startsWith('?') ? `/${routeBase}${link}` : link.startsWith('/') ? link : `/${link}` : `/${routeBase}`;
