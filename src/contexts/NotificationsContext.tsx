@@ -18,7 +18,7 @@ export type NotificationRow = {
   type?: string | null;
   is_read: boolean;
   created_at: string;
-  sender_id?: string | null;
+  entity_id?: string | null; // ✅ FIX: Added entity_id here
   conversation_id?: string | null;
   message_preview?: string | null;
 };
@@ -62,8 +62,9 @@ function filterForDisplay(notifications: NotificationRow[]): NotificationRow[] {
   const seen = new Set<string>();
   const result: NotificationRow[] = [];
   for (const n of filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
+    // ✅ FIX: Changed sender_id to entity_id for correct de-duplication
     const dedupeKey =
-      (n.conversation_id || n.sender_id || "unknown") +
+      (n.conversation_id || n.entity_id || "unknown") +
       ":" +
       new Date(n.created_at).toISOString().slice(0, 16);
     if (!seen.has(dedupeKey)) {
@@ -282,13 +283,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           console.error("Failed to mark by conversation_id, falling back:", convErr);
         }
 
-        // Select matching IDs (sender-based)
+        // Select matching IDs (entity-based)
         const { data: rows, error: selErr } = await supabase
           .from("notifications")
           .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
-          .eq("entity_id", senderId); // ✅ FIX: Changed "sender_id" to "entity_id" to match the database schema
+          .eq("entity_id", senderId);
 
         if (selErr) {
           console.error("Failed to select message notifications by sender:", selErr);
