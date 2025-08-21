@@ -198,20 +198,29 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   const fetchNewMessage = async (messageId: string) => {
     try {
-      const { data, error } = await supabase
+      // Fetch the message without foreign key embeds
+      const { data: messageData, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          sender:users(id, name, email, role),
-          receiver:users(id, name, email, role)
-        `)
+        .select('*')
         .eq('id', messageId)
         .single();
 
       if (error) throw error;
       
-      if (data) {
-        setMessages(prev => [...prev, data]);
+      if (messageData) {
+        // Fetch sender and receiver data separately
+        const [{ data: sender }, { data: receiver }] = await Promise.all([
+          supabase.from('users').select('id, name, email, role').eq('id', messageData.sender_id).single(),
+          supabase.from('users').select('id, name, email, role').eq('id', messageData.receiver_id).single()
+        ]);
+
+        const messageWithUsers = {
+          ...messageData,
+          sender: sender || null,
+          receiver: receiver || null
+        };
+
+        setMessages(prev => [...prev, messageWithUsers]);
         
         await supabase
           .from('messages')
@@ -219,7 +228,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .eq('id', messageId);
 
         // Also clear notifications when new messages arrive
-        if (data.sender_id === otherUserId) {
+        if (messageData.sender_id === otherUserId) {
           markMessageNotificationsAsRead(otherUserId);
         }
 
@@ -227,7 +236,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           fetchUnreadCount();
         }, 500);
           
-        if (data.sender_id === otherUserId && userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
+        if (messageData.sender_id === otherUserId && userProfile?.role === 'developer' && otherUserRole === 'recruiter') {
           setCanSendMessage(true);
         }
       }
@@ -244,11 +253,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
       let query = supabase
         .from('messages')
-        .select(`
-          *,
-          sender:users(id, name, email, role),
-          receiver:users(id, name, email, role)
-        `)
+        .select('*')
         .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
 
       if (jobContext?.id) {
@@ -257,17 +262,48 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         query = query.is('job_role_id', null);
       }
 
-      const { data, error } = await query.order('sent_at', { ascending: true });
+      const { data: messagesData, error } = await query.order('sent_at', { ascending: true });
 
       if (error) throw error;
 
-      setMessages(data || []);
+      if (!messagesData || messagesData.length === 0) {
+        setMessages([]);
+        setHasInitiatedContact(false);
+        return;
+      }
 
-      const hasInitiated = data?.some(msg => msg.sender_id === userProfile.id) || false;
+      // Get all unique user IDs from messages
+      const userIds = [...new Set([
+        ...messagesData.map(m => m.sender_id),
+        ...messagesData.map(m => m.receiver_id)
+      ])];
+
+      // Fetch all users at once
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email, role')
+        .in('id', userIds);
+
+      if (usersError) throw usersError;
+
+      // Create user lookup map
+      const userLookup = new Map();
+      users?.forEach(user => userLookup.set(user.id, user));
+
+      // Combine messages with user data
+      const messagesWithUsers = messagesData.map(message => ({
+        ...message,
+        sender: userLookup.get(message.sender_id),
+        receiver: userLookup.get(message.receiver_id)
+      }));
+
+      setMessages(messagesWithUsers);
+
+      const hasInitiated = messagesWithUsers.some(msg => msg.sender_id === userProfile.id) || false;
       setHasInitiatedContact(hasInitiated);
 
       if (userProfile.role === 'developer' && otherUserRole === 'recruiter') {
-        const hasReceivedMessage = data?.some(msg => msg.sender_id === otherUserId) || false;
+        const hasReceivedMessage = messagesWithUsers.some(msg => msg.sender_id === otherUserId) || false;
         setCanSendMessage(hasReceivedMessage);
       } else {
         setCanSendMessage(true);
@@ -341,17 +377,25 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       const { data: newMsgData, error } = await supabase
         .from('messages')
         .insert(messageData)
-        .select(`
-            *,
-            sender:users(id, name, email, role),
-            receiver:users(id, name, email, role)
-        `)
+        .select('*')
         .single();
 
       if (error) throw error;
 
       if (newMsgData) {
-        setMessages(prev => [...prev, newMsgData]);
+        // Fetch sender and receiver data for the new message
+        const [{ data: sender }, { data: receiver }] = await Promise.all([
+          supabase.from('users').select('id, name, email, role').eq('id', newMsgData.sender_id).single(),
+          supabase.from('users').select('id, name, email, role').eq('id', newMsgData.receiver_id).single()
+        ]);
+
+        const messageWithUsers = {
+          ...newMsgData,
+          sender: sender || null,
+          receiver: receiver || null
+        };
+
+        setMessages(prev => [...prev, messageWithUsers]);
       }
 
       setNewMessage('');
