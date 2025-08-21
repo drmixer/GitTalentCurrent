@@ -3,11 +3,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { supabase } from '../../lib/supabase';
 import { REALTIME_LISTEN_TYPES } from '@supabase/supabase-js';
-import { 
-  Send, 
-  ArrowLeft, 
-  User, 
-  Building, 
+import {
+  Send,
+  ArrowLeft,
+  User,
+  Building,
   Code,
   Clock,
   CheckCircle,
@@ -147,8 +147,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             .from('messages')
             .update({ is_read: true })
             .eq('id', payload.new.id);
-          if (!error) {
-            console.log('✅ New message marked as read immediately');
+          
+          // ✅ FIX: Only clear the notification if the user is actively looking at the window
+          if (!error && document.hasFocus()) {
+            console.log('✅ New message marked as read immediately because window is focused');
             
             // Also clear the notification for this message
             markMessageNotificationsAsRead(otherUserId);
@@ -219,7 +221,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           .eq('id', messageId);
 
         // Also clear notifications when new messages arrive
-        if (data.sender_id === otherUserId) {
+        if (data.sender_id === otherUserId && document.hasFocus()) {
           markMessageNotificationsAsRead(otherUserId);
         }
 
