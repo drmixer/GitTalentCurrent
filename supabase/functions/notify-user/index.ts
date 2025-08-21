@@ -96,6 +96,9 @@ serve(async (req)=>{
     let table;
     let emailContent = '';
     let emailSubject = '';
+    
+    console.log('📧 Notification request received:', JSON.stringify(requestBody, null, 2));
+
     // Support multiple trigger formats
     if (requestBody.table && requestBody.operation) {
       type = requestBody.operation;
@@ -106,12 +109,17 @@ serve(async (req)=>{
       record = requestBody.record;
       table = record?.table || record?.schema || undefined;
     }
+
     if (!record) {
       throw new Error('Invalid request: missing record');
     }
+
     entityId = record.id;
     // Normalize table when possible
     if (!table && record.table) table = record.table;
+    
+    console.log('🔍 Processing notification:', { type, table, recordId: record.id });
+
     // Router
     switch(`${type}:${table || record.table || ''}`){
       case 'INSERT:assignments':
@@ -211,11 +219,16 @@ serve(async (req)=>{
         }
         break;
       case 'INSERT:messages':
+        console.log('📨 Processing new message notification');
         // Fetch sender details and message content
         const [{ data: sender }, { data: messageData }] = await Promise.all([
           supabase.from('users').select('name, email').eq('id', record.sender_id).single(),
-          supabase.from('messages').select('content, subject').eq('id', record.id).single()
+          supabase.from('messages').select('body, subject').eq('id', record.id).single()
         ]);
+        
+        console.log('👤 Sender data:', sender);
+        console.log('💬 Message data:', messageData);
+        
         title = 'New Message';
         message = `You have a new message from ${sender?.name || 'a user'}.`;
         userId = record.receiver_id;
@@ -223,22 +236,27 @@ serve(async (req)=>{
         link = '?tab=messages';
         entityId = record.sender_id; // Use sender_id for entity_id for messages
         emailSubject = messageData?.subject || 'New Message on GitTalent';
-        const messagePreview = messageData?.content ? messageData.content.length > 150 ? messageData.content.substring(0, 150) + '...' : messageData.content : '';
+        const messagePreview = messageData?.body ? messageData.body.length > 150 ? messageData.body.substring(0, 150) + '...' : messageData.body : '';
         emailContent = `
           <p>You have received a new message from <strong>${sender?.name || 'a user'}</strong>.</p>
-          ${messageData?.content ? `
+          ${messageData?.body ? `
             <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0; text-align: left;">
               <p style="margin: 0; color: #374151; font-style: italic;">"${messagePreview}"</p>
             </div>
           ` : ''}
           <p>Click below to read the full message and reply.</p>
         `;
+        
+        console.log('📧 Message notification prepared:', { userId, title, notificationType });
+        
         // Also notify admins (existing behavior)
         {
-          const { data: admins } = await supabase.from('user_profiles').select('id').eq('role', 'admin');
+          const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin');
+          console.log('👥 Found admins for notification:', admins);
           if (admins && admins.length > 0) {
             for (const admin of admins){
               if (admin.id !== userId) {
+                console.log('📬 Sending admin notification to:', admin.id);
                 await supabase.from('notifications').insert({
                   user_id: admin.id,
                   message: 'New message between users.',
@@ -323,7 +341,7 @@ serve(async (req)=>{
       // Legacy compatibility
       case 'INSERT:recruiter_profiles':
         if (record.status === 'pending') {
-          const { data: admins, error } = await supabase.from('user_profiles').select('id').eq('role', 'admin');
+          const { data: admins, error } = await supabase.from('users').select('id').eq('role', 'admin');
           if (!error && admins?.length) {
             for (const admin of admins){
               await supabase.from('notifications').insert({
@@ -339,10 +357,13 @@ serve(async (req)=>{
         }
         break;
       default:
+        console.log('🤷 No handler for notification type:', `${type}:${table || record.table || ''}`);
         break;
     }
+
     // If nothing to send, exit early
     if (!message || !userId || !notificationType) {
+      console.log('❌ No notification to send - missing required fields:', { message: !!message, userId: !!userId, notificationType: !!notificationType });
       return new Response(JSON.stringify({
         message: 'No-op'
       }), {
@@ -352,10 +373,16 @@ serve(async (req)=>{
         }
       });
     }
+    
+    console.log('✅ Notification prepared:', { userId, title, notificationType, entityId });
+
     // Load target user (role + email) once for downstream logic
     const { data: targetUser } = await supabase.from('users').select('id, role, email, name').eq('id', userId).maybeSingle();
+    console.log('👤 Target user:', targetUser);
+
     // Skip test-assignment notifications aimed at recruiters
     if (notificationType === 'test_assignment' && targetUser?.role === 'recruiter') {
+      console.log('⏭️ Skipping test-assignment notification for recruiter');
       return new Response(JSON.stringify({
         message: 'Skipped recruiter test-assignment notification'
       }), {
@@ -365,6 +392,7 @@ serve(async (req)=>{
         }
       });
     }
+
     // Deliver channels according to preferences
     // Load preferences once (developer + recruiter tables)
     let devPrefs = null;
@@ -376,31 +404,45 @@ serve(async (req)=>{
       ]);
       devPrefs = d?.notification_preferences || null;
       recPrefs = r?.notification_preferences || null;
+      console.log('🔧 User preferences:', { devPrefs, recPrefs });
     } catch (e) {
       console.warn('Could not load preferences; defaulting to allow in-app/email.', e);
     }
+
     const allowType = isTypeAllowed(devPrefs, notificationType) && isTypeAllowed(recPrefs, notificationType);
     const allowInApp = allowType && (typeof devPrefs?.in_app === 'boolean' ? devPrefs?.in_app : true) && (typeof recPrefs?.in_app === 'boolean' ? recPrefs?.in_app : true);
     const allowEmail = allowType && ((typeof devPrefs?.email === 'boolean' ? devPrefs?.email : false) || (typeof recPrefs?.email === 'boolean' ? recPrefs?.email : false));
+    
+    console.log('📋 Delivery preferences:', { allowType, allowInApp, allowEmail });
+
     // Insert in-app notification if allowed
     if (allowInApp) {
-      await supabase.from('notifications').insert({
+      console.log('📱 Inserting in-app notification');
+      const { data: notificationData, error: notificationError } = await supabase.from('notifications').insert({
         user_id: userId,
         message,
         type: notificationType,
         entity_id: entityId,
         link,
         title: title || message
-      });
+      }).select('*').single();
+      
+      if (notificationError) {
+        console.error('❌ Failed to insert notification:', notificationError);
+      } else {
+        console.log('✅ In-app notification inserted:', notificationData?.id);
+      }
     } else {
-      console.log('In-app suppressed by user preference', {
+      console.log('🚫 In-app notification suppressed by user preference', {
         userId,
         notificationType
       });
     }
+
     // Send email if allowed and we have an address
     if (allowEmail && targetUser?.email) {
-      const APP_BASE_URL = Deno.env.get('APP_BASE_URL')?.replace(/\/+$/, '') || '';
+      console.log('📧 Sending email notification to:', targetUser.email);
+      const APP_BASE_URL = Deno.env.get('APP_BASE_URL')?.replace(/\/+$/, '') || 'https://gittalent.dev';
       // Pick a base route by role
       const routeBase = targetUser.role === 'recruiter' ? 'recruiter' : targetUser.role === 'admin' ? 'admin' : 'developer';
       // link is usually a query string like "?tab=..." to append after /{routeBase}
@@ -416,14 +458,25 @@ serve(async (req)=>{
           </div>
         `;
       try {
-        await sendEmailViaResend(targetUser.email, subject, html, text);
-        console.log('Notification email sent via Resend to', targetUser.email, 'type:', notificationType);
+        const emailResult = await sendEmailViaResend(targetUser.email, subject, html, text);
+        console.log('✅ Email sent successfully:', emailResult);
       } catch (e) {
-        console.error('Failed to send notification email via Resend:', e);
+        console.error('❌ Failed to send notification email via Resend:', e);
+      }
+    } else {
+      if (!allowEmail) {
+        console.log('🚫 Email notification disabled by user preferences');
+      }
+      if (!targetUser?.email) {
+        console.log('❌ No email address for user:', userId);
       }
     }
+
+    console.log('🎉 Notification processing completed successfully');
     return new Response(JSON.stringify({
-      ok: true
+      ok: true,
+      notificationSent: allowInApp,
+      emailSent: allowEmail && !!targetUser?.email
     }), {
       headers: {
         ...corsHeaders,
@@ -431,7 +484,7 @@ serve(async (req)=>{
       }
     });
   } catch (error) {
-    console.error('notify-user error:', error);
+    console.error('❌ notify-user error:', error);
     return new Response(JSON.stringify({
       error: error?.message || 'Unknown error'
     }), {
