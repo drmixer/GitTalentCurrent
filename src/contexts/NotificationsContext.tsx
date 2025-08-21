@@ -282,16 +282,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           console.error("Failed to mark by conversation_id, falling back:", convErr);
         }
 
-        // Select matching IDs (sender-based), supporting both old and new data schemas
+        // Select matching IDs (sender-based)
         const { data: rows, error: selErr } = await supabase
           .from("notifications")
           .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
-          .or(`sender_id.eq.${senderId},entity_id.eq.${senderId}`);
+          .eq("sender_id", senderId);
 
         if (selErr) {
-          console.error("Failed to select message notifications by sender/entity:", selErr);
+          console.error("Failed to select message notifications by sender:", selErr);
         }
 
         const ids = (rows || []).map((r: any) => r.id);
