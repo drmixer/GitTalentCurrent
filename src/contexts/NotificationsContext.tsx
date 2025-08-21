@@ -288,7 +288,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           .select("id")
           .eq("user_id", userProfile.id)
           .eq("is_read", false)
-          .eq("sender_id", senderId);
+          .eq("entity_id", senderId); // ✅ FIX: Changed "sender_id" to "entity_id" to match the database schema
 
         if (selErr) {
           console.error("Failed to select message notifications by sender:", selErr);
