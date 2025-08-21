@@ -335,13 +335,92 @@ serve(async (req)=>{
       // 🔧 FIX: Use linkForEmail instead of link for email generation
       const subPath = linkForEmail ? linkForEmail.startsWith('?') ? `/${routeBase}${linkForEmail}` : linkForEmail.startsWith('/') ? linkForEmail : `/${linkForEmail}` : `/${routeBase}`;
       const fullLink = APP_BASE_URL ? `${APP_BASE_URL}${subPath}` : '';
+      // 🎨 Enhanced email content with more details
+      let enhancedMessage = message;
+      let actionText = 'View Details';
+      // Add specific details based on notification type
+      if (notificationType === 'message') {
+        // Get sender details for message notifications
+        const { data: sender } = await supabase.from('users').select('name, email').eq('id', record.sender_id).single();
+        const senderName = sender?.name || sender?.email?.split('@')[0] || 'Someone';
+        enhancedMessage = `You received a new message from ${senderName}.`;
+        // Include message preview if it's short enough
+        if (record.body && record.body.length <= 100) {
+          enhancedMessage += `\n\n"${record.body}"`;
+        }
+        actionText = 'View Message';
+      } else if (notificationType === 'test_assignment') {
+        // Get test/job details for assignment notifications
+        const { data: testDetails } = await supabase.from('test_assignments').select(`
+            *,
+            test:coding_tests(title),
+            job:job_roles(title, company)
+          `).eq('id', record.id).single();
+        if (testDetails?.test?.title && testDetails?.job?.title) {
+          enhancedMessage = `You've been assigned the coding test "${testDetails.test.title}" for the position "${testDetails.job.title}"`;
+          if (testDetails.job.company) {
+            enhancedMessage += ` at ${testDetails.job.company}`;
+          }
+          enhancedMessage += '.';
+        }
+        actionText = 'Start Test';
+      } else if (notificationType === 'test_completion') {
+        // Get developer details for completion notifications
+        const { data: developer } = await supabase.from('users').select('name, email').eq('id', record.developer_id).single();
+        const developerName = developer?.name || developer?.email?.split('@')[0] || 'A developer';
+        enhancedMessage = `${developerName} has completed a coding test you assigned.`;
+        actionText = 'View Results';
+      } else if (notificationType === 'job_application') {
+        // Get developer and job details for application notifications
+        const { data: applicant } = await supabase.from('users').select('name, email').eq('id', record.developer_id).single();
+        const { data: jobDetails } = await supabase.from('job_roles').select('title, company').eq('id', record.job_id).single();
+        const applicantName = applicant?.name || applicant?.email?.split('@')[0] || 'A developer';
+        if (jobDetails?.title) {
+          enhancedMessage = `${applicantName} has applied for your "${jobDetails.title}" position`;
+          if (jobDetails.company) {
+            enhancedMessage += ` at ${jobDetails.company}`;
+          }
+          enhancedMessage += '.';
+        }
+        actionText = 'View Application';
+      }
       const emailSubject = title || 'Notification';
-      const emailText = `${message}${fullLink ? `\n\nOpen: ${fullLink}` : ''}`;
+      const emailText = `${enhancedMessage}${fullLink ? `\n\nOpen: ${fullLink}` : ''}`;
+      // 🎨 Beautiful styled HTML email
       const emailHtml = `
-        <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
-          <p>${message}</p>
-          ${fullLink ? `<p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Open in GitTalent</a></p>` : ''}
-        </div>
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px; margin: 0;">
+    <div style="max-width: 500px; margin: auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center;">
+      
+      <img src="https://gittalent.dev/logo.png" alt="GitTalent" style="max-width: 150px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
+      
+      <h2 style="color: #4f46e5; margin-bottom: 16px; font-size: 24px;">${title}</h2>
+      
+      <div style="color: #374151; line-height: 1.6; margin-bottom: 24px; white-space: pre-line;">
+        ${enhancedMessage}
+      </div>
+      
+      ${fullLink ? `
+      <p style="margin: 24px 0;">
+        <a href="${fullLink}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-block; font-weight: 500;">
+          ${actionText}
+        </a>
+      </p>
+      ` : ''}
+      
+      <div style="border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 20px;">
+        <p style="color: #6b7280; font-size: 14px; margin: 0;">
+          You're receiving this because you have notifications enabled in your GitTalent account.
+        </p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">
+          © 2025 GitTalent · <a href="https://gittalent.dev" style="color: #4f46e5; text-decoration: none;">Visit our site</a>
+        </p>
+      </div>
+      
+    </div>
+  </body>
+</html>
       `;
       try {
         await sendEmailViaResend(targetUser.email, emailSubject, emailHtml, emailText);
