@@ -59,7 +59,7 @@ async function sendViaResend(to, subject, html, text) {
     },
     body: JSON.stringify({
       from: EMAIL_FROM,
-      to: [to],
+      to,
       subject,
       html,
       text
