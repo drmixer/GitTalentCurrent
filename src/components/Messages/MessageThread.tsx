@@ -202,8 +202,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         .from('messages')
         .select(`
           *,
-          sender:users!messages_sender_id_fkey(*),
-          receiver:users!messages_receiver_id_fkey(*)
+          sender:users(id, name, email, role),
+          receiver:users(id, name, email, role)
         `)
         .eq('id', messageId)
         .single();
@@ -246,8 +246,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         .from('messages')
         .select(`
           *,
-          sender:users!messages_sender_id_fkey(*),
-          receiver:users!messages_receiver_id_fkey(*)
+          sender:users(id, name, email, role),
+          receiver:users(id, name, email, role)
         `)
         .or(`and(sender_id.eq.${userProfile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userProfile.id})`);
 
@@ -343,8 +343,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         .insert(messageData)
         .select(`
             *,
-            sender:users!messages_sender_id_fkey(*),
-            receiver:users!messages_receiver_id_fkey(*)
+            sender:users(id, name, email, role),
+            receiver:users(id, name, email, role)
         `)
         .single();
 
