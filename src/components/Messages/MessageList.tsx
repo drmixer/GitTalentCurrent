@@ -57,71 +57,42 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
 
       if (!userProfile?.id) return;
 
-      // Fetch all messages where user is sender or receiver - using simple query without foreign key embeds
+      // Fetch all messages where user is sender or receiver
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
-        .select('*')
+        .select(`
+          *,
+          sender:users!messages_sender_id_fkey(*),
+          receiver:users!messages_receiver_id_fkey(*),
+          job_role:job_roles(id, title)
+        `)
         .or(`sender_id.eq.${userProfile.id},receiver_id.eq.${userProfile.id}`)
         .order('sent_at', { ascending: false });
 
       if (messagesError) throw messagesError;
 
-      if (!messages || messages.length === 0) {
-        setThreads([]);
-        return;
-      }
+      // Group messages into threads
+      const threadMap = new Map<string, MessageThread>();
 
-      // Get all unique user IDs we need to fetch
-      const userIds = new Set<string>();
-      const jobRoleIds = new Set<string>();
-
-      messages.forEach(message => {
-        userIds.add(message.sender_id);
-        userIds.add(message.receiver_id);
-        if (message.job_role_id) {
-          jobRoleIds.add(message.job_role_id);
+      // Fetch profile pictures for developers
+      const developerIds = new Set<string>();
+      messages?.forEach(message => {
+        const isFromCurrentUser = message.sender_id === userProfile.id;
+        const otherUserId = isFromCurrentUser ? message.receiver_id : message.sender_id;
+        const otherUser = isFromCurrentUser ? message.receiver : message.sender;
+        
+        if (otherUser?.role === 'developer') {
+          developerIds.add(otherUserId);
         }
       });
 
-      // Fetch all users at once
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('id, name, email, role')
-        .in('id', Array.from(userIds));
-
-      if (usersError) throw usersError;
-
-      // Fetch job roles if any
-      let jobRoles: any[] = [];
-      if (jobRoleIds.size > 0) {
-        const { data: jobRoleData, error: jobRoleError } = await supabase
-          .from('job_roles')
-          .select('id, title')
-          .in('id', Array.from(jobRoleIds));
-        
-        if (jobRoleError) console.warn('Error fetching job roles:', jobRoleError);
-        else jobRoles = jobRoleData || [];
-      }
-
-      // Create lookup maps
-      const userLookup = new Map();
-      users?.forEach(user => userLookup.set(user.id, user));
-
-      const jobRoleLookup = new Map();
-      jobRoles.forEach(role => jobRoleLookup.set(role.id, role));
-
-      // Fetch profile pictures for developers
-      const developerIds = Array.from(userIds).filter(userId => {
-        const user = userLookup.get(userId);
-        return user?.role === 'developer';
-      });
-
+      // Get profile pictures for developers
       const developerProfilePics: Record<string, string> = {};
-      if (developerIds.length > 0) {
+      if (developerIds.size > 0) {
         const { data: developers } = await supabase
           .from('developers')
           .select('user_id, profile_pic_url')
-          .in('user_id', developerIds);
+          .in('user_id', Array.from(developerIds));
           
         developers?.forEach(dev => {
           if (dev.profile_pic_url) {
@@ -130,18 +101,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         });
       }
 
-      // Combine messages with user data
-      const messagesWithUsers = messages.map(message => ({
-        ...message,
-        sender: userLookup.get(message.sender_id),
-        receiver: userLookup.get(message.receiver_id),
-        job_role: message.job_role_id ? jobRoleLookup.get(message.job_role_id) : null
-      }));
-
-      // Group messages into threads
-      const threadMap = new Map<string, MessageThread>();
-
-      messagesWithUsers.forEach((message) => {
+      messages?.forEach((message) => {
         const isFromCurrentUser = message.sender_id === userProfile.id;
         const otherUser = isFromCurrentUser ? message.receiver : message.sender;
         
@@ -154,7 +114,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         
         if (!existingThread || new Date(message.sent_at) > new Date(existingThread.lastMessage.sent_at)) {
           // Count unread messages for this thread
-          const unreadCount = messagesWithUsers.filter(m => 
+          const unreadCount = (messages || []).filter(m => 
             m.receiver_id === userProfile.id && 
             !m.is_read &&
             ((m.sender_id === otherUser.id && m.job_role_id === message.job_role_id) ||
@@ -261,26 +221,24 @@ export const MessageList: React.FC<MessageListProps> = ({ onThreadSelect, search
         // Get all recruiters who have messaged this developer
         const { data: recruitersWhoMessaged } = await supabase
           .from('messages')
-          .select('sender_id')
-          .eq('receiver_id', userProfile.id);
+          .select(`
+            sender:users!messages_sender_id_fkey(*)
+          `)
+          .eq('receiver_id', userProfile.id)
+          .eq('sender.role', 'recruiter');
         
-        if (recruitersWhoMessaged) {
-          const recruiterIds = [...new Set(recruitersWhoMessaged.map(msg => msg.sender_id))];
-          if (recruiterIds.length > 0) {
-            const { data: recruiters } = await supabase
-              .from('users')
-              .select('*')
-              .eq('role', 'recruiter')
-              .in('id', recruiterIds);
-            
-            contacts = [
-              ...(adminUsers || []),
-              ...(recruiters || [])
-            ];
-          } else {
-            contacts = adminUsers || [];
+        // Extract unique recruiters
+        const uniqueRecruiters = new Map();
+        recruitersWhoMessaged?.forEach(msg => {
+          if (msg.sender && !uniqueRecruiters.has(msg.sender.id)) {
+            uniqueRecruiters.set(msg.sender.id, msg.sender);
           }
-        }
+        });
+
+        contacts = [
+          ...(adminUsers || []),
+          ...Array.from(uniqueRecruiters.values())
+        ];
         
         // For each recruiter, check if they've messaged the developer
         const canInitiate: {[key: string]: boolean} = {};
