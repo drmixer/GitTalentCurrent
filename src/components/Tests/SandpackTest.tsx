@@ -11,6 +11,7 @@ import {
 } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
+// Helper types and functions
 type Framework = 'react' | 'vue' | 'javascript';
 
 interface SandpackTestProps {
@@ -32,40 +33,27 @@ const getSetup = (framework: Framework) => {
         codeFile: '/src/App.tsx',
         testFile: '/src/App.test.tsx',
         deps: {
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
-          '@testing-library/react': '^14.2.1',
-          '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
+          react: '^18.2.0', 'react-dom': '^18.2.0', '@testing-library/react': '^14.2.1',
+          '@testing-library/user-event': '^14.5.2', '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
     case 'vue':
       return {
         template: 'vue3' as SandpackProviderProps['template'],
-        codeFile: '/src/App.vue',
-        testFile: '/src/App.test.ts',
+        codeFile: '/src/App.vue', testFile: '/src/App.test.ts',
         deps: {
-          vue: '^3.4.21',
-          '@vue/test-utils': '^2.4.5',
-          '@testing-library/vue': '^8.0.3',
-          '@testing-library/dom': '^9.3.4',
-          '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
+          vue: '^3.4.21', '@vue/test-utils': '^2.4.5', '@testing-library/vue': '^8.0.3',
+          '@testing-library/dom': '^9.3.4', '@testing-library/user-event': '^14.5.2',
+          '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
-    case 'javascript':
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/index.ts',
-        testFile: '/src/index.test.ts',
+        codeFile: '/src/index.ts', testFile: '/src/index.test.ts',
         deps: {
-          '@testing-library/dom': '^9.3.4',
-          '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2',
-          vitest: '^0.34.6',
+          '@testing-library/dom': '^9.3.4', '@testing-library/user-event': '^14.5.2',
+          '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
   }
@@ -74,14 +62,14 @@ const getSetup = (framework: Framework) => {
 function parseSummary(text: string) {
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
   if (!ran) return { ran: false };
-  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
   const num = (re: RegExp, s: string) => (s.match(re) ? Number(s.match(re)![1]) : undefined);
-  const suites = suitesLine ? { passed: num(/(\d+)\s*passed/i, suitesLine), failed: num(/(\d+)\s*failed/i, suitesLine), total: num(/(\d+)\s*total/i, suitesLine) } : undefined;
   const tests = testsLine ? { passed: num(/(\d+)\s*passed/i, testsLine), failed: num(/(\d+)\s*failed/i, testsLine), total: num(/(\d+)\s*total/i, testsLine) } : undefined;
-  return { ran, suites, tests };
+  return { ran, tests };
 }
 
+
+// This component contains the view and all the logic. It must be a child of SandpackProvider.
 const SandpackView: React.FC<SandpackTestProps> = (props) => {
   const { sandpack } = useSandpack();
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'passed' | 'failed'>('idle');
@@ -89,6 +77,7 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
   const [lastResult, setLastResult] = useState<{ rawText: string; parsed: any } | null>(null);
   const testsContainerRef = useRef<HTMLDivElement>(null);
   
+  // This effect watches the DOM for test results when a test is running.
   useEffect(() => {
     if (testStatus !== 'running') return;
 
@@ -118,18 +107,20 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
     setLastResult(null);
 
     try {
+      // Poll with a generous timeout for the test client to be ready.
       let testClient = sandpack.clients.test;
       let attempts = 0;
-      const maxAttempts = 20; // Poll for 5 seconds
+      const maxAttempts = 40; // Poll for 10 seconds (40 * 250ms)
 
       while (!testClient && attempts < maxAttempts) {
+        console.log(`[SandpackTest] Waiting for test client... Attempt ${attempts + 1}/${maxAttempts}`);
         await new Promise(resolve => setTimeout(resolve, 250));
         testClient = sandpack.clients.test;
         attempts++;
       }
 
       if (testClient) {
-        console.log(`[SandpackTest] Test client found after ${attempts} attempts. Dispatching run command.`);
+        console.log(`[SandpackTest] Test client found! Dispatching run command.`);
         testClient.dispatch({ type: 'run-test' });
       } else {
         throw new Error('Sandpack test client did not initialize in time.');
@@ -147,7 +138,7 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
     const score = (total && total > 0 && failed === 0) ? 1 : 0;
 
     try {
-      const { error } = await supabase.from('test_results').upsert({
+      await supabase.from('test_results').upsert({
         assignment_id: props.assignmentId,
         question_id: props.questionId,
         score,
@@ -157,7 +148,6 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
         stderr: '',
       }, { onConflict: 'assignment_id,question_id' });
 
-      if (error) throw error;
       setSubmitted(true);
       setTimeout(() => (props.isLastQuestion ? props.onComplete() : props.onNext()), 2000);
     } catch (err) {
@@ -180,6 +170,7 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
       padding: '10px 20px', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600,
       fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
     };
+
     if (testStatus === 'running') {
       return (<button disabled style={{ ...baseStyle, backgroundColor: '#94a3b8', cursor: 'not-allowed' }}>
           <div style={{ width: '16px', height: '16px', border: '2px solid #ffffff40', borderTop: '2px solid #ffffff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
@@ -197,22 +188,25 @@ const SandpackView: React.FC<SandpackTestProps> = (props) => {
 
   return (
     <>
-      <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+      <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', height: '65px' }}>
         {submitted ? (<p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>✅ Submitted! Advancing...</p>) : (<> {renderStatusMessage()} {renderActionButtons()} </>)}
       </div>
       <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       
-      <SandpackLayout>
-        <SandpackCodeEditor style={{ height: '70vh', flex: 1 }} showTabs showLineNumbers showInlineErrors />
-        <div ref={testsContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '70vh' }}>
-          <SandpackTests style={{ flex: 1 }} />
-          <SandpackConsole style={{ height: '180px', flexGrow: 0, flexShrink: 0 }} />
-        </div>
-      </SandpackLayout>
+      <div style={{ height: 'calc(100vh - 65px)', display: 'flex', flexDirection: 'column' }}>
+        <SandpackLayout style={{ flex: 1 }}>
+          <SandpackCodeEditor style={{ height: '100%' }} showTabs showLineNumbers showInlineErrors />
+          <div ref={testsContainerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '50%' }}>
+            <SandpackTests style={{ flex: 1 }} />
+            <SandpackConsole style={{ height: '180px', flexGrow: 0, flexShrink: 0, borderTop: '1px solid #e5e7eb' }} />
+          </div>
+        </SandpackLayout>
+      </div>
     </>
   );
 };
 
+// This is the main export component. It sets up the provider and files.
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
@@ -234,12 +228,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       template={template}
       customSetup={{ dependencies: deps }}
       files={files}
-      options={{
-        autorun: false,
-        initMode: 'immediate',
-        visibleFiles: [codeFile, testFile],
-        activeFile: codeFile,
-      }}
+      options={{ autorun: false, initMode: 'immediate' }}
     >
       <SandpackView {...props} />
     </SandpackProvider>
