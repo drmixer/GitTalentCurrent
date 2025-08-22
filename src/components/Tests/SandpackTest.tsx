@@ -354,4 +354,5 @@ export const SandpackTestWrapper: React.FC<SandpackTestProps> = (props) => {
   );
 };
 
+export default SandpackTestWrapper;
 
