@@ -73,13 +73,9 @@ const getSetup = (framework: Framework) => {
 
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
-  
+
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
-  
-  if (!ran) {
-    console.log('[SandpackTest] No test indicators found in output');
-    return { ran: false, suites: undefined, tests: undefined };
-  }
+  if (!ran) return { ran: false, suites: undefined, tests: undefined };
 
   const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
@@ -90,22 +86,14 @@ function parseSummary(text: string) {
   };
 
   const suites = suitesLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, suitesLine),
-        failed: num(/(\d+)\s*failed/i, suitesLine),
-        total: num(/(\d+)\s*total/i, suitesLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, suitesLine), failed: num(/(\d+)\s*failed/i, suitesLine), total: num(/(\d+)\s*total/i, suitesLine) }
     : undefined;
-
   const tests = testsLine
-    ? {
-        passed: num(/(\d+)\s*passed/i, testsLine),
-        failed: num(/(\d+)\s*failed/i, testsLine),
-        total: num(/(\d+)\s*total/i, testsLine),
-      }
+    ? { passed: num(/(\d+)\s*passed/i, testsLine), failed: num(/(\d+)\s*failed/i, testsLine), total: num(/(\d+)\s*total/i, testsLine) }
     : undefined;
 
   const result = { ran, suites, tests };
+  console.log('[SandpackTest] Parsed result:', result);
   return result;
 }
 
@@ -120,7 +108,6 @@ const TestsAndConsole: React.FC<{
     if (!root) return;
 
     observerRef.current?.disconnect();
-
     const obs = new MutationObserver(() => {
       const text = root.textContent || '';
       if (!text) return;
@@ -132,37 +119,23 @@ const TestsAndConsole: React.FC<{
         observerRef.current = null;
       }
     });
-
     obs.observe(root, { childList: true, subtree: true, characterData: true });
     observerRef.current = obs;
 
-    return () => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
-    };
-  }, [onTestsComplete, testsRootRef]);
+    return () => observerRef.current?.disconnect();
+  }, [onTestsComplete]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests 
-          style={{ height: '100%' }} 
-          watchMode={false} 
-          showWatchButton={false} 
-          showVerboseButton={false}
-          hideTestsAndSupressLogs={false}
-        />
+        <SandpackTests style={{ height: '100%' }} watchMode={false} showWatchButton={false} showVerboseButton={false} hideTestsAndSupressLogs={false} />
       </div>
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
         <SandpackConsole
           maxMessageCount={200}
           showHeader
           standalone
-          style={{
-            height: '100%',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            fontSize: 12,
-          }}
+          style={{ height: '100%', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}
         />
       </div>
     </div>
@@ -170,27 +143,9 @@ const TestsAndConsole: React.FC<{
 };
 
 const SandpackTestInner: React.FC<
-  SandpackTestProps & {
-    template: SandpackProviderProps['template'];
-    codeFile: string;
-    testFile: string;
-    deps: Record<string, string>;
-  }
+  SandpackTestProps & { template: SandpackProviderProps['template']; codeFile: string; testFile: string; deps: Record<string, string> }
 > = (props) => {
-  const {
-    starterCode,
-    testCode,
-    framework,
-    assignmentId,
-    questionId,
-    isLastQuestion,
-    onNext,
-    onComplete,
-    template,
-    codeFile,
-    testFile,
-    deps,
-  } = props;
+  const { starterCode, testCode, framework, assignmentId, questionId, isLastQuestion, onNext, onComplete, template, codeFile, testFile, deps } = props;
 
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -201,32 +156,7 @@ const SandpackTestInner: React.FC<
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
 
-  const files = useMemo<SandpackFiles>(() => {
-    if (!testCode) return {};
-    return {
-      [codeFile]: { code: starterCode ?? '', active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
-      '/vitest.config.ts': {
-        code: `
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
-});
-        `.trim(),
-        hidden: true,
-      },
-      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
-      '/package.json': {
-        code: JSON.stringify(
-          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
-          null,
-          2
-        ),
-        hidden: true,
-      },
-    };
-  }, [starterCode, testCode, codeFile, testFile]);
-
+  // Handle test completion
   const handleTestsComplete = (rawText: string, parsed: any) => {
     setLastRawText(rawText);
     setLastParsed(parsed);
@@ -241,14 +171,14 @@ export default defineConfig({
     setLastParsed(null);
 
     try {
-      await sandpack.runSandpack(); // compile
-
-      // let tests run via observer
+      await sandpack.runSandpack(); // compile/update
       setTimeout(() => {
-        if (!canSubmit) setIsRunning(false);
-      }, 15000);
-    } catch (err) {
-      console.error(err);
+        // click the internal Sandpack test button
+        const btn = document.querySelector<HTMLButtonElement>('.sp-tests button, [data-sp-tests] button');
+        if (btn) btn.click();
+        else setIsRunning(false); // fallback
+      }, 1000);
+    } catch {
       setIsRunning(false);
     }
   };
@@ -257,45 +187,31 @@ export default defineConfig({
     if (!lastParsed) return;
 
     const tests = lastParsed.tests || {};
-    const total = typeof tests.total === 'number' ? tests.total : undefined;
-    const failed = typeof tests.failed === 'number' ? tests.failed : undefined;
-    const passed = typeof tests.passed === 'number' ? tests.passed : undefined;
+    const total = tests.total ?? undefined;
+    const failed = tests.failed ?? undefined;
+    const passed = tests.passed ?? undefined;
 
     let score = 0;
     if (total && total > 0) {
-      if (typeof failed === 'number') score = failed === 0 ? 1 : 0;
-      else if (typeof passed === 'number') score = passed === total ? 1 : 0;
-      else score = 1;
+      score = failed === 0 ? 1 : 0;
     }
 
     try {
-      const { error: upsertError } = await supabase
+      const { error } = await supabase
         .from('test_results')
         .upsert(
-          {
-            assignment_id: assignmentId,
-            question_id: questionId,
-            score,
-            passed_test_cases: passed ?? null,
-            total_test_cases: total ?? null,
-            stdout: lastRawText,
-            stderr: '',
-          },
+          { assignment_id: assignmentId, question_id: questionId, score, passed_test_cases: passed ?? null, total_test_cases: total ?? null, stdout: lastRawText, stderr: '' },
           { onConflict: 'assignment_id,question_id' }
         );
 
-      if (upsertError) {
-        alert('Failed to submit results. Please try again.');
-        return;
-      }
-
+      if (error) return alert('Failed to submit results. Please try again.');
       setSubmitted(true);
+
       setTimeout(() => {
         if (isLastQuestion) onComplete();
         else onNext();
-      }, 2000);
-    } catch (err) {
-      console.error(err);
+      }, 1500);
+    } catch {
       alert('Unexpected error during submit.');
     }
   };
@@ -304,77 +220,22 @@ export default defineConfig({
 
   return (
     <>
-      <div 
-        style={{
-          padding: '16px',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '16px'
-        }}
-      >
+      <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
         {submitted ? (
-          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
-            ✅ Submitted! Advancing to next question...
-          </p>
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: 600 }}>✅ Submitted! Advancing...</p>
         ) : canSubmit ? (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-              ✅ Tests completed!
-            </p>
-            <button
-              onClick={handleSubmit}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-              }}
-            >
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: 500 }}>✅ Tests completed!</p>
+            <button onClick={handleSubmit} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
               Submit Results
             </button>
           </>
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-              Write your code, then run tests to see results
-            </p>
-            <button
-              onClick={handleRunTests}
-              disabled={isRunning}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: isRunning ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run tests to see results</p>
+            <button onClick={handleRunTests} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: isRunning ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: isRunning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {isRunning ? (
-                <>
-                  <div style={{ 
-                    width: '16px', 
-                    height: '16px', 
-                    border: '2px solid #ffffff40',
-                    borderTop: '2px solid #ffffff',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  Running Tests...
-                </>
+                <div style={{ width: '16px', height: '16px', border: '2px solid #ffffff40', borderTop: '2px solid #ffffff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               ) : (
                 '▶️ Run Tests'
               )}
@@ -382,15 +243,7 @@ export default defineConfig({
           </>
         )}
       </div>
-
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
+      <style>{`@keyframes spin {0% {transform: rotate(0deg);}100% {transform: rotate(360deg);}}`}</style>
 
       <div className="gt-sp">
         <SandpackLayout>
@@ -405,41 +258,31 @@ export default defineConfig({
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
-  if (!props.testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
-
-  const files = useMemo<SandpackFiles>(() => {
-    return {
-      [codeFile]: { code: props.starterCode ?? '', active: true },
-      [testFile]: { code: props.testCode ?? '', hidden: false },
-      '/vitest.config.ts': {
-        code: `
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
-});
-        `.trim(),
-        hidden: true,
-      },
-      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
-      '/package.json': {
-        code: JSON.stringify(
-          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
-          null,
-          2
-        ),
-        hidden: true,
-      },
-    };
-  }, [props.starterCode, props.testCode, codeFile, testFile]);
+  if (!props.testCode) return <div>This Sandpack question is missing its test code.</div>;
 
   return (
-    <SandpackProvider template={template} customSetup={{ files, dependencies: deps }} options={{ autorun: false }}>
+    <SandpackProvider
+      key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
+      template={template}
+      customSetup={{
+        files: {
+          [codeFile]: { code: props.starterCode, active: true },
+          [testFile]: { code: props.testCode, hidden: false },
+          '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
+          '/vitest.config.ts': {
+            code: `import { defineConfig } from 'vitest/config';
+export default defineConfig({ test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] } });`,
+            hidden: true,
+          },
+          '/package.json': { code: JSON.stringify({ name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } }, null, 2), hidden: true },
+        },
+        dependencies: deps,
+      }}
+      options={{ autorun: false }}
+    >
       <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
     </SandpackProvider>
   );
 };
 
 export default SandpackTest;
-
