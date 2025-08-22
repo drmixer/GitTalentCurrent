@@ -350,38 +350,61 @@ serve(async (req)=>{
         }
         actionText = 'View Message';
       } else if (notificationType === 'test_assignment') {
-        // Get test/job details for assignment notifications
+        // Get test/job details for assignment notifications with recruiter info
         const { data: testDetails } = await supabase.from('test_assignments').select(`
             *,
             test:coding_tests(title),
-            job:job_roles(title, company)
+            job:job_roles(title, recruiter_id)
           `).eq('id', record.id).single();
-        if (testDetails?.test?.title && testDetails?.job?.title) {
-          enhancedMessage = `You've been assigned the coding test "${testDetails.test.title}" for the position "${testDetails.job.title}"`;
-          if (testDetails.job.company) {
-            enhancedMessage += ` at ${testDetails.job.company}`;
+        if (testDetails?.job?.recruiter_id) {
+          // Get recruiter details
+          const { data: recruiter } = await supabase.from('users').select('name, email').eq('id', testDetails.job.recruiter_id).single();
+          const recruiterName = recruiter?.name || recruiter?.email?.split('@')[0] || 'A recruiter';
+          enhancedMessage = `You've been assigned a coding test by ${recruiterName}`;
+          if (testDetails?.test?.title) {
+            enhancedMessage += ` - "${testDetails.test.title}"`;
+          }
+          if (testDetails?.job?.title) {
+            enhancedMessage += ` for the position "${testDetails.job.title}"`;
           }
           enhancedMessage += '.';
         }
         actionText = 'Start Test';
       } else if (notificationType === 'test_completion') {
-        // Get developer details for completion notifications
+        // Get developer and test details for completion notifications
         const { data: developer } = await supabase.from('users').select('name, email').eq('id', record.developer_id).single();
         const developerName = developer?.name || developer?.email?.split('@')[0] || 'A developer';
-        enhancedMessage = `${developerName} has completed a coding test you assigned.`;
+        // Get test and job details for more context
+        const { data: testDetails } = await supabase.from('test_assignments').select(`
+            *,
+            test:coding_tests(title),
+            job:job_roles(title)
+          `).eq('id', record.id).single();
+        enhancedMessage = `${developerName} has completed`;
+        if (testDetails?.test?.title) {
+          enhancedMessage += ` the coding test "${testDetails.test.title}"`;
+        } else {
+          enhancedMessage += ' a coding test';
+        }
+        if (testDetails?.job?.title) {
+          enhancedMessage += ` for the position "${testDetails.job.title}"`;
+        } else {
+          enhancedMessage += ' you assigned';
+        }
+        enhancedMessage += '.';
         actionText = 'View Results';
       } else if (notificationType === 'job_application') {
-        // Get developer and job details for application notifications
+        // Get developer and job details for application notifications with developer name
         const { data: applicant } = await supabase.from('users').select('name, email').eq('id', record.developer_id).single();
-        const { data: jobDetails } = await supabase.from('job_roles').select('title, company').eq('id', record.job_id).single();
+        const { data: jobDetails } = await supabase.from('job_roles').select('title').eq('id', record.job_id).single();
         const applicantName = applicant?.name || applicant?.email?.split('@')[0] || 'A developer';
+        enhancedMessage = `${applicantName} has applied`;
         if (jobDetails?.title) {
-          enhancedMessage = `${applicantName} has applied for your "${jobDetails.title}" position`;
-          if (jobDetails.company) {
-            enhancedMessage += ` at ${jobDetails.company}`;
-          }
-          enhancedMessage += '.';
+          enhancedMessage += ` for your "${jobDetails.title}" position`;
+        } else {
+          enhancedMessage += ' for one of your job positions';
         }
+        enhancedMessage += '.';
         actionText = 'View Application';
       }
       const emailSubject = title || 'Notification';
