@@ -257,32 +257,16 @@ export default defineConfig({
     };
   }, [starterCode, testCode, codeFile, testFile]);
 
-  // Check if tests passed - same logic as before
-  const testsPassed = useMemo(() => {
-    if (!lastParsed?.tests) return false;
-    const { total, failed, passed } = lastParsed.tests;
-    
-    if (total && total > 0) {
-      if (typeof failed === 'number') {
-        return failed === 0;
-      } else if (typeof passed === 'number') {
-        return passed === total;
-      }
-      return true;
-    }
-    return false;
-  }, [lastParsed]);
-
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
-    setCanSubmit(true);  // Always set to true when tests complete
+    setCanSubmit(true);
     setIsRunning(false);
   };
 
-  // ORIGINAL working button logic - keeping this exactly the same
+  // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -485,7 +469,7 @@ export default defineConfig({
 
   return (
     <>
-      {/* UPDATED: Modified action bar logic to show run button again for failed tests */}
+      {/* Action bar with run/rerun and submit buttons */}
       <div 
         style={{
           padding: '16px',
@@ -501,34 +485,10 @@ export default defineConfig({
           <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
             ✅ Submitted! Advancing to next question...
           </p>
-        ) : canSubmit && testsPassed ? (
-          // Tests passed - show submit button
+        ) : canSubmit ? (
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-              ✅ All tests passed!
-            </p>
-            <button
-              onClick={handleSubmit}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              Submit Results
-            </button>
-          </>
-        ) : canSubmit && !testsPassed ? (
-          // Tests failed - show failure message and rerun button
-          <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
-              ❌ {lastParsed?.tests?.failed || 0} of {lastParsed?.tests?.total || 0} tests failed. Fix your code and try again.
+              ✅ Tests completed!
             </p>
             <button
               onClick={handleRunTests}
@@ -558,15 +518,30 @@ export default defineConfig({
                     borderRadius: '50%',
                     animation: 'spin 1s linear infinite'
                   }} />
-                  Running Tests...
+                  Rerunning Tests...
                 </>
               ) : (
-                '🔄 Run Tests Again'
+                '🔄 Rerun Tests'
               )}
+            </button>
+            <button
+              onClick={handleSubmit}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              Submit Results
             </button>
           </>
         ) : (
-          // Initial state or running - show run button
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
               Write your code, then run tests to see results
