@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -131,6 +131,9 @@ const TestsAndConsole: React.FC<{
       observerRef.current = null;
     }
 
+    // Reset last processed text when setting up new observer
+    lastProcessedText.current = '';
+
     const observe = () => {
       const obs = new MutationObserver(() => {
         const text = root.textContent || '';
@@ -143,8 +146,6 @@ const TestsAndConsole: React.FC<{
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
           lastProcessedText.current = text; // Prevent duplicate processing
           onTestsComplete(text, parsed);
-          
-          // Don't disconnect immediately - let the component handle cleanup
         }
       });
       
@@ -164,11 +165,6 @@ const TestsAndConsole: React.FC<{
         observerRef.current = null;
       }
     };
-  }, [onTestsComplete]);
-
-  // Reset last processed text when onTestsComplete changes (new test run)
-  useEffect(() => {
-    lastProcessedText.current = '';
   }, [onTestsComplete]);
 
   return (
@@ -271,8 +267,8 @@ export default defineConfig({
     };
   }, [starterCode, testCode, codeFile, testFile]);
 
-  // Handle test completion from the observer
-  const handleTestsComplete = (rawText: string, parsed: any) => {
+  // Handle test completion from the observer - use useCallback to prevent unnecessary re-renders
+  const handleTestsComplete = useCallback((rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
@@ -284,7 +280,7 @@ export default defineConfig({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-  };
+  }, []);
 
   // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
@@ -393,9 +389,7 @@ export default defineConfig({
         // Set a timeout to reset running state if tests don't complete
         timeoutRef.current = setTimeout(() => {
           console.log('[SandpackTest] Tests timeout - resetting state');
-          if (isRunning) {
-            setIsRunning(false);
-          }
+          setIsRunning(false);
         }, 15000); // 15 second timeout
         
       } else {
