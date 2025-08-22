@@ -354,67 +354,90 @@ export default defineConfig({
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // More specific selectors that avoid file tabs
-        const selectors = [
-          // Standard Sandpack test runner selectors (most specific first)
-          '.sp-tests button:not([disabled]):not(.sp-tab-button)',
-          '[data-sp-tests] button:not([disabled]):not(.sp-tab-button)',
-          '.sp-test-runner button:not([disabled]):not(.sp-tab-button)',
-          
-          // Look for buttons with "Run" in the text content specifically
-          'button:not([disabled]):not(.sp-tab-button)',  // We'll filter by text content below
-        ];
+        // Debug: log all available buttons first
+        if (attempts === 1) {
+          const allButtons = document.querySelectorAll('button');
+          console.log('[SandpackTest] All buttons on page:');
+          allButtons.forEach((btn, index) => {
+            const text = (btn.textContent || '').trim();
+            const title = btn.title || '';
+            const ariaLabel = btn.getAttribute('aria-label') || '';
+            const classes = btn.className || '';
+            console.log(`  ${index}: text="${text}" title="${title}" aria-label="${ariaLabel}" class="${classes}" disabled=${btn.disabled}`);
+          });
+        }
         
-        for (const selector of selectors) {
-          try {
-            const buttons = document.querySelectorAll(selector);
-            for (const btn of buttons) {
-              if (btn instanceof HTMLButtonElement && !btn.disabled) {
-                // Make sure it's actually visible and clickable
-                const rect = btn.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                  const buttonText = (btn.textContent || '').toLowerCase();
-                  const buttonTitle = (btn.title || '').toLowerCase();
-                  const buttonAriaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-                  
-                  // Skip file tabs and other non-test buttons
-                  if (btn.classList.contains('sp-tab-button')) {
-                    continue;
-                  }
-                  
-                  // Look for actual test run buttons
-                  if (
-                    buttonText.includes('run') ||
-                    buttonTitle.includes('run') ||
-                    buttonAriaLabel.includes('run') ||
-                    buttonText.includes('test') ||
-                    buttonTitle.includes('run test') ||
-                    buttonAriaLabel.includes('test')
-                  ) {
-                    // Make sure it's not a file tab
-                    if (!buttonTitle.includes('.test.') && !buttonTitle.includes('.spec.')) {
+        // Look specifically for the Tests button in the right panel
+        const testsPanel = testsRootRef.current;
+        if (testsPanel) {
+          // First try to find buttons within the tests panel specifically
+          const panelButtons = testsPanel.querySelectorAll('button:not([disabled])');
+          console.log(`[SandpackTest] Found ${panelButtons.length} buttons in tests panel`);
+          
+          for (const btn of panelButtons) {
+            if (btn instanceof HTMLButtonElement && !btn.disabled) {
+              const text = (btn.textContent || '').toLowerCase().trim();
+              const title = (btn.title || '').toLowerCase();
+              const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+              
+              console.log(`[SandpackTest] Checking panel button: text="${text}" title="${title}" aria-label="${ariaLabel}"`);
+              
+              // Look for buttons that specifically relate to running tests
+              if (
+                text === 'run' ||
+                text === 'tests' ||
+                text.includes('run tests') ||
+                title.includes('run tests') ||
+                ariaLabel.includes('run tests') ||
+                (text.includes('run') && (btn.closest('.sp-tests') || btn.closest('[data-sp-tests]')))
+              ) {
+                testButton = btn;
+                console.log('[SandpackTest] Found test button in panel:', btn);
+                break;
+              }
+            }
+          }
+        }
+        
+        // If no button found in panel, try global search but be more selective
+        if (!testButton) {
+          const selectors = [
+            // Look specifically for test-related buttons
+            '.sp-tests button:not([disabled]):not(.sp-tab-button)',
+            '[data-sp-tests] button:not([disabled]):not(.sp-tab-button)',
+          ];
+          
+          for (const selector of selectors) {
+            try {
+              const buttons = document.querySelectorAll(selector);
+              for (const btn of buttons) {
+                if (btn instanceof HTMLButtonElement && !btn.disabled) {
+                  const rect = btn.getBoundingClientRect();
+                  if (rect.width > 0 && rect.height > 0) {
+                    const buttonText = (btn.textContent || '').toLowerCase().trim();
+                    console.log(`[SandpackTest] Checking selector button: "${buttonText}"`);
+                    
+                    // Be very specific about what constitutes a test button
+                    if (
+                      buttonText === 'run' ||
+                      buttonText === 'tests' ||
+                      buttonText.includes('run tests')
+                    ) {
                       testButton = btn;
-                      console.log('[SandpackTest] Found test button with selector:', selector, 'button:', btn, 'text:', buttonText, 'title:', buttonTitle);
+                      console.log('[SandpackTest] Found test button with selector:', selector, btn);
                       break;
                     }
                   }
                 }
               }
+              if (testButton) break;
+            } catch (e) {
+              console.warn('[SandpackTest] Invalid selector:', selector, e);
             }
-            if (testButton) break;
-          } catch (e) {
-            console.warn('[SandpackTest] Invalid selector:', selector, e);
           }
         }
         
         if (!testButton) {
-          // Debug: log all available buttons to see what we're missing
-          const allButtons = document.querySelectorAll('button');
-          console.log('[SandpackTest] All buttons on page:');
-          allButtons.forEach((btn, index) => {
-            console.log(`  ${index}: "${btn.textContent}" class="${btn.className}" title="${btn.title}" disabled=${btn.disabled}`);
-          });
-          
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
