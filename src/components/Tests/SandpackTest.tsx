@@ -73,26 +73,16 @@ const getSetup = (framework: Framework) => {
 
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
-
+  
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
-
+  
   if (!ran) {
     console.log('[SandpackTest] No test indicators found in output');
     return { ran: false, suites: undefined, tests: undefined };
   }
 
-  const suitesLine =
-    text.match(/Test suites?:([^\n]+)/i)?.[1] ??
-    text.match(/Test files?:([^\n]+)/i)?.[1] ??
-    '';
+  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
-
-  console.log(
-    '[SandpackTest] Extracted lines - suites:',
-    suitesLine,
-    'tests:',
-    testsLine
-  );
 
   const num = (re: RegExp, s: string) => {
     const m = s.match(re);
@@ -116,7 +106,6 @@ function parseSummary(text: string) {
     : undefined;
 
   const result = { ran, suites, tests };
-  console.log('[SandpackTest] Parsed result:', result);
   return result;
 }
 
@@ -130,53 +119,40 @@ const TestsAndConsole: React.FC<{
     const root = testsRootRef.current;
     if (!root) return;
 
-    console.log('[SandpackTest] Setting up test completion observer');
-
     observerRef.current?.disconnect();
 
-    const observe = () => {
-      const obs = new MutationObserver(() => {
-        const text = root.textContent || '';
-        if (!text) return;
-        const parsed = parseSummary(text);
-        if (parsed.ran) {
-          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
-          onTestsComplete(text, parsed);
-          obs.disconnect();
-          observerRef.current = null;
-        }
-      });
-      obs.observe(root, { childList: true, subtree: true, characterData: true });
-      observerRef.current = obs;
-    };
+    const obs = new MutationObserver(() => {
+      const text = root.textContent || '';
+      if (!text) return;
 
-    observe();
+      const parsed = parseSummary(text);
+      if (parsed.ran) {
+        onTestsComplete(text, parsed);
+        obs.disconnect();
+        observerRef.current = null;
+      }
+    });
+
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
+    observerRef.current = obs;
 
     return () => {
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, testsRootRef]);
 
   return (
-    <div
-      style={{
-        width: '50%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: '1px solid #e5e7eb',
-      }}
-    >
+    <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests
-          style={{ height: '100%' }}
-          watchMode={false}
-          showWatchButton={false}
+        <SandpackTests 
+          style={{ height: '100%' }} 
+          watchMode={false} 
+          showWatchButton={false} 
           showVerboseButton={false}
           hideTestsAndSupressLogs={false}
         />
       </div>
-
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
         <SandpackConsole
           maxMessageCount={200}
@@ -184,8 +160,7 @@ const TestsAndConsole: React.FC<{
           standalone
           style={{
             height: '100%',
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
           }}
         />
@@ -214,16 +189,14 @@ const SandpackTestInner: React.FC<
     template,
     codeFile,
     testFile,
+    deps,
   } = props;
 
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
-  const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(
-    null
-  );
-  const [canRerun, setCanRerun] = useState(false);
+  const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -237,27 +210,15 @@ const SandpackTestInner: React.FC<
         code: `
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./setupTests.ts'],
-  },
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
 });
         `.trim(),
         hidden: true,
       },
-      '/setupTests.ts': {
-        code: `import '@testing-library/jest-dom';`,
-        hidden: true,
-      },
+      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
       '/package.json': {
         code: JSON.stringify(
-          {
-            name: 'sandpack-tests',
-            version: '1.0.0',
-            private: true,
-            scripts: { test: 'vitest run --reporter=basic' },
-          },
+          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
           null,
           2
         ),
@@ -267,31 +228,28 @@ export default defineConfig({
   }, [starterCode, testCode, codeFile, testFile]);
 
   const handleTestsComplete = (rawText: string, parsed: any) => {
-    console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
-
-    if (parsed.tests?.failed) {
-      setCanRerun(true);
-    } else {
-      setCanRerun(false);
-    }
   };
 
   const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
 
-    // Run the original working method
     try {
-      await sandpack.runSandpack();
-    } catch (error) {
-      console.error('[SandpackTest] Error running tests:', error);
+      await sandpack.runSandpack(); // compile
+
+      // let tests run via observer
+      setTimeout(() => {
+        if (!canSubmit) setIsRunning(false);
+      }, 15000);
+    } catch (err) {
+      console.error(err);
+      setIsRunning(false);
     }
   };
 
@@ -346,7 +304,7 @@ export default defineConfig({
 
   return (
     <>
-      <div
+      <div 
         style={{
           padding: '16px',
           backgroundColor: '#f8fafc',
@@ -354,35 +312,18 @@ export default defineConfig({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px',
+          gap: '16px'
         }}
       >
         {submitted ? (
-          <p style={{ margin: 0, fontSize: 14, color: '#10b981', fontWeight: 600 }}>
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
             ✅ Submitted! Advancing to next question...
           </p>
         ) : canSubmit ? (
           <>
-            <p style={{ margin: 0, fontSize: 14, color: '#059669', fontWeight: 500 }}>
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
               ✅ Tests completed!
             </p>
-            {canRerun && (
-              <button
-                onClick={handleRunTests}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                }}
-              >
-                🔄 Rerun Tests
-              </button>
-            )}
             <button
               onClick={handleSubmit}
               style={{
@@ -390,34 +331,66 @@ export default defineConfig({
                 backgroundColor: '#10b981',
                 color: 'white',
                 border: 'none',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 14,
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
                 cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
               }}
             >
               Submit Results
             </button>
           </>
         ) : (
-          <button
-            onClick={handleRunTests}
-            disabled={isRunning}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: isRunning ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isRunning ? 'Running Tests...' : '▶️ Run Tests'}
-          </button>
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+              Write your code, then run tests to see results
+            </p>
+            <button
+              onClick={handleRunTests}
+              disabled={isRunning}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isRunning ? (
+                <>
+                  <div style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #ffffff40',
+                    borderTop: '2px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Running Tests...
+                </>
+              ) : (
+                '▶️ Run Tests'
+              )}
+            </button>
+          </>
         )}
       </div>
+
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
 
       <div className="gt-sp">
         <SandpackLayout>
@@ -431,12 +404,38 @@ export default defineConfig({
 
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
+
+  if (!props.testCode) {
+    return <div>This Sandpack question is missing its test code.</div>;
+  }
+
+  const files = useMemo<SandpackFiles>(() => {
+    return {
+      [codeFile]: { code: props.starterCode ?? '', active: true },
+      [testFile]: { code: props.testCode ?? '', hidden: false },
+      '/vitest.config.ts': {
+        code: `
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
+});
+        `.trim(),
+        hidden: true,
+      },
+      '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
+      '/package.json': {
+        code: JSON.stringify(
+          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
+          null,
+          2
+        ),
+        hidden: true,
+      },
+    };
+  }, [props.starterCode, props.testCode, codeFile, testFile]);
+
   return (
-    <SandpackProvider
-      template={template}
-      customSetup={{ files: {}, dependencies: deps }}
-      options={{ autorun: false }}
-    >
+    <SandpackProvider template={template} customSetup={{ files, dependencies: deps }} options={{ autorun: false }}>
       <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
     </SandpackProvider>
   );
