@@ -115,16 +115,22 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-}> = ({ testsRootRef, onTestsComplete }) => {
+  isRunning: boolean;
+}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
   const observerRef = useRef<MutationObserver | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const root = testsRootRef.current;
-    if (!root) return;
+    if (!root || !isRunning) return;
 
     console.log('[SandpackTest] Setting up test completion observer');
 
+    // Clear any existing observer and timeout
     observerRef.current?.disconnect();
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
 
     const observe = () => {
       const obs = new MutationObserver(() => {
@@ -134,11 +140,18 @@ const TestsAndConsole: React.FC<{
         
         const parsed = parseSummary(text);
         
-        if (parsed.ran) {
-          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
+        // Check for test completion OR compilation errors
+        const hasError = text.includes('Error') || text.includes('SyntaxError') || text.includes('TypeError');
+        
+        if (parsed.ran || hasError) {
+          console.log('[SandpackTest] Tests completed or error detected, calling onTestsComplete');
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
         }
       });
       
@@ -148,6 +161,16 @@ const TestsAndConsole: React.FC<{
         characterData: true
       });
       observerRef.current = obs;
+
+      // Set a timeout to handle stuck tests
+      timeoutRef.current = setTimeout(() => {
+        console.log('[SandpackTest] Observer timeout - tests seem stuck');
+        const text = root.textContent || '';
+        onTestsComplete(text, { ran: false, error: true });
+        obs.disconnect();
+        observerRef.current = null;
+        timeoutRef.current = null;
+      }, 20000); // 20 second timeout
     };
 
     observe();
@@ -155,8 +178,12 @@ const TestsAndConsole: React.FC<{
     return () => {
       observerRef.current?.disconnect();
       observerRef.current = null;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, isRunning]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -167,7 +194,6 @@ const TestsAndConsole: React.FC<{
           watchMode={false} 
           showWatchButton={false} 
           showVerboseButton={false}
-          // Hide the run button since we'll have our own
           hideTestsAndSupressLogs={false}
         />
       </div>
@@ -270,7 +296,6 @@ export default defineConfig({
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
-    setHasTestResults(false);
     setLastRawText('');
     setLastParsed(null);
 
@@ -278,30 +303,25 @@ export default defineConfig({
       // First, ensure code is compiled/updated
       await sandpack.runSandpack();
       
-      // Wait a bit longer for Sandpack to fully initialize
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a bit for Sandpack to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       let testButton = null;
       let attempts = 0;
-      const maxAttempts = 10;
+      const maxAttempts = 8;
       
-      // Keep trying to find the test button for up to 5 seconds
+      // Keep trying to find the test button
       while (!testButton && attempts < maxAttempts) {
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // Method 1: More comprehensive selectors
+        // Look for test button
         const selectors = [
+          '.sp-tests button',
+          '[data-sp-tests] button',
           'button[title*="Run"]',
           'button[aria-label*="Run"]',
           'button[aria-label*="run"]',
-          'button[title*="run"]',
-          '[data-sp-tests] button',
-          '.sp-tests button',
-          '.sp-test button',
-          'button[data-testid*="run"]',
-          'button[class*="run"]',
-          'button[class*="test"]'
         ];
         
         for (const selector of selectors) {
@@ -309,13 +329,9 @@ export default defineConfig({
             const buttons = document.querySelectorAll(selector);
             for (const btn of buttons) {
               if (btn instanceof HTMLButtonElement && !btn.disabled) {
-                // Check if this button is in the test area
-                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-                if (parentClasses) {
-                  testButton = btn;
-                  console.log('[SandpackTest] Found test button with selector:', selector);
-                  break;
-                }
+                testButton = btn;
+                console.log('[SandpackTest] Found test button with selector:', selector);
+                break;
               }
             }
             if (testButton) break;
@@ -324,61 +340,28 @@ export default defineConfig({
           }
         }
         
-        // Method 2: Look for play button or run button by content and SVG
         if (!testButton) {
-          const allButtons = document.querySelectorAll('button');
-          for (const button of allButtons) {
-            // Check for play icon (triangle/arrow) or run text
-            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
-            const text = button.textContent?.toLowerCase() || '';
-            const title = button.title?.toLowerCase() || '';
-            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-            
-            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-            
-            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
-              testButton = button;
-              console.log('[SandpackTest] Found test button by content/icon');
-              break;
-            }
-          }
-        }
-        
-        if (!testButton) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
       if (testButton && testButton instanceof HTMLButtonElement) {
         console.log('[SandpackTest] Clicking test button programmatically');
-        
-        // Try multiple ways to trigger the button
-        testButton.focus();
         testButton.click();
-        
-        // Also try dispatching events
-        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        
-        // Set a timeout to reset running state if tests don't complete
-        setTimeout(() => {
-          console.log('[SandpackTest] Checking if tests completed...');
-          if (!hasTestResults) {
-            console.log('[SandpackTest] Tests seem stuck, resetting state');
-            setIsRunning(false);
-          }
-        }, 15000); // 15 second timeout
-        
       } else {
-        console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
+        console.log('[SandpackTest] Could not find test button, resetting state');
         setIsRunning(false);
+        setLastRawText('Could not find test button. Please try refreshing the page.');
+        setLastParsed({ ran: false, error: true });
+        setHasTestResults(true);
       }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
+      setLastRawText('Error running tests: ' + error);
+      setLastParsed({ ran: false, error: true });
+      setHasTestResults(true);
     }
   };
 
@@ -472,15 +455,26 @@ export default defineConfig({
       return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
     }
     if (hasTestResults && lastParsed) {
-      const tests = lastParsed.tests || {};
-      const total = tests.total || 0;
-      const passed = tests.passed || 0;
-      const failed = tests.failed || 0;
+      // Check for compilation or runtime errors
+      const hasError = lastRawText.includes('Error') || lastRawText.includes('SyntaxError') || lastRawText.includes('TypeError');
       
-      if (failed === 0 && passed > 0) {
-        return { text: `✅ All tests passed! (${passed}/${total})`, color: '#059669' };
+      if (hasError) {
+        return { text: '❌ Code has errors - fix them and try again', color: '#dc2626' };
+      }
+      
+      if (lastParsed.ran) {
+        const tests = lastParsed.tests || {};
+        const total = tests.total || 0;
+        const passed = tests.passed || 0;
+        const failed = tests.failed || 0;
+        
+        if (failed === 0 && passed > 0) {
+          return { text: `✅ All tests passed! (${passed}/${total})`, color: '#059669' };
+        } else {
+          return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
+        }
       } else {
-        return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
+        return { text: '❌ Tests could not run - check your code for errors', color: '#dc2626' };
       }
     }
     return { text: 'Write your code, then run tests to see results', color: '#64748b' };
@@ -543,7 +537,7 @@ export default defineConfig({
               )}
             </button>
             
-            {hasTestResults && lastParsed && (
+            {hasTestResults && lastParsed && !lastParsed.error && (
               <button
                 onClick={handleSubmit}
                 style={{
@@ -578,7 +572,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
         </SandpackLayout>
       </div>
     </>
