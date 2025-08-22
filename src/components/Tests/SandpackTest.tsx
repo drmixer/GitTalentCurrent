@@ -210,7 +210,7 @@ const SandpackTestInner: React.FC<
     testFile,
   } = props;
 
-  const [canSubmit, setCanSubmit] = useState(false);
+  const [hasTestResults, setHasTestResults] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
@@ -262,15 +262,15 @@ export default defineConfig({
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
-    setCanSubmit(true);
+    setHasTestResults(true);
     setIsRunning(false);
   };
 
-  // NEW: Single button that triggers both compile and test execution
+  // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
-    setCanSubmit(false);
+    setHasTestResults(false);
     setLastRawText('');
     setLastParsed(null);
 
@@ -365,7 +365,7 @@ export default defineConfig({
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit) {
+          if (!hasTestResults) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
@@ -467,9 +467,30 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
+  const getStatusMessage = () => {
+    if (submitted) {
+      return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
+    }
+    if (hasTestResults && lastParsed) {
+      const tests = lastParsed.tests || {};
+      const total = tests.total || 0;
+      const passed = tests.passed || 0;
+      const failed = tests.failed || 0;
+      
+      if (failed === 0 && passed > 0) {
+        return { text: `✅ All tests passed! (${passed}/${total})`, color: '#059669' };
+      } else {
+        return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
+      }
+    }
+    return { text: 'Write your code, then run tests to see results', color: '#64748b' };
+  };
+
+  const statusMessage = getStatusMessage();
+
   return (
     <>
-      {/* NEW: Single, clear action bar with one run button */}
+      {/* Updated action bar with both run and submit buttons when tests have results */}
       <div 
         style={{
           padding: '16px',
@@ -481,37 +502,12 @@ export default defineConfig({
           gap: '16px'
         }}
       >
-        {submitted ? (
-          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
-            ✅ Submitted! Advancing to next question...
-          </p>
-        ) : canSubmit ? (
-          <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-              ✅ Tests completed!
-            </p>
-            <button
-              onClick={handleSubmit}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              Submit Results
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-              Write your code, then run tests to see results
-            </p>
+        <p style={{ margin: 0, fontSize: '14px', color: statusMessage.color, fontWeight: '500' }}>
+          {statusMessage.text}
+        </p>
+        
+        {submitted ? null : (
+          <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={handleRunTests}
               disabled={isRunning}
@@ -543,10 +539,29 @@ export default defineConfig({
                   Running Tests...
                 </>
               ) : (
-                '▶️ Run Tests'
+                <>▶️ {hasTestResults ? 'Run Tests Again' : 'Run Tests'}</>
               )}
             </button>
-          </>
+            
+            {hasTestResults && lastParsed && (
+              <button
+                onClick={handleSubmit}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                }}
+              >
+                Submit Results
+              </button>
+            )}
+          </div>
         )}
       </div>
 
