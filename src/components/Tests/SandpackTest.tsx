@@ -338,19 +338,11 @@ export default defineConfig({
     setTestKey(prev => prev + 1); // Force re-render of test components
 
     try {
-      // First, ensure code is compiled/updated
-      console.log('[SandpackTest] Restarting sandpack...');
-      sandpack.restartSandpack();
+      // Log available sandpack methods for debugging
+      console.log('[SandpackTest] Available sandpack methods:', Object.keys(sandpack));
       
-      // Wait for restart to complete
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Now try to run tests using the sandpack API directly
-      console.log('[SandpackTest] Running sandpack...');
-      await sandpack.runSandpack();
-      
-      // Wait for the code to compile
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simple approach: Just wait a bit for components to render, then look for test button
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Try to find and click the test button with improved selectors
       let testButton = null;
