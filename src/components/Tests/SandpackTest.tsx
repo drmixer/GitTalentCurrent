@@ -323,36 +323,36 @@ export default defineConfig({
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // Method 1: Look for buttons in test areas with various selectors
+        // Method 1: Look specifically for test run buttons with strict criteria
         const testAreaSelectors = [
           '[data-sp-tests]',
           '.sp-tests',
-          '.sp-test',
-          '[class*="test"]',
-          '[class*="sp-"]'
+          '.sp-test'
         ];
         
         for (const areaSelector of testAreaSelectors) {
           const testArea = document.querySelector(areaSelector);
           if (testArea) {
-            // Look for any button in the test area
+            // Look for buttons in the test area
             const buttons = testArea.querySelectorAll('button');
             for (const btn of buttons) {
               if (btn instanceof HTMLButtonElement && !btn.disabled && btn.offsetParent !== null) {
-                // Check if button looks like a run/play button
                 const text = btn.textContent?.toLowerCase() || '';
                 const title = btn.title?.toLowerCase() || '';
                 const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
-                const hasPlayIcon = btn.querySelector('svg, [class*="play"], [class*="triangle"]');
+                const hasPlayIcon = btn.querySelector('svg path, svg polygon, svg [class*="play"]');
                 
-                const isRunButton = text.includes('run') || title.includes('run') || 
-                                  ariaLabel.includes('run') || hasPlayIcon || 
-                                  text.includes('test') || title.includes('test') || 
-                                  ariaLabel.includes('test');
+                // Be very specific about what constitutes a run button
+                // Exclude file tabs and other UI buttons
+                const isFileTab = text.includes('.tsx') || text.includes('.ts') || text.includes('.js') || text.includes('.vue');
+                const isRunButton = (
+                  (text.includes('run') || title.includes('run') || ariaLabel.includes('run')) ||
+                  (hasPlayIcon && !isFileTab)
+                ) && !isFileTab;
                 
                 if (isRunButton) {
                   testButton = btn;
-                  console.log('[SandpackTest] Found test button in area:', areaSelector, 'Button text:', text);
+                  console.log('[SandpackTest] Found test button in area:', areaSelector, 'Button text:', text, 'Title:', title, 'AriaLabel:', ariaLabel);
                   break;
                 }
               }
@@ -361,7 +361,7 @@ export default defineConfig({
           }
         }
         
-        // Method 2: Broader search if we haven't found it yet
+        // Method 2: Broader search with stricter filtering
         if (!testButton) {
           const allButtons = document.querySelectorAll('button');
           for (const button of allButtons) {
@@ -370,17 +370,21 @@ export default defineConfig({
               const title = button.title?.toLowerCase() || '';
               const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
               
-              // Look for buttons with run/test/play indicators
-              const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-              const hasTestText = text.includes('test') || title.includes('test') || ariaLabel.includes('test');
-              const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"]');
+              // Exclude file tabs and navigation buttons
+              const isFileTab = text.includes('.tsx') || text.includes('.ts') || text.includes('.js') || text.includes('.vue') || text.includes('.html');
+              const isNavigationButton = text.includes('tab') || text.includes('file') || button.closest('[role="tablist"]');
               
-              // Check if it's in a sandpack-related container
+              // Look for explicit run/test buttons
+              const hasRunText = text.includes('run') && !isFileTab;
+              const hasTestText = text.includes('test') && !text.includes('.test') && !isFileTab;
+              const hasPlayIcon = button.querySelector('svg path[d*="M"], svg polygon') && !isFileTab;
+              
+              // Must be in a sandpack area
               const inSandpackArea = button.closest('[class*="sp-"], [class*="sandpack"], [data-sp-tests], .gt-sp');
               
-              if ((hasRunText || hasTestText || hasPlayIcon) && inSandpackArea) {
+              if ((hasRunText || hasTestText || hasPlayIcon) && inSandpackArea && !isNavigationButton && !isFileTab) {
                 testButton = button;
-                console.log('[SandpackTest] Found test button via broad search. Text:', text, 'In area:', inSandpackArea?.className);
+                console.log('[SandpackTest] Found test button via broad search. Text:', text, 'Title:', title, 'AriaLabel:', ariaLabel);
                 break;
               }
             }
