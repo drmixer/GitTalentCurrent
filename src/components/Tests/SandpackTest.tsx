@@ -132,112 +132,53 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  isRunning: boolean;
-  testKey: number;
-}> = ({ testsRootRef, onTestsComplete, isRunning, testKey }) => {
+}> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const root = testsRootRef.current;
-    if (!root || !isRunning) {
-      // Clean up if not running
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      return;
-    }
+    if (!root) return;
 
-    console.log('[SandpackTest] Setting up test completion observer with key:', testKey);
+    console.log('[SandpackTest] Setting up test completion observer');
 
-    // Clear any existing observer and timeout
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    let hasCompleted = false;
+    observerRef.current?.disconnect();
 
     const observe = () => {
       const obs = new MutationObserver(() => {
-        if (hasCompleted) return;
-        
         const text = root.textContent || '';
         
         if (!text) return;
         
-        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 200));
-        
         const parsed = parseSummary(text);
         
-        // Check for test completion, compilation errors, or test results
-        const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(text);
-        const hasCompileSuccess = /compiled successfully|Compiled successfully/i.test(text);
-        const hasTestOutput = /PASS|FAIL|✓|✗|passed|failed|Test.*:|expect/i.test(text);
-        
-        // Consider completion if we have meaningful test output
-        if (parsed.ran || hasTestOutput || (hasError && text.length > 50)) {
-          hasCompleted = true;
-          console.log('[SandpackTest] Tests completed - parsed:', parsed, 'hasTestOutput:', hasTestOutput, 'hasError:', hasError);
+        if (parsed.ran) {
+          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-        } else if (hasCompileSuccess && !parsed.ran) {
-          console.log('[SandpackTest] Code compiled successfully, continuing to wait for tests...');
         }
       });
       
       obs.observe(root, { 
         childList: true, 
         subtree: true, 
-        characterData: true,
-        attributes: true
+        characterData: true
       });
       observerRef.current = obs;
-
-      // Set a timeout to handle stuck tests
-      timeoutRef.current = setTimeout(() => {
-        if (hasCompleted) return;
-        console.log('[SandpackTest] Observer timeout - tests seem stuck');
-        hasCompleted = true;
-        const text = root.textContent || '';
-        onTestsComplete(text, { ran: false, error: true });
-        obs.disconnect();
-        observerRef.current = null;
-        timeoutRef.current = null;
-      }, 25000); // 25 second timeout
     };
 
     observe();
 
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      observerRef.current?.disconnect();
+      observerRef.current = null;
     };
-  }, [onTestsComplete, isRunning, testKey]);
+  }, [onTestsComplete]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
         <SandpackTests 
-          key={`tests-${testKey}`}
           style={{ height: '100%' }} 
           watchMode={false} 
           showWatchButton={false} 
@@ -248,7 +189,6 @@ const TestsAndConsole: React.FC<{
 
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
         <SandpackConsole
-          key={`console-${testKey}`}
           maxMessageCount={200}
           showHeader
           standalone
@@ -285,12 +225,11 @@ const SandpackTestInner: React.FC<
     testFile,
   } = props;
 
-  const [hasTestResults, setHasTestResults] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any; error?: boolean } | null>(null);
-  const [testKey, setTestKey] = useState(0);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -338,171 +277,126 @@ export default defineConfig({
 
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
-    console.log('[SandpackTest] Tests completed with results:', parsed, 'rawText length:', rawText.length);
+    console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
-    setHasTestResults(true);
+    setCanSubmit(true);
     setIsRunning(false);
   };
 
-  // New approach: Use sandpack client directly to execute tests
+  // Simple, working test runner based on the original working version
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
-    
-    // Reset all previous state for fresh run
+    setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
-    setHasTestResults(false);
-    setTestKey(prev => prev + 1);
 
     try {
-      console.log('[SandpackTest] Available sandpack methods:', Object.getOwnPropertyNames(sandpack));
-      console.log('[SandpackTest] Sandpack clients:', sandpack.clients);
-      console.log('[SandpackTest] Sandpack status:', sandpack.sandpack.status);
-
-      // Method 1: Try to run the sandbox first to ensure everything is compiled
-      if (sandpack.runSandpack) {
-        console.log('[SandpackTest] Running sandbox...');
-        await sandpack.runSandpack();
-        
-        // Wait for compilation to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-
-      // Method 2: Try to access the sandpack client directly
-      const clients = sandpack.clients;
-      console.log('[SandpackTest] Available clients:', Object.keys(clients));
+      // First, ensure code is compiled/updated
+      await sandpack.runSandpack();
       
-      for (const [clientId, client] of Object.entries(clients)) {
-        console.log(`[SandpackTest] Client ${clientId}:`, client);
+      // Wait a bit longer for Sandpack to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      let testButton = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      // Keep trying to find the test button for up to 5 seconds
+      while (!testButton && attempts < maxAttempts) {
+        attempts++;
+        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        if (client && typeof client.dispatch === 'function') {
-          console.log(`[SandpackTest] Trying to run tests via client ${clientId}...`);
-          
-          // Try various command approaches
-          try {
-            // Approach 1: Direct test command
-            await client.dispatch({
-              type: 'shell',
-              command: 'npm test'
-            });
-            
-            console.log('[SandpackTest] Dispatched npm test command');
-            
-            // Wait and try another approach
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Approach 2: Try vitest directly
-            await client.dispatch({
-              type: 'shell',
-              command: 'npx vitest run'
-            });
-            
-            console.log('[SandpackTest] Dispatched vitest run command');
-            
-          } catch (dispatchError) {
-            console.log(`[SandpackTest] Client ${clientId} dispatch error:`, dispatchError);
-          }
-        }
-      }
-
-      // Method 3: Try the original dispatch approach with different commands
-      if (sandpack.dispatch) {
-        console.log('[SandpackTest] Trying sandpack.dispatch approaches...');
-        
-        const commands = [
-          { type: 'run-tests' },
-          { type: 'test' },
-          { type: 'shell', command: 'npm test' },
-          { type: 'shell', command: 'npm run test' },
-          { type: 'shell', command: 'npx vitest run' },
-          { type: 'command', command: 'test' },
+        // Method 1: More comprehensive selectors
+        const selectors = [
+          'button[title*="Run"]',
+          'button[aria-label*="Run"]',
+          'button[aria-label*="run"]',
+          'button[title*="run"]',
+          '[data-sp-tests] button',
+          '.sp-tests button',
+          '.sp-test button',
+          'button[data-testid*="run"]',
+          'button[class*="run"]',
+          'button[class*="test"]'
         ];
         
-        for (const command of commands) {
+        for (const selector of selectors) {
           try {
-            console.log('[SandpackTest] Trying dispatch command:', command);
-            sandpack.dispatch(command);
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (error) {
-            console.log('[SandpackTest] Command failed:', command, error);
+            const buttons = document.querySelectorAll(selector);
+            for (const btn of buttons) {
+              if (btn instanceof HTMLButtonElement && !btn.disabled) {
+                // Check if this button is in the test area
+                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+                if (parentClasses) {
+                  testButton = btn;
+                  console.log('[SandpackTest] Found test button with selector:', selector);
+                  break;
+                }
+              }
+            }
+            if (testButton) break;
+          } catch (e) {
+            // Invalid selector, continue
           }
         }
-      }
-
-      // Method 4: Try to trigger tests by updating files
-      console.log('[SandpackTest] Trying file-based trigger...');
-      if (sandpack.updateFile) {
-        try {
-          // Force a small update to the test file to trigger re-run
-          const currentTestCode = sandpack.sandpack.files[testFile]?.code || testCode;
-          sandpack.updateFile(testFile, currentTestCode + '\n// trigger');
-          
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Restore original content
-          sandpack.updateFile(testFile, currentTestCode || '');
-          
-          console.log('[SandpackTest] Triggered via file update');
-        } catch (error) {
-          console.log('[SandpackTest] File update trigger failed:', error);
-        }
-      }
-
-      // Method 5: Look for and simulate clicks on any hidden test buttons
-      console.log('[SandpackTest] Looking for hidden test execution mechanisms...');
-      
-      // Wait a bit longer for everything to settle
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Try to find test buttons with more aggressive selectors
-      const possibleSelectors = [
-        '.sp-tests button',
-        '[data-sp-tests] button',
-        '.sp-test-runner button',
-        'button[data-testid*="test"]',
-        'button[aria-label*="test"]',
-        'button[title*="test"]',
-        '.sp-c-tests button',
-        '.sandpack-tests button',
-      ];
-      
-      for (const selector of possibleSelectors) {
-        try {
-          const buttons = document.querySelectorAll(selector);
-          console.log(`[SandpackTest] Found ${buttons.length} buttons with selector: ${selector}`);
-          
-          for (const button of buttons) {
-            if (button instanceof HTMLElement && !button.classList.contains('sp-tab-button')) {
-              console.log(`[SandpackTest] Trying to click button:`, button.textContent, button.className);
-              button.click();
-              
-              // Also try focus and dispatch events
-              button.focus();
-              button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-              button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-              button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              
-              await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Method 2: Look for play button or run button by content and SVG
+        if (!testButton) {
+          const allButtons = document.querySelectorAll('button');
+          for (const button of allButtons) {
+            // Check for play icon (triangle/arrow) or run text
+            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
+            const text = button.textContent?.toLowerCase() || '';
+            const title = button.title?.toLowerCase() || '';
+            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+            
+            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+            
+            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
+              testButton = button;
+              console.log('[SandpackTest] Found test button by content/icon');
+              break;
             }
           }
-        } catch (error) {
-          console.log(`[SandpackTest] Selector ${selector} failed:`, error);
+        }
+        
+        if (!testButton) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
-
-      // Give everything some time to execute
-      console.log('[SandpackTest] Waiting for test execution to complete...');
       
-      // If nothing happens after reasonable time, we'll be caught by the observer timeout
+      if (testButton && testButton instanceof HTMLButtonElement) {
+        console.log('[SandpackTest] Clicking test button programmatically');
+        
+        // Try multiple ways to trigger the button
+        testButton.focus();
+        testButton.click();
+        
+        // Also try dispatching events
+        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        
+        // Set a timeout to reset running state if tests don't complete
+        setTimeout(() => {
+          console.log('[SandpackTest] Checking if tests completed...');
+          if (!canSubmit) {
+            console.log('[SandpackTest] Tests seem stuck, resetting state');
+            setIsRunning(false);
+          }
+        }, 15000); // 15 second timeout
+        
+      } else {
+        console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
+        setIsRunning(false);
+      }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
-      setLastRawText('Error running tests: ' + String(error));
-      setLastParsed({ ran: false, error: true });
-      setHasTestResults(true);
     }
   };
 
@@ -595,7 +489,7 @@ export default defineConfig({
     if (submitted) {
       return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
     }
-    if (hasTestResults && lastParsed) {
+    if (canSubmit && lastParsed) {
       const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(lastRawText);
       
       if (hasError && !lastParsed.ran) {
@@ -613,8 +507,6 @@ export default defineConfig({
         } else {
           return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
         }
-      } else if (lastParsed.error) {
-        return { text: '❌ Tests could not run - check your code for errors', color: '#dc2626' };
       }
     }
     if (isRunning) {
@@ -675,11 +567,11 @@ export default defineConfig({
                   Running Tests...
                 </>
               ) : (
-                <>▶️ {hasTestResults ? 'Run Tests Again' : 'Run Tests'}</>
+                <>▶️ {canSubmit ? 'Run Tests Again' : 'Run Tests'}</>
               )}
             </button>
             
-            {hasTestResults && lastParsed && !lastParsed.error && lastParsed.ran && (
+            {canSubmit && lastParsed && lastParsed.ran && (
               <button
                 onClick={handleSubmit}
                 style={{
@@ -713,12 +605,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole 
-            testsRootRef={testsRootRef} 
-            onTestsComplete={handleTestsComplete} 
-            isRunning={isRunning}
-            testKey={testKey}
-          />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
         </SandpackLayout>
       </div>
     </>
