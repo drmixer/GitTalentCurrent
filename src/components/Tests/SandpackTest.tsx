@@ -37,7 +37,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
-    // Redacted other frameworks for brevity, they remain the same
+    // Redacted other frameworks for brevity
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
@@ -66,7 +66,6 @@ function parseSummary(text: string) {
 // All logic is now consolidated into this single inner component.
 const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
   const { assignmentId, questionId, isLastQuestion, onNext, onComplete, testCode } = props;
-  const { sandpack } = useSandpack();
   const [isRunning, setIsRunning] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -100,7 +99,7 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
       const parsed = parseSummary(text);
       if (parsed.ran) {
         handleTestsComplete(text, parsed);
-        observer.disconnect(); // Disconnect after completion
+        observer.disconnect();
       }
     });
 
@@ -119,19 +118,19 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
     setLastParsed(null);
     
     try {
-      // This command resets the Sandpack client, ensuring a clean state for every run.
-      await sandpack.runSandpack();
-      // Wait for the environment to be ready.
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      // Give the UI a moment to enter the "running" state
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       let testButton: HTMLButtonElement | null = null;
       let attempts = 0;
-      while (!testButton && attempts < 10) {
+      while (!testButton && attempts < 20) { // Increased attempts for reliability
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
-        testButton = document.querySelector('.sp-tests button, button[title*="Run tests"]');
+        // Use a more specific selector for the run button inside the test viewer
+        testButton = document.querySelector('[data-testid="test-runner"] button, .sp-c-jIprpA button');
         if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
       }
+
       if (testButton) {
         console.log('[SandpackTest] Found test button, clicking...');
         testButton.click();
@@ -139,15 +138,15 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
           setIsRunning(current => {
             if (current) {
                 console.log('[SandpackTest] Tests seem stuck, resetting state');
-                alert("The test runner seems to be stuck. Please try running the tests again.");
+                alert("The test runner timed out. Please try running the tests again.");
                 return false;
             }
             return current;
           });
-        }, 15000); // 15-second timeout
+        }, 20000); // 20-second timeout
       } else {
         console.log('[SandpackTest] Could not find test button after all attempts');
-        alert("Could not find the test runner button. Please try refreshing the page.");
+        alert("Could not initialize the test runner. Please try refreshing the page.");
         setIsRunning(false);
       }
     } catch (error) {
@@ -184,24 +183,17 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
         {submitted ? (
           <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>✅ Submitted! Advancing...</p>
         ) : canSubmit ? (
-          (() => {
-            const tests = lastParsed?.tests;
-            const testsFailed = tests?.failed > 0;
-            const allTestsPassed = tests && tests.total > 0 && tests.failed === 0;
-            return (
-              <>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: testsFailed ? '#ef4444' : '#10b981' }}>
-                  {allTestsPassed ? `✅ All tests passed!` : testsFailed ? `❌ ${tests.failed ?? 0} of ${tests.total ?? 0} failed.` : 'ℹ️ Tests completed.'}
-                </p>
-                <button onClick={handleRunTests} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
-                  Rerun Tests
-                </button>
-                <button onClick={handleSubmit} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
-                  Submit Results
-                </button>
-              </>
-            );
-          })()
+          <>
+            <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: lastParsed?.tests?.failed > 0 ? '#ef4444' : '#10b981' }}>
+              {lastParsed?.tests?.failed > 0 ? `❌ ${lastParsed.tests.failed} of ${lastParsed.tests.total} failed.` : '✅ All tests passed!'}
+            </p>
+            <button onClick={handleRunTests} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+              Rerun Tests
+            </button>
+            <button onClick={handleSubmit} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+              Submit Results
+            </button>
+          </>
         ) : (
           <>
             <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run the tests.</p>
@@ -231,7 +223,6 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
   );
 };
 
-// This is the main export, now simplified.
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
@@ -250,11 +241,11 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
         hidden: true,
       },
     };
-  }, [props.starterCode, props.testCode, codeFile, testFile]);
+  }, [props.questionId]); // Reruns memo only when the question changes
   
   return (
     <SandpackProvider
-      key={props.questionId} // Key now only changes when the question changes
+      key={props.questionId}
       template={template}
       customSetup={{ dependencies: deps }}
       files={files}
