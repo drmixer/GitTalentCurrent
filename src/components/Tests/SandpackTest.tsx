@@ -6,8 +6,8 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
-  SandpackProviderProps,
-  SandpackFiles,
+  type SandpackFiles,
+  type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
@@ -37,11 +37,12 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
-    // Redacted other frameworks for brevity
+    // Other frameworks remain the same
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
-        codeFile: '/src/index.ts', testFile: '/src/index.test.ts',
+        codeFile: '/src/index.ts',
+        testFile: '/src/index.test.ts',
         deps: {
           '@testing-library/dom': '^9.3.4', '@testing-library/user-event': '^14.5.2',
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
@@ -63,94 +64,104 @@ function parseSummary(text: string) {
   return { ran, tests };
 }
 
-// All logic is now consolidated into this single inner component.
-const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
-  const { assignmentId, questionId, isLastQuestion, onNext, onComplete, testCode } = props;
-  const [isRunning, setIsRunning] = useState(false);
-  const [canSubmit, setCanSubmit] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [lastParsed, setLastParsed] = useState<any>(null);
-  const [lastRawText, setLastRawText] = useState('');
-  const testsRootRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const TestsAndConsole: React.FC<{
+  testsRootRef: React.RefObject<HTMLDivElement>;
+  onTestsComplete: (rawText: string, parsed: any) => void;
+  isRunning: boolean;
+}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
+  const observerRef = useRef<MutationObserver | null>(null);
 
-  useEffect(() => {
-    // Cleanup timeout on unmount
-    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, []);
-
-  const handleTestsComplete = (rawText: string, parsed: any) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    console.log('[SandpackTest] Tests completed with results:', parsed);
-    setLastRawText(rawText);
-    setLastParsed(parsed);
-    setCanSubmit(true);
-    setIsRunning(false);
-  };
-  
-  // This effect manages the observer that listens for test results.
   useEffect(() => {
     const root = testsRootRef.current;
-    if (!isRunning || !root) return;
-
+    if (!isRunning || !root) {
+      observerRef.current?.disconnect();
+      return;
+    }
     const observer = new MutationObserver(() => {
       const text = root.textContent || '';
       if (!text) return;
       const parsed = parseSummary(text);
       if (parsed.ran) {
-        handleTestsComplete(text, parsed);
-        observer.disconnect();
+        onTestsComplete(text, parsed);
+        // We no longer disconnect here; the useEffect cleanup handles it.
       }
     });
-
     observer.observe(root, { childList: true, subtree: true, characterData: true });
-
+    observerRef.current = observer;
     return () => {
-      observer.disconnect();
+      observerRef.current?.disconnect();
     };
-  }, [isRunning]);
+  }, [isRunning, onTestsComplete, testsRootRef]);
+
+  return (
+    <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
+      <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
+        <SandpackTests style={{ height: '100%' }} />
+      </div>
+      <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
+        <SandpackConsole />
+      </div>
+    </div>
+  );
+};
+
+const SandpackTestInner: React.FC<
+  SandpackTestProps & { codeFile: string; }
+> = (props) => {
+  const {
+    assignmentId, questionId, isLastQuestion,
+    onNext, onComplete, testCode,
+  } = props;
+
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [lastRawText, setLastRawText] = useState('');
+  const [lastParsed, setLastParsed] = useState<any>(null);
+
+  const { sandpack } = useSandpack();
+  const testsRootRef = useRef<HTMLDivElement>(null);
+
+  const handleTestsComplete = (rawText: string, parsed: any) => {
+    setLastRawText(rawText);
+    setLastParsed(parsed);
+    setCanSubmit(true);
+    setIsRunning(false);
+  };
 
   const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests...');
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setIsRunning(true);
     setCanSubmit(false);
     setLastParsed(null);
-    
+
     try {
-      // Give the UI a moment to enter the "running" state
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await sandpack.runSandpack();
+      await new Promise(resolve => setTimeout(resolve, 2500)); // Increased wait time for stability
       
       let testButton: HTMLButtonElement | null = null;
       let attempts = 0;
-      while (!testButton && attempts < 20) { // Increased attempts for reliability
+      // Reverted to your original, more robust selectors
+      const selectors = [
+        'button[title*="Run"]', 'button[aria-label*="Run"]', 'button[aria-label*="run"]',
+        'button[title*="run"]', '[data-sp-tests] button', '.sp-tests button',
+      ];
+      
+      while (!testButton && attempts < 10) {
         attempts++;
-        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
-        // Use a more specific selector for the run button inside the test viewer
-        testButton = document.querySelector('[data-testid="test-runner"] button, .sp-c-jIprpA button');
+        for (const selector of selectors) {
+          testButton = document.querySelector(selector);
+          if (testButton) break;
+        }
         if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       if (testButton) {
-        console.log('[SandpackTest] Found test button, clicking...');
         testButton.click();
-        timeoutRef.current = setTimeout(() => {
-          setIsRunning(current => {
-            if (current) {
-                console.log('[SandpackTest] Tests seem stuck, resetting state');
-                alert("The test runner timed out. Please try running the tests again.");
-                return false;
-            }
-            return current;
-          });
-        }, 20000); // 20-second timeout
       } else {
-        console.log('[SandpackTest] Could not find test button after all attempts');
         alert("Could not initialize the test runner. Please try refreshing the page.");
         setIsRunning(false);
       }
     } catch (error) {
-      console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
     }
   };
@@ -167,11 +178,10 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
       }, { onConflict: 'assignment_id,question_id' });
       setSubmitted(true);
       setTimeout(() => {
-        if (isLastQuestion) onComplete();
-        else onNext();
+        isLastQuestion ? onComplete() : onNext();
       }, 2000);
     } catch (err) {
-      alert('Unexpected error during submit.');
+      alert('An unexpected error occurred during submission.');
     }
   };
 
@@ -209,14 +219,7 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-            <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-              <SandpackTests style={{ height: '100%' }} />
-            </div>
-            <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
-              <SandpackConsole />
-            </div>
-          </div>
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
         </SandpackLayout>
       </div>
     </>
@@ -241,7 +244,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
         hidden: true,
       },
     };
-  }, [props.questionId]); // Reruns memo only when the question changes
+  }, [props.questionId, props.starterCode, props.testCode, codeFile, testFile]);
   
   return (
     <SandpackProvider
@@ -251,7 +254,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       files={files}
       options={{ autorun: false, initMode: 'immediate' }}
     >
-      <SandpackTestRunner {...props} />
+      <SandpackTestInner {...props} codeFile={codeFile} />
     </SandpackProvider>
   );
 };
