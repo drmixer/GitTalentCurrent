@@ -132,48 +132,119 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-}> = ({ testsRootRef, onTestsComplete }) => {
+  isRunning: boolean;
+}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
   const observerRef = useRef<MutationObserver | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTextRef = useRef<string>('');
 
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
 
-    console.log('[SandpackTest] Setting up test completion observer');
+    // Clean up previous observer and timeout
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
-    observerRef.current?.disconnect();
+    if (!isRunning) {
+      lastTextRef.current = '';
+      return;
+    }
+
+    console.log('[SandpackTest] Setting up test completion observer');
+    let hasCompleted = false;
 
     const observe = () => {
       const obs = new MutationObserver(() => {
+        if (hasCompleted) return;
+        
         const text = root.textContent || '';
         
-        if (!text) return;
+        if (!text || text === lastTextRef.current) return;
+        
+        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 200));
+        lastTextRef.current = text;
         
         const parsed = parseSummary(text);
         
-        if (parsed.ran) {
-          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
+        // Check for various completion indicators
+        const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(text);
+        const hasTestOutput = /PASS|FAIL|✓|✗|passed|failed|Test.*:|expect|describe|it\(/i.test(text);
+        const hasCompileSuccess = /compiled successfully|Compiled successfully/i.test(text);
+        
+        // Consider completion if:
+        // 1. Tests ran successfully (parsed.ran = true)
+        // 2. We have test-related output (even if not fully parsed)
+        // 3. We have compilation errors that prevent tests
+        // 4. Text is substantial and looks like test output
+        if (parsed.ran || hasTestOutput || (hasError && text.length > 100) || 
+            (text.length > 50 && (text.includes('vitest') || text.includes('test')))) {
+          
+          hasCompleted = true;
+          console.log('[SandpackTest] Tests completed - parsed:', parsed, 'hasTestOutput:', hasTestOutput, 'hasError:', hasError);
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
         }
       });
       
       obs.observe(root, { 
         childList: true, 
         subtree: true, 
-        characterData: true
+        characterData: true,
+        attributes: true
       });
       observerRef.current = obs;
+
+      // Set a timeout to handle cases where tests complete but we don't detect it
+      timeoutRef.current = setTimeout(() => {
+        if (hasCompleted) return;
+        
+        console.log('[SandpackTest] Observer timeout - checking final state');
+        const text = root.textContent || '';
+        
+        if (text && text.length > 20) {
+          // If we have substantial text, treat it as completed
+          hasCompleted = true;
+          console.log('[SandpackTest] Timeout with text content:', text.substring(0, 100));
+          const parsed = parseSummary(text);
+          onTestsComplete(text, parsed);
+        } else {
+          // No meaningful output - treat as failed
+          hasCompleted = true;
+          console.log('[SandpackTest] Timeout with no meaningful output');
+          onTestsComplete('Tests could not run - no output detected', { ran: false, error: true });
+        }
+        
+        obs.disconnect();
+        observerRef.current = null;
+        timeoutRef.current = null;
+      }, 20000); // 20 second timeout
     };
 
     observe();
 
     return () => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, isRunning]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -278,6 +349,9 @@ export default defineConfig({
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
+    console.log('[SandpackTest] Raw text length:', rawText.length);
+    console.log('[SandpackTest] Raw text preview:', rawText.substring(0, 300));
+    
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
@@ -605,7 +679,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
         </SandpackLayout>
       </div>
     </>
