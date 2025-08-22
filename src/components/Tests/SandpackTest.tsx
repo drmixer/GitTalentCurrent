@@ -142,9 +142,16 @@ const TestsAndConsole: React.FC<{
         
         // Check for test completion OR compilation errors
         const hasError = text.includes('Error') || text.includes('SyntaxError') || text.includes('TypeError');
+        const hasCompileSuccess = text.includes('compiled successfully') || text.includes('Compiled successfully');
         
-        if (parsed.ran || hasError) {
-          console.log('[SandpackTest] Tests completed or error detected, calling onTestsComplete');
+        // If we have a compilation success after an error, wait a bit more for tests
+        if (hasCompileSuccess && !parsed.ran) {
+          console.log('[SandpackTest] Code compiled successfully, waiting for tests...');
+          return; // Keep waiting for actual test results
+        }
+        
+        if (parsed.ran || (hasError && text.length > 50)) { // Only treat as error if substantial text
+          console.log('[SandpackTest] Tests completed or significant error detected, calling onTestsComplete');
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
@@ -285,7 +292,7 @@ export default defineConfig({
 
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
-    console.log('[SandpackTest] Tests completed with results:', parsed);
+    console.log('[SandpackTest] Tests completed with results:', parsed, 'rawText length:', rawText.length);
     setLastRawText(rawText);
     setLastParsed(parsed);
     setHasTestResults(true);
@@ -296,8 +303,10 @@ export default defineConfig({
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
+    // Reset all previous state for fresh run
     setLastRawText('');
     setLastParsed(null);
+    setHasTestResults(false);
 
     try {
       // First, ensure code is compiled/updated
@@ -349,7 +358,7 @@ export default defineConfig({
         console.log('[SandpackTest] Clicking test button programmatically');
         testButton.click();
       } else {
-        console.log('[SandpackTest] Could not find test button, resetting state');
+        console.log('[SandpackTest] Could not find test button, setting error state');
         setIsRunning(false);
         setLastRawText('Could not find test button. Please try refreshing the page.');
         setLastParsed({ ran: false, error: true });
@@ -455,10 +464,10 @@ export default defineConfig({
       return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
     }
     if (hasTestResults && lastParsed) {
-      // Check for compilation or runtime errors
+      // Check for compilation or runtime errors in the raw text
       const hasError = lastRawText.includes('Error') || lastRawText.includes('SyntaxError') || lastRawText.includes('TypeError');
       
-      if (hasError) {
+      if (hasError && !lastParsed.ran) {
         return { text: '❌ Code has errors - fix them and try again', color: '#dc2626' };
       }
       
@@ -473,7 +482,7 @@ export default defineConfig({
         } else {
           return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
         }
-      } else {
+      } else if (lastParsed.error) {
         return { text: '❌ Tests could not run - check your code for errors', color: '#dc2626' };
       }
     }
@@ -537,7 +546,7 @@ export default defineConfig({
               )}
             </button>
             
-            {hasTestResults && lastParsed && !lastParsed.error && (
+            {hasTestResults && lastParsed && !lastParsed.error && lastParsed.ran && (
               <button
                 onClick={handleSubmit}
                 style={{
