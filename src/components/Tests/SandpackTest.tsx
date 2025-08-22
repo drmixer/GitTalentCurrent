@@ -64,50 +64,7 @@ function parseSummary(text: string) {
   return { ran, tests };
 }
 
-const TestsAndConsole: React.FC<{
-  testsRootRef: React.RefObject<HTMLDivElement>;
-  onTestsComplete: (rawText: string, parsed: any) => void;
-  isRunning: boolean;
-}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
-  const observerRef = useRef<MutationObserver | null>(null);
-
-  useEffect(() => {
-    const root = testsRootRef.current;
-    if (!isRunning || !root) {
-      observerRef.current?.disconnect();
-      return;
-    }
-    const observer = new MutationObserver(() => {
-      const text = root.textContent || '';
-      if (!text) return;
-      const parsed = parseSummary(text);
-      if (parsed.ran) {
-        onTestsComplete(text, parsed);
-        // We no longer disconnect here; the useEffect cleanup handles it.
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true, characterData: true });
-    observerRef.current = observer;
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, [isRunning, onTestsComplete, testsRootRef]);
-
-  return (
-    <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-      <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests style={{ height: '100%' }} />
-      </div>
-      <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
-        <SandpackConsole />
-      </div>
-    </div>
-  );
-};
-
-const SandpackTestInner: React.FC<
-  SandpackTestProps & { codeFile: string; }
-> = (props) => {
+const SandpackTestInner: React.FC<SandpackTestProps> = (props) => {
   const {
     assignmentId, questionId, isLastQuestion,
     onNext, onComplete, testCode,
@@ -119,51 +76,101 @@ const SandpackTestInner: React.FC<
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<any>(null);
 
-  const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
+  const testRunTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (testRunTimeoutRef.current) clearTimeout(testRunTimeoutRef.current);
+    };
+  }, []);
 
   const handleTestsComplete = (rawText: string, parsed: any) => {
+    if (testRunTimeoutRef.current) clearTimeout(testRunTimeoutRef.current);
+    console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
   };
 
+  useEffect(() => {
+    const root = testsRootRef.current;
+    if (!isRunning || !root) return;
+
+    const observer = new MutationObserver(() => {
+      const text = root.textContent || '';
+      if (text) {
+        const parsed = parseSummary(text);
+        if (parsed.ran) {
+          handleTestsComplete(text, parsed);
+          observer.disconnect();
+        }
+      }
+    });
+
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isRunning]);
+
   const handleRunTests = async () => {
+    console.log('[SandpackTest] Running tests...');
+    if (testRunTimeoutRef.current) clearTimeout(testRunTimeoutRef.current);
     setIsRunning(true);
     setCanSubmit(false);
     setLastParsed(null);
-
-    try {
-      await sandpack.runSandpack();
-      await new Promise(resolve => setTimeout(resolve, 2500)); // Increased wait time for stability
-      
-      let testButton: HTMLButtonElement | null = null;
-      let attempts = 0;
-      // Reverted to your original, more robust selectors
+    setLastRawText('');
+    
+    // Give the UI a moment to enter the "running" state and for the observer to attach
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    let testButton: HTMLButtonElement | null = null;
+    let attempts = 0;
+    
+    const findAndClickButton = () => {
+      attempts++;
+      console.log(`[SandpackTest] Attempt ${attempts} to find test button...`);
+      // Use a robust set of selectors that is not dependent on unstable class names
       const selectors = [
-        'button[title*="Run"]', 'button[aria-label*="Run"]', 'button[aria-label*="run"]',
-        'button[title*="run"]', '[data-sp-tests] button', '.sp-tests button',
+          'button[title*="Run Tests"]',
+          'button[aria-label*="Run Tests"]',
+          '.sp-button[title*="Run"]', // Common Sandpack button class
+          '.sp-test-runner button'
       ];
-      
-      while (!testButton && attempts < 10) {
-        attempts++;
-        for (const selector of selectors) {
-          testButton = document.querySelector(selector);
-          if (testButton) break;
-        }
-        if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
+      for (const selector of selectors) {
+          const btn = document.querySelector<HTMLButtonElement>(selector);
+          if (btn && !btn.disabled) {
+              testButton = btn;
+              break;
+          }
       }
 
       if (testButton) {
+        console.log('[SandpackTest] Found button, clicking.');
         testButton.click();
+        
+        // Set a timeout to catch tests that get stuck
+        testRunTimeoutRef.current = setTimeout(() => {
+          console.log('[SandpackTest] Test run timed out.');
+          alert("The test runner timed out. Your code might have an infinite loop. Please check your code and try again.");
+          setIsRunning(false);
+        }, 20000); // 20-second timeout
+
+      } else if (attempts < 20) {
+        // If not found, try again shortly
+        setTimeout(findAndClickButton, 500);
       } else {
-        alert("Could not initialize the test runner. Please try refreshing the page.");
+        console.error('[SandpackTest] Could not find test button after all attempts.');
+        alert("Could not initialize the test runner. Please refresh the page and try again.");
         setIsRunning(false);
       }
-    } catch (error) {
-      setIsRunning(false);
-    }
+    };
+
+    findAndClickButton();
   };
 
   const handleSubmit = async () => {
@@ -219,7 +226,14 @@ const SandpackTestInner: React.FC<
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
+          <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
+            <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
+              <SandpackTests style={{ height: '100%' }} />
+            </div>
+            <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
+              <SandpackConsole />
+            </div>
+          </div>
         </SandpackLayout>
       </div>
     </>
@@ -254,7 +268,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       files={files}
       options={{ autorun: false, initMode: 'immediate' }}
     >
-      <SandpackTestInner {...props} codeFile={codeFile} />
+      <SandpackTestInner {...props} />
     </SandpackProvider>
   );
 };
