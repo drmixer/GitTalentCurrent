@@ -269,7 +269,6 @@ export default defineConfig({
     }
   };
 
-  // NEW: Button action to trigger test execution using a direct command
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests via direct dispatch...');
     setRunId(prev => prev + 1); // Re-initialize the observer
@@ -278,8 +277,12 @@ export default defineConfig({
     setLastParsed(null);
 
     try {
-      // Dispatch the command to run the 'test' script from package.json
-      sandpack.dispatch({ type: 'run-test' });
+      // **THE FIX**: Send the 'run-test' command directly to the test client
+      if (sandpack.clients.test) {
+        sandpack.clients.test.dispatch({ type: 'run-test' });
+      } else {
+        throw new Error('Sandpack test client not found.');
+      }
 
       // Set a timeout to catch tests that get stuck
       setTimeout(() => {
@@ -500,7 +503,6 @@ export default defineConfig({
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
       customSetup={{ dependencies: deps }}
-      files={files}
       options={{
         autorun: false,
         initMode: 'immediate',
