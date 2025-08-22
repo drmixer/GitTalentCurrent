@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
 
-// Prop interfaces defined for clarity and type safety
+// Prop interfaces defined for clarity
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
@@ -25,7 +25,7 @@ interface SandpackTestProps {
   onComplete: () => void;
 }
 
-interface SandpackTestInnerProps extends Omit<SandpackTestProps, 'starterCode'> {
+interface SandpackTestInnerProps extends SandpackTestProps {
   wasTriggeredByRerun: boolean;
   onRerun: (currentCode: string) => void;
   codeFile: string;
@@ -44,17 +44,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
-    case 'vue':
-      return {
-        template: 'vue3' as SandpackProviderProps['template'],
-        codeFile: '/src/App.vue', testFile: '/src/App.test.ts',
-        deps: {
-          vue: '^3.4.21', '@vue/test-utils': '^2.4.5', '@testing-library/vue': '^8.0.3',
-          '@testing-library/dom': '^9.3.4', '@testing-library/user-event': '^14.5.2',
-          '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
-        },
-      };
-    case 'javascript':
+    // ... other frameworks
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
@@ -226,7 +216,7 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
             return (
               <>
                 <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: testsFailed ? '#ef4444' : '#10b981' }}>
-                  {allTestsPassed ? `✅ All tests passed!` : testsFailed ? `❌ ${tests.failed} of ${tests.total} failed.` : 'ℹ️ Tests completed.'}
+                  {allTestsPassed ? `✅ All tests passed!` : testsFailed ? `❌ ${tests.failed ?? 0} of ${tests.total ?? 0} failed.` : 'ℹ️ Tests completed.'}
                 </p>
                 <button onClick={() => onRerun(sandpack.files[codeFile].code)} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
                   Rerun Tests
@@ -261,28 +251,33 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
 
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
+  
   const [runState, setRunState] = useState({ key: 0, wasTriggeredByRerun: false });
-  // State to hold the current code, initialized with the starterCode prop.
   const [currentCode, setCurrentCode] = useState(props.starterCode);
+  const [codeToResetTo, setCodeToResetTo] = useState<string | null>(null);
 
-  // When the question changes (identified by questionId), reset the code to the new starterCode.
   useEffect(() => {
     setCurrentCode(props.starterCode);
-    setRunState({ key: 0, wasTriggeredByRerun: false }); // Also reset the run state
+    setRunState({ key: 0, wasTriggeredByRerun: false });
   }, [props.questionId, props.starterCode]);
 
-  // The rerun handler now accepts the latest code from the editor.
+  // This effect orchestrates the reset to prevent race conditions.
+  useEffect(() => {
+    if (codeToResetTo !== null) {
+      setCurrentCode(codeToResetTo); // 1. Set the new code
+      setRunState(s => ({ key: s.key + 1, wasTriggeredByRerun: true })); // 2. Trigger re-key
+      setCodeToResetTo(null); // 3. Reset the trigger
+    }
+  }, [codeToResetTo]);
+
+  // The rerun handler now just sets a trigger state.
   const handleRerun = (latestCode: string) => {
-    // 1. Save the latest code.
-    setCurrentCode(latestCode);
-    // 2. Trigger the reset and autorun.
-    setRunState(s => ({ key: s.key + 1, wasTriggeredByRerun: true }));
+    setCodeToResetTo(latestCode);
   };
 
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
-      // The code is now sourced from our state variable, not the original prop.
       [codeFile]: { code: currentCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '' },
       '/vitest.config.ts': { code: `import { defineConfig } from 'vitest/config';\nexport default defineConfig({ test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] } });`, hidden: true },
@@ -295,7 +290,6 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
         hidden: true,
       },
     };
-    // Depend on currentCode to regenerate files when it changes.
   }, [currentCode, props.testCode, codeFile, testFile]);
   
   return (
@@ -308,7 +302,6 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     >
       <SandpackTestInner
         {...props}
-        starterCode={currentCode} // Pass the most current code down
         wasTriggeredByRerun={runState.wasTriggeredByRerun}
         onRerun={handleRerun}
         codeFile={codeFile}
