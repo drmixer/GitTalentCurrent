@@ -354,30 +354,15 @@ export default defineConfig({
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // More comprehensive selectors based on Sandpack's current structure
+        // More specific selectors that avoid file tabs
         const selectors = [
-          // Standard Sandpack selectors
-          '.sp-tests button:not([disabled])',
-          '[data-sp-tests] button:not([disabled])',
-          '.sp-test-runner button:not([disabled])',
+          // Standard Sandpack test runner selectors (most specific first)
+          '.sp-tests button:not([disabled]):not(.sp-tab-button)',
+          '[data-sp-tests] button:not([disabled]):not(.sp-tab-button)',
+          '.sp-test-runner button:not([disabled]):not(.sp-tab-button)',
           
-          // Generic button selectors within test containers
-          'button[title*="test" i]:not([disabled])',
-          'button[aria-label*="test" i]:not([disabled])',
-          'button[title*="run" i]:not([disabled])',
-          'button[aria-label*="run" i]:not([disabled])',
-          
-          // Look for buttons with specific text content
-          ...Array.from(document.querySelectorAll('button:not([disabled])')).filter(btn => {
-            const text = btn.textContent?.toLowerCase() || '';
-            return text.includes('test') || text.includes('run');
-          }).map(btn => {
-            // Create a unique selector for this button
-            let selector = 'button';
-            if (btn.className) selector += `.${btn.className.split(' ').join('.')}`;
-            if (btn.id) selector += `#${btn.id}`;
-            return selector;
-          }),
+          // Look for buttons with "Run" in the text content specifically
+          'button:not([disabled]):not(.sp-tab-button)',  // We'll filter by text content below
         ];
         
         for (const selector of selectors) {
@@ -388,9 +373,31 @@ export default defineConfig({
                 // Make sure it's actually visible and clickable
                 const rect = btn.getBoundingClientRect();
                 if (rect.width > 0 && rect.height > 0) {
-                  testButton = btn;
-                  console.log('[SandpackTest] Found test button with selector:', selector, btn);
-                  break;
+                  const buttonText = (btn.textContent || '').toLowerCase();
+                  const buttonTitle = (btn.title || '').toLowerCase();
+                  const buttonAriaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+                  
+                  // Skip file tabs and other non-test buttons
+                  if (btn.classList.contains('sp-tab-button')) {
+                    continue;
+                  }
+                  
+                  // Look for actual test run buttons
+                  if (
+                    buttonText.includes('run') ||
+                    buttonTitle.includes('run') ||
+                    buttonAriaLabel.includes('run') ||
+                    buttonText.includes('test') ||
+                    buttonTitle.includes('run test') ||
+                    buttonAriaLabel.includes('test')
+                  ) {
+                    // Make sure it's not a file tab
+                    if (!buttonTitle.includes('.test.') && !buttonTitle.includes('.spec.')) {
+                      testButton = btn;
+                      console.log('[SandpackTest] Found test button with selector:', selector, 'button:', btn, 'text:', buttonText, 'title:', buttonTitle);
+                      break;
+                    }
+                  }
                 }
               }
             }
@@ -401,6 +408,13 @@ export default defineConfig({
         }
         
         if (!testButton) {
+          // Debug: log all available buttons to see what we're missing
+          const allButtons = document.querySelectorAll('button');
+          console.log('[SandpackTest] All buttons on page:');
+          allButtons.forEach((btn, index) => {
+            console.log(`  ${index}: "${btn.textContent}" class="${btn.className}" title="${btn.title}" disabled=${btn.disabled}`);
+          });
+          
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
