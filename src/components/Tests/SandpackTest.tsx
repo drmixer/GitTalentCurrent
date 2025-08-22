@@ -74,7 +74,7 @@ const getSetup = (framework: Framework) => {
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
   
-  const ran = /Test suites?:|Test files?:|Tests?:|No tests found|PASS|FAIL|✓|✗|passed|failed/i.test(text);
+  const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
   
   if (!ran) {
     console.log('[SandpackTest] No test indicators found in output');
@@ -107,23 +107,6 @@ function parseSummary(text: string) {
       }
     : undefined;
 
-  // If we can't parse structured output, try to infer from content
-  if (!tests && ran) {
-    const passCount = (text.match(/✓|PASS/g) || []).length;
-    const failCount = (text.match(/✗|FAIL/g) || []).length;
-    if (passCount > 0 || failCount > 0) {
-      return {
-        ran: true,
-        suites,
-        tests: {
-          passed: passCount,
-          failed: failCount,
-          total: passCount + failCount
-        }
-      };
-    }
-  }
-
   const result = { ran, suites, tests };
   console.log('[SandpackTest] Parsed result:', result);
   return result;
@@ -132,128 +115,59 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  isRunning: boolean;
-}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
+}> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastTextRef = useRef<string>('');
 
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
 
-    // Clean up previous observer and timeout
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    if (!isRunning) {
-      lastTextRef.current = '';
-      return;
-    }
-
     console.log('[SandpackTest] Setting up test completion observer');
-    let hasCompleted = false;
+
+    observerRef.current?.disconnect();
 
     const observe = () => {
       const obs = new MutationObserver(() => {
-        if (hasCompleted) return;
-        
         const text = root.textContent || '';
         
-        if (!text || text === lastTextRef.current) return;
-        
-        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 200));
-        lastTextRef.current = text;
+        if (!text) return;
         
         const parsed = parseSummary(text);
         
-        // Check for various completion indicators
-        const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(text);
-        const hasTestOutput = /PASS|FAIL|✓|✗|passed|failed|Test.*:|expect|describe|it\(/i.test(text);
-        const hasCompileSuccess = /compiled successfully|Compiled successfully/i.test(text);
-        
-        // Consider completion if:
-        // 1. Tests ran successfully (parsed.ran = true)
-        // 2. We have test-related output (even if not fully parsed)
-        // 3. We have compilation errors that prevent tests
-        // 4. Text is substantial and looks like test output
-        if (parsed.ran || hasTestOutput || (hasError && text.length > 100) || 
-            (text.length > 50 && (text.includes('vitest') || text.includes('test')))) {
-          
-          hasCompleted = true;
-          console.log('[SandpackTest] Tests completed - parsed:', parsed, 'hasTestOutput:', hasTestOutput, 'hasError:', hasError);
+        if (parsed.ran) {
+          console.log('[SandpackTest] Tests completed, calling onTestsComplete');
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
         }
       });
       
       obs.observe(root, { 
         childList: true, 
         subtree: true, 
-        characterData: true,
-        attributes: true
+        characterData: true
       });
       observerRef.current = obs;
-
-      // Set a timeout to handle cases where tests complete but we don't detect it
-      timeoutRef.current = setTimeout(() => {
-        if (hasCompleted) return;
-        
-        console.log('[SandpackTest] Observer timeout - checking final state');
-        const text = root.textContent || '';
-        
-        if (text && text.length > 20) {
-          // If we have substantial text, treat it as completed
-          hasCompleted = true;
-          console.log('[SandpackTest] Timeout with text content:', text.substring(0, 100));
-          const parsed = parseSummary(text);
-          onTestsComplete(text, parsed);
-        } else {
-          // No meaningful output - treat as failed
-          hasCompleted = true;
-          console.log('[SandpackTest] Timeout with no meaningful output');
-          onTestsComplete('Tests could not run - no output detected', { ran: false, error: true });
-        }
-        
-        obs.disconnect();
-        observerRef.current = null;
-        timeoutRef.current = null;
-      }, 20000); // 20 second timeout
     };
 
     observe();
 
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      observerRef.current?.disconnect();
+      observerRef.current = null;
     };
-  }, [onTestsComplete, isRunning]);
+  }, [onTestsComplete]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
+        {/* Hide the built-in test controls since we'll trigger them programmatically */}
         <SandpackTests 
           style={{ height: '100%' }} 
           watchMode={false} 
           showWatchButton={false} 
           showVerboseButton={false}
+          // Hide the run button since we'll have our own
           hideTestsAndSupressLogs={false}
         />
       </div>
@@ -300,7 +214,7 @@ const SandpackTestInner: React.FC<
   const [submitted, setSubmitted] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
-  const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any; error?: boolean } | null>(null);
+  const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -333,10 +247,7 @@ export default defineConfig({
             name: 'sandpack-tests',
             version: '1.0.0',
             private: true,
-            scripts: { 
-              test: 'vitest run --reporter=basic',
-              'test:ui': 'vitest --ui'
-            },
+            scripts: { test: 'vitest run --reporter=basic' },
           },
           null,
           2
@@ -349,16 +260,13 @@ export default defineConfig({
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
-    console.log('[SandpackTest] Raw text length:', rawText.length);
-    console.log('[SandpackTest] Raw text preview:', rawText.substring(0, 300));
-    
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
   };
 
-  // Simple, working test runner based on the original working version
+  // NEW: Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -559,40 +467,9 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  const getStatusMessage = () => {
-    if (submitted) {
-      return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
-    }
-    if (canSubmit && lastParsed) {
-      const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(lastRawText);
-      
-      if (hasError && !lastParsed.ran) {
-        return { text: '❌ Code has errors - fix them and try again', color: '#dc2626' };
-      }
-      
-      if (lastParsed.ran) {
-        const tests = lastParsed.tests || {};
-        const total = tests.total || 0;
-        const passed = tests.passed || 0;
-        const failed = tests.failed || 0;
-        
-        if (failed === 0 && passed > 0) {
-          return { text: `✅ All tests passed! (${passed}/${total})`, color: '#059669' };
-        } else {
-          return { text: `❌ Some tests failed (${passed}/${total} passed)`, color: '#dc2626' };
-        }
-      }
-    }
-    if (isRunning) {
-      return { text: '🔄 Running tests...', color: '#3b82f6' };
-    }
-    return { text: 'Write your code, then run tests to see results', color: '#64748b' };
-  };
-
-  const statusMessage = getStatusMessage();
-
   return (
     <>
+      {/* NEW: Single, clear action bar with one run button */}
       <div 
         style={{
           padding: '16px',
@@ -604,12 +481,37 @@ export default defineConfig({
           gap: '16px'
         }}
       >
-        <p style={{ margin: 0, fontSize: '14px', color: statusMessage.color, fontWeight: '500' }}>
-          {statusMessage.text}
-        </p>
-        
-        {submitted ? null : (
-          <div style={{ display: 'flex', gap: '12px' }}>
+        {submitted ? (
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
+            ✅ Submitted! Advancing to next question...
+          </p>
+        ) : canSubmit ? (
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
+              ✅ Tests completed!
+            </p>
+            <button
+              onClick={handleSubmit}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              Submit Results
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+              Write your code, then run tests to see results
+            </p>
             <button
               onClick={handleRunTests}
               disabled={isRunning}
@@ -641,32 +543,14 @@ export default defineConfig({
                   Running Tests...
                 </>
               ) : (
-                <>▶️ {canSubmit ? 'Run Tests Again' : 'Run Tests'}</>
+                '▶️ Run Tests'
               )}
             </button>
-            
-            {canSubmit && lastParsed && lastParsed.ran && (
-              <button
-                onClick={handleSubmit}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-                }}
-              >
-                Submit Results
-              </button>
-            )}
-          </div>
+          </>
         )}
       </div>
 
+      {/* Add CSS animation for spinner */}
       <style>
         {`
           @keyframes spin {
@@ -679,7 +563,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
         </SandpackLayout>
       </div>
     </>
@@ -698,12 +582,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
         code: `
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: { 
-    environment: 'jsdom', 
-    globals: true, 
-    setupFiles: ['./setupTests.ts'],
-    reporter: 'basic'
-  },
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
 });
         `.trim(),
         hidden: true,
@@ -711,14 +590,7 @@ export default defineConfig({
       '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
       '/package.json': {
         code: JSON.stringify(
-          { 
-            name: 'sandpack-tests', 
-            private: true, 
-            scripts: { 
-              test: 'vitest run --reporter=basic',
-              'test:watch': 'vitest --reporter=basic'
-            } 
-          },
+          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
           null,
           2
         ),
@@ -746,7 +618,6 @@ export default defineConfig({
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
-        autoReload: false, // Prevent auto-reloading when files change
       }}
     >
       <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
