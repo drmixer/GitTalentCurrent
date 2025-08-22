@@ -195,15 +195,11 @@ const SandpackTestInner: React.FC<
   }
 > = (props) => {
   const {
-    starterCode,
-    testCode,
     assignmentId,
     questionId,
     isLastQuestion,
     onNext,
     onComplete,
-    codeFile,
-    testFile,
   } = props;
 
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'passed' | 'failed'>('idle');
@@ -214,44 +210,6 @@ const SandpackTestInner: React.FC<
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
-
-  const files = useMemo<SandpackFiles>(() => {
-    if (!testCode) return {};
-    return {
-      [codeFile]: { code: starterCode ?? '', active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
-      '/vitest.config.ts': {
-        code: `
-import { defineConfig } from 'vitest/config';
-export default defineConfig({
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./setupTests.ts'],
-  },
-});
-        `.trim(),
-        hidden: true,
-      },
-      '/setupTests.ts': {
-        code: `import '@testing-library/jest-dom';`,
-        hidden: true,
-      },
-      '/package.json': {
-        code: JSON.stringify(
-          {
-            name: 'sandpack-tests',
-            version: '1.0.0',
-            private: true,
-            scripts: { test: 'vitest run --reporter=basic' },
-          },
-          null,
-          2
-        ),
-        hidden: true,
-      },
-    };
-  }, [starterCode, testCode, codeFile, testFile]);
 
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
@@ -277,7 +235,7 @@ export default defineConfig({
     setLastParsed(null);
 
     try {
-      // **THE FIX**: Send the 'run-test' command directly to the test client
+      // Send the 'run-test' command directly to the test client
       if (sandpack.clients.test) {
         sandpack.clients.test.dispatch({ type: 'run-test' });
       } else {
@@ -363,10 +321,6 @@ export default defineConfig({
       alert('Unexpected error during submit.');
     }
   };
-
-  if (!testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
 
   const renderStatusMessage = () => {
     switch (testStatus) {
@@ -468,10 +422,15 @@ export default defineConfig({
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
+  // **THE FIX**: Do not render anything until the necessary code props are available.
+  // This prevents Sandpack from loading its default template.
+  if (!props.starterCode || !props.testCode) {
+    return <div>Loading Question...</div>; // Or a loading spinner
+  }
+
   const files = useMemo<SandpackFiles>(() => {
-    if (!props.testCode) return {};
     return {
-      [codeFile]: { code: props.starterCode ?? '', active: true },
+      [codeFile]: { code: props.starterCode, active: true },
       [testFile]: { code: props.testCode ?? '', hidden: false },
       '/vitest.config.ts': {
         code: `
@@ -494,15 +453,12 @@ export default defineConfig({
     };
   }, [props.starterCode, props.testCode, codeFile, testFile]);
 
-  if (!props.testCode) {
-    return <div>This Sandpack question is missing its test code.</div>;
-  }
-
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
       template={template}
       customSetup={{ dependencies: deps }}
+      files={files}
       options={{
         autorun: false,
         initMode: 'immediate',
