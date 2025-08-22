@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
 
-// Prop interfaces are defined first for clarity
+// Prop interfaces defined for clarity and type safety
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
@@ -26,14 +26,9 @@ interface SandpackTestProps {
 }
 
 interface SandpackTestInnerProps extends SandpackTestProps {
-  template: SandpackProviderProps['template'];
-  codeFile: string;
-  testFile: string;
-  deps: Record<string, string>;
-  shouldAutorun: boolean;
+  wasTriggeredByRerun: boolean;
   onRerun: () => void;
 }
-
 
 const getSetup = (framework: Framework) => {
   switch (framework) {
@@ -147,14 +142,8 @@ const TestsAndConsole: React.FC<{
 
 const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
   const {
-    assignmentId,
-    questionId,
-    isLastQuestion,
-    onNext,
-    onComplete,
-    testCode,
-    shouldAutorun,
-    onRerun,
+    assignmentId, questionId, isLastQuestion, onNext, onComplete,
+    testCode, wasTriggeredByRerun, onRerun,
   } = props;
 
   const [canSubmit, setCanSubmit] = useState(false);
@@ -220,11 +209,13 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
     setIsRunning(false);
   };
 
+  // **THE FIX**: This effect runs ONLY ONCE when the component mounts.
+  // If it was mounted because of a rerun, it automatically starts the tests.
   useEffect(() => {
-    if (shouldAutorun) {
+    if (wasTriggeredByRerun) {
       setTimeout(() => handleRunTests(), 100);
     }
-  }, [shouldAutorun]);
+  }, []); // <-- Empty dependency array ensures this only runs once on mount.
 
   const handleSubmit = async () => {
     if (!lastParsed) return;
@@ -299,10 +290,10 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
 
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
-  const [runState, setRunState] = useState({ key: 0, shouldAutorun: false });
+  const [runState, setRunState] = useState({ key: 0, wasTriggeredByRerun: false });
 
   const handleRerun = () => {
-    setRunState(s => ({ key: s.key + 1, shouldAutorun: true }));
+    setRunState(s => ({ key: s.key + 1, wasTriggeredByRerun: true }));
   };
 
   const files = useMemo<SandpackFiles>(() => {
@@ -312,7 +303,6 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [testFile]: { code: props.testCode ?? '' },
       '/vitest.config.ts': { code: `import { defineConfig } from 'vitest/config';\nexport default defineConfig({ test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] } });`, hidden: true },
       '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
-      // RESTORED to full, correct version
       '/package.json': {
         code: JSON.stringify({
           name: 'sandpack-tests',
@@ -335,11 +325,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
     >
       <SandpackTestInner
         {...props}
-        template={template}
-        codeFile={codeFile}
-        testFile={testFile}
-        deps={deps}
-        shouldAutorun={runState.shouldAutorun}
+        wasTriggeredByRerun={runState.wasTriggeredByRerun}
         onRerun={handleRerun}
       />
     </SandpackProvider>
