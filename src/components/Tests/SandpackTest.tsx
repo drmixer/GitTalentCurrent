@@ -74,7 +74,7 @@ const getSetup = (framework: Framework) => {
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
   
-  const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
+  const ran = /Test suites?:|Test files?:|Tests?:|No tests found|PASS|FAIL|✓|✗|passed|failed/i.test(text);
   
   if (!ran) {
     console.log('[SandpackTest] No test indicators found in output');
@@ -107,6 +107,23 @@ function parseSummary(text: string) {
       }
     : undefined;
 
+  // If we can't parse structured output, try to infer from content
+  if (!tests && ran) {
+    const passCount = (text.match(/✓|PASS/g) || []).length;
+    const failCount = (text.match(/✗|FAIL/g) || []).length;
+    if (passCount > 0 || failCount > 0) {
+      return {
+        ran: true,
+        suites,
+        tests: {
+          passed: passCount,
+          failed: failCount,
+          total: passCount + failCount
+        }
+      };
+    }
+  }
+
   const result = { ran, suites, tests };
   console.log('[SandpackTest] Parsed result:', result);
   return result;
@@ -116,7 +133,7 @@ const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
   isRunning: boolean;
-  testKey: number; // Add a key to force re-render when needed
+  testKey: number;
 }> = ({ testsRootRef, onTestsComplete, isRunning, testKey }) => {
   const observerRef = useRef<MutationObserver | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,26 +163,26 @@ const TestsAndConsole: React.FC<{
       clearTimeout(timeoutRef.current);
     }
 
-    let hasCompleted = false; // Prevent multiple completions
+    let hasCompleted = false;
 
     const observe = () => {
       const obs = new MutationObserver(() => {
-        if (hasCompleted) return; // Already processed
+        if (hasCompleted) return;
         
         const text = root.textContent || '';
         
         if (!text) return;
         
-        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 100));
+        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 200));
         
         const parsed = parseSummary(text);
         
         // Check for test completion, compilation errors, or test results
-        const hasError = text.includes('Error') || text.includes('SyntaxError') || text.includes('TypeError');
-        const hasCompileSuccess = text.includes('compiled successfully') || text.includes('Compiled successfully');
-        const hasTestOutput = text.includes('PASS') || text.includes('FAIL') || text.includes('✓') || text.includes('✗');
+        const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(text);
+        const hasCompileSuccess = /compiled successfully|Compiled successfully/i.test(text);
+        const hasTestOutput = /PASS|FAIL|✓|✗|passed|failed|Test.*:|expect/i.test(text);
         
-        // If we have test output or results, consider it complete
+        // Consider completion if we have meaningful test output
         if (parsed.ran || hasTestOutput || (hasError && text.length > 50)) {
           hasCompleted = true;
           console.log('[SandpackTest] Tests completed - parsed:', parsed, 'hasTestOutput:', hasTestOutput, 'hasError:', hasError);
@@ -184,7 +201,8 @@ const TestsAndConsole: React.FC<{
       obs.observe(root, { 
         childList: true, 
         subtree: true, 
-        characterData: true
+        characterData: true,
+        attributes: true
       });
       observerRef.current = obs;
 
@@ -198,7 +216,7 @@ const TestsAndConsole: React.FC<{
         obs.disconnect();
         observerRef.current = null;
         timeoutRef.current = null;
-      }, 20000); // 20 second timeout
+      }, 25000); // 25 second timeout
     };
 
     observe();
@@ -218,7 +236,6 @@ const TestsAndConsole: React.FC<{
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        {/* Use key to force re-render when needed */}
         <SandpackTests 
           key={`tests-${testKey}`}
           style={{ height: '100%' }} 
@@ -273,7 +290,7 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any; error?: boolean } | null>(null);
-  const [testKey, setTestKey] = useState(0); // Force re-render key
+  const [testKey, setTestKey] = useState(0);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -306,7 +323,10 @@ export default defineConfig({
             name: 'sandpack-tests',
             version: '1.0.0',
             private: true,
-            scripts: { test: 'vitest run --reporter=basic' },
+            scripts: { 
+              test: 'vitest run --reporter=basic',
+              'test:ui': 'vitest --ui'
+            },
           },
           null,
           2
@@ -325,7 +345,7 @@ export default defineConfig({
     setIsRunning(false);
   };
 
-  // Improved test runner using useSandpack hook
+  // New approach: Use sandpack client directly to execute tests
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -334,174 +354,148 @@ export default defineConfig({
     setLastRawText('');
     setLastParsed(null);
     setHasTestResults(false);
-    setTestKey(prev => prev + 1); // Force re-render of test components
+    setTestKey(prev => prev + 1);
 
     try {
-      // Log available sandpack methods for debugging
-      console.log('[SandpackTest] Available sandpack methods:', Object.keys(sandpack));
-      
-      // Use Sandpack's dispatch method to run tests
-      console.log('[SandpackTest] Using sandpack dispatch to run tests...');
-      
-      // Try different approaches to trigger tests
-      if (sandpack.dispatch) {
-        // Method 1: Try to dispatch a test run command
-        console.log('[SandpackTest] Trying dispatch method...');
-        sandpack.dispatch({
-          type: 'run-tests'
-        });
-        
-        // Wait a bit and also try the npm test command
-        setTimeout(() => {
-          sandpack.dispatch({
-            type: 'shell/run',
-            command: 'npm test'
-          });
-        }, 1000);
-        
-      } else if (sandpack.runSandpack) {
-        // Method 2: Run the sandbox and then try to execute tests
-        console.log('[SandpackTest] Running sandbox first...');
+      console.log('[SandpackTest] Available sandpack methods:', Object.getOwnPropertyNames(sandpack));
+      console.log('[SandpackTest] Sandpack clients:', sandpack.clients);
+      console.log('[SandpackTest] Sandpack status:', sandpack.sandpack.status);
+
+      // Method 1: Try to run the sandbox first to ensure everything is compiled
+      if (sandpack.runSandpack) {
+        console.log('[SandpackTest] Running sandbox...');
         await sandpack.runSandpack();
         
-        // Wait for it to compile, then try to run tests via shell command
-        setTimeout(() => {
-          console.log('[SandpackTest] Trying to run tests via shell...');
-          if (sandpack.dispatch) {
-            sandpack.dispatch({
-              type: 'shell/run', 
+        // Wait for compilation to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // Method 2: Try to access the sandpack client directly
+      const clients = sandpack.clients;
+      console.log('[SandpackTest] Available clients:', Object.keys(clients));
+      
+      for (const [clientId, client] of Object.entries(clients)) {
+        console.log(`[SandpackTest] Client ${clientId}:`, client);
+        
+        if (client && typeof client.dispatch === 'function') {
+          console.log(`[SandpackTest] Trying to run tests via client ${clientId}...`);
+          
+          // Try various command approaches
+          try {
+            // Approach 1: Direct test command
+            await client.dispatch({
+              type: 'shell',
               command: 'npm test'
             });
+            
+            console.log('[SandpackTest] Dispatched npm test command');
+            
+            // Wait and try another approach
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Approach 2: Try vitest directly
+            await client.dispatch({
+              type: 'shell',
+              command: 'npx vitest run'
+            });
+            
+            console.log('[SandpackTest] Dispatched vitest run command');
+            
+          } catch (dispatchError) {
+            console.log(`[SandpackTest] Client ${clientId} dispatch error:`, dispatchError);
           }
-        }, 2000);
+        }
       }
-      
-      // Give it time to start running tests
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Try to find and click the test button with improved selectors
-      let testButton = null;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      // Keep trying to find the test button with more comprehensive selectors
-      while (!testButton && attempts < maxAttempts) {
-        attempts++;
-        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
+
+      // Method 3: Try the original dispatch approach with different commands
+      if (sandpack.dispatch) {
+        console.log('[SandpackTest] Trying sandpack.dispatch approaches...');
         
-        // Debug: log all available buttons first
-        if (attempts === 1) {
-          const allButtons = document.querySelectorAll('button');
-          console.log('[SandpackTest] All buttons on page:');
-          allButtons.forEach((btn, index) => {
-            const text = (btn.textContent || '').trim();
-            const title = btn.title || '';
-            const ariaLabel = btn.getAttribute('aria-label') || '';
-            const classes = btn.className || '';
-            console.log(`  ${index}: text="${text}" title="${title}" aria-label="${ariaLabel}" class="${classes}" disabled=${btn.disabled}`);
-          });
-        }
+        const commands = [
+          { type: 'run-tests' },
+          { type: 'test' },
+          { type: 'shell', command: 'npm test' },
+          { type: 'shell', command: 'npm run test' },
+          { type: 'shell', command: 'npx vitest run' },
+          { type: 'command', command: 'test' },
+        ];
         
-        // Look specifically for the Tests button in the right panel
-        const testsPanel = testsRootRef.current;
-        if (testsPanel) {
-          // First try to find buttons within the tests panel specifically
-          const panelButtons = testsPanel.querySelectorAll('button:not([disabled])');
-          console.log(`[SandpackTest] Found ${panelButtons.length} buttons in tests panel`);
-          
-          for (const btn of panelButtons) {
-            if (btn instanceof HTMLButtonElement && !btn.disabled) {
-              const text = (btn.textContent || '').toLowerCase().trim();
-              const title = (btn.title || '').toLowerCase();
-              const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-              
-              console.log(`[SandpackTest] Checking panel button: text="${text}" title="${title}" aria-label="${ariaLabel}"`);
-              
-              // Look for buttons that specifically relate to running tests
-              if (
-                text === 'run' ||
-                text === 'tests' ||
-                text.includes('run tests') ||
-                title.includes('run tests') ||
-                ariaLabel.includes('run tests') ||
-                (text.includes('run') && (btn.closest('.sp-tests') || btn.closest('[data-sp-tests]')))
-              ) {
-                testButton = btn;
-                console.log('[SandpackTest] Found test button in panel:', btn);
-                break;
-              }
-            }
+        for (const command of commands) {
+          try {
+            console.log('[SandpackTest] Trying dispatch command:', command);
+            sandpack.dispatch(command);
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error) {
+            console.log('[SandpackTest] Command failed:', command, error);
           }
         }
-        
-        // If no button found in panel, try global search but be more selective
-        if (!testButton) {
-          const selectors = [
-            // Look specifically for test-related buttons
-            '.sp-tests button:not([disabled]):not(.sp-tab-button)',
-            '[data-sp-tests] button:not([disabled]):not(.sp-tab-button)',
-          ];
+      }
+
+      // Method 4: Try to trigger tests by updating files
+      console.log('[SandpackTest] Trying file-based trigger...');
+      if (sandpack.updateFile) {
+        try {
+          // Force a small update to the test file to trigger re-run
+          const currentTestCode = sandpack.sandpack.files[testFile]?.code || testCode;
+          sandpack.updateFile(testFile, currentTestCode + '\n// trigger');
           
-          for (const selector of selectors) {
-            try {
-              const buttons = document.querySelectorAll(selector);
-              for (const btn of buttons) {
-                if (btn instanceof HTMLButtonElement && !btn.disabled) {
-                  const rect = btn.getBoundingClientRect();
-                  if (rect.width > 0 && rect.height > 0) {
-                    const buttonText = (btn.textContent || '').toLowerCase().trim();
-                    console.log(`[SandpackTest] Checking selector button: "${buttonText}"`);
-                    
-                    // Be very specific about what constitutes a test button
-                    if (
-                      buttonText === 'run' ||
-                      buttonText === 'tests' ||
-                      buttonText.includes('run tests')
-                    ) {
-                      testButton = btn;
-                      console.log('[SandpackTest] Found test button with selector:', selector, btn);
-                      break;
-                    }
-                  }
-                }
-              }
-              if (testButton) break;
-            } catch (e) {
-              console.warn('[SandpackTest] Invalid selector:', selector, e);
-            }
-          }
-        }
-        
-        if (!testButton) {
           await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Restore original content
+          sandpack.updateFile(testFile, currentTestCode || '');
+          
+          console.log('[SandpackTest] Triggered via file update');
+        } catch (error) {
+          console.log('[SandpackTest] File update trigger failed:', error);
         }
       }
+
+      // Method 5: Look for and simulate clicks on any hidden test buttons
+      console.log('[SandpackTest] Looking for hidden test execution mechanisms...');
       
-      if (testButton && testButton instanceof HTMLButtonElement) {
-        console.log('[SandpackTest] Clicking test button programmatically');
-        // Try multiple click methods
-        testButton.focus();
-        testButton.click();
-        
-        // Also try dispatching events
-        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        
-      } else {
-        console.log('[SandpackTest] Could not find test button after', maxAttempts, 'attempts');
-        // Try alternative: Use sandpack's test runner API if available
-        if (sandpack && typeof sandpack.runTests === 'function') {
-          console.log('[SandpackTest] Trying sandpack.runTests() API');
-          await sandpack.runTests();
-        } else {
-          console.log('[SandpackTest] Setting error state - no test button found');
-          setIsRunning(false);
-          setLastRawText('Could not find test button. The test interface may not be fully loaded. Please try again.');
-          setLastParsed({ ran: false, error: true });
-          setHasTestResults(true);
+      // Wait a bit longer for everything to settle
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Try to find test buttons with more aggressive selectors
+      const possibleSelectors = [
+        '.sp-tests button',
+        '[data-sp-tests] button',
+        '.sp-test-runner button',
+        'button[data-testid*="test"]',
+        'button[aria-label*="test"]',
+        'button[title*="test"]',
+        '.sp-c-tests button',
+        '.sandpack-tests button',
+      ];
+      
+      for (const selector of possibleSelectors) {
+        try {
+          const buttons = document.querySelectorAll(selector);
+          console.log(`[SandpackTest] Found ${buttons.length} buttons with selector: ${selector}`);
+          
+          for (const button of buttons) {
+            if (button instanceof HTMLElement && !button.classList.contains('sp-tab-button')) {
+              console.log(`[SandpackTest] Trying to click button:`, button.textContent, button.className);
+              button.click();
+              
+              // Also try focus and dispatch events
+              button.focus();
+              button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+              button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+              button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        } catch (error) {
+          console.log(`[SandpackTest] Selector ${selector} failed:`, error);
         }
       }
+
+      // Give everything some time to execute
+      console.log('[SandpackTest] Waiting for test execution to complete...');
+      
+      // If nothing happens after reasonable time, we'll be caught by the observer timeout
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
@@ -602,8 +596,7 @@ export default defineConfig({
       return { text: '✅ Submitted! Advancing to next question...', color: '#10b981' };
     }
     if (hasTestResults && lastParsed) {
-      // Check for compilation or runtime errors in the raw text
-      const hasError = lastRawText.includes('Error') || lastRawText.includes('SyntaxError') || lastRawText.includes('TypeError');
+      const hasError = /Error|SyntaxError|TypeError|ReferenceError/i.test(lastRawText);
       
       if (hasError && !lastParsed.ran) {
         return { text: '❌ Code has errors - fix them and try again', color: '#dc2626' };
@@ -634,7 +627,6 @@ export default defineConfig({
 
   return (
     <>
-      {/* Updated action bar with both run and submit buttons when tests have results */}
       <div 
         style={{
           padding: '16px',
@@ -709,7 +701,6 @@ export default defineConfig({
         )}
       </div>
 
-      {/* Add CSS animation for spinner */}
       <style>
         {`
           @keyframes spin {
@@ -746,7 +737,12 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
         code: `
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] },
+  test: { 
+    environment: 'jsdom', 
+    globals: true, 
+    setupFiles: ['./setupTests.ts'],
+    reporter: 'basic'
+  },
 });
         `.trim(),
         hidden: true,
@@ -754,7 +750,14 @@ export default defineConfig({
       '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
       '/package.json': {
         code: JSON.stringify(
-          { name: 'sandpack-tests', private: true, scripts: { test: 'vitest run --reporter=basic' } },
+          { 
+            name: 'sandpack-tests', 
+            private: true, 
+            scripts: { 
+              test: 'vitest run --reporter=basic',
+              'test:watch': 'vitest --reporter=basic'
+            } 
+          },
           null,
           2
         ),
@@ -782,6 +785,7 @@ export default defineConfig({
         showErrorOverlay: true,
         visibleFiles: [codeFile, testFile],
         activeFile: codeFile,
+        autoReload: false, // Prevent auto-reloading when files change
       }}
     >
       <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
