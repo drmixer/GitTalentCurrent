@@ -6,14 +6,13 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
-  type SandpackFiles,
-  type SandpackProviderProps,
+  SandpackProviderProps,
+  SandpackFiles,
 } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
 
-// Prop interfaces defined for clarity
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
@@ -25,13 +24,8 @@ interface SandpackTestProps {
   onComplete: () => void;
 }
 
-interface SandpackTestInnerProps extends SandpackTestProps {
-  wasTriggeredByRerun: boolean;
-  onRerun: (currentCode: string) => void;
-  codeFile: string;
-}
-
 const getSetup = (framework: Framework) => {
+  // ... (This function remains the same)
   switch (framework) {
     case 'react':
       return {
@@ -44,7 +38,6 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
-    // ... other frameworks
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
@@ -70,116 +63,56 @@ function parseSummary(text: string) {
   return { ran, tests };
 }
 
-const TestsAndConsole: React.FC<{
-  testsRootRef: React.RefObject<HTMLDivElement>;
-  onTestsComplete: (rawText: string, parsed: any) => void;
-  isRunning: boolean;
-}> = ({ testsRootRef, onTestsComplete, isRunning }) => {
-  const observerRef = useRef<MutationObserver | null>(null);
-
-  useEffect(() => {
-    const root = testsRootRef.current;
-    if (!isRunning || !root) {
-      observerRef.current?.disconnect();
-      return;
-    }
-    const obs = new MutationObserver(() => {
-      const text = root.textContent || '';
-      if (!text) return;
-      const parsed = parseSummary(text);
-      if (parsed.ran) {
-        onTestsComplete(text, parsed);
-      }
-    });
-    obs.observe(root, { childList: true, subtree: true, characterData: true });
-    observerRef.current = obs;
-    return () => { observerRef.current?.disconnect(); };
-  }, [isRunning, onTestsComplete, testsRootRef]);
-
-  return (
-    <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
-      <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests style={{ height: '100%' }} watchMode={false} showWatchButton={false} showVerboseButton={false} />
-      </div>
-      <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
-        <SandpackConsole maxMessageCount={200} showHeader standalone style={{ height: '100%', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}/>
-      </div>
-    </div>
-  );
-};
-
-const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
-  const {
-    assignmentId, questionId, isLastQuestion, onNext, onComplete,
-    testCode, wasTriggeredByRerun, onRerun, codeFile,
-  } = props;
-
+// All logic is now consolidated into this single inner component.
+const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
+  const { assignmentId, questionId, isLastQuestion, onNext, onComplete, testCode } = props;
+  const { sandpack } = useSandpack();
+  const [isRunning, setIsRunning] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<any>(null);
-
-  const { sandpack } = useSandpack();
+  const [lastRawText, setLastRawText] = useState('');
   const testsRootRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, []);
-  
-  const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests...');
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setIsRunning(true);
-    setCanSubmit(false);
-    setLastRawText('');
-    setLastParsed(null);
-    
-    try {
-      await sandpack.runSandpack();
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      let testButton: HTMLButtonElement | null = null;
-      let attempts = 0;
-      while (!testButton && attempts < 10) {
-        attempts++;
-        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
-        testButton = document.querySelector('.sp-tests button, button[title*="Run tests"]');
-        if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      if (testButton) {
-        console.log('[SandpackTest] Found test button, clicking...');
-        testButton.click();
-        timeoutRef.current = setTimeout(() => {
-          setIsRunning(current => {
-            if (current) console.log('[SandpackTest] Tests seem stuck, resetting state');
-            return false;
-          });
-        }, 15000);
-      } else {
-        console.log('[SandpackTest] Could not find test button after all attempts');
-        setIsRunning(false);
-      }
-    } catch (error) {
-      console.error('[SandpackTest] Error running tests:', error);
-      setIsRunning(false);
-    }
-  };
 
   const handleTestsComplete = (rawText: string, parsed: any) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
   };
-
+  
+  // This effect manages the observer that listens for test results.
   useEffect(() => {
-    if (wasTriggeredByRerun) {
-      setTimeout(() => handleRunTests(), 100);
-    }
-  }, []);
+    const root = testsRootRef.current;
+    if (!isRunning || !root) return;
+
+    const observer = new MutationObserver(() => {
+      const text = root.textContent || '';
+      if (!text) return;
+      const parsed = parseSummary(text);
+      if (parsed.ran) {
+        handleTestsComplete(text, parsed);
+        observer.disconnect(); // Disconnect after completion
+      }
+    });
+
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isRunning]); // This effect re-runs only when `isRunning` changes.
+
+  const handleRunTests = async () => {
+    console.log('[SandpackTest] Running tests...');
+    setIsRunning(true);
+    setCanSubmit(false);
+    setLastParsed(null);
+
+    // Directly and reliably run the 'test' script from package.json
+    sandpack.runScript('test');
+  };
 
   const handleSubmit = async () => {
     if (!lastParsed) return;
@@ -218,7 +151,7 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
                 <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: testsFailed ? '#ef4444' : '#10b981' }}>
                   {allTestsPassed ? `✅ All tests passed!` : testsFailed ? `❌ ${tests.failed ?? 0} of ${tests.total ?? 0} failed.` : 'ℹ️ Tests completed.'}
                 </p>
-                <button onClick={() => onRerun(sandpack.files[codeFile].code)} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+                <button onClick={handleRunTests} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
                   Rerun Tests
                 </button>
                 <button onClick={handleSubmit} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
@@ -242,7 +175,14 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} isRunning={isRunning} />
+          <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
+            <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
+              <SandpackTests style={{ height: '100%' }} />
+            </div>
+            <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
+              <SandpackConsole />
+            </div>
+          </div>
         </SandpackLayout>
       </div>
     </>
@@ -251,61 +191,33 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
 
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
-  
-  const [runState, setRunState] = useState({ key: 0, wasTriggeredByRerun: false });
-  const [currentCode, setCurrentCode] = useState(props.starterCode);
-  const [codeToResetTo, setCodeToResetTo] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCurrentCode(props.starterCode);
-    setRunState({ key: 0, wasTriggeredByRerun: false });
-  }, [props.questionId, props.starterCode]);
-
-  // This effect orchestrates the reset to prevent race conditions.
-  useEffect(() => {
-    if (codeToResetTo !== null) {
-      setCurrentCode(codeToResetTo); // 1. Set the new code
-      setRunState(s => ({ key: s.key + 1, wasTriggeredByRerun: true })); // 2. Trigger re-key
-      setCodeToResetTo(null); // 3. Reset the trigger
-    }
-  }, [codeToResetTo]);
-
-  // The rerun handler now just sets a trigger state.
-  const handleRerun = (latestCode: string) => {
-    setCodeToResetTo(latestCode);
-  };
 
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
-      [codeFile]: { code: currentCode ?? '', active: true },
+      [codeFile]: { code: props.starterCode ?? '', active: true },
       [testFile]: { code: props.testCode ?? '' },
       '/vitest.config.ts': { code: `import { defineConfig } from 'vitest/config';\nexport default defineConfig({ test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] } });`, hidden: true },
       '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
       '/package.json': {
         code: JSON.stringify({
           name: 'sandpack-tests', version: '1.0.0', private: true,
-          scripts: { test: 'vitest run --reporter=basic' },
+          scripts: { test: 'vitest run --reporter=basic' }, // The script we run directly
         }, null, 2),
         hidden: true,
       },
     };
-  }, [currentCode, props.testCode, codeFile, testFile]);
+  }, [props.starterCode, props.testCode, codeFile, testFile]);
   
   return (
     <SandpackProvider
-      key={`${props.questionId}-${runState.key}`}
+      key={props.questionId} // Key now only changes when the question changes
       template={template}
       customSetup={{ dependencies: deps }}
       files={files}
       options={{ autorun: false, initMode: 'immediate' }}
     >
-      <SandpackTestInner
-        {...props}
-        wasTriggeredByRerun={runState.wasTriggeredByRerun}
-        onRerun={handleRerun}
-        codeFile={codeFile}
-      />
+      <SandpackTestRunner {...props} />
     </SandpackProvider>
   );
 };
