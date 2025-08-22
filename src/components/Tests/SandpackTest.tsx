@@ -269,9 +269,10 @@ export default defineConfig({
     }
   };
 
+  // Button action to trigger test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
-    setRunId(prev => prev + 1);
+    setRunId(prev => prev + 1); // Increment key to re-initiate the observer
     setTestStatus('running');
     setLastRawText('');
     setLastParsed(null);
@@ -282,7 +283,7 @@ export default defineConfig({
       
       let testButton = null;
       let attempts = 0;
-      const maxAttempts = 10;
+      const maxAttempts = 30; // Increased from 10
       
       while (!testButton && attempts < maxAttempts) {
         attempts++;
@@ -338,7 +339,7 @@ export default defineConfig({
             }
             return currentStatus;
           });
-        }, 15000);
+        }, 25000); // Increased from 15000 to give tests more time
         
       } else {
         console.log('[SandpackTest] Could not find test button, marking as failed');
