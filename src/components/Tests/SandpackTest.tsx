@@ -228,18 +228,29 @@ const SandpackTestInner: React.FC<
   };
 
   const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests via direct dispatch...');
+    console.log('[SandpackTest] Attempting to run tests...');
     setRunId(prev => prev + 1); // Re-initialize the observer
     setTestStatus('running');
     setLastRawText('');
     setLastParsed(null);
 
     try {
-      // Send the 'run-test' command directly to the test client
-      if (sandpack.clients.test) {
-        sandpack.clients.test.dispatch({ type: 'run-test' });
+      // **THE FIX**: Wait for the test client to be initialized before using it.
+      let testClient = sandpack.clients.test;
+      let attempts = 0;
+      const maxAttempts = 20; // Poll for 5 seconds (20 * 250ms)
+
+      while (!testClient && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        testClient = sandpack.clients.test;
+        attempts++;
+      }
+
+      if (testClient) {
+        console.log(`[SandpackTest] Test client found after ${attempts} attempts. Dispatching run command.`);
+        testClient.dispatch({ type: 'run-test' });
       } else {
-        throw new Error('Sandpack test client not found.');
+        throw new Error('Sandpack test client did not initialize in time.');
       }
 
       // Set a timeout to catch tests that get stuck
@@ -254,7 +265,7 @@ const SandpackTestInner: React.FC<
       }, 20000); // 20-second timeout for the entire test run
 
     } catch (error) {
-      console.error('[SandpackTest] Error dispatching run-test command:', error);
+      console.error('[SandpackTest] Error running tests:', error);
       setTestStatus('failed');
     }
   };
@@ -422,7 +433,7 @@ const SandpackTestInner: React.FC<
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
-  // **THE FIX**: Do not render anything until the necessary code props are available.
+  // Do not render anything until the necessary code props are available.
   // This prevents Sandpack from loading its default template.
   if (!props.starterCode || !props.testCode) {
     return <div>Loading Question...</div>; // Or a loading spinner
