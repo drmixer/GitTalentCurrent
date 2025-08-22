@@ -13,16 +13,7 @@ import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
 
-// This interface is now defined outside to be shared
-interface SandpackTestInnerProps extends SandpackTestProps {
-  template: SandpackProviderProps['template'];
-  codeFile: string;
-  testFile: string;
-  deps: Record<string, string>;
-  shouldAutorun: boolean;
-  onRerun: () => void;
-}
-
+// Prop interfaces are defined first for clarity
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
@@ -33,6 +24,16 @@ interface SandpackTestProps {
   onNext: () => void;
   onComplete: () => void;
 }
+
+interface SandpackTestInnerProps extends SandpackTestProps {
+  template: SandpackProviderProps['template'];
+  codeFile: string;
+  testFile: string;
+  deps: Record<string, string>;
+  shouldAutorun: boolean;
+  onRerun: () => void;
+}
+
 
 const getSetup = (framework: Framework) => {
   switch (framework) {
@@ -84,9 +85,8 @@ const getSetup = (framework: Framework) => {
 function parseSummary(text: string) {
   const ran = /Test suites?:|Test files?:|Tests?:|No tests found/i.test(text);
   if (!ran) return { ran: false };
-  const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
-  const num = (re: RegExp, s: string) => Number(s.match(re)?.[1]);
+  const num = (re: RegExp, s: string) => s.match(re) ? Number(s.match(re)?.[1]) : undefined;
   const tests = {
     passed: num(/(\d+)\s*passed/i, testsLine),
     failed: num(/(\d+)\s*failed/i, testsLine),
@@ -126,10 +126,20 @@ const TestsAndConsole: React.FC<{
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
-        <SandpackTests style={{ height: '100%' }} />
+        <SandpackTests
+          style={{ height: '100%' }}
+          watchMode={false}
+          showWatchButton={false}
+          showVerboseButton={false}
+        />
       </div>
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
-        <SandpackConsole />
+        <SandpackConsole
+          maxMessageCount={200}
+          showHeader
+          standalone
+          style={{ height: '100%', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}
+        />
       </div>
     </div>
   );
@@ -137,14 +147,12 @@ const TestsAndConsole: React.FC<{
 
 const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
   const {
-    starterCode,
-    testCode,
     assignmentId,
     questionId,
     isLastQuestion,
     onNext,
     onComplete,
-    codeFile,
+    testCode,
     shouldAutorun,
     onRerun,
   } = props;
@@ -164,16 +172,9 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
-
-  const handleTestsComplete = (rawText: string, parsed: any) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setLastRawText(rawText);
-    setLastParsed(parsed);
-    setCanSubmit(true);
-    setIsRunning(false);
-  };
   
   const handleRunTests = async () => {
+    console.log('[SandpackTest] Running tests...');
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setIsRunning(true);
     setCanSubmit(false);
@@ -187,10 +188,12 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
       let attempts = 0;
       while (!testButton && attempts < 10) {
         attempts++;
-        testButton = document.querySelector('.sp-tests button');
+        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
+        testButton = document.querySelector('.sp-tests button, button[title*="Run tests"]');
         if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
       }
       if (testButton) {
+        console.log('[SandpackTest] Found test button, clicking...');
         testButton.click();
         timeoutRef.current = setTimeout(() => {
           setIsRunning(current => {
@@ -208,13 +211,18 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
     }
   };
 
-  // If the parent requests an autorun (after a reset), trigger it.
+  const handleTestsComplete = (rawText: string, parsed: any) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    console.log('[SandpackTest] Tests completed with results:', parsed);
+    setLastRawText(rawText);
+    setLastParsed(parsed);
+    setCanSubmit(true);
+    setIsRunning(false);
+  };
+
   useEffect(() => {
     if (shouldAutorun) {
-      // Short delay to ensure the new Sandpack instance is fully ready.
-      setTimeout(() => {
-        handleRunTests();
-      }, 100);
+      setTimeout(() => handleRunTests(), 100);
     }
   }, [shouldAutorun]);
 
@@ -224,11 +232,8 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
     const score = (tests.total > 0 && tests.failed === 0) ? 1 : 0;
     try {
       await supabase.from('test_results').upsert({
-        assignment_id: assignmentId,
-        question_id: questionId,
-        score,
-        passed_test_cases: tests.passed ?? null,
-        total_test_cases: tests.total ?? null,
+        assignment_id: assignmentId, question_id: questionId, score,
+        passed_test_cases: tests.passed ?? null, total_test_cases: tests.total ?? null,
         stdout: lastRawText,
       }, { onConflict: 'assignment_id,question_id' });
       setSubmitted(true);
@@ -241,7 +246,7 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
     }
   };
 
-  if (!testCode) return <div>Missing test code.</div>;
+  if (!testCode) return <div>Missing test code for this question.</div>;
 
   return (
     <>
@@ -269,12 +274,12 @@ const SandpackTestInner: React.FC<SandpackTestInnerProps> = (props) => {
           })()
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run tests.</p>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Write your code, then run the tests.</p>
             <button onClick={handleRunTests} disabled={isRunning} style={{ padding: '10px 20px', backgroundColor: isRunning ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isRunning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {isRunning ? (
                 <>
                   <div style={{ width: '16px', height: '16px', border: '2px solid #ffffff40', borderTop: '2px solid #ffffff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                  Running...
+                  Running Tests...
                 </>
               ) : '▶️ Run Tests'}
             </button>
@@ -307,7 +312,16 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       [testFile]: { code: props.testCode ?? '' },
       '/vitest.config.ts': { code: `import { defineConfig } from 'vitest/config';\nexport default defineConfig({ test: { environment: 'jsdom', globals: true, setupFiles: ['./setupTests.ts'] } });`, hidden: true },
       '/setupTests.ts': { code: `import '@testing-library/jest-dom';`, hidden: true },
-      '/package.json': { code: JSON.stringify({ name: 'sandpack-tests', scripts: { test: 'vitest run --reporter=basic' } }, null, 2), hidden: true },
+      // RESTORED to full, correct version
+      '/package.json': {
+        code: JSON.stringify({
+          name: 'sandpack-tests',
+          version: '1.0.0',
+          private: true,
+          scripts: { test: 'vitest run --reporter=basic' },
+        }, null, 2),
+        hidden: true,
+      },
     };
   }, [props.starterCode, props.testCode, codeFile, testFile]);
   
