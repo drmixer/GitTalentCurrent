@@ -117,6 +117,7 @@ const TestsAndConsole: React.FC<{
   onTestsComplete: (rawText: string, parsed: any) => void;
 }> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
+  const lastProcessedText = useRef<string>('');
 
   useEffect(() => {
     const root = testsRootRef.current;
@@ -124,21 +125,26 @@ const TestsAndConsole: React.FC<{
 
     console.log('[SandpackTest] Setting up test completion observer');
 
-    observerRef.current?.disconnect();
+    // Clean up previous observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
 
     const observe = () => {
       const obs = new MutationObserver(() => {
         const text = root.textContent || '';
         
-        if (!text) return;
+        if (!text || text === lastProcessedText.current) return;
         
         const parsed = parseSummary(text);
         
-        if (parsed.ran) {
+        if (parsed.ran && text !== lastProcessedText.current) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
+          lastProcessedText.current = text; // Prevent duplicate processing
           onTestsComplete(text, parsed);
-          obs.disconnect();
-          observerRef.current = null;
+          
+          // Don't disconnect immediately - let the component handle cleanup
         }
       });
       
@@ -153,9 +159,16 @@ const TestsAndConsole: React.FC<{
     observe();
 
     return () => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
     };
+  }, [onTestsComplete]);
+
+  // Reset last processed text when onTestsComplete changes (new test run)
+  useEffect(() => {
+    lastProcessedText.current = '';
   }, [onTestsComplete]);
 
   return (
@@ -218,6 +231,7 @@ const SandpackTestInner: React.FC<
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
@@ -264,12 +278,26 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
+    
+    // Clear the timeout since tests completed successfully
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    // Reset state for new test run
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
@@ -363,10 +391,9 @@ export default defineConfig({
         testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         
         // Set a timeout to reset running state if tests don't complete
-        setTimeout(() => {
-          console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit) {
-            console.log('[SandpackTest] Tests seem stuck, resetting state');
+        timeoutRef.current = setTimeout(() => {
+          console.log('[SandpackTest] Tests timeout - resetting state');
+          if (isRunning) {
             setIsRunning(false);
           }
         }, 15000); // 15 second timeout
