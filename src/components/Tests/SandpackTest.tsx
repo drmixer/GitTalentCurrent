@@ -269,85 +269,31 @@ export default defineConfig({
     }
   };
 
-  // Button action to trigger test execution
+  // NEW: Button action to trigger test execution using a direct command
   const handleRunTests = async () => {
-    console.log('[SandpackTest] Running tests...');
-    setRunId(prev => prev + 1); // Increment key to re-initiate the observer
+    console.log('[SandpackTest] Running tests via direct dispatch...');
+    setRunId(prev => prev + 1); // Re-initialize the observer
     setTestStatus('running');
     setLastRawText('');
     setLastParsed(null);
 
     try {
-      await sandpack.runSandpack();
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      let testButton = null;
-      let attempts = 0;
-      const maxAttempts = 30; // Increased from 10
-      
-      while (!testButton && attempts < maxAttempts) {
-        attempts++;
-        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
-        
-        const selectors = [
-          'button[title*="Run"]', 'button[aria-label*="Run"]', 'button[aria-label*="run"]', 'button[title*="run"]',
-          '[data-sp-tests] button', '.sp-tests button', '.sp-test button', 'button[data-testid*="run"]',
-          'button[class*="run"]', 'button[class*="test"]'
-        ];
-        
-        for (const selector of selectors) {
-          try {
-            const buttons = document.querySelectorAll(selector);
-            for (const btn of buttons) {
-              if (btn instanceof HTMLButtonElement && !btn.disabled && btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]')) {
-                testButton = btn;
-                console.log('[SandpackTest] Found test button with selector:', selector);
-                break;
-              }
-            }
-            if (testButton) break;
-          } catch (e) { /* Invalid selector */ }
-        }
-        
-        if (!testButton) {
-          const allButtons = document.querySelectorAll('button');
-          for (const button of allButtons) {
-            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"]');
-            const hasRunText = (button.textContent || button.title || button.getAttribute('aria-label') || '').toLowerCase().includes('run');
-            if ((hasPlayIcon || hasRunText) && button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]') && !button.disabled) {
-              testButton = button;
-              console.log('[SandpackTest] Found test button by content/icon');
-              break;
-            }
+      // Dispatch the command to run the 'test' script from package.json
+      sandpack.dispatch({ type: 'run-test' });
+
+      // Set a timeout to catch tests that get stuck
+      setTimeout(() => {
+        setTestStatus(currentStatus => {
+          if (currentStatus === 'running') {
+            console.log('[SandpackTest] Tests seem stuck, marking as failed');
+            return 'failed';
           }
-        }
-        
-        if (!testButton) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-      if (testButton && testButton instanceof HTMLButtonElement) {
-        console.log('[SandpackTest] Clicking test button programmatically');
-        testButton.click();
-        
-        setTimeout(() => {
-          setTestStatus(currentStatus => {
-            if (currentStatus === 'running') {
-              console.log('[SandpackTest] Tests seem stuck, marking as failed');
-              return 'failed';
-            }
-            return currentStatus;
-          });
-        }, 25000); // Increased from 15000 to give tests more time
-        
-      } else {
-        console.log('[SandpackTest] Could not find test button, marking as failed');
-        setTestStatus('failed');
-      }
-      
+          return currentStatus;
+        });
+      }, 20000); // 20-second timeout for the entire test run
+
     } catch (error) {
-      console.error('[SandpackTest] Error running tests:', error);
+      console.error('[SandpackTest] Error dispatching run-test command:', error);
       setTestStatus('failed');
     }
   };
