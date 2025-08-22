@@ -311,107 +311,132 @@ export default defineConfig({
       // First, ensure code is compiled/updated
       await sandpack.runSandpack();
       
-      // Wait a bit longer for Sandpack to fully initialize
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a bit for Sandpack to initialize
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       let testButton = null;
       let attempts = 0;
-      const maxAttempts = 10;
+      const maxAttempts = 15; // Increased attempts
       
-      // Keep trying to find the test button for up to 5 seconds
+      // Keep trying to find the test button
       while (!testButton && attempts < maxAttempts) {
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // Method 1: More comprehensive selectors
-        const selectors = [
-          'button[title*="Run"]',
-          'button[aria-label*="Run"]',
-          'button[aria-label*="run"]',
-          'button[title*="run"]',
-          '[data-sp-tests] button',
-          '.sp-tests button',
-          '.sp-test button',
-          'button[data-testid*="run"]',
-          'button[class*="run"]',
-          'button[class*="test"]'
+        // Method 1: Look for buttons in test areas with various selectors
+        const testAreaSelectors = [
+          '[data-sp-tests]',
+          '.sp-tests',
+          '.sp-test',
+          '[class*="test"]',
+          '[class*="sp-"]'
         ];
         
-        for (const selector of selectors) {
-          try {
-            const buttons = document.querySelectorAll(selector);
+        for (const areaSelector of testAreaSelectors) {
+          const testArea = document.querySelector(areaSelector);
+          if (testArea) {
+            // Look for any button in the test area
+            const buttons = testArea.querySelectorAll('button');
             for (const btn of buttons) {
-              if (btn instanceof HTMLButtonElement && !btn.disabled) {
-                // Check if this button is in the test area
-                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-                if (parentClasses) {
+              if (btn instanceof HTMLButtonElement && !btn.disabled && btn.offsetParent !== null) {
+                // Check if button looks like a run/play button
+                const text = btn.textContent?.toLowerCase() || '';
+                const title = btn.title?.toLowerCase() || '';
+                const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+                const hasPlayIcon = btn.querySelector('svg, [class*="play"], [class*="triangle"]');
+                
+                const isRunButton = text.includes('run') || title.includes('run') || 
+                                  ariaLabel.includes('run') || hasPlayIcon || 
+                                  text.includes('test') || title.includes('test') || 
+                                  ariaLabel.includes('test');
+                
+                if (isRunButton) {
                   testButton = btn;
-                  console.log('[SandpackTest] Found test button with selector:', selector);
+                  console.log('[SandpackTest] Found test button in area:', areaSelector, 'Button text:', text);
                   break;
                 }
               }
             }
             if (testButton) break;
-          } catch (e) {
-            // Invalid selector, continue
           }
         }
         
-        // Method 2: Look for play button or run button by content and SVG
+        // Method 2: Broader search if we haven't found it yet
         if (!testButton) {
           const allButtons = document.querySelectorAll('button');
           for (const button of allButtons) {
-            // Check for play icon (triangle/arrow) or run text
-            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
-            const text = button.textContent?.toLowerCase() || '';
-            const title = button.title?.toLowerCase() || '';
-            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-            
-            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
-            
-            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
-              testButton = button;
-              console.log('[SandpackTest] Found test button by content/icon');
-              break;
+            if (button instanceof HTMLButtonElement && !button.disabled && button.offsetParent !== null) {
+              const text = button.textContent?.toLowerCase() || '';
+              const title = button.title?.toLowerCase() || '';
+              const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+              
+              // Look for buttons with run/test/play indicators
+              const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
+              const hasTestText = text.includes('test') || title.includes('test') || ariaLabel.includes('test');
+              const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"]');
+              
+              // Check if it's in a sandpack-related container
+              const inSandpackArea = button.closest('[class*="sp-"], [class*="sandpack"], [data-sp-tests], .gt-sp');
+              
+              if ((hasRunText || hasTestText || hasPlayIcon) && inSandpackArea) {
+                testButton = button;
+                console.log('[SandpackTest] Found test button via broad search. Text:', text, 'In area:', inSandpackArea?.className);
+                break;
+              }
             }
           }
         }
         
         if (!testButton) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 400));
         }
       }
       
       if (testButton && testButton instanceof HTMLButtonElement) {
         console.log('[SandpackTest] Clicking test button programmatically');
         
-        // Try multiple ways to trigger the button
+        // Ensure button is visible and interactable
+        testButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Try multiple click methods
         testButton.focus();
+        
+        // Method 1: Direct click
         testButton.click();
         
-        // Also try dispatching events
+        // Method 2: Programmatic events
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        testButton.dispatchEvent(clickEvent);
+        
+        // Method 3: Mouse events sequence
         testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit) {
+          if (isRunning && !lastParsed?.ran) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
-        }, 15000); // 15 second timeout
+        }, 20000); // 20 second timeout
         
       } else {
         console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
         setIsRunning(false);
+        // Show user-friendly error
+        alert('Unable to find test button. Please refresh the page and try again.');
       }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
+      alert('Error running tests. Please try again.');
     }
   };
 
@@ -721,4 +746,3 @@ export default defineConfig({
 };
 
 export default SandpackTest;
-
