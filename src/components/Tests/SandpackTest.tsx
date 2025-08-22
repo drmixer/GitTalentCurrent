@@ -25,7 +25,6 @@ interface SandpackTestProps {
 }
 
 const getSetup = (framework: Framework) => {
-  // ... (This function remains the same)
   switch (framework) {
     case 'react':
       return {
@@ -38,6 +37,7 @@ const getSetup = (framework: Framework) => {
           '@testing-library/jest-dom': '^6.4.2', vitest: '^0.34.6',
         },
       };
+    // Redacted other frameworks for brevity, they remain the same
     default:
       return {
         template: 'vanilla-ts' as SandpackProviderProps['template'],
@@ -73,8 +73,15 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
   const [lastParsed, setLastParsed] = useState<any>(null);
   const [lastRawText, setLastRawText] = useState('');
   const testsRootRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, []);
 
   const handleTestsComplete = (rawText: string, parsed: any) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
@@ -102,16 +109,51 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
     return () => {
       observer.disconnect();
     };
-  }, [isRunning]); // This effect re-runs only when `isRunning` changes.
+  }, [isRunning]);
 
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setIsRunning(true);
     setCanSubmit(false);
     setLastParsed(null);
-
-    // Directly and reliably run the 'test' script from package.json
-    sandpack.runScript('test');
+    
+    try {
+      // This command resets the Sandpack client, ensuring a clean state for every run.
+      await sandpack.runSandpack();
+      // Wait for the environment to be ready.
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      let testButton: HTMLButtonElement | null = null;
+      let attempts = 0;
+      while (!testButton && attempts < 10) {
+        attempts++;
+        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
+        testButton = document.querySelector('.sp-tests button, button[title*="Run tests"]');
+        if (!testButton) await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      if (testButton) {
+        console.log('[SandpackTest] Found test button, clicking...');
+        testButton.click();
+        timeoutRef.current = setTimeout(() => {
+          setIsRunning(current => {
+            if (current) {
+                console.log('[SandpackTest] Tests seem stuck, resetting state');
+                alert("The test runner seems to be stuck. Please try running the tests again.");
+                return false;
+            }
+            return current;
+          });
+        }, 15000); // 15-second timeout
+      } else {
+        console.log('[SandpackTest] Could not find test button after all attempts');
+        alert("Could not find the test runner button. Please try refreshing the page.");
+        setIsRunning(false);
+      }
+    } catch (error) {
+      console.error('[SandpackTest] Error running tests:', error);
+      setIsRunning(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -189,6 +231,7 @@ const SandpackTestRunner: React.FC<SandpackTestProps> = (props) => {
   );
 };
 
+// This is the main export, now simplified.
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
 
@@ -202,7 +245,7 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
       '/package.json': {
         code: JSON.stringify({
           name: 'sandpack-tests', version: '1.0.0', private: true,
-          scripts: { test: 'vitest run --reporter=basic' }, // The script we run directly
+          scripts: { test: 'vitest run --reporter=basic' },
         }, null, 2),
         hidden: true,
       },
