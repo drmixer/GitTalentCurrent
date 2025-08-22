@@ -156,22 +156,19 @@ const TestsAndConsole: React.FC<{
         
         if (!text) return;
         
+        console.log('[SandpackTest] Observer detected text change:', text.substring(0, 100));
+        
         const parsed = parseSummary(text);
         
-        // Check for test completion OR compilation errors
+        // Check for test completion, compilation errors, or test results
         const hasError = text.includes('Error') || text.includes('SyntaxError') || text.includes('TypeError');
         const hasCompileSuccess = text.includes('compiled successfully') || text.includes('Compiled successfully');
+        const hasTestOutput = text.includes('PASS') || text.includes('FAIL') || text.includes('✓') || text.includes('✗');
         
-        // If we have a compilation success after an error, wait a bit more for tests
-        if (hasCompileSuccess && !parsed.ran && !hasError) {
-          console.log('[SandpackTest] Code compiled successfully, waiting for tests...');
-          return; // Keep waiting for actual test results
-        }
-        
-        // Mark as complete if we have test results or significant error
-        if (parsed.ran || (hasError && text.length > 50)) {
+        // If we have test output or results, consider it complete
+        if (parsed.ran || hasTestOutput || (hasError && text.length > 50)) {
           hasCompleted = true;
-          console.log('[SandpackTest] Tests completed or significant error detected, calling onTestsComplete');
+          console.log('[SandpackTest] Tests completed - parsed:', parsed, 'hasTestOutput:', hasTestOutput, 'hasError:', hasError);
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
@@ -179,6 +176,8 @@ const TestsAndConsole: React.FC<{
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
+        } else if (hasCompileSuccess && !parsed.ran) {
+          console.log('[SandpackTest] Code compiled successfully, continuing to wait for tests...');
         }
       });
       
@@ -341,8 +340,44 @@ export default defineConfig({
       // Log available sandpack methods for debugging
       console.log('[SandpackTest] Available sandpack methods:', Object.keys(sandpack));
       
-      // Simple approach: Just wait a bit for components to render, then look for test button
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use Sandpack's dispatch method to run tests
+      console.log('[SandpackTest] Using sandpack dispatch to run tests...');
+      
+      // Try different approaches to trigger tests
+      if (sandpack.dispatch) {
+        // Method 1: Try to dispatch a test run command
+        console.log('[SandpackTest] Trying dispatch method...');
+        sandpack.dispatch({
+          type: 'run-tests'
+        });
+        
+        // Wait a bit and also try the npm test command
+        setTimeout(() => {
+          sandpack.dispatch({
+            type: 'shell/run',
+            command: 'npm test'
+          });
+        }, 1000);
+        
+      } else if (sandpack.runSandpack) {
+        // Method 2: Run the sandbox and then try to execute tests
+        console.log('[SandpackTest] Running sandbox first...');
+        await sandpack.runSandpack();
+        
+        // Wait for it to compile, then try to run tests via shell command
+        setTimeout(() => {
+          console.log('[SandpackTest] Trying to run tests via shell...');
+          if (sandpack.dispatch) {
+            sandpack.dispatch({
+              type: 'shell/run', 
+              command: 'npm test'
+            });
+          }
+        }, 2000);
+      }
+      
+      // Give it time to start running tests
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Try to find and click the test button with improved selectors
       let testButton = null;
