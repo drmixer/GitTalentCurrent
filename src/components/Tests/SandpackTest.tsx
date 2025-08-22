@@ -257,12 +257,12 @@ export default defineConfig({
     };
   }, [starterCode, testCode, codeFile, testFile]);
 
-  // Check if tests passed based on parsed results
+  // Check if tests passed - same logic as before
   const testsPassed = useMemo(() => {
     if (!lastParsed?.tests) return false;
     const { total, failed, passed } = lastParsed.tests;
     
-    if (typeof total === 'number' && total > 0) {
+    if (total && total > 0) {
       if (typeof failed === 'number') {
         return failed === 0;
       } else if (typeof passed === 'number') {
@@ -278,28 +278,11 @@ export default defineConfig({
     console.log('[SandpackTest] Tests completed with results:', parsed);
     setLastRawText(rawText);
     setLastParsed(parsed);
-    
-    // Only set canSubmit to true if tests actually passed
-    const testsPassedNow = (() => {
-      if (!parsed?.tests) return false;
-      const { total, failed, passed } = parsed.tests;
-      
-      if (typeof total === 'number' && total > 0) {
-        if (typeof failed === 'number') {
-          return failed === 0;
-        } else if (typeof passed === 'number') {
-          return passed === total;
-        }
-        return true;
-      }
-      return false;
-    })();
-    
-    setCanSubmit(testsPassedNow);
+    setCanSubmit(true);  // Always set to true when tests complete
     setIsRunning(false);
   };
 
-  // NEW: Single button that triggers both compile and test execution
+  // ORIGINAL working button logic - keeping this exactly the same
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -311,136 +294,107 @@ export default defineConfig({
       // First, ensure code is compiled/updated
       await sandpack.runSandpack();
       
-      // Wait a bit for Sandpack to initialize
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Wait a bit longer for Sandpack to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       let testButton = null;
       let attempts = 0;
-      const maxAttempts = 15; // Increased attempts
+      const maxAttempts = 10;
       
-      // Keep trying to find the test button
+      // Keep trying to find the test button for up to 5 seconds
       while (!testButton && attempts < maxAttempts) {
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
         
-        // Method 1: Look specifically for test run buttons with strict criteria
-        const testAreaSelectors = [
-          '[data-sp-tests]',
-          '.sp-tests',
-          '.sp-test'
+        // Method 1: More comprehensive selectors
+        const selectors = [
+          'button[title*="Run"]',
+          'button[aria-label*="Run"]',
+          'button[aria-label*="run"]',
+          'button[title*="run"]',
+          '[data-sp-tests] button',
+          '.sp-tests button',
+          '.sp-test button',
+          'button[data-testid*="run"]',
+          'button[class*="run"]',
+          'button[class*="test"]'
         ];
         
-        for (const areaSelector of testAreaSelectors) {
-          const testArea = document.querySelector(areaSelector);
-          if (testArea) {
-            // Look for buttons in the test area
-            const buttons = testArea.querySelectorAll('button');
+        for (const selector of selectors) {
+          try {
+            const buttons = document.querySelectorAll(selector);
             for (const btn of buttons) {
-              if (btn instanceof HTMLButtonElement && !btn.disabled && btn.offsetParent !== null) {
-                const text = btn.textContent?.toLowerCase() || '';
-                const title = btn.title?.toLowerCase() || '';
-                const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
-                const hasPlayIcon = btn.querySelector('svg path, svg polygon, svg [class*="play"]');
-                
-                // Be very specific about what constitutes a run button
-                // Exclude file tabs and other UI buttons
-                const isFileTab = text.includes('.tsx') || text.includes('.ts') || text.includes('.js') || text.includes('.vue');
-                const isRunButton = (
-                  (text.includes('run') || title.includes('run') || ariaLabel.includes('run')) ||
-                  (hasPlayIcon && !isFileTab)
-                ) && !isFileTab;
-                
-                if (isRunButton) {
+              if (btn instanceof HTMLButtonElement && !btn.disabled) {
+                // Check if this button is in the test area
+                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+                if (parentClasses) {
                   testButton = btn;
-                  console.log('[SandpackTest] Found test button in area:', areaSelector, 'Button text:', text, 'Title:', title, 'AriaLabel:', ariaLabel);
+                  console.log('[SandpackTest] Found test button with selector:', selector);
                   break;
                 }
               }
             }
             if (testButton) break;
+          } catch (e) {
+            // Invalid selector, continue
           }
         }
         
-        // Method 2: Broader search with stricter filtering
+        // Method 2: Look for play button or run button by content and SVG
         if (!testButton) {
           const allButtons = document.querySelectorAll('button');
           for (const button of allButtons) {
-            if (button instanceof HTMLButtonElement && !button.disabled && button.offsetParent !== null) {
-              const text = button.textContent?.toLowerCase() || '';
-              const title = button.title?.toLowerCase() || '';
-              const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-              
-              // Exclude file tabs and navigation buttons
-              const isFileTab = text.includes('.tsx') || text.includes('.ts') || text.includes('.js') || text.includes('.vue') || text.includes('.html');
-              const isNavigationButton = text.includes('tab') || text.includes('file') || button.closest('[role="tablist"]');
-              
-              // Look for explicit run/test buttons
-              const hasRunText = text.includes('run') && !isFileTab;
-              const hasTestText = text.includes('test') && !text.includes('.test') && !isFileTab;
-              const hasPlayIcon = button.querySelector('svg path[d*="M"], svg polygon') && !isFileTab;
-              
-              // Must be in a sandpack area
-              const inSandpackArea = button.closest('[class*="sp-"], [class*="sandpack"], [data-sp-tests], .gt-sp');
-              
-              if ((hasRunText || hasTestText || hasPlayIcon) && inSandpackArea && !isNavigationButton && !isFileTab) {
-                testButton = button;
-                console.log('[SandpackTest] Found test button via broad search. Text:', text, 'Title:', title, 'AriaLabel:', ariaLabel);
-                break;
-              }
+            // Check for play icon (triangle/arrow) or run text
+            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
+            const text = button.textContent?.toLowerCase() || '';
+            const title = button.title?.toLowerCase() || '';
+            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+            
+            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+            
+            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
+              testButton = button;
+              console.log('[SandpackTest] Found test button by content/icon');
+              break;
             }
           }
         }
         
         if (!testButton) {
-          await new Promise(resolve => setTimeout(resolve, 400));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
       if (testButton && testButton instanceof HTMLButtonElement) {
         console.log('[SandpackTest] Clicking test button programmatically');
         
-        // Ensure button is visible and interactable
-        testButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        // Try multiple click methods
+        // Try multiple ways to trigger the button
         testButton.focus();
-        
-        // Method 1: Direct click
         testButton.click();
         
-        // Method 2: Programmatic events
-        const clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window
-        });
-        testButton.dispatchEvent(clickEvent);
-        
-        // Method 3: Mouse events sequence
+        // Also try dispatching events
         testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (isRunning && !lastParsed?.ran) {
+          if (!canSubmit) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
-        }, 20000); // 20 second timeout
+        }, 15000); // 15 second timeout
         
       } else {
         console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
         setIsRunning(false);
-        // Show user-friendly error
-        alert('Unable to find test button. Please refresh the page and try again.');
       }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
-      alert('Error running tests. Please try again.');
     }
   };
 
@@ -529,137 +483,9 @@ export default defineConfig({
     return <div>This Sandpack question is missing its test code.</div>;
   }
 
-  // Determine what to show in the action bar
-  const getActionBarContent = () => {
-    if (submitted) {
-      return (
-        <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
-          ✅ Submitted! Advancing to next question...
-        </p>
-      );
-    }
-
-    if (canSubmit && testsPassed) {
-      // Tests passed - show success message and submit button
-      return (
-        <>
-          <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-            ✅ All tests passed!
-          </p>
-          <button
-            onClick={handleSubmit}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '600',
-              fontSize: '14px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            Submit Results
-          </button>
-        </>
-      );
-    }
-
-    if (lastParsed && !testsPassed) {
-      // Tests failed - show failure message and rerun button
-      const failedCount = lastParsed.tests?.failed || 0;
-      const totalCount = lastParsed.tests?.total || 0;
-      return (
-        <>
-          <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
-            ❌ {failedCount} of {totalCount} tests failed. Fix your code and try again.
-          </p>
-          <button
-            onClick={handleRunTests}
-            disabled={isRunning}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '600',
-              fontSize: '14px',
-              cursor: isRunning ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            {isRunning ? (
-              <>
-                <div style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  border: '2px solid #ffffff40',
-                  borderTop: '2px solid #ffffff',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                Running Tests...
-              </>
-            ) : (
-              '🔄 Run Tests Again'
-            )}
-          </button>
-        </>
-      );
-    }
-
-    // Initial state - no tests run yet
-    return (
-      <>
-        <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
-          Write your code, then run tests to see results
-        </p>
-        <button
-          onClick={handleRunTests}
-          disabled={isRunning}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: '600',
-            fontSize: '14px',
-            cursor: isRunning ? 'not-allowed' : 'pointer',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          {isRunning ? (
-            <>
-              <div style={{ 
-                width: '16px', 
-                height: '16px', 
-                border: '2px solid #ffffff40',
-                borderTop: '2px solid #ffffff',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }} />
-              Running Tests...
-            </>
-          ) : (
-            '▶️ Run Tests'
-          )}
-        </button>
-      </>
-    );
-  };
-
   return (
     <>
-      {/* Action bar with conditional content */}
+      {/* UPDATED: Modified action bar logic to show run button again for failed tests */}
       <div 
         style={{
           padding: '16px',
@@ -671,7 +497,116 @@ export default defineConfig({
           gap: '16px'
         }}
       >
-        {getActionBarContent()}
+        {submitted ? (
+          <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
+            ✅ Submitted! Advancing to next question...
+          </p>
+        ) : canSubmit && testsPassed ? (
+          // Tests passed - show submit button
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
+              ✅ All tests passed!
+            </p>
+            <button
+              onClick={handleSubmit}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              Submit Results
+            </button>
+          </>
+        ) : canSubmit && !testsPassed ? (
+          // Tests failed - show failure message and rerun button
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
+              ❌ {lastParsed?.tests?.failed || 0} of {lastParsed?.tests?.total || 0} tests failed. Fix your code and try again.
+            </p>
+            <button
+              onClick={handleRunTests}
+              disabled={isRunning}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isRunning ? (
+                <>
+                  <div style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #ffffff40',
+                    borderTop: '2px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Running Tests...
+                </>
+              ) : (
+                '🔄 Run Tests Again'
+              )}
+            </button>
+          </>
+        ) : (
+          // Initial state or running - show run button
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+              Write your code, then run tests to see results
+            </p>
+            <button
+              onClick={handleRunTests}
+              disabled={isRunning}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isRunning ? (
+                <>
+                  <div style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #ffffff40',
+                    borderTop: '2px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Running Tests...
+                </>
+              ) : (
+                '▶️ Run Tests'
+              )}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Add CSS animation for spinner */}
