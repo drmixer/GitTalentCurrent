@@ -1,14 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+
 import {
+
   SandpackProvider,
+
   SandpackLayout,
+
   SandpackCodeEditor,
+
   SandpackTests,
+
   SandpackConsole,
+
   useSandpack,
+
   type SandpackFiles,
+
   type SandpackProviderProps,
+
 } from '@codesandbox/sandpack-react';
+
 import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
@@ -215,6 +226,7 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
+  const [testsPassed, setTestsPassed] = useState<boolean | null>(null);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -264,15 +276,35 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
+    
+    // Determine if tests passed
+    const tests = parsed.tests || {};
+    const total = typeof tests.total === 'number' ? tests.total : undefined;
+    const failed = typeof tests.failed === 'number' ? tests.failed : undefined;
+    const passed = typeof tests.passed === 'number' ? tests.passed : undefined;
+    
+    let passedAll = false;
+    if (total && total > 0) {
+      if (typeof failed === 'number') {
+        passedAll = failed === 0;
+      } else if (typeof passed === 'number') {
+        passedAll = passed === total;
+      } else {
+        passedAll = true;
+      }
+    }
+    
+    setTestsPassed(passedAll);
   };
 
-  // NEW: Single button that triggers both compile and test execution
+  // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
+    setTestsPassed(null);
 
     try {
       // First, ensure code is compiled/updated
@@ -469,7 +501,7 @@ export default defineConfig({
 
   return (
     <>
-      {/* NEW: Single, clear action bar with one run button */}
+      {/* Action bar with run button and conditional submit/rerun options */}
       <div 
         style={{
           padding: '16px',
@@ -487,25 +519,85 @@ export default defineConfig({
           </p>
         ) : canSubmit ? (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-              ✅ Tests completed!
-            </p>
-            <button
-              onClick={handleSubmit}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              Submit Results
-            </button>
+            {testsPassed ? (
+              <>
+                <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
+                  ✅ All tests passed!
+                </p>
+                <button
+                  onClick={handleSubmit}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  Submit Results
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
+                  ❌ Some tests failed
+                </p>
+                <button
+                  onClick={handleRunTests}
+                  disabled={isRunning}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {isRunning ? (
+                    <>
+                      <div style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        border: '2px solid #ffffff40',
+                        borderTop: '2px solid #ffffff',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      Running Tests...
+                    </>
+                  ) : (
+                    '🔄 Rerun Tests'
+                  )}
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  Submit Anyway
+                </button>
+              </>
+            )}
           </>
         ) : (
           <>
