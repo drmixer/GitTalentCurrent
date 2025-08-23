@@ -18,7 +18,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import EmailConfirmPage from './pages/EmailConfirmPage';
 import PendingApprovalPage from './pages/PendingApprovalPage';
 import { LandingPage } from './pages/LandingPage';
-import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { Legal } from './pages/Legal';
 import { AdminDashboard } from './pages/AdminDashboard';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import RecruiterProfilePage from './pages/RecruiterProfilePage';
@@ -58,7 +58,7 @@ function App() {
           <Routes>
             {/* Main Routes */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/legal" element={<Legal />} />
             <Route path="/login" element={<LoginForm />} />
             <Route path="/signup" element={<SignupForm />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

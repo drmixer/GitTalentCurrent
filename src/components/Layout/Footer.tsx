@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Twitter, Linkedin } from 'lucide-react';
+import { Github, X, Linkedin } from 'lucide-react';
 
 export const Footer = () => {
   const navLinks = [
@@ -64,13 +64,8 @@ export const Footer = () => {
               <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Legal</h3>
               <ul className="mt-4 space-y-4">
                 <li>
-                  <Link to="/privacy-policy" className="text-base text-gray-500 hover:text-gray-900 transition-colors">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/terms-of-service" className="text-base text-gray-500 hover:text-gray-900 transition-colors">
-                    Terms of Service
+                  <Link to="/legal" className="text-base text-gray-500 hover:text-gray-900 transition-colors">
+                    Legal
                   </Link>
                 </li>
               </ul>
@@ -78,15 +73,15 @@ export const Footer = () => {
             <div className="md:col-span-2">
               <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Follow Us</h3>
               <div className="mt-4 flex space-x-6">
-                <a href="#" className="text-gray-400 hover:text-gray-500">
+                <a href="https://github.com/GitTalent-dev" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-500">
                   <span className="sr-only">GitHub</span>
                   <Github className="h-6 w-6" />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-gray-500">
-                  <span className="sr-only">Twitter</span>
-                  <Twitter className="h-6 w-6" />
+                <a href="https://x.com/GitTalent" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-500">
+                  <span className="sr-only">X</span>
+                  <X className="h-6 w-6" />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-gray-500">
+                <a href="https://www.linkedin.com/company/gittalent" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-500">
                   <span className="sr-only">LinkedIn</span>
                   <Linkedin className="h-6 w-6" />
                 </a>
