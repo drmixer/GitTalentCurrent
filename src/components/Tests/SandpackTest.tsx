@@ -242,7 +242,7 @@ export default defineConfig({
     setCanSubmit(true);
     setIsRunning(false);
   };
-  // Updated function to properly reset and rerun tests
+  // Updated function to properly rerun tests
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
@@ -251,17 +251,17 @@ export default defineConfig({
     setLastParsed(null);
     
     try {
-      // Force a complete reset of the Sandpack environment
-      await sandpack.resetAll();
-      
-      // Wait for reset to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Increment run count to force re-render of the test component
+      // Increment run count to force a re-render of the test component
       setRunCount(prev => prev + 1);
       
-      // Wait a bit for the state update to take effect
+      // Wait for the state update to take effect
       await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Update the files to ensure Sandpack registers the changes
+      sandpack.updateFile(codeFile, starterCode);
+      
+      // Wait for file update to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Run the sandpack to compile the updated code
       await sandpack.runSandpack();
