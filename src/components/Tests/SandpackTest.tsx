@@ -194,6 +194,7 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
+  const [runCount, setRunCount] = useState(0); // Track run count to force re-render
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
   const files = useMemo<SandpackFiles>(() => {
@@ -241,18 +242,31 @@ export default defineConfig({
     setCanSubmit(true);
     setIsRunning(false);
   };
-  // NEW: Single button that triggers both compile and test execution
+  // Updated function to properly reset and rerun tests
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
+    
     try {
-      // First, ensure code is compiled/updated
+      // Force a complete reset of the Sandpack environment
+      await sandpack.resetAll();
+      
+      // Wait for reset to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Increment run count to force re-render of the test component
+      setRunCount(prev => prev + 1);
+      
+      // Wait a bit for the state update to take effect
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Run the sandpack to compile the updated code
       await sandpack.runSandpack();
       
-      // Wait a bit longer for Sandpack to fully initialize
+      // Wait for compilation to complete
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       let testButton = null;
@@ -539,7 +553,11 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole 
+            key={`tests-${runCount}`} // Force re-render with runCount
+            testsRootRef={testsRootRef} 
+            onTestsComplete={handleTestsComplete} 
+          />
         </SandpackLayout>
       </div>
     </>
