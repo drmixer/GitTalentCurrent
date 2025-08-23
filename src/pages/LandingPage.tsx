@@ -7,6 +7,7 @@ import { About } from '../components/Landing/About';
 import { FAQ } from '../components/Landing/FAQ';
 import { Contact } from '../components/Landing/Contact';
 import { AnimatedSection } from '../components/Landing/AnimatedSection';
+import { Footer } from '../components/Layout/Footer';
 
 export const LandingPage = () => {
   return (
@@ -31,6 +32,7 @@ export const LandingPage = () => {
       <AnimatedSection>
         <Contact />
       </AnimatedSection>
+      <Footer />
     </div>
   );
 };
