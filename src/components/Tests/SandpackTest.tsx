@@ -6,6 +6,7 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
+  useSandpackTheme,
   type SandpackFiles,
   type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
@@ -194,14 +195,33 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
+  const [currentCode, setCurrentCode] = useState(starterCode); // Track current code
   const [runCount, setRunCount] = useState(0); // Track run count to force re-render
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
+  
+  // Listen for code changes in the editor
+  useEffect(() => {
+    const unsubscribe = sandpack.listen((message) => {
+      if (message.type === 'update' && message.codesandbox === true) {
+        // Get the current code from the editor
+        const editorContent = sandpack.getFileContent(codeFile);
+        if (editorContent && editorContent !== currentCode) {
+          setCurrentCode(editorContent);
+        }
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [sandpack, codeFile, currentCode]);
+  
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
     return {
-      [codeFile]: { code: starterCode ?? '', active: true },
-      [testFile]: { code: testCode ?? '', hidden: false },
+      [codeFile]: { code: currentCode, active: true }, // Use currentCode instead of starterCode
+      [testFile]: { code: testCode, hidden: false },
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -233,7 +253,8 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [starterCode, testCode, codeFile, testFile]);
+  }, [currentCode, testCode, codeFile, testFile]);
+  
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
@@ -242,6 +263,7 @@ export default defineConfig({
     setCanSubmit(true);
     setIsRunning(false);
   };
+  
   // Updated function to properly rerun tests
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
@@ -251,14 +273,20 @@ export default defineConfig({
     setLastParsed(null);
     
     try {
+      // Get the current code from the editor
+      const editorContent = sandpack.getFileContent(codeFile);
+      if (editorContent && editorContent !== currentCode) {
+        setCurrentCode(editorContent);
+      }
+      
       // Increment run count to force a re-render of the test component
       setRunCount(prev => prev + 1);
       
       // Wait for the state update to take effect
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Update the files to ensure Sandpack registers the changes
-      sandpack.updateFile(codeFile, starterCode);
+      // Update the files with the current code
+      sandpack.updateFile(codeFile, currentCode);
       
       // Wait for file update to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -369,6 +397,7 @@ export default defineConfig({
       setIsRunning(false);
     }
   };
+  
   const handleSubmit = async () => {
     if (!lastParsed) {
       console.log('[SandpackTest] Cannot submit - no test results parsed');
@@ -439,9 +468,11 @@ export default defineConfig({
       alert('Unexpected error during submit.');
     }
   };
+  
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
+  
   return (
     <>
       {/* Action bar with run/submit/rerun options */}
@@ -568,8 +599,8 @@ const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
-      [codeFile]: { code: props.starterCode ?? '', active: true },
-      [testFile]: { code: props.testCode ?? '', hidden: false },
+      [codeFile]: { code: props.starterCode, active: true },
+      [testFile]: { code: props.testCode, hidden: false },
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
