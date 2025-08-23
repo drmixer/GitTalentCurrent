@@ -639,6 +639,6 @@ export default defineConfig({
       <SandpackTestInner {...props} template={template} codeFile={codeFile} testFile={testFile} deps={deps} />
     </SandpackProvider>
   );
-};
+}; 
 
 export default SandpackTest;
