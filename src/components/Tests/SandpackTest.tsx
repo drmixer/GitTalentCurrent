@@ -1,25 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-
 import {
-
   SandpackProvider,
-
   SandpackLayout,
-
   SandpackCodeEditor,
-
   SandpackTests,
-
   SandpackConsole,
-
   useSandpack,
-
   type SandpackFiles,
-
   type SandpackProviderProps,
-
 } from '@codesandbox/sandpack-react';
-
 import { supabase } from '../../lib/supabase';
 
 type Framework = 'react' | 'vue' | 'javascript';
@@ -126,10 +115,8 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  onTestsError: () => void;
-}> = ({ testsRootRef, onTestsComplete, onTestsError }) => {
+}> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
-  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     const root = testsRootRef.current;
@@ -145,20 +132,13 @@ const TestsAndConsole: React.FC<{
         
         if (!text) return;
         
-        // Check for compilation errors
-        if (text.includes('Error') || text.includes('error') || text.includes('Cannot assign')) {
-          console.log('[SandpackTest] Detected error in test output');
-          setHasError(true);
-          onTestsError();
-          return;
-        }
-        
         const parsed = parseSummary(text);
         
         if (parsed.ran) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
-          setHasError(false);
           onTestsComplete(text, parsed);
+          obs.disconnect();
+          observerRef.current = null;
         }
       });
       
@@ -176,7 +156,7 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete, onTestsError]);
+  }, [onTestsComplete]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -235,8 +215,6 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
-  const [testsPassed, setTestsPassed] = useState<boolean | null>(null);
-  const [hasCompilationError, setHasCompilationError] = useState(false);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -286,45 +264,15 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
-    setHasCompilationError(false);
-    
-    // Determine if tests passed
-    const tests = parsed.tests || {};
-    const total = typeof tests.total === 'number' ? tests.total : undefined;
-    const failed = typeof tests.failed === 'number' ? tests.failed : undefined;
-    const passed = typeof tests.passed === 'number' ? tests.passed : undefined;
-    
-    let passedAll = false;
-    if (total && total > 0) {
-      if (typeof failed === 'number') {
-        passedAll = failed === 0;
-      } else if (typeof passed === 'number') {
-        passedAll = passed === total;
-      } else {
-        passedAll = true;
-      }
-    }
-    
-    setTestsPassed(passedAll);
   };
 
-  // Handle test errors
-  const handleTestsError = () => {
-    console.log('[SandpackTest] Tests encountered an error');
-    setIsRunning(false);
-    setHasCompilationError(true);
-    setCanSubmit(false);
-  };
-
-  // Single button that triggers both compile and test execution
+  // NEW: Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
-    setTestsPassed(null);
-    setHasCompilationError(false);
 
     try {
       // First, ensure code is compiled/updated
@@ -387,7 +335,7 @@ export default defineConfig({
             const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
             
             const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-            const inTestArea = button.closest('[class*="test"], [class*="sp-'], [data-sp-tests]');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
             
             if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
               testButton = button;
@@ -417,7 +365,7 @@ export default defineConfig({
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit && !hasCompilationError) {
+          if (!canSubmit) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
@@ -521,7 +469,7 @@ export default defineConfig({
 
   return (
     <>
-      {/* Action bar with run button and conditional submit/rerun options */}
+      {/* NEW: Single, clear action bar with one run button */}
       <div 
         style={{
           padding: '16px',
@@ -530,135 +478,34 @@ export default defineConfig({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px',
-          flexWrap: 'wrap'
+          gap: '16px'
         }}
       >
         {submitted ? (
           <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
             ✅ Submitted! Advancing to next question...
           </p>
-        ) : hasCompilationError ? (
+        ) : canSubmit ? (
           <>
-            <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
-              ❌ Compilation error - fix your code and try again
+            <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
+              ✅ Tests completed!
             </p>
             <button
-              onClick={handleRunTests}
-              disabled={isRunning}
+              onClick={handleSubmit}
               style={{
                 padding: '10px 20px',
-                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                backgroundColor: '#10b981',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: '600',
                 fontSize: '14px',
-                cursor: isRunning ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
               }}
             >
-              {isRunning ? (
-                <>
-                  <div style={{ 
-                    width: '16px', 
-                    height: '16px', 
-                    border: '2px solid #ffffff40',
-                    borderTop: '2px solid #ffffff',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  Running Tests...
-                </>
-              ) : (
-                '🔄 Try Again'
-              )}
+              Submit Results
             </button>
-          </>
-        ) : canSubmit ? (
-          <>
-            {testsPassed ? (
-              <>
-                <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: '500' }}>
-                  ✅ All tests passed!
-                </p>
-                <button
-                  onClick={handleSubmit}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  Submit Results
-                </button>
-              </>
-            ) : (
-              <>
-                <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
-                  ❌ Some tests failed
-                </p>
-                <button
-                  onClick={handleRunTests}
-                  disabled={isRunning}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  {isRunning ? (
-                    <>
-                      <div style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        border: '2px solid #ffffff40',
-                        borderTop: '2px solid #ffffff',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }} />
-                      Running Tests...
-                    </>
-                  ) : (
-                    '🔄 Rerun Tests'
-                  )}
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  Submit Anyway
-                </button>
-              </>
-            )}
           </>
         ) : (
           <>
@@ -716,11 +563,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole 
-            testsRootRef={testsRootRef} 
-            onTestsComplete={handleTestsComplete} 
-            onTestsError={handleTestsError}
-          />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
         </SandpackLayout>
       </div>
     </>
