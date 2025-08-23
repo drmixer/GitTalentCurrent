@@ -126,8 +126,19 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-}> = ({ testsRootRef, onTestsComplete }) => {
+  resetObserver: boolean;
+}> = ({ testsRootRef, onTestsComplete, resetObserver }) => {
   const observerRef = useRef<MutationObserver | null>(null);
+  const [observerKey, setObserverKey] = useState(0);
+
+  useEffect(() => {
+    // Reset observer when resetObserver prop changes
+    if (resetObserver) {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      setObserverKey(prev => prev + 1);
+    }
+  }, [resetObserver]);
 
   useEffect(() => {
     const root = testsRootRef.current;
@@ -148,8 +159,7 @@ const TestsAndConsole: React.FC<{
         if (parsed.ran) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
           onTestsComplete(text, parsed);
-          obs.disconnect();
-          observerRef.current = null;
+          // Don't disconnect the observer so it can detect future test runs
         }
       });
       
@@ -167,7 +177,7 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, observerKey]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -227,6 +237,7 @@ const SandpackTestInner: React.FC<
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
   const [testsPassed, setTestsPassed] = useState<boolean | null>(null);
+  const [resetObserver, setResetObserver] = useState(false);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -305,6 +316,9 @@ export default defineConfig({
     setLastRawText('');
     setLastParsed(null);
     setTestsPassed(null);
+    
+    // Reset the observer to ensure it can detect new test runs
+    setResetObserver(prev => !prev);
 
     try {
       // First, ensure code is compiled/updated
@@ -655,7 +669,11 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole 
+            testsRootRef={testsRootRef} 
+            onTestsComplete={handleTestsComplete} 
+            resetObserver={resetObserver}
+          />
         </SandpackLayout>
       </div>
     </>
