@@ -117,7 +117,8 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-}> = ({ testsRootRef, onTestsComplete }) => {
+  observerKey: number;
+}> = ({ testsRootRef, onTestsComplete, observerKey }) => {
   const observerRef = useRef<MutationObserver | null>(null);
 
   useEffect(() => {
@@ -158,7 +159,7 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete]);
+  }, [onTestsComplete, observerKey]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -217,6 +218,7 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
+  const [observerKey, setObserverKey] = useState(0);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -275,6 +277,7 @@ export default defineConfig({
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
+    setObserverKey((prev) => prev + 1);
 
     try {
       // First, ensure code is compiled/updated
@@ -294,6 +297,14 @@ export default defineConfig({
         
         // Method 1: More comprehensive selectors
         const selectors = [
+          'button[aria-label="Run all tests"]',
+          'button[aria-label="Run tests"]',
+          'button[title="Run all tests"]',
+          'button[title="Run tests"]',
+          'button[aria-label="Rerun all tests"]',
+          'button[aria-label="Rerun tests"]',
+          'button[title="Rerun all tests"]',
+          'button[title="Rerun tests"]',
           'button[title*="Run"]',
           'button[aria-label*="Run"]',
           'button[aria-label*="run"]',
@@ -578,7 +589,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} observerKey={observerKey} />
         </SandpackLayout>
       </div>
     </>
@@ -640,4 +651,4 @@ export default defineConfig({
   );
 };
 
-export default SandpackTest; 
+export default SandpackTest;
