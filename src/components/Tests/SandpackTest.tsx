@@ -6,7 +6,6 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
-  useActiveCode,
   type SandpackFiles,
   type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
@@ -115,11 +114,8 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  runKey: string;
-  autorun: boolean;
-}> = ({ testsRootRef, onTestsComplete, runKey, autorun }) => {
+}> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
-  const hasRunRef = useRef(false);
   
   useEffect(() => {
     const root = testsRootRef.current;
@@ -136,9 +132,8 @@ const TestsAndConsole: React.FC<{
         
         const parsed = parseSummary(text);
         
-        if (parsed.ran && !hasRunRef.current) {
+        if (parsed.ran) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
-          hasRunRef.current = true;
           onTestsComplete(text, parsed);
           obs.disconnect();
           observerRef.current = null;
@@ -158,7 +153,7 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete, runKey, autorun]);
+  }, [onTestsComplete]);
   
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -169,8 +164,6 @@ const TestsAndConsole: React.FC<{
           showWatchButton={false} 
           showVerboseButton={false}
           hideTestsAndSupressLogs={false}
-          key={runKey}
-          autorun={autorun}
         />
       </div>
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
@@ -216,18 +209,14 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
-  const [runCount, setRunCount] = useState(0);
-  const [autorun, setAutorun] = useState(false);
   const { sandpack } = useSandpack();
-  const { code } = useActiveCode();
   const testsRootRef = useRef<HTMLDivElement>(null);
-  const isRunningRef = useRef(false);
   
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
     return {
-      [codeFile]: { code: code || starterCode, active: true },
-      [testFile]: { code: testCode, hidden: false },
+      [codeFile]: { code: starterCode ?? '', active: true },
+      [testFile]: { code: testCode ?? '', hidden: false },
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -259,7 +248,7 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [code, starterCode, testCode, codeFile, testFile]);
+  }, [starterCode, testCode, codeFile, testFile]);
   
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
@@ -268,53 +257,126 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
-    isRunningRef.current = false;
-    setAutorun(false);
   };
   
-  // Simple approach: Use Sandpack's built-in autorun
+  // Original working approach
   const handleRunTests = async () => {
-    if (isRunningRef.current) {
+    if (isRunning) {
       console.log('[SandpackTest] Tests already running, ignoring request');
       return;
     }
     
     console.log('[SandpackTest] Running tests...');
-    isRunningRef.current = true;
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
     
     try {
-      // Update the files with the current code
-      sandpack.updateFile(codeFile, code || starterCode);
+      // First, ensure code is compiled/updated
+      await sandpack.runSandpack();
       
-      // Wait for file update to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait a bit longer for Sandpack to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Increment run count to force a complete remount
-      setRunCount(prev => prev + 1);
+      let testButton = null;
+      let attempts = 0;
+      const maxAttempts = 10;
       
-      // Enable autorun to trigger tests
-      setAutorun(true);
-      
-      // Set a timeout to reset running state if tests don't complete
-      setTimeout(() => {
-        console.log('[SandpackTest] Checking if tests completed...');
-        if (isRunningRef.current) {
-          console.log('[SandpackTest] Tests seem stuck, resetting state');
-          setIsRunning(false);
-          isRunningRef.current = false;
-          setAutorun(false);
+      // Keep trying to find the test button for up to 5 seconds
+      while (!testButton && attempts < maxAttempts) {
+        attempts++;
+        console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
+        
+        // Method 1: More comprehensive selectors
+        const selectors = [
+          'button[title*="Run"]',
+          'button[aria-label*="Run"]',
+          'button[aria-label*="run"]',
+          'button[title*="run"]',
+          '[data-sp-tests] button',
+          '.sp-tests button',
+          '.sp-test button',
+          'button[data-testid*="run"]',
+          'button[class*="run"]',
+          'button[class*="test"]'
+        ];
+        
+        for (const selector of selectors) {
+          try {
+            const buttons = document.querySelectorAll(selector);
+            for (const btn of buttons) {
+              if (btn instanceof HTMLButtonElement && !btn.disabled) {
+                // Check if this button is in the test area
+                const parentClasses = btn.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+                if (parentClasses) {
+                  testButton = btn;
+                  console.log('[SandpackTest] Found test button with selector:', selector);
+                  break;
+                }
+              }
+            }
+            if (testButton) break;
+          } catch (e) {
+            // Invalid selector, continue
+          }
         }
-      }, 20000);
+        
+        // Method 2: Look for play button or run button by content and SVG
+        if (!testButton) {
+          const allButtons = document.querySelectorAll('button');
+          for (const button of allButtons) {
+            // Check for play icon (triangle/arrow) or run text
+            const hasPlayIcon = button.querySelector('svg path[d*="triangle"], svg path[d*="polygon"], svg [class*="play"], svg [class*="triangle"]');
+            const text = button.textContent?.toLowerCase() || '';
+            const title = button.title?.toLowerCase() || '';
+            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+            
+            const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+            
+            if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
+              testButton = button;
+              console.log('[SandpackTest] Found test button by content/icon');
+              break;
+            }
+          }
+        }
+        
+        if (!testButton) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      if (testButton && testButton instanceof HTMLButtonElement) {
+        console.log('[SandpackTest] Clicking test button programmatically');
+        
+        // Try multiple ways to trigger the button
+        testButton.focus();
+        testButton.click();
+        
+        // Also try dispatching events
+        testButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        testButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        
+        // Set a timeout to reset running state if tests don't complete
+        setTimeout(() => {
+          console.log('[SandpackTest] Checking if tests completed...');
+          if (!canSubmit) {
+            console.log('[SandpackTest] Tests seem stuck, resetting state');
+            setIsRunning(false);
+          }
+        }, 15000); // 15 second timeout
+        
+      } else {
+        console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
+        setIsRunning(false);
+      }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
-      isRunningRef.current = false;
-      setAutorun(false);
     }
   };
   
@@ -517,8 +579,6 @@ export default defineConfig({
           <TestsAndConsole 
             testsRootRef={testsRootRef} 
             onTestsComplete={handleTestsComplete} 
-            runKey={`run-${runCount}`}
-            autorun={autorun}
           />
         </SandpackLayout>
       </div>
