@@ -5,7 +5,7 @@ def run(playwright):
     page = browser.new_page()
 
     # Go to the landing page
-    page.goto("http://localhost:4174/")
+    page.goto("http://localhost:4173/")
 
     # Wait for the subtitle to be visible, indicating the page has loaded
     expect(page.locator('p:has-text("We match developers based on real GitHub work")')).to_be_visible()
