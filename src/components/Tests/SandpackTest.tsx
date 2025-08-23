@@ -6,13 +6,13 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
-  useActiveCode,
-  useSandpackClient,
   type SandpackFiles,
   type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
 import { supabase } from '../../lib/supabase';
+
 type Framework = 'react' | 'vue' | 'javascript';
+
 interface SandpackTestProps {
   starterCode: string;
   testCode: string | null | undefined;
@@ -23,6 +23,7 @@ interface SandpackTestProps {
   onNext: () => void;
   onComplete: () => void;
 }
+
 const getSetup = (framework: Framework) => {
   switch (framework) {
     case 'react':
@@ -69,6 +70,7 @@ const getSetup = (framework: Framework) => {
       };
   }
 };
+
 function parseSummary(text: string) {
   console.log('[SandpackTest] Parsing test output:', text);
   
@@ -78,13 +80,17 @@ function parseSummary(text: string) {
     console.log('[SandpackTest] No test indicators found in output');
     return { ran: false, suites: undefined, tests: undefined };
   }
+
   const suitesLine = text.match(/Test suites?:([^\n]+)/i)?.[1] ?? text.match(/Test files?:([^\n]+)/i)?.[1] ?? '';
   const testsLine = text.match(/Tests?:([^\n]+)/i)?.[1] ?? '';
+
   console.log('[SandpackTest] Extracted lines - suites:', suitesLine, 'tests:', testsLine);
+
   const num = (re: RegExp, s: string) => {
     const m = s.match(re);
     return m ? Number(m[1]) : undefined;
   };
+
   const suites = suitesLine
     ? {
         passed: num(/(\d+)\s*passed/i, suitesLine),
@@ -92,6 +98,7 @@ function parseSummary(text: string) {
         total: num(/(\d+)\s*total/i, suitesLine),
       }
     : undefined;
+
   const tests = testsLine
     ? {
         passed: num(/(\d+)\s*passed/i, testsLine),
@@ -99,21 +106,26 @@ function parseSummary(text: string) {
         total: num(/(\d+)\s*total/i, testsLine),
       }
     : undefined;
+
   const result = { ran, suites, tests };
   console.log('[SandpackTest] Parsed result:', result);
   return result;
 }
+
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  runKey: string;
-}> = ({ testsRootRef, onTestsComplete, runKey }) => {
+}> = ({ testsRootRef, onTestsComplete }) => {
   const observerRef = useRef<MutationObserver | null>(null);
+
   useEffect(() => {
     const root = testsRootRef.current;
     if (!root) return;
+
     console.log('[SandpackTest] Setting up test completion observer');
+
     observerRef.current?.disconnect();
+
     const observe = () => {
       const obs = new MutationObserver(() => {
         const text = root.textContent || '';
@@ -137,12 +149,15 @@ const TestsAndConsole: React.FC<{
       });
       observerRef.current = obs;
     };
+
     observe();
+
     return () => {
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete, runKey]);
+  }, [onTestsComplete]);
+
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
       <div ref={testsRootRef} style={{ flex: 1, minHeight: 0 }}>
@@ -152,11 +167,11 @@ const TestsAndConsole: React.FC<{
           watchMode={false} 
           showWatchButton={false} 
           showVerboseButton={false}
+          // Hide the run button since we'll have our own
           hideTestsAndSupressLogs={false}
-          key={runKey}
-          autorun={false} // Add this to prevent automatic test running
         />
       </div>
+
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
         <SandpackConsole
           maxMessageCount={200}
@@ -172,6 +187,7 @@ const TestsAndConsole: React.FC<{
     </div>
   );
 };
+
 const SandpackTestInner: React.FC<
   SandpackTestProps & {
     template: SandpackProviderProps['template'];
@@ -193,24 +209,21 @@ const SandpackTestInner: React.FC<
     codeFile,
     testFile,
   } = props;
+
   const [canSubmit, setCanSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
-  const [runCount, setRunCount] = useState(0);
-  const [runKey, setRunKey] = useState('initial-run');
+
   const { sandpack } = useSandpack();
-  const { code } = useActiveCode();
-  const { client } = useSandpackClient();
   const testsRootRef = useRef<HTMLDivElement>(null);
-  const isRunningRef = useRef(false);
-  
+
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
     return {
-      [codeFile]: { code: code || starterCode, active: true },
-      [testFile]: { code: testCode, hidden: false },
+      [codeFile]: { code: starterCode ?? '', active: true },
+      [testFile]: { code: testCode ?? '', hidden: false },
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -242,8 +255,8 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [code, starterCode, testCode, codeFile, testFile]);
-  
+  }, [starterCode, testCode, codeFile, testFile]);
+
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
     console.log('[SandpackTest] Tests completed with results:', parsed);
@@ -251,110 +264,28 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
-    isRunningRef.current = false;
   };
-  
-  // New approach: Directly execute the test command
+
+  // NEW: Single button that triggers both compile and test execution
   const handleRunTests = async () => {
-    if (isRunningRef.current) {
-      console.log('[SandpackTest] Tests already running, ignoring request');
-      return;
-    }
-    
     console.log('[SandpackTest] Running tests...');
-    isRunningRef.current = true;
     setIsRunning(true);
     setCanSubmit(false);
     setLastRawText('');
     setLastParsed(null);
-    
+
     try {
-      // Generate a new run key to force re-render
-      const newRunKey = `run-${Date.now()}`;
-      setRunKey(newRunKey);
-      
-      // Increment run count
-      setRunCount(prev => prev + 1);
-      
-      // Wait for the state update to take effect
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Update the files with the current code
-      sandpack.updateFile(codeFile, code || starterCode);
-      
-      // Wait for file update to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Run the sandpack to compile the updated code
+      // First, ensure code is compiled/updated
       await sandpack.runSandpack();
       
-      // Wait for compilation to complete
+      // Wait a bit longer for Sandpack to fully initialize
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Try to run tests using the client's dispatch method
-      if (client) {
-        try {
-          console.log('[SandpackTest] Attempting to run tests via client dispatch');
-          
-          // Try to dispatch a test command
-          await client.dispatch({ 
-            type: 'action', 
-            action: 'run-tests' 
-          });
-          
-          // Set a timeout to reset running state if tests don't complete
-          setTimeout(() => {
-            console.log('[SandpackTest] Checking if tests completed...');
-            if (isRunningRef.current) {
-              console.log('[SandpackTest] Tests seem stuck, resetting state');
-              setIsRunning(false);
-              isRunningRef.current = false;
-            }
-          }, 20000);
-          
-          return;
-        } catch (error) {
-          console.error('[SandpackTest] Error running tests via client dispatch:', error);
-        }
-      }
-      
-      // Try to run tests using the sandpack's internal method
-      try {
-        console.log('[SandpackTest] Attempting to run tests via sandpack internal method');
-        
-        // Try to access the sandpack's internal test runner
-        const sandpackInstance = (sandpack as any)._sandpack;
-        if (sandpackInstance && sandpackInstance.clients && sandpackInstance.clients[0]) {
-          const testClient = sandpackInstance.clients[0];
-          if (testClient && testClient.iframe) {
-            const iframeWindow = testClient.iframe.contentWindow;
-            if (iframeWindow) {
-              // Try to trigger the test run via postMessage
-              iframeWindow.postMessage({ type: 'run-tests' }, '*');
-              
-              // Set a timeout to reset running state if tests don't complete
-              setTimeout(() => {
-                console.log('[SandpackTest] Checking if tests completed...');
-                if (isRunningRef.current) {
-                  console.log('[SandpackTest] Tests seem stuck, resetting state');
-                  setIsRunning(false);
-                  isRunningRef.current = false;
-                }
-              }, 20000);
-              
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.error('[SandpackTest] Error running tests via sandpack internal method:', error);
-      }
-      
-      // Fallback: Try to find and click the test button
       let testButton = null;
       let attempts = 0;
-      const maxAttempts = 15;
+      const maxAttempts = 10;
       
+      // Keep trying to find the test button for up to 5 seconds
       while (!testButton && attempts < maxAttempts) {
         attempts++;
         console.log(`[SandpackTest] Attempt ${attempts} to find test button`);
@@ -434,36 +365,36 @@ export default defineConfig({
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (isRunningRef.current) {
+          if (!canSubmit) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
-            isRunningRef.current = false;
           }
-        }, 20000);
+        }, 15000); // 15 second timeout
         
       } else {
         console.log('[SandpackTest] Could not find test button after all attempts, resetting state');
         setIsRunning(false);
-        isRunningRef.current = false;
       }
       
     } catch (error) {
       console.error('[SandpackTest] Error running tests:', error);
       setIsRunning(false);
-      isRunningRef.current = false;
     }
   };
-  
+
   const handleSubmit = async () => {
     if (!lastParsed) {
       console.log('[SandpackTest] Cannot submit - no test results parsed');
       return;
     }
+
     console.log('[SandpackTest] Submitting results:', lastParsed);
+
     const tests = lastParsed.tests || {};
     const total = typeof tests.total === 'number' ? tests.total : undefined;
     const failed = typeof tests.failed === 'number' ? tests.failed : undefined;
     const passed = typeof tests.passed === 'number' ? tests.passed : undefined;
+
     let score = 0;
     if (total && total > 0) {
       if (typeof failed === 'number') {
@@ -474,12 +405,14 @@ export default defineConfig({
         score = 1;
       }
     }
+
     console.log('[SandpackTest] Score calculation:', {
       total,
       passed,
       failed,
       calculatedScore: score
     });
+
     try {
       const { error: upsertError } = await supabase
         .from('test_results')
@@ -495,13 +428,16 @@ export default defineConfig({
           },
           { onConflict: 'assignment_id,question_id' }
         );
+
       if (upsertError) {
         console.error('[SandpackTest] submit upsert error', upsertError);
         alert('Failed to submit results. Please try again.');
         return;
       }
+
       console.log('[SandpackTest] Successfully submitted results with score:', score);
       setSubmitted(true);
+
       try {
         window.dispatchEvent(
           new CustomEvent('sandpack:submitted', {
@@ -511,6 +447,7 @@ export default defineConfig({
       } catch (error) {
         console.log('[SandpackTest] Could not dispatch submitted event:', error);
       }
+
       setTimeout(() => {
         console.log('[SandpackTest] Advancing to next question/completion');
         if (isLastQuestion) {
@@ -519,19 +456,20 @@ export default defineConfig({
           onNext();
         }
       }, 2000);
+
     } catch (err) {
       console.error('[SandpackTest] submit exception', err);
       alert('Unexpected error during submit.');
     }
   };
-  
+
   if (!testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
-  
+
   return (
     <>
-      {/* Action bar with run/submit/rerun options */}
+      {/* NEW: Single, clear action bar with one run button */}
       <div 
         style={{
           padding: '16px',
@@ -567,23 +505,6 @@ export default defineConfig({
               }}
             >
               Submit Results
-            </button>
-            <button
-              onClick={handleRunTests}
-              disabled={isRunning}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: isRunning ? 'not-allowed' : 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              {isRunning ? 'Running...' : '🔄 Rerun Tests'}
             </button>
           </>
         ) : (
@@ -628,6 +549,7 @@ export default defineConfig({
           </>
         )}
       </div>
+
       {/* Add CSS animation for spinner */}
       <style>
         {`
@@ -637,26 +559,25 @@ export default defineConfig({
           }
         `}
       </style>
+
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole 
-            testsRootRef={testsRootRef} 
-            onTestsComplete={handleTestsComplete} 
-            runKey={runKey}
-          />
+          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} />
         </SandpackLayout>
       </div>
     </>
   );
 };
+
 const SandpackTest: React.FC<SandpackTestProps> = (props) => {
   const { template, codeFile, testFile, deps } = getSetup(props.framework);
+
   const files = useMemo<SandpackFiles>(() => {
     if (!props.testCode) return {};
     return {
-      [codeFile]: { code: props.starterCode, active: true },
-      [testFile]: { code: props.testCode, hidden: false },
+      [codeFile]: { code: props.starterCode ?? '', active: true },
+      [testFile]: { code: props.testCode ?? '', hidden: false },
       '/vitest.config.ts': {
         code: `
 import { defineConfig } from 'vitest/config';
@@ -677,9 +598,11 @@ export default defineConfig({
       },
     };
   }, [props.starterCode, props.testCode, codeFile, testFile]);
+
   if (!props.testCode) {
     return <div>This Sandpack question is missing its test code.</div>;
   }
+
   return (
     <SandpackProvider
       key={`${template}-${codeFile}-${testFile}-${props.questionId}`}
@@ -701,4 +624,5 @@ export default defineConfig({
     </SandpackProvider>
   );
 };
+
 export default SandpackTest;
