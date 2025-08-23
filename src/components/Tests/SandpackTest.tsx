@@ -126,19 +126,10 @@ function parseSummary(text: string) {
 const TestsAndConsole: React.FC<{
   testsRootRef: React.RefObject<HTMLDivElement>;
   onTestsComplete: (rawText: string, parsed: any) => void;
-  resetObserver: boolean;
-}> = ({ testsRootRef, onTestsComplete, resetObserver }) => {
+  onTestsError: () => void;
+}> = ({ testsRootRef, onTestsComplete, onTestsError }) => {
   const observerRef = useRef<MutationObserver | null>(null);
-  const [observerKey, setObserverKey] = useState(0);
-
-  useEffect(() => {
-    // Reset observer when resetObserver prop changes
-    if (resetObserver) {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
-      setObserverKey(prev => prev + 1);
-    }
-  }, [resetObserver]);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     const root = testsRootRef.current;
@@ -154,12 +145,20 @@ const TestsAndConsole: React.FC<{
         
         if (!text) return;
         
+        // Check for compilation errors
+        if (text.includes('Error') || text.includes('error') || text.includes('Cannot assign')) {
+          console.log('[SandpackTest] Detected error in test output');
+          setHasError(true);
+          onTestsError();
+          return;
+        }
+        
         const parsed = parseSummary(text);
         
         if (parsed.ran) {
           console.log('[SandpackTest] Tests completed, calling onTestsComplete');
+          setHasError(false);
           onTestsComplete(text, parsed);
-          // Don't disconnect the observer so it can detect future test runs
         }
       });
       
@@ -177,7 +176,7 @@ const TestsAndConsole: React.FC<{
       observerRef.current?.disconnect();
       observerRef.current = null;
     };
-  }, [onTestsComplete, observerKey]);
+  }, [onTestsComplete, onTestsError]);
 
   return (
     <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e5e7eb' }}>
@@ -237,7 +236,7 @@ const SandpackTestInner: React.FC<
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
   const [testsPassed, setTestsPassed] = useState<boolean | null>(null);
-  const [resetObserver, setResetObserver] = useState(false);
+  const [hasCompilationError, setHasCompilationError] = useState(false);
 
   const { sandpack } = useSandpack();
   const testsRootRef = useRef<HTMLDivElement>(null);
@@ -287,6 +286,7 @@ export default defineConfig({
     setLastParsed(parsed);
     setCanSubmit(true);
     setIsRunning(false);
+    setHasCompilationError(false);
     
     // Determine if tests passed
     const tests = parsed.tests || {};
@@ -308,6 +308,14 @@ export default defineConfig({
     setTestsPassed(passedAll);
   };
 
+  // Handle test errors
+  const handleTestsError = () => {
+    console.log('[SandpackTest] Tests encountered an error');
+    setIsRunning(false);
+    setHasCompilationError(true);
+    setCanSubmit(false);
+  };
+
   // Single button that triggers both compile and test execution
   const handleRunTests = async () => {
     console.log('[SandpackTest] Running tests...');
@@ -316,9 +324,7 @@ export default defineConfig({
     setLastRawText('');
     setLastParsed(null);
     setTestsPassed(null);
-    
-    // Reset the observer to ensure it can detect new test runs
-    setResetObserver(prev => !prev);
+    setHasCompilationError(false);
 
     try {
       // First, ensure code is compiled/updated
@@ -381,7 +387,7 @@ export default defineConfig({
             const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
             
             const hasRunText = text.includes('run') || title.includes('run') || ariaLabel.includes('run');
-            const inTestArea = button.closest('[class*="test"], [class*="sp-"], [data-sp-tests]');
+            const inTestArea = button.closest('[class*="test"], [class*="sp-'], [data-sp-tests]');
             
             if ((hasPlayIcon || hasRunText) && inTestArea && !button.disabled) {
               testButton = button;
@@ -411,7 +417,7 @@ export default defineConfig({
         // Set a timeout to reset running state if tests don't complete
         setTimeout(() => {
           console.log('[SandpackTest] Checking if tests completed...');
-          if (!canSubmit) {
+          if (!canSubmit && !hasCompilationError) {
             console.log('[SandpackTest] Tests seem stuck, resetting state');
             setIsRunning(false);
           }
@@ -524,13 +530,54 @@ export default defineConfig({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px'
+          gap: '16px',
+          flexWrap: 'wrap'
         }}
       >
         {submitted ? (
           <p style={{ margin: 0, fontSize: '14px', color: '#10b981', fontWeight: '600' }}>
             ✅ Submitted! Advancing to next question...
           </p>
+        ) : hasCompilationError ? (
+          <>
+            <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: '500' }}>
+              ❌ Compilation error - fix your code and try again
+            </p>
+            <button
+              onClick={handleRunTests}
+              disabled={isRunning}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isRunning ? '#94a3b8' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isRunning ? (
+                <>
+                  <div style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #ffffff40',
+                    borderTop: '2px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Running Tests...
+                </>
+              ) : (
+                '🔄 Try Again'
+              )}
+            </button>
+          </>
         ) : canSubmit ? (
           <>
             {testsPassed ? (
@@ -672,7 +719,7 @@ export default defineConfig({
           <TestsAndConsole 
             testsRootRef={testsRootRef} 
             onTestsComplete={handleTestsComplete} 
-            resetObserver={resetObserver}
+            onTestsError={handleTestsError}
           />
         </SandpackLayout>
       </div>
