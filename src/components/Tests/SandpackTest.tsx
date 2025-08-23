@@ -154,6 +154,7 @@ const TestsAndConsole: React.FC<{
           showVerboseButton={false}
           hideTestsAndSupressLogs={false}
           key={runKey}
+          autorun={false} // Add this to prevent automatic test running
         />
       </div>
       <div style={{ height: 180, borderTop: '1px solid #e5e7eb' }}>
@@ -253,7 +254,7 @@ export default defineConfig({
     isRunningRef.current = false;
   };
   
-  // New approach: Execute tests via console command
+  // New approach: Directly execute the test command
   const handleRunTests = async () => {
     if (isRunningRef.current) {
       console.log('[SandpackTest] Tests already running, ignoring request');
@@ -290,15 +291,15 @@ export default defineConfig({
       // Wait for compilation to complete
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Try to run tests via console command
+      // Try to run tests using the client's dispatch method
       if (client) {
         try {
-          console.log('[SandpackTest] Attempting to run tests via console command');
+          console.log('[SandpackTest] Attempting to run tests via client dispatch');
           
-          // Try to execute the test command directly in the console
+          // Try to dispatch a test command
           await client.dispatch({ 
-            type: 'console', 
-            codes: ['npm test'] 
+            type: 'action', 
+            action: 'run-tests' 
           });
           
           // Set a timeout to reset running state if tests don't complete
@@ -313,8 +314,40 @@ export default defineConfig({
           
           return;
         } catch (error) {
-          console.error('[SandpackTest] Error running tests via console command:', error);
+          console.error('[SandpackTest] Error running tests via client dispatch:', error);
         }
+      }
+      
+      // Try to run tests using the sandpack's internal method
+      try {
+        console.log('[SandpackTest] Attempting to run tests via sandpack internal method');
+        
+        // Try to access the sandpack's internal test runner
+        const sandpackInstance = (sandpack as any)._sandpack;
+        if (sandpackInstance && sandpackInstance.clients && sandpackInstance.clients[0]) {
+          const testClient = sandpackInstance.clients[0];
+          if (testClient && testClient.iframe) {
+            const iframeWindow = testClient.iframe.contentWindow;
+            if (iframeWindow) {
+              // Try to trigger the test run via postMessage
+              iframeWindow.postMessage({ type: 'run-tests' }, '*');
+              
+              // Set a timeout to reset running state if tests don't complete
+              setTimeout(() => {
+                console.log('[SandpackTest] Checking if tests completed...');
+                if (isRunningRef.current) {
+                  console.log('[SandpackTest] Tests seem stuck, resetting state');
+                  setIsRunning(false);
+                  isRunningRef.current = false;
+                }
+              }, 20000);
+              
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[SandpackTest] Error running tests via sandpack internal method:', error);
       }
       
       // Fallback: Try to find and click the test button
