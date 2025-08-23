@@ -6,7 +6,7 @@ import {
   SandpackTests,
   SandpackConsole,
   useSandpack,
-  useSandpackTheme,
+  useActiveCode,
   type SandpackFiles,
   type SandpackProviderProps,
 } from '@codesandbox/sandpack-react';
@@ -195,32 +195,15 @@ const SandpackTestInner: React.FC<
   const [isRunning, setIsRunning] = useState(false);
   const [lastRawText, setLastRawText] = useState('');
   const [lastParsed, setLastParsed] = useState<{ ran: boolean; suites?: any; tests?: any } | null>(null);
-  const [currentCode, setCurrentCode] = useState(starterCode); // Track current code
   const [runCount, setRunCount] = useState(0); // Track run count to force re-render
   const { sandpack } = useSandpack();
+  const { code } = useActiveCode(); // Use useActiveCode hook to get current code
   const testsRootRef = useRef<HTMLDivElement>(null);
-  
-  // Listen for code changes in the editor
-  useEffect(() => {
-    const unsubscribe = sandpack.listen((message) => {
-      if (message.type === 'update' && message.codesandbox === true) {
-        // Get the current code from the editor
-        const editorContent = sandpack.getFileContent(codeFile);
-        if (editorContent && editorContent !== currentCode) {
-          setCurrentCode(editorContent);
-        }
-      }
-    });
-    
-    return () => {
-      unsubscribe();
-    };
-  }, [sandpack, codeFile, currentCode]);
   
   const files = useMemo<SandpackFiles>(() => {
     if (!testCode) return {};
     return {
-      [codeFile]: { code: currentCode, active: true }, // Use currentCode instead of starterCode
+      [codeFile]: { code: code || starterCode, active: true }, // Use current code from editor
       [testFile]: { code: testCode, hidden: false },
       '/vitest.config.ts': {
         code: `
@@ -253,7 +236,7 @@ export default defineConfig({
         hidden: true,
       },
     };
-  }, [currentCode, testCode, codeFile, testFile]);
+  }, [code, starterCode, testCode, codeFile, testFile]);
   
   // Handle test completion from the observer
   const handleTestsComplete = (rawText: string, parsed: any) => {
@@ -273,12 +256,6 @@ export default defineConfig({
     setLastParsed(null);
     
     try {
-      // Get the current code from the editor
-      const editorContent = sandpack.getFileContent(codeFile);
-      if (editorContent && editorContent !== currentCode) {
-        setCurrentCode(editorContent);
-      }
-      
       // Increment run count to force a re-render of the test component
       setRunCount(prev => prev + 1);
       
@@ -286,7 +263,7 @@ export default defineConfig({
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Update the files with the current code
-      sandpack.updateFile(codeFile, currentCode);
+      sandpack.updateFile(codeFile, code || starterCode);
       
       // Wait for file update to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
