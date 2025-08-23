@@ -253,7 +253,7 @@ export default defineConfig({
     isRunningRef.current = false;
   };
   
-  // New approach: Directly execute tests using the client
+  // New approach: Execute tests via console command
   const handleRunTests = async () => {
     if (isRunningRef.current) {
       console.log('[SandpackTest] Tests already running, ignoring request');
@@ -290,12 +290,16 @@ export default defineConfig({
       // Wait for compilation to complete
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Try to run tests directly through the client if available
+      // Try to run tests via console command
       if (client) {
         try {
-          console.log('[SandpackTest] Attempting to run tests via client');
-          // Try to run the test command directly
-          await client.dispatch({ type: 'run', command: 'test' });
+          console.log('[SandpackTest] Attempting to run tests via console command');
+          
+          // Try to execute the test command directly in the console
+          await client.dispatch({ 
+            type: 'console', 
+            codes: ['npm test'] 
+          });
           
           // Set a timeout to reset running state if tests don't complete
           setTimeout(() => {
@@ -309,7 +313,7 @@ export default defineConfig({
           
           return;
         } catch (error) {
-          console.error('[SandpackTest] Error running tests via client:', error);
+          console.error('[SandpackTest] Error running tests via console command:', error);
         }
       }
       
