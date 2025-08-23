@@ -589,7 +589,7 @@ export default defineConfig({
       <div className="gt-sp">
         <SandpackLayout>
           <SandpackCodeEditor style={{ height: '70vh' }} showTabs showLineNumbers showInlineErrors />
-          <TestsAndConsole testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} observerKey={observerKey} />
+          <TestsAndConsole key={observerKey} testsRootRef={testsRootRef} onTestsComplete={handleTestsComplete} observerKey={observerKey} />
         </SandpackLayout>
       </div>
     </>
