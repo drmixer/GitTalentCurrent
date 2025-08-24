@@ -649,7 +649,7 @@ export const DeveloperDashboard: React.FC = () => {
       
       // Then refresh local data
       console.log('🔄 [DASHBOARD] Refreshing dashboard data...');
-      await fetchDeveloperPageData();
+      await fetchDeveloperPageData(); 
       console.log('✅ [DASHBOARD] Dashboard data refresh completed');
       
       // Force refresh the profile form with a delay to ensure data propagation
@@ -802,7 +802,7 @@ export const DeveloperDashboard: React.FC = () => {
             </div>
             {currentDeveloperProfile?.github_handle ? (
               <div className="space-y-6">
-                {finalGitHubDataToShow && !gitHubDataLoadingToShow && !gitHubDataErrorToShow ? (
+                {finalGitHubDataToShow?.contributions?.calendar ? (
                   <>
                     <RealGitHubChart gitHubData={finalGitHubDataToShow} />
                     <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
