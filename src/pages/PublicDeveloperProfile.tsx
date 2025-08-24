@@ -105,7 +105,7 @@ export const PublicDeveloperProfile: React.FC = () => {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'github', label: 'GitHub', icon: Code },
-    { id: 'endorsements', label: 'Reviews', icon: Star },
+    { id: 'endorsements', label: 'Endorsements', icon: Star },
   ];
 
   const handleTabChange = (tabId: 'profile' | 'portfolio' | 'github' | 'endorsements') => {
