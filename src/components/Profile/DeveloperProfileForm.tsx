@@ -93,7 +93,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Effect to properly initialize form data from initialData
+  // CRITICAL FIX: Effect to properly initialize form data from initialData
   useEffect(() => {
     if (initialData && user?.id && !isInitialized) {
       console.log('Initializing form data with:', initialData);
@@ -108,19 +108,22 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         finalValue: installationIdToUse
       });
       
+      // CRITICAL FIX: Use explicit checks instead of || fallbacks to prevent empty strings from being overridden
       setFormData(prev => ({
         ...prev,
         user_id: user.id,
         github_handle: initialData.github_handle || user?.user_metadata?.login || prev.github_handle,
-        bio: initialData.bio || '', // Ensure we use the actual value, not fallback to prev
+        // FIXED: Use explicit undefined checks instead of || operator
+        bio: initialData.bio !== undefined ? initialData.bio : prev.bio,
         availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
         linked_projects: initialData.linked_projects || prev.linked_projects,
-        location: initialData.location || '', // Ensure we use the actual value, not fallback to prev
-        experience_years: initialData.experience_years || prev.experience_years,
-        desired_salary: initialData.desired_salary || prev.desired_salary,
+        // FIXED: Use explicit undefined checks instead of || operator  
+        location: initialData.location !== undefined ? initialData.location : prev.location,
+        experience_years: initialData.experience_years !== undefined ? initialData.experience_years : prev.experience_years,
+        desired_salary: initialData.desired_salary !== undefined ? initialData.desired_salary : prev.desired_salary,
         skills: initialData.skills || prev.skills,
         skills_categories: initialData.skills_categories || prev.skills_categories,
-        profile_strength: initialData.profile_strength || prev.profile_strength,
+        profile_strength: initialData.profile_strength !== undefined ? initialData.profile_strength : prev.profile_strength,
         public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug,
         notification_preferences: initialData.notification_preferences || prev.notification_preferences,
         resume_url: initialData.resume_url || prev.resume_url,
@@ -150,6 +153,38 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       setIsInitialized(true);
     }
   }, [initialData, user?.id, user?.user_metadata, isInitialized]);
+
+  // ADDITIONAL FIX: Add effect to re-initialize when initialData changes after initial load
+  useEffect(() => {
+    if (initialData && isInitialized) {
+      console.log('Re-initializing form data due to initialData change:', initialData);
+      
+      const installationIdFromMetadata = user?.user_metadata?.github_installation_id;
+      const installationIdToUse = initialData.github_installation_id || installationIdFromMetadata || '';
+      
+      setFormData(prev => ({
+        ...prev,
+        // FIXED: Always use the new values from initialData when they change
+        bio: initialData.bio !== undefined ? initialData.bio : prev.bio,
+        location: initialData.location !== undefined ? initialData.location : prev.location,
+        github_handle: initialData.github_handle !== undefined ? initialData.github_handle : prev.github_handle,
+        availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
+        linked_projects: initialData.linked_projects || prev.linked_projects,
+        experience_years: initialData.experience_years !== undefined ? initialData.experience_years : prev.experience_years,
+        desired_salary: initialData.desired_salary !== undefined ? initialData.desired_salary : prev.desired_salary,
+        skills: initialData.skills || prev.skills,
+        skills_categories: initialData.skills_categories || prev.skills_categories,
+        profile_strength: initialData.profile_strength !== undefined ? initialData.profile_strength : prev.profile_strength,
+        public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug,
+        notification_preferences: initialData.notification_preferences || prev.notification_preferences,
+        resume_url: initialData.resume_url || prev.resume_url,
+        profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url,
+        github_installation_id: installationIdToUse,
+        public_profile_enabled: initialData.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
+        preferred_title: initialData.preferred_title || prev.preferred_title
+      }));
+    }
+  }, [initialData, user?.user_metadata, isInitialized]);
 
   // Set initial profile picture from GitHub if not already set and available
   useEffect(() => {
@@ -401,6 +436,8 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               <p className="text-blue-600">GitHub Handle: {formData.github_handle || 'Not set'}</p>
               <p className="text-blue-600">Installation ID: {formData.github_installation_id ? 'Present' : 'Missing'}</p>
               <p className="text-blue-600">User ID: {formData.user_id || 'Not set'}</p>
+              <p className="text-blue-600">Bio: "{formData.bio}" (length: {formData.bio.length})</p>
+              <p className="text-blue-600">Location: "{formData.location}" (length: {formData.location.length})</p>
             </div>
           )}
 
