@@ -142,6 +142,9 @@ export const DeveloperDashboard: React.FC = () => {
   // NEW: State to track calendar year contributions for YTD display
   const [calendarYearContributions, setCalendarYearContributions] = useState<number>(0);
 
+  // CRITICAL FIX: Add state to track when profile form should be force-refreshed
+  const [profileFormKey, setProfileFormKey] = useState(0);
+
   // Badge: derive unread test assignments from deduped list so it matches the bell
   const unreadTestsBadge = useMemo(
     () =>
@@ -426,7 +429,7 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
 
-  // CRITICAL FIX: Enhanced developer profile merging with comprehensive debugging AND GITHUB DATA INJECTION
+  // CRITICAL FIX: Enhanced developer profile merging with REAL-TIME AUTH DATA INJECTION
   const currentDeveloperProfile = useMemo(() => {
     console.log('🔄 [Dashboard] Computing current developer profile...', {
       hasContextProfile: !!contextDeveloperProfile,
@@ -440,7 +443,7 @@ export const DeveloperDashboard: React.FC = () => {
       authUserBio: authUser?.user_metadata?.bio?.length || 0
     });
 
-    // CRITICAL FIX: Always start with contextDeveloperProfile as base if available
+    // CRITICAL FIX: Always prioritize contextDeveloperProfile as it has the most up-to-date data
     let profile = contextDeveloperProfile || developerData;
     
     if (!profile && authUser?.id) {
@@ -473,19 +476,19 @@ export const DeveloperDashboard: React.FC = () => {
       return null;
     }
 
-    // CRITICAL FIX: Merge data with GitHub auth metadata when fields are empty
+    // CRITICAL FIX: AGGRESSIVE merging with auth user metadata to fill empty fields
     const mergedProfile = {
       ...profile,
-      // CRITICAL: Use GitHub data from user metadata when database fields are empty
-      github_handle: profile.github_handle || authUser?.user_metadata?.login || '',
+      // CRITICAL: Always inject fresh auth data when database fields are empty or missing
+      github_handle: profile.github_handle || authUser?.user_metadata?.login || authUser?.user_metadata?.user_name || authUser?.user_metadata?.preferred_username || '',
       bio: profile.bio || authUser?.user_metadata?.bio || '',
       location: profile.location || authUser?.user_metadata?.location || '',
       profile_pic_url: profile.profile_pic_url || authUser?.user_metadata?.avatar_url || '',
-      github_installation_id: profile.github_installation_id || authUser?.user_metadata?.github_installation_id || '',
+      github_installation_id: profile.github_installation_id || authUser?.user_metadata?.github_installation_id || authUser?.user_metadata?.installation_id || '',
       
       // Merge user data if needed
       user: profile.user || (authUser ? {
-        name: authUser.user_metadata?.name || authUser.email,
+        name: authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email,
         email: authUser.email,
         id: authUser.id
       } : undefined)
@@ -502,6 +505,22 @@ export const DeveloperDashboard: React.FC = () => {
     
     return mergedProfile;
   }, [contextDeveloperProfile, developerData, authUser]);
+
+  // CRITICAL FIX: Force refresh profile form when auth context changes
+  useEffect(() => {
+    if (authUser?.id && contextDeveloperProfile) {
+      console.log('🔄 [Dashboard] Auth context updated, forcing profile form refresh');
+      setProfileFormKey(prev => prev + 1);
+    }
+  }, [authUser, contextDeveloperProfile]);
+
+  // CRITICAL FIX: Force refresh when switching to profile tab
+  useEffect(() => {
+    if (activeTab === 'profile' && currentDeveloperProfile) {
+      console.log('🔄 [Dashboard] Profile tab activated, forcing form refresh');
+      setProfileFormKey(prev => prev + 1);
+    }
+  }, [activeTab, currentDeveloperProfile]);
 
   const renderOverview = () => {
     if (!currentDeveloperProfile) {
@@ -542,6 +561,9 @@ export const DeveloperDashboard: React.FC = () => {
       // Then refresh local data
       console.log('🔄 [Dashboard] Refreshing dashboard data...');
       await fetchDeveloperPageData();
+      
+      // Force refresh the profile form
+      setProfileFormKey(prev => prev + 1);
       
       console.log('✅ [Dashboard] Profile refresh completed successfully');
     } catch (error) {
@@ -613,7 +635,7 @@ export const DeveloperDashboard: React.FC = () => {
       {activeTab === 'profile' && (
         displayDeveloperProfileForForm ? (
           <DeveloperProfileForm
-            key={`profile-form-${currentDeveloperProfile?.id || 'new'}-${currentDeveloperProfile?.github_handle || 'no-handle'}`}
+            key={`profile-form-${profileFormKey}-${currentDeveloperProfile?.id || 'new'}-${currentDeveloperProfile?.github_handle || 'no-handle'}`}
             initialData={displayDeveloperProfileForForm}
             onSuccess={handleProfileFormSuccess}
             isOnboarding={false}
