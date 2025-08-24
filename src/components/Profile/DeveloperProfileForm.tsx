@@ -176,42 +176,44 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setFormInitializationDebug(debugInfo);
 
     // CRITICAL FIX: Set form data with all resolved values
-    setFormData(prev => {
-      const newFormData = {
-        ...prev,
-        user_id: user.id,
-        github_handle: finalGithubHandle,
-        bio: finalBio,
-        location: finalLocation,
-        github_installation_id: finalInstallationId,
-        profile_pic_url: initialData?.profile_pic_url || user?.user_metadata?.avatar_url || prev.profile_pic_url,
-        
-        // Handle all other fields with proper undefined checks
-        availability: initialData?.availability !== undefined ? initialData.availability : prev.availability,
-        linked_projects: initialData?.linked_projects || prev.linked_projects,
-        experience_years: initialData?.experience_years !== undefined ? initialData.experience_years : prev.experience_years,
-        desired_salary: initialData?.desired_salary !== undefined ? initialData.desired_salary : prev.desired_salary,
-        skills: initialData?.skills || prev.skills,
-        skills_categories: initialData?.skills_categories || prev.skills_categories,
-        profile_strength: initialData?.profile_strength !== undefined ? initialData.profile_strength : prev.profile_strength,
-        public_profile_slug: initialData?.public_profile_slug || prev.public_profile_slug,
-        notification_preferences: initialData?.notification_preferences || prev.notification_preferences,
-        resume_url: initialData?.resume_url || prev.resume_url,
-        public_profile_enabled: initialData?.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
-        preferred_title: initialData?.preferred_title || prev.preferred_title
-      };
+    const newFormData = {
+      user_id: user.id,
+      github_handle: finalGithubHandle,
+      bio: finalBio,
+      location: finalLocation,
+      github_installation_id: finalInstallationId,
+      profile_pic_url: initialData?.profile_pic_url || user?.user_metadata?.avatar_url || '',
+      
+      // Handle all other fields with proper undefined checks
+      availability: initialData?.availability !== undefined ? initialData.availability : true,
+      linked_projects: initialData?.linked_projects || [],
+      experience_years: initialData?.experience_years !== undefined ? initialData.experience_years : 0,
+      desired_salary: initialData?.desired_salary !== undefined ? initialData.desired_salary : 0,
+      skills: initialData?.skills || [],
+      skills_categories: initialData?.skills_categories || {},
+      profile_strength: initialData?.profile_strength !== undefined ? initialData.profile_strength : 0,
+      public_profile_slug: initialData?.public_profile_slug || '',
+      notification_preferences: initialData?.notification_preferences || {
+        email: true,
+        in_app: true,
+        messages: true,
+        assignments: true
+      },
+      resume_url: initialData?.resume_url || '',
+      public_profile_enabled: initialData?.public_profile_enabled !== undefined ? initialData.public_profile_enabled : true,
+      preferred_title: initialData?.preferred_title || ''
+    };
 
-      console.log('✅ Form data initialized:', {
-        github_handle: newFormData.github_handle,
-        bio_length: newFormData.bio.length,
-        location_length: newFormData.location.length,
-        installation_id: newFormData.github_installation_id ? 'present' : 'missing',
-        profile_pic: newFormData.profile_pic_url ? 'present' : 'missing'
-      });
-
-      return newFormData;
+    console.log('✅ Form data being set:', {
+      github_handle: newFormData.github_handle,
+      bio_length: newFormData.bio.length,
+      location_length: newFormData.location.length,
+      installation_id: newFormData.github_installation_id ? 'present' : 'missing',
+      profile_pic: newFormData.profile_pic_url ? 'present' : 'missing'
     });
 
+    // CRITICAL FIX: Use functional update to ensure state is set correctly
+    setFormData(newFormData);
     setIsInitialized(true);
     
     // Clear localStorage after successful initialization to prevent issues
@@ -496,6 +498,20 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const { strength: currentProfileStrength, suggestions } = calculateProfileStrength(formData);
 
+  // CRITICAL DEBUG: Log current form state whenever it changes
+  useEffect(() => {
+    console.log('🎯 CURRENT FORM STATE:', {
+      github_handle: `"${formData.github_handle}"`,
+      github_handle_length: formData.github_handle.length,
+      bio: `"${formData.bio}"`,
+      bio_length: formData.bio.length,
+      location: `"${formData.location}"`,
+      location_length: formData.location.length,
+      isInitialized,
+      timestamp: new Date().toISOString()
+    });
+  }, [formData.github_handle, formData.bio, formData.location, isInitialized]);
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -668,6 +684,27 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               </div>
               {errors.profile_pic && (
                 <p className="text-red-600 text-sm mt-1">{errors.profile_pic}</p>
+              )}
+            </div>
+
+            {/* CRITICAL FIX: Added missing GitHub Handle input field */}
+            <div>
+              <label htmlFor="github_handle" className="block text-sm font-medium text-gray-700 mb-2">
+                GitHub Handle *
+              </label>
+              <div className="relative">
+                <Github className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  id="github_handle"
+                  value={formData.github_handle}
+                  onChange={(e) => setFormData(prev => ({ ...prev, github_handle: e.target.value }))}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., your-username"
+                />
+              </div>
+              {errors.github_handle && (
+                <p className="text-red-600 text-sm mt-1">{errors.github_handle}</p>
               )}
             </div>
 
