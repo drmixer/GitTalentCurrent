@@ -38,11 +38,11 @@ export const SignupForm = () => {
 
   // Redirect to dashboard if user is already authenticated and has a profile
   useEffect(() => {
-    if (!authLoading && user) {
-      console.log('✅ User authenticated, redirecting to dashboard...');
+    if (!authLoading && user && userProfile) {
+      console.log('✅ User authenticated with profile, redirecting to dashboard...');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, userProfile, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,18 +113,57 @@ export const SignupForm = () => {
     setGithubLoading(true);
     
     try {
-      console.log('Starting GitHub signup for:', formData.name, 'with role:', formData.role);
+      console.log('🚀 Starting GitHub signup process:', {
+        name: formData.name.trim(),
+        role: formData.role
+      });
       
-      // Store the name and role in localStorage so we can use it after redirect
-      localStorage.setItem('gittalent_signup_name', formData.name);
-      localStorage.setItem('gittalent_signup_role', formData.role);
+      // CRITICAL FIX: Store signup data with more explicit keys and debugging
+      const signupData = {
+        name: formData.name.trim(),
+        role: formData.role,
+        timestamp: Date.now(),
+        isSignup: true
+      };
       
-      // FIXED: Pass true for new user signup
+      console.log('📦 Storing signup data to localStorage:', signupData);
+      
+      // Store each piece of data separately for better reliability
+      localStorage.setItem('gittalent_signup_name', signupData.name);
+      localStorage.setItem('gittalent_signup_role', signupData.role);
+      localStorage.setItem('gittalent_signup_timestamp', signupData.timestamp.toString());
+      localStorage.setItem('gittalent_signup_is_signup', 'true');
+      
+      // Additional debugging - verify storage worked
+      const storedName = localStorage.getItem('gittalent_signup_name');
+      const storedRole = localStorage.getItem('gittalent_signup_role');
+      
+      console.log('🔍 Verification of stored data:', {
+        storedName,
+        storedRole,
+        matches: storedName === signupData.name && storedRole === signupData.role
+      });
+      
+      if (storedName !== signupData.name || storedRole !== signupData.role) {
+        console.error('❌ localStorage storage failed!');
+        throw new Error('Failed to prepare signup data. Please try again.');
+      }
+      
+      // Start GitHub OAuth flow
+      console.log('🔐 Initiating GitHub OAuth for signup...');
       await signInWithGitHub(true);
+      
       // Navigation will be handled by the redirect
     } catch (error: any) {
-      console.error('GitHub signup error:', error);
+      console.error('💥 GitHub signup error:', error);
       setError(error.message || 'An error occurred with GitHub signup');
+      
+      // Clear localStorage on error
+      localStorage.removeItem('gittalent_signup_name');
+      localStorage.removeItem('gittalent_signup_role');
+      localStorage.removeItem('gittalent_signup_timestamp');
+      localStorage.removeItem('gittalent_signup_is_signup');
+      
       setTimeout(() => {
         setGithubLoading(false);
       }, 500);
