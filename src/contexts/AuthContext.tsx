@@ -431,88 +431,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // ENHANCED: More robust refreshProfile function that ensures fresh data
   const refreshProfile = useCallback(
     async (onComplete?: () => void) => {
       if (!user) {
         onComplete?.();
         return;
       }
-      
-      console.log('🔄 [AUTH CONTEXT] ===== STARTING PROFILE REFRESH =====');
       setLoading(true);
-      
-      try {
-        // Force cache invalidation by doing a fresh query with timestamp
-        const timestamp = Date.now();
-        console.log('🔄 [AUTH CONTEXT] Invalidating cache with timestamp:', timestamp);
-        
-        // First, refresh user profile
-        console.log('🔄 [AUTH CONTEXT] Refreshing user profile...');
-        const { data: freshUserProfile, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (userError) {
-          console.error('❌ [AUTH CONTEXT] Error refreshing user profile:', userError);
-        } else {
-          console.log('✅ [AUTH CONTEXT] User profile refreshed');
-          setUserProfile(freshUserProfile);
-        }
-
-        // Then, refresh developer profile if user is a developer
-        if (!userError && freshUserProfile?.role === 'developer') {
-          console.log('🔄 [AUTH CONTEXT] Refreshing developer profile...');
-          const { data: freshDeveloperProfile, error: devError } = await supabase
-            .from('developers')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-
-          if (devError) {
-            if (devError.code === 'PGRST116') {
-              console.log('⚠️ [AUTH CONTEXT] No developer profile found');
-              setDeveloperProfile(null);
-            } else {
-              console.error('❌ [AUTH CONTEXT] Error refreshing developer profile:', devError);
-            }
-          } else {
-            console.log('✅ [AUTH CONTEXT] Developer profile refreshed:', {
-              github_handle: freshDeveloperProfile.github_handle,
-              bio_length: freshDeveloperProfile.bio?.length || 0,
-              location_length: freshDeveloperProfile.location?.length || 0,
-              updated_at: freshDeveloperProfile.updated_at
-            });
-            
-            // Merge with auth user metadata to ensure we have the latest info
-            const mergedProfile = {
-              ...freshDeveloperProfile,
-              github_handle: freshDeveloperProfile.github_handle || user.user_metadata?.login || '',
-              bio: freshDeveloperProfile.bio || user.user_metadata?.bio || '',
-              location: freshDeveloperProfile.location || user.user_metadata?.location || '',
-              profile_pic_url: freshDeveloperProfile.profile_pic_url || user.user_metadata?.avatar_url || '',
-              github_installation_id: freshDeveloperProfile.github_installation_id || user.user_metadata?.github_installation_id || user.user_metadata?.installation_id || ''
-            };
-            
-            setDeveloperProfile(mergedProfile);
-          }
-        }
-        
-        setLastProfileUpdateTime(Date.now());
-        console.log('✅ [AUTH CONTEXT] Profile refresh completed successfully');
-        
-      } catch (error) {
-        console.error('💥 [AUTH CONTEXT] Error during profile refresh:', error);
-        setAuthError('Failed to refresh profile data');
-      } finally {
-        setLoading(false);
-        if (onComplete) {
-          onComplete();
-        }
-        console.log('🏁 [AUTH CONTEXT] ===== PROFILE REFRESH COMPLETE =====');
+      await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) console.error('Cache invalidation might not be fully effective:', error);
+        });
+      if (onComplete) {
+        setOnRefreshComplete(() => onComplete);
       }
+      setAuthUserToProcess(user);
+      setAuthProcessingEventType('MANUAL_REFRESH');
     },
     [user],
   );
@@ -782,7 +719,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // ENHANCED: Update developer profile and immediately refresh context state
   const updateDeveloperProfile = async (
     updates: Partial<Developer>,
   ): Promise<{ data: any | null; error: any | null }> => {
@@ -790,39 +726,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!user || !developerProfile) {
         throw new Error('User and developer profile must exist to update');
       }
-      
-      console.log('🔄 [AUTH CONTEXT] Updating developer profile with:', updates);
-      
       const { data, error } = await supabase
         .from('developers')
         .update(updates)
         .eq('user_id', user.id)
         .select()
         .single();
-      
       if (error) {
         throw error;
       }
-      
-      console.log('✅ [AUTH CONTEXT] Developer profile updated in database:', data);
-      
-      // Immediately update the context state with fresh data
-      const mergedProfile = {
-        ...data,
-        // Ensure we preserve any auth metadata that might not be in the DB
-        github_handle: data.github_handle || user.user_metadata?.login || '',
-        profile_pic_url: data.profile_pic_url || user.user_metadata?.avatar_url || '',
-        github_installation_id: data.github_installation_id || user.user_metadata?.github_installation_id || user.user_metadata?.installation_id || ''
-      };
-      
-      setDeveloperProfile(mergedProfile as any);
-      setLastProfileUpdateTime(Date.now());
-      
-      console.log('✅ [AUTH CONTEXT] Context state updated with fresh profile data');
-      
-      return { data: mergedProfile, error: null };
+      setDeveloperProfile(data as any);
+      return { data, error: null };
     } catch (error: any) {
-      console.error('❌ [AUTH CONTEXT] Error updating developer profile:', error);
       return { data: null, error };
     }
   };
