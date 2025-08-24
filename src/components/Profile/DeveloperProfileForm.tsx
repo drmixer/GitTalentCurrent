@@ -94,21 +94,27 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // CRITICAL FIX: Enhanced initialization with comprehensive debugging and data sources
+  // CRITICAL DEBUG: Enhanced initialization with comprehensive debugging and data sources
   useEffect(() => {
     if (!user?.id) {
-      console.log('🔍 Form initialization skipped - no user ID');
+      console.log('🔍 [FORM INIT] Form initialization skipped - no user ID');
       return;
     }
 
     if (isInitialized) {
-      console.log('🔍 Form already initialized, skipping...');
+      console.log('🔍 [FORM INIT] Form already initialized, skipping...');
       return;
     }
 
-    console.log('🚀 Starting form initialization process...');
+    console.log('🚀 [FORM INIT] ===== STARTING FORM INITIALIZATION =====');
+    console.log('🔍 [FORM INIT] Component Props:', {
+      isOnboarding,
+      hasInitialData: !!initialData,
+      initialDataKeys: initialData ? Object.keys(initialData) : [],
+      userId: user.id
+    });
     
-    // Collect ALL possible data sources
+    // Collect ALL possible data sources with detailed logging
     const dataSources = {
       initialData: initialData || {},
       userMetadata: user?.user_metadata || {},
@@ -119,9 +125,26 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       }
     };
 
-    console.log('📦 Available data sources:', dataSources);
+    console.log('📦 [FORM INIT] Available data sources:', {
+      initialData: {
+        keys: Object.keys(dataSources.initialData),
+        bio: dataSources.initialData.bio,
+        location: dataSources.initialData.location,
+        github_handle: dataSources.initialData.github_handle
+      },
+      userMetadata: {
+        keys: Object.keys(dataSources.userMetadata),
+        bio: dataSources.userMetadata.bio,
+        location: dataSources.userMetadata.location,
+        login: dataSources.userMetadata.login,
+        user_name: dataSources.userMetadata.user_name,
+        avatar_url: dataSources.userMetadata.avatar_url,
+        installation_id: dataSources.userMetadata.github_installation_id || dataSources.userMetadata.installation_id
+      },
+      localStorage: dataSources.localStorage
+    });
 
-    // ENHANCED: Multiple-source GitHub handle resolution
+    // ENHANCED: Multiple-source GitHub handle resolution with detailed logging
     const githubHandleSources = [
       initialData?.github_handle,
       user?.user_metadata?.login,
@@ -130,8 +153,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     ].filter(Boolean);
 
     const finalGithubHandle = githubHandleSources[0] || '';
+    console.log('🔍 [FORM INIT] GitHub Handle Resolution:', {
+      sources: githubHandleSources,
+      final: finalGithubHandle
+    });
 
-    // ENHANCED: Multiple-source installation ID resolution
+    // ENHANCED: Multiple-source installation ID resolution with detailed logging
     const installationIdSources = [
       initialData?.github_installation_id,
       user?.user_metadata?.github_installation_id,
@@ -139,8 +166,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     ].filter(Boolean);
 
     const finalInstallationId = installationIdSources[0] || '';
+    console.log('🔍 [FORM INIT] Installation ID Resolution:', {
+      sources: installationIdSources,
+      final: finalInstallationId ? 'present' : 'missing'
+    });
 
-    // ENHANCED: Bio and location with localStorage fallback for fresh signups
+    // CRITICAL: Bio and location resolution with detailed logging
     const finalBio = initialData?.bio !== undefined ? 
       initialData.bio : 
       (user?.user_metadata?.bio || '');
@@ -149,30 +180,48 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       initialData.location : 
       (user?.user_metadata?.location || '');
 
+    console.log('🔍 [FORM INIT] Data Resolution Summary:', {
+      bio: {
+        fromInitialData: initialData?.bio,
+        fromUserMetadata: user?.user_metadata?.bio,
+        final: finalBio,
+        finalLength: finalBio.length
+      },
+      location: {
+        fromInitialData: initialData?.location,
+        fromUserMetadata: user?.user_metadata?.location,
+        final: finalLocation,
+        finalLength: finalLocation.length
+      }
+    });
+
     // Create comprehensive debug info
     const debugInfo = {
       timestamp: new Date().toISOString(),
       userId: user.id,
+      componentType: isOnboarding ? 'onboarding' : 'dashboard',
       githubHandleSources,
       finalGithubHandle,
       installationIdSources,
       finalInstallationId,
-      bioInfo: {
+      bioResolution: {
         fromInitialData: initialData?.bio,
         fromUserMetadata: user?.user_metadata?.bio,
-        final: finalBio
+        final: finalBio,
+        finalLength: finalBio.length
       },
-      locationInfo: {
+      locationResolution: {
         fromInitialData: initialData?.location,
         fromUserMetadata: user?.user_metadata?.location,
-        final: finalLocation
+        final: finalLocation,
+        finalLength: finalLocation.length
       },
-      isOnboarding,
       hasInitialData: !!initialData,
-      initialDataKeys: initialData ? Object.keys(initialData) : []
+      initialDataKeys: initialData ? Object.keys(initialData) : [],
+      userMetadataKeys: Object.keys(user?.user_metadata || {})
     };
 
-    console.log('🔍 Form initialization debug info:', debugInfo);
+    console.log('🔍 [FORM INIT] Complete debug info:', debugInfo);
     setFormInitializationDebug(debugInfo);
 
     // CRITICAL FIX: Set form data with all resolved values
@@ -204,9 +253,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       preferred_title: initialData?.preferred_title || ''
     };
 
-    console.log('✅ Form data being set:', {
-      github_handle: newFormData.github_handle,
+    console.log('✅ [FORM INIT] NEW FORM DATA BEING SET:', {
+      github_handle: `"${newFormData.github_handle}"`,
+      github_handle_length: newFormData.github_handle.length,
+      bio: `"${newFormData.bio}"`,
       bio_length: newFormData.bio.length,
+      location: `"${newFormData.location}"`,
       location_length: newFormData.location.length,
       installation_id: newFormData.github_installation_id ? 'present' : 'missing',
       profile_pic: newFormData.profile_pic_url ? 'present' : 'missing'
@@ -216,9 +268,11 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     setFormData(newFormData);
     setIsInitialized(true);
     
+    console.log('🎯 [FORM INIT] Form initialization completed - state should be updated');
+    
     // Clear localStorage after successful initialization to prevent issues
     if (dataSources.localStorage.isSignup === 'true') {
-      console.log('🧹 Cleaning up localStorage after successful form initialization');
+      console.log('🧹 [FORM INIT] Cleaning up localStorage after successful form initialization');
       setTimeout(() => {
         localStorage.removeItem('gittalent_signup_name');
         localStorage.removeItem('gittalent_signup_role');
@@ -227,15 +281,17 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       }, 1000);
     }
 
+    console.log('🏁 [FORM INIT] ===== FORM INITIALIZATION COMPLETE =====');
+
   }, [initialData, user?.id, user?.user_metadata, isInitialized, isOnboarding]);
 
-  // ADDITIONAL FIX: Handle initialData updates after initial load
+  // ADDITIONAL DEBUG: Handle initialData updates after initial load
   useEffect(() => {
     if (!isInitialized || !initialData || !user?.id) {
       return;
     }
 
-    console.log('🔄 Handling initialData update after form initialization:', initialData);
+    console.log('🔄 [FORM UPDATE] Handling initialData update after form initialization:', initialData);
 
     // Only update if we have meaningful new data
     const hasNewData = initialData.bio !== undefined || 
@@ -243,34 +299,46 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
                       initialData.github_handle !== undefined;
 
     if (hasNewData) {
-      console.log('📝 Updating form with new initialData');
+      console.log('📝 [FORM UPDATE] Updating form with new initialData');
       
-      setFormData(prev => ({
-        ...prev,
-        bio: initialData.bio !== undefined ? initialData.bio : prev.bio,
-        location: initialData.location !== undefined ? initialData.location : prev.location,
-        github_handle: initialData.github_handle !== undefined ? initialData.github_handle : prev.github_handle,
-        availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
-        linked_projects: initialData.linked_projects || prev.linked_projects,
-        experience_years: initialData.experience_years !== undefined ? initialData.experience_years : prev.experience_years,
-        desired_salary: initialData.desired_salary !== undefined ? initialData.desired_salary : prev.desired_salary,
-        skills: initialData.skills || prev.skills,
-        skills_categories: initialData.skills_categories || prev.skills_categories,
-        profile_strength: initialData.profile_strength !== undefined ? initialData.profile_strength : prev.profile_strength,
-        public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug,
-        notification_preferences: initialData.notification_preferences || prev.notification_preferences,
-        resume_url: initialData.resume_url || prev.resume_url,
-        profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url,
-        github_installation_id: initialData.github_installation_id || prev.github_installation_id,
-        public_profile_enabled: initialData.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
-        preferred_title: initialData.preferred_title || prev.preferred_title
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          bio: initialData.bio !== undefined ? initialData.bio : prev.bio,
+          location: initialData.location !== undefined ? initialData.location : prev.location,
+          github_handle: initialData.github_handle !== undefined ? initialData.github_handle : prev.github_handle,
+          availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
+          linked_projects: initialData.linked_projects || prev.linked_projects,
+          experience_years: initialData.experience_years !== undefined ? initialData.experience_years : prev.experience_years,
+          desired_salary: initialData.desired_salary !== undefined ? initialData.desired_salary : prev.desired_salary,
+          skills: initialData.skills || prev.skills,
+          skills_categories: initialData.skills_categories || prev.skills_categories,
+          profile_strength: initialData.profile_strength !== undefined ? initialData.profile_strength : prev.profile_strength,
+          public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug,
+          notification_preferences: initialData.notification_preferences || prev.notification_preferences,
+          resume_url: initialData.resume_url || prev.resume_url,
+          profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url,
+          github_installation_id: initialData.github_installation_id || prev.github_installation_id,
+          public_profile_enabled: initialData.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
+          preferred_title: initialData.preferred_title || prev.preferred_title
+        };
+
+        console.log('🔄 [FORM UPDATE] Updated form data:', {
+          bio_changed: updated.bio !== prev.bio,
+          location_changed: updated.location !== prev.location,
+          bio_length: updated.bio.length,
+          location_length: updated.location.length
+        });
+
+        return updated;
+      });
     }
   }, [initialData, isInitialized, user?.id]);
 
   // Set initial profile picture from GitHub if not already set and available
   useEffect(() => {
     if (!formData.profile_pic_url && user?.user_metadata?.avatar_url) {
+      console.log('🖼️ [FORM] Setting GitHub avatar as profile picture');
       setFormData(prev => ({
         ...prev,
         profile_pic_url: user.user_metadata.avatar_url
@@ -323,7 +391,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       let finalInstallationId = formData.github_installation_id;
       if (!finalInstallationId && user?.user_metadata?.github_installation_id) {
         finalInstallationId = user.user_metadata.github_installation_id;
-        console.log('🔗 Retrieved installation_id from user metadata:', finalInstallationId);
+        console.log('🔗 [FORM SUBMIT] Retrieved installation_id from user metadata:', finalInstallationId);
       }
       
       // Create the data object for database insertion/update
@@ -344,12 +412,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         notification_preferences: formData.notification_preferences,
         resume_url: formData.resume_url,
         profile_pic_url: formData.profile_pic_url,
-        github_installation_id: finalInstallationId, // Use the final resolved installation ID
+        github_installation_id: finalInstallationId,
         public_profile_enabled: formData.public_profile_enabled,
         preferred_title: formData.preferred_title
       };
 
-      console.log('💾 Saving developer profile data:', {
+      console.log('💾 [FORM SUBMIT] Saving developer profile data:', {
         ...dataToSave,
         github_installation_id: dataToSave.github_installation_id ? 'present' : 'null',
         bio_length: dataToSave.bio.length,
@@ -364,23 +432,21 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         .single();
 
       if (userCheckError && userCheckError.code === 'PGRST116') {
-        // User record doesn't exist - this is the root cause of the foreign key constraint error
         throw new Error('User profile not found. Please try logging out and signing in again.');
       } else if (userCheckError) {
-        console.error('❌ Error checking user record:', userCheckError);
+        console.error('❌ [FORM SUBMIT] Error checking user record:', userCheckError);
         throw new Error('Unable to verify user profile. Please try again.');
       }
 
-      console.log('✅ User record verified, proceeding with developer profile save');
+      console.log('✅ [FORM SUBMIT] User record verified, proceeding with developer profile save');
 
       const { error } = await supabase
         .from('developers')
         .upsert(dataToSave, { onConflict: 'user_id' });
 
       if (error) {
-        console.error('💥 Supabase error:', error);
+        console.error('💥 [FORM SUBMIT] Supabase error:', error);
         
-        // Provide more helpful error messages based on the error type
         if (error.code === '23503' && error.message.includes('developers_user_id_fkey')) {
           throw new Error('Unable to link your developer profile. Please try logging out and signing in again.');
         } else if (error.code === '23505') {
@@ -390,12 +456,12 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         }
       }
 
-      console.log('🎉 Developer profile saved successfully!');
+      console.log('🎉 [FORM SUBMIT] Developer profile saved successfully!');
       setSaveStatus('success');
       setTimeout(() => setSaveStatus(null), 3000);
       onSuccess?.();
     } catch (error: any) {
-      console.error('💥 Error saving developer profile:', error);
+      console.error('💥 [FORM SUBMIT] Error saving developer profile:', error);
       setErrors({ submit: `Failed to save profile. ${error?.message || 'Please try again.'}` });
       setSaveStatus('error');
     } finally {
@@ -500,7 +566,7 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   // CRITICAL DEBUG: Log current form state whenever it changes
   useEffect(() => {
-    console.log('🎯 CURRENT FORM STATE:', {
+    console.log('🎯 [FORM STATE] CURRENT FORM STATE UPDATE:', {
       github_handle: `"${formData.github_handle}"`,
       github_handle_length: formData.github_handle.length,
       bio: `"${formData.bio}"`,
@@ -508,9 +574,21 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
       location: `"${formData.location}"`,
       location_length: formData.location.length,
       isInitialized,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      trigger: 'formData_change'
     });
   }, [formData.github_handle, formData.bio, formData.location, isInitialized]);
+
+  // CRITICAL DEBUG: Log when component renders
+  useEffect(() => {
+    console.log('🔄 [FORM RENDER] Form component rendered/re-rendered:', {
+      isInitialized,
+      hasInitialData: !!initialData,
+      isOnboarding,
+      userId: user?.id,
+      timestamp: new Date().toISOString()
+    });
+  });
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -532,28 +610,58 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
           {(isOnboarding || process.env.NODE_ENV === 'development') && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
               <details>
-                <summary className="font-medium text-blue-800 cursor-pointer">🔍 Debug Information (Click to expand)</summary>
+                <summary className="font-medium text-blue-800 cursor-pointer">🔍 Form Debug Information (Click to expand)</summary>
                 <div className="mt-2 text-blue-600 space-y-1">
                   <p><strong>Form Initialized:</strong> {isInitialized ? '✅ Yes' : '❌ No'}</p>
+                  <p><strong>Component Type:</strong> {isOnboarding ? 'Onboarding' : 'Dashboard'}</p>
                   <p><strong>GitHub Handle:</strong> "{formData.github_handle}" (length: {formData.github_handle.length})</p>
                   <p><strong>Installation ID:</strong> {formData.github_installation_id ? '✅ Present' : '❌ Missing'}</p>
                   <p><strong>User ID:</strong> {formData.user_id || 'Not set'}</p>
                   <p><strong>Bio:</strong> "{formData.bio}" (length: {formData.bio.length})</p>
                   <p><strong>Location:</strong> "{formData.location}" (length: {formData.location.length})</p>
                   <p><strong>Profile Picture:</strong> {formData.profile_pic_url ? '✅ Present' : '❌ Missing'}</p>
-                  <p><strong>Is Onboarding:</strong> {isOnboarding ? 'Yes' : 'No'}</p>
+                  <p><strong>Has Initial Data:</strong> {initialData ? 'Yes' : 'No'}</p>
                   {formInitializationDebug.timestamp && (
                     <p><strong>Last Init:</strong> {new Date(formInitializationDebug.timestamp).toLocaleTimeString()}</p>
+                  )}
+                  {initialData && (
+                    <div className="mt-2 p-2 bg-white rounded border">
+                      <p><strong>Initial Data Keys:</strong> {Object.keys(initialData).join(', ')}</p>
+                      <p><strong>Initial Bio:</strong> "{initialData.bio || 'undefined'}"</p>
+                      <p><strong>Initial Location:</strong> "{initialData.location || 'undefined'}"</p>
+                    </div>
                   )}
                 </div>
               </details>
             </div>
           )}
 
-          {initialData?.user?.name && initialData?.github_handle && (
+          {/* Display GitHub Handle (read-only) */}
+          {formData.github_handle && (
             <div className="mb-6 pb-4 border-b border-gray-200">
-              <h1 className="text-3xl font-bold text-gray-900">{initialData.user.name}</h1>
-              <p className="text-lg text-gray-500">@{initialData.github_handle}</p>
+              <div className="flex items-center space-x-3">
+                <img 
+                  src={formData.profile_pic_url || '/default-avatar.png'} 
+                  alt="Profile" 
+                  className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/default-avatar.png';
+                  }}
+                />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{user?.user_metadata?.name || user?.email}</h1>
+                  <a 
+                    href={`https://github.com/${formData.github_handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-lg text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                  >
+                    <Github className="w-4 h-4 mr-1" />
+                    @{formData.github_handle}
+                    <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
+                </div>
+              </div>
             </div>
           )}
 
@@ -684,27 +792,6 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
               </div>
               {errors.profile_pic && (
                 <p className="text-red-600 text-sm mt-1">{errors.profile_pic}</p>
-              )}
-            </div>
-
-            {/* CRITICAL FIX: Added missing GitHub Handle input field */}
-            <div>
-              <label htmlFor="github_handle" className="block text-sm font-medium text-gray-700 mb-2">
-                GitHub Handle *
-              </label>
-              <div className="relative">
-                <Github className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  id="github_handle"
-                  value={formData.github_handle}
-                  onChange={(e) => setFormData(prev => ({ ...prev, github_handle: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., your-username"
-                />
-              </div>
-              {errors.github_handle && (
-                <p className="text-red-600 text-sm mt-1">{errors.github_handle}</p>
               )}
             </div>
 
