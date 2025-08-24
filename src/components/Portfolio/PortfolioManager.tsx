@@ -23,11 +23,13 @@ import { PortfolioItem } from '../../types';
 interface PortfolioManagerProps {
   developerId: string;
   isEditable?: boolean;
+  showTitle?: boolean; // New prop to control title display
 }
 
 export const PortfolioManager: React.FC<PortfolioManagerProps> = ({ 
   developerId, 
-  isEditable: isEditableProp // Renamed prop to avoid conflict
+  isEditable: isEditableProp,
+  showTitle = true // Default to showing title
 }) => {
   const { userProfile, user } = useAuth(); // Added user for direct ID comparison
 
@@ -305,10 +307,25 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-black text-gray-900">Portfolio</h3>
-        {isEditable && (
+      {/* Conditional Header */}
+      {showTitle && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-black text-gray-900">Portfolio</h3>
+          {isEditable && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Add Item Button for when title is hidden but still editable */}
+      {!showTitle && isEditable && (
+        <div className="flex justify-end">
           <button
             onClick={() => setShowForm(true)}
             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
@@ -316,8 +333,8 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
             <Plus className="w-4 h-4 mr-2" />
             Add Item
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
