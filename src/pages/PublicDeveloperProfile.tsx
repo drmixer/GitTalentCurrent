@@ -285,7 +285,7 @@ export const PublicDeveloperProfile: React.FC = () => {
             <DeveloperProfileDetails developerId={developer.user_id} />
           )}
           {activeTab === 'portfolio' && (
-            <PortfolioManager developerId={developer.user_id} isEditable={false} />
+            <PortfolioManager developerId={developer.user_id} isEditable={false} showTitle={false} />
           )}
           {activeTab === 'github' && developer.github_handle && (
             developer?.github_installation_id ? (
