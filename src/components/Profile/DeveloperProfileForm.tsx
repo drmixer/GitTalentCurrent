@@ -98,10 +98,20 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     if (initialData && user?.id && !isInitialized) {
       console.log('Initializing form data with:', initialData);
       
+      // CRITICAL FIX: Get installation_id from user metadata if not in initialData
+      const installationIdFromMetadata = user?.user_metadata?.github_installation_id;
+      const installationIdToUse = initialData.github_installation_id || installationIdFromMetadata || '';
+      
+      console.log('Installation ID sources:', {
+        fromInitialData: initialData.github_installation_id,
+        fromUserMetadata: installationIdFromMetadata,
+        finalValue: installationIdToUse
+      });
+      
       setFormData(prev => ({
         ...prev,
         user_id: user.id,
-        github_handle: initialData.github_handle || prev.github_handle,
+        github_handle: initialData.github_handle || user?.user_metadata?.login || prev.github_handle,
         bio: initialData.bio || '', // Ensure we use the actual value, not fallback to prev
         availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
         linked_projects: initialData.linked_projects || prev.linked_projects,
@@ -115,14 +125,31 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         notification_preferences: initialData.notification_preferences || prev.notification_preferences,
         resume_url: initialData.resume_url || prev.resume_url,
         profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url,
-        github_installation_id: initialData.github_installation_id || prev.github_installation_id,
+        // CRITICAL: Use installation ID from multiple sources
+        github_installation_id: installationIdToUse,
         public_profile_enabled: initialData.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
         preferred_title: initialData.preferred_title || prev.preferred_title
       }));
       
       setIsInitialized(true);
+    } else if (!initialData && user?.id && !isInitialized) {
+      // Handle case where no initialData but we have a user (onboarding)
+      console.log('Initializing form for onboarding without initialData');
+      const installationIdFromMetadata = user?.user_metadata?.github_installation_id;
+      
+      setFormData(prev => ({
+        ...prev,
+        user_id: user.id,
+        github_handle: user?.user_metadata?.login || prev.github_handle,
+        bio: user?.user_metadata?.bio || prev.bio,
+        location: user?.user_metadata?.location || prev.location,
+        profile_pic_url: user?.user_metadata?.avatar_url || prev.profile_pic_url,
+        github_installation_id: installationIdFromMetadata || prev.github_installation_id
+      }));
+      
+      setIsInitialized(true);
     }
-  }, [initialData, user?.id, isInitialized]);
+  }, [initialData, user?.id, user?.user_metadata, isInitialized]);
 
   // Set initial profile picture from GitHub if not already set and available
   useEffect(() => {
@@ -175,6 +202,13 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     try {
       const { strength } = calculateProfileStrength(formData);
       
+      // CRITICAL FIX: Ensure we have the installation_id from user metadata if not already set
+      let finalInstallationId = formData.github_installation_id;
+      if (!finalInstallationId && user?.user_metadata?.github_installation_id) {
+        finalInstallationId = user.user_metadata.github_installation_id;
+        console.log('Retrieved installation_id from user metadata:', finalInstallationId);
+      }
+      
       // Create the data object for database insertion/update
       const skills = Object.values(formData.skills_categories).flat();
       const dataToSave = {
@@ -193,12 +227,32 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         notification_preferences: formData.notification_preferences,
         resume_url: formData.resume_url,
         profile_pic_url: formData.profile_pic_url,
-        github_installation_id: formData.github_installation_id,
+        github_installation_id: finalInstallationId, // Use the final resolved installation ID
         public_profile_enabled: formData.public_profile_enabled,
         preferred_title: formData.preferred_title
       };
 
-      console.log('Saving developer profile data:', dataToSave);
+      console.log('Saving developer profile data:', {
+        ...dataToSave,
+        github_installation_id: dataToSave.github_installation_id ? 'present' : 'null'
+      });
+
+      // IMPROVED ERROR HANDLING: Check if users table record exists first
+      const { data: userRecord, error: userCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', formData.user_id)
+        .single();
+
+      if (userCheckError && userCheckError.code === 'PGRST116') {
+        // User record doesn't exist - this is the root cause of the foreign key constraint error
+        throw new Error('User profile not found. Please try logging out and signing in again.');
+      } else if (userCheckError) {
+        console.error('Error checking user record:', userCheckError);
+        throw new Error('Unable to verify user profile. Please try again.');
+      }
+
+      console.log('User record verified, proceeding with developer profile save');
 
       const { error } = await supabase
         .from('developers')
@@ -206,7 +260,15 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
       if (error) {
         console.error('Supabase error:', error);
-        throw error;
+        
+        // Provide more helpful error messages based on the error type
+        if (error.code === '23503' && error.message.includes('developers_user_id_fkey')) {
+          throw new Error('Unable to link your developer profile. Please try logging out and signing in again.');
+        } else if (error.code === '23505') {
+          throw new Error('A profile with this information already exists. Please check your data and try again.');
+        } else {
+          throw error;
+        }
       }
 
       setSaveStatus('success');
@@ -332,6 +394,16 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
+          {/* DEBUG INFO (remove in production) */}
+          {isOnboarding && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+              <p className="font-medium text-blue-800">Debug Info:</p>
+              <p className="text-blue-600">GitHub Handle: {formData.github_handle || 'Not set'}</p>
+              <p className="text-blue-600">Installation ID: {formData.github_installation_id ? 'Present' : 'Missing'}</p>
+              <p className="text-blue-600">User ID: {formData.user_id || 'Not set'}</p>
+            </div>
+          )}
+
           {initialData?.user?.name && initialData?.github_handle && (
             <div className="mb-6 pb-4 border-b border-gray-200">
               <h1 className="text-3xl font-bold text-gray-900">{initialData.user.name}</h1>
