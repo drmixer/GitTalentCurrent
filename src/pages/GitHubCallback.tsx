@@ -132,14 +132,35 @@ export const GitHubCallback: React.FC = () => {
           console.log('[GitHubCallback] Session established successfully via AuthContext');
 
           setStatus('success');
-          setMessage('Welcome to GitTalent! Redirecting to your dashboard...');
           
-          // Wait a moment for the auth state to update, then redirect
-          setTimeout(() => {
-            const targetPath = result.user.role === 'developer' ? '/developer' : '/dashboard';
-            console.log('[GitHubCallback] Redirecting to:', targetPath);
-            navigate(targetPath, { replace: true });
-          }, 2000);
+          // IMPROVED: Better routing logic based on profile completeness
+          if (result.user.role === 'developer') {
+            // Check if developer profile needs completion
+            const needsOnboarding = !result.developer_profile || 
+                                  !result.developer_profile.bio || 
+                                  !result.developer_profile.location;
+            
+            if (needsOnboarding) {
+              setMessage('Welcome to GitTalent! Please complete your developer profile...');
+              setTimeout(() => {
+                console.log('[GitHubCallback] Redirecting to onboarding');
+                navigate('/onboarding', { replace: true });
+              }, 2000);
+            } else {
+              setMessage('Welcome back! Redirecting to your dashboard...');
+              setTimeout(() => {
+                console.log('[GitHubCallback] Redirecting to developer dashboard');
+                navigate('/developer', { replace: true });
+              }, 2000);
+            }
+          } else {
+            setMessage('Welcome to GitTalent! Redirecting to your dashboard...');
+            setTimeout(() => {
+              const targetPath = result.user.role === 'recruiter' ? '/recruiter' : '/dashboard';
+              console.log('[GitHubCallback] Redirecting to:', targetPath);
+              navigate(targetPath, { replace: true });
+            }, 2000);
+          }
 
         } else if (result.user && result.message) {
           // User was created but no session was provided
@@ -163,7 +184,7 @@ export const GitHubCallback: React.FC = () => {
         console.error('[GitHubCallback] Error processing callback:', error);
         setStatus('error');
         
-        // Handle specific error cases
+        // IMPROVED: Better error handling with more specific messages
         if (error.message.includes('code passed is incorrect or expired')) {
           setMessage('The GitHub authorization code has expired. Please try signing in again.');
         } else if (error.message.includes('already registered')) {
@@ -172,6 +193,10 @@ export const GitHubCallback: React.FC = () => {
             navigate('/login?message=Account already exists, please sign in', { replace: true });
           }, 3000);
           return;
+        } else if (error.message.includes('foreign key constraint')) {
+          setMessage('There was an issue setting up your profile. Please try signing in again or contact support if the issue persists.');
+        } else if (error.message.includes('Unable to link your developer profile')) {
+          setMessage('Profile setup incomplete. Please try logging out and signing in again.');
         } else {
           setMessage(error.message || 'An unexpected error occurred during authentication');
         }
@@ -191,6 +216,10 @@ export const GitHubCallback: React.FC = () => {
     // Clear any stored state and redirect to start over
     localStorage.removeItem('github_auth_intent');
     sessionStorage.removeItem('github_auth_email');
+    
+    // Reset processing state for retry
+    setHasProcessed(false);
+    processedRef.current = false;
     
     // Redirect to login page to start the flow again
     navigate('/login', { replace: true });
