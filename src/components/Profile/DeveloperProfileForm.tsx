@@ -46,6 +46,7 @@ const SKILL_CATEGORIES = {
   'Tools & Others': ['Git', 'Webpack', 'Vite', 'Babel', 'ESLint', 'Prettier', 'Jest', 'Cypress', 'Selenium', 'Figma', 'Adobe XD', 'Sketch']
 };
 
+// FIXED: Use centralized profile strength calculation
 export { calculateProfileStrength } from '../../utils/profileStrengthUtils';
 
 export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
@@ -92,37 +93,46 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Effect to properly initialize form data from initialData and user metadata
+  // Effect to properly initialize form data from initialData
   useEffect(() => {
-    if (user?.id && !isInitialized) {
-      console.log('Initializing form data with:', { initialData, userMetadata: user.user_metadata });
+    if (initialData && user?.id && !isInitialized) {
+      console.log('Initializing form data with:', initialData);
       
       setFormData(prev => ({
         ...prev,
         user_id: user.id,
-        github_handle: initialData?.github_handle || user.user_metadata?.user_name || prev.github_handle,
-        bio: initialData?.bio || user.user_metadata?.bio || '',
-        availability: initialData?.availability !== undefined ? initialData.availability : prev.availability,
-        linked_projects: initialData?.linked_projects || prev.linked_projects,
-        location: initialData?.location || '',
-        experience_years: initialData?.experience_years || prev.experience_years,
-        desired_salary: initialData?.desired_salary || prev.desired_salary,
-        skills: initialData?.skills || prev.skills,
-        skills_categories: initialData?.skills_categories || prev.skills_categories,
-        profile_strength: initialData?.profile_strength || prev.profile_strength,
-        public_profile_slug: initialData?.public_profile_slug || prev.public_profile_slug,
-        notification_preferences: initialData?.notification_preferences || prev.notification_preferences,
-        resume_url: initialData?.resume_url || prev.resume_url,
-        profile_pic_url: initialData?.profile_pic_url || user.user_metadata?.avatar_url || prev.profile_pic_url,
-        // **THE ONLY CHANGE IS THIS LINE**: It now falls back to the user metadata
-        github_installation_id: initialData?.github_installation_id || user.user_metadata?.github_installation_id || prev.github_installation_id,
-        public_profile_enabled: initialData?.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
-        preferred_title: initialData?.preferred_title || prev.preferred_title
+        github_handle: initialData.github_handle || prev.github_handle,
+        bio: initialData.bio || '', // Ensure we use the actual value, not fallback to prev
+        availability: initialData.availability !== undefined ? initialData.availability : prev.availability,
+        linked_projects: initialData.linked_projects || prev.linked_projects,
+        location: initialData.location || '', // Ensure we use the actual value, not fallback to prev
+        experience_years: initialData.experience_years || prev.experience_years,
+        desired_salary: initialData.desired_salary || prev.desired_salary,
+        skills: initialData.skills || prev.skills,
+        skills_categories: initialData.skills_categories || prev.skills_categories,
+        profile_strength: initialData.profile_strength || prev.profile_strength,
+        public_profile_slug: initialData.public_profile_slug || prev.public_profile_slug,
+        notification_preferences: initialData.notification_preferences || prev.notification_preferences,
+        resume_url: initialData.resume_url || prev.resume_url,
+        profile_pic_url: initialData.profile_pic_url || prev.profile_pic_url,
+        github_installation_id: initialData.github_installation_id || prev.github_installation_id,
+        public_profile_enabled: initialData.public_profile_enabled !== undefined ? initialData.public_profile_enabled : prev.public_profile_enabled,
+        preferred_title: initialData.preferred_title || prev.preferred_title
       }));
       
       setIsInitialized(true);
     }
-  }, [initialData, user, isInitialized]);
+  }, [initialData, user?.id, isInitialized]);
+
+  // Set initial profile picture from GitHub if not already set and available
+  useEffect(() => {
+    if (!formData.profile_pic_url && user?.user_metadata?.avatar_url) {
+      setFormData(prev => ({
+        ...prev,
+        profile_pic_url: user.user_metadata.avatar_url
+      }));
+    }
+  }, [formData.profile_pic_url, user?.user_metadata?.avatar_url]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -165,11 +175,27 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     try {
       const { strength } = calculateProfileStrength(formData);
       
+      // Create the data object for database insertion/update
       const skills = Object.values(formData.skills_categories).flat();
       const dataToSave = {
-        ...formData,
+        user_id: formData.user_id,
+        github_handle: formData.github_handle,
+        bio: formData.bio,
+        availability: formData.availability,
+        linked_projects: formData.linked_projects,
+        location: formData.location,
+        experience_years: formData.experience_years,
+        desired_salary: formData.desired_salary,
         skills: skills,
+        skills_categories: formData.skills_categories,
         profile_strength: strength,
+        public_profile_slug: formData.public_profile_slug,
+        notification_preferences: formData.notification_preferences,
+        resume_url: formData.resume_url,
+        profile_pic_url: formData.profile_pic_url,
+        github_installation_id: formData.github_installation_id,
+        public_profile_enabled: formData.public_profile_enabled,
+        preferred_title: formData.preferred_title
       };
 
       console.log('Saving developer profile data:', dataToSave);
@@ -206,36 +232,10 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
-  const handleFileUpload = async (file: File, type: 'profile_pic' | 'resume') => {
-    const uploader = type === 'resume' ? setUploadingResume : setUploadingProfilePic;
-    uploader(true);
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}-${type}-${Date.now()}.${fileExt}`;
-      const filePath = `${type}s/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('developer-files')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('developer-files')
-        .getPublicUrl(filePath);
-
-      setFormData(prev => ({
-        ...prev,
-        [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl
-      }));
-
-    } catch (error) {
-      console.error(`Error uploading ${type}:`, error);
-      setErrors({ [type]: `Failed to upload ${type}. Please try again.` });
-    } finally {
-      uploader(false);
-    }
+  const handleConnectGitHub = () => {
+    setConnectingGitHub(true);
+    // Note: navigate is not imported in this version
+    // navigate('/github-setup');
   };
 
   const addSkillToCategory = (category: string) => {
@@ -275,6 +275,45 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
     }
   };
 
+  const handleFileUpload = async (file: File, type: 'profile_pic' | 'resume') => {
+    if (type === 'resume') {
+      setUploadingResume(true);
+    } else {
+      setUploadingProfilePic(true);
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}-${type}-${Date.now()}.${fileExt}`;
+      const filePath = `${type}s/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('developer-files')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('developer-files')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({
+        ...prev,
+        [type === 'resume' ? 'resume_url' : 'profile_pic_url']: publicUrl
+      }));
+
+    } catch (error) {
+      console.error(`Error uploading ${type}:`, error);
+      setErrors({ [type]: `Failed to upload ${type}. Please try again.` });
+    } finally {
+      if (type === 'resume') {
+        setUploadingResume(false);
+      } else {
+        setUploadingProfilePic(false);
+      }
+    }
+  };
+
   const { strength: currentProfileStrength, suggestions } = calculateProfileStrength(formData);
 
   return (
@@ -293,6 +332,13 @@ export const DeveloperProfileForm: React.FC<DeveloperProfileFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
+          {initialData?.user?.name && initialData?.github_handle && (
+            <div className="mb-6 pb-4 border-b border-gray-200">
+              <h1 className="text-3xl font-bold text-gray-900">{initialData.user.name}</h1>
+              <p className="text-lg text-gray-500">@{initialData.github_handle}</p>
+            </div>
+          )}
+
           <div className="bg-gray-50 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Profile Strength</h3>
