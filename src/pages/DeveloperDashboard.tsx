@@ -388,9 +388,11 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
 
+  // FIXED: Prioritize freshly fetched developerData over potentially stale contextDeveloperProfile
   const currentDeveloperProfile = useMemo(() => {
     if (contextDeveloperProfile) {
-      return { ...developerData, ...contextDeveloperProfile, user: contextDeveloperProfile.user || developerData?.user };
+      // Prioritize the freshly fetched developerData over the context
+      return { ...contextDeveloperProfile, ...developerData, user: contextDeveloperProfile.user || developerData?.user };
     }
     return developerData;
   }, [contextDeveloperProfile, developerData]);
