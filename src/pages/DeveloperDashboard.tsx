@@ -145,6 +145,9 @@ export const DeveloperDashboard: React.FC = () => {
   // CRITICAL FIX: Add state to track when profile form should be force-refreshed
   const [profileFormKey, setProfileFormKey] = useState(0);
 
+  // CRITICAL DEBUG: Add comprehensive data flow debugging
+  const [dashboardDebugInfo, setDashboardDebugInfo] = useState<any>({});
+
   // Badge: derive unread test assignments from deduped list so it matches the bell
   const unreadTestsBadge = useMemo(
     () =>
@@ -195,10 +198,10 @@ export const DeveloperDashboard: React.FC = () => {
     gitHubDataErrorToShow = freshGitHubError;
   }
 
-  // CRITICAL FIX: Enhanced developer data fetching with better error handling and data merging
+  // CRITICAL DEBUG: Enhanced developer data fetching with comprehensive debugging
   const fetchDeveloperPageData = useCallback(async () => {
     if (!authUser?.id) {
-      console.log('🔍 [Dashboard] No user ID available for data fetch');
+      console.log('🔍 [DASHBOARD] No user ID available for data fetch');
       setDashboardPageLoading(false);
       setIsLoadingEndorsements(false);
       setEndorsementError("User not logged in.");
@@ -206,11 +209,20 @@ export const DeveloperDashboard: React.FC = () => {
     }
 
     setDashboardPageLoading(true);
-    console.log('🚀 [Dashboard] Starting comprehensive developer page data fetch for user:', authUser.id);
+    console.log('🚀 [DASHBOARD] ===== STARTING COMPREHENSIVE DATA FETCH =====');
+    console.log('🔍 [DASHBOARD] User ID:', authUser.id);
+    console.log('🔍 [DASHBOARD] Auth User Metadata:', {
+      keys: Object.keys(authUser.user_metadata || {}),
+      bio: authUser.user_metadata?.bio,
+      location: authUser.user_metadata?.location,
+      login: authUser.user_metadata?.login,
+      github_installation_id: authUser.user_metadata?.github_installation_id,
+      installation_id: authUser.user_metadata?.installation_id
+    });
     
     try {
       // ENHANCED: Fetch developer data with more comprehensive query
-      console.log('📋 [Dashboard] Fetching developer profile from database...');
+      console.log('📋 [DASHBOARD] Fetching developer profile from database...');
       const { data: devData, error: devError } = await supabase
         .from('developers')
         .select(`
@@ -221,25 +233,30 @@ export const DeveloperDashboard: React.FC = () => {
         .single();
 
       if (devError && devError.code !== 'PGRST116') {
-        console.error('❌ [Dashboard] Error fetching developer data:', devError);
+        console.error('❌ [DASHBOARD] Error fetching developer data:', devError);
         // Don't throw here, continue with context data
       } else if (devData) {
-        console.log('✅ [Dashboard] Developer data fetched successfully:', {
+        console.log('✅ [DASHBOARD] Developer data fetched from database:', {
           id: devData.id,
-          github_handle: devData.github_handle,
+          github_handle: `"${devData.github_handle}"`,
+          github_handle_length: devData.github_handle?.length || 0,
+          bio: `"${devData.bio}"`,
           bio_length: devData.bio?.length || 0,
-          location: devData.location,
+          location: `"${devData.location}"`,
+          location_length: devData.location?.length || 0,
           installation_id: devData.github_installation_id ? 'present' : 'missing',
-          profile_strength: devData.profile_strength
+          profile_strength: devData.profile_strength,
+          created_at: devData.created_at,
+          updated_at: devData.updated_at
         });
         setDeveloperData(devData as Developer);
       } else {
-        console.log('🔍 [Dashboard] No developer data found in database, using context data');
+        console.log('🔍 [DASHBOARD] No developer data found in database, using context data');
         setDeveloperData(null);
       }
 
       // Fetch portfolio items
-      console.log('🎨 [Dashboard] Fetching portfolio items...');
+      console.log('🎨 [DASHBOARD] Fetching portfolio items...');
       const { data: portfolioData, error: portfolioError } = await supabase
         .from('portfolio_items')
         .select('*')
@@ -247,34 +264,34 @@ export const DeveloperDashboard: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (portfolioError) {
-        console.error('❌ [Dashboard] Error fetching portfolio items:', portfolioError);
+        console.error('❌ [DASHBOARD] Error fetching portfolio items:', portfolioError);
       } else {
-        console.log('✅ [Dashboard] Portfolio items fetched:', portfolioData?.length || 0, 'items');
+        console.log('✅ [DASHBOARD] Portfolio items fetched:', portfolioData?.length || 0, 'items');
         setPortfolioItems(portfolioData || []);
       }
 
       // Fetch endorsements
-      console.log('⭐ [Dashboard] Fetching endorsements...');
+      console.log('⭐ [DASHBOARD] Fetching endorsements...');
       setIsLoadingEndorsements(true);
       setEndorsementError(null);
       
       const fetchedEndorsements = await fetchEndorsementsForDeveloper(authUser.id, false);
       if (fetchedEndorsements) {
         setEndorsements(fetchedEndorsements);
-        console.log('✅ [Dashboard] Endorsements fetched:', fetchedEndorsements.length, 'items');
+        console.log('✅ [DASHBOARD] Endorsements fetched:', fetchedEndorsements.length, 'items');
       } else {
-        console.warn('⚠️ [Dashboard] Failed to fetch endorsements');
+        console.warn('⚠️ [DASHBOARD] Failed to fetch endorsements');
         setEndorsementError("Failed to load endorsements.");
       }
       setIsLoadingEndorsements(false);
 
     } catch (error) {
-      console.error('💥 [Dashboard] Critical error in fetchDeveloperPageData:', error);
+      console.error('💥 [DASHBOARD] Critical error in fetchDeveloperPageData:', error);
       setIsLoadingEndorsements(false);
       setEndorsementError("An unexpected error occurred while loading endorsements.");
     } finally {
       setDashboardPageLoading(false);
-      console.log('🏁 [Dashboard] Finished fetching all developer page data');
+      console.log('🏁 [DASHBOARD] ===== FINISHED DATA FETCH =====');
     }
   }, [authUser?.id]);
 
@@ -295,29 +312,36 @@ export const DeveloperDashboard: React.FC = () => {
     setIsLoadingEndorsements(false);
   }, []);
 
-  // CRITICAL FIX: Enhanced effect to handle both auth loading and user changes
+  // CRITICAL DEBUG: Enhanced effect to handle both auth loading and user changes
   useEffect(() => {
+    console.log('🔄 [DASHBOARD] Auth state changed:', {
+      authContextLoading,
+      hasAuthUser: !!authUser?.id,
+      userId: authUser?.id,
+      timestamp: new Date().toISOString()
+    });
+
     if (authContextLoading) {
-      console.log('⏳ [Dashboard] Auth context still loading...');
+      console.log('⏳ [DASHBOARD] Auth context still loading...');
       return;
     }
 
     if (!authUser?.id) {
-      console.log('❌ [Dashboard] No authenticated user found');
+      console.log('❌ [DASHBOARD] No authenticated user found');
       setDashboardPageLoading(false);
       setIsLoadingEndorsements(false);
       setEndorsementError("Not authenticated to load endorsements.");
       return;
     }
 
-    console.log('👤 [Dashboard] User authenticated, fetching data for:', authUser.id);
+    console.log('👤 [DASHBOARD] User authenticated, fetching data for:', authUser.id);
     fetchDeveloperPageData();
   }, [authUser, authContextLoading, fetchDeveloperPageData]);
 
   // Clear notifications when accessing relevant tabs
   useEffect(() => {
     if (userProfile?.id && activeTab) {
-      console.log('🔄 DeveloperDashboard: Clearing notifications for tab:', activeTab);
+      console.log('🔄 [DASHBOARD] Clearing notifications for tab:', activeTab);
       if (activeTab === 'tests') {
         markAsReadByType('test_assignment');
       } else if (activeTab === 'messages') {
@@ -333,7 +357,7 @@ export const DeveloperDashboard: React.FC = () => {
   // GitHub recent commits derivation
   useEffect(() => {
     if (finalGitHubDataToShow) {
-      console.log('[Dashboard] Processing GitHub data:', finalGitHubDataToShow);
+      console.log('[DASHBOARD] Processing GitHub data:', finalGitHubDataToShow);
       if (finalGitHubDataToShow.recentCommits && Array.isArray(finalGitHubDataToShow.recentCommits)) {
         const formattedCommits = finalGitHubDataToShow.recentCommits.slice(0, 3).map((commit: any) => ({
           sha: commit.sha || Math.random().toString(36).substring(7),
@@ -343,7 +367,7 @@ export const DeveloperDashboard: React.FC = () => {
           url: commit.url || '#',
         }));
         setRecentCommits(formattedCommits);
-        console.log('[Dashboard] Set recent commits:', formattedCommits);
+        console.log('[DASHBOARD] Set recent commits:', formattedCommits);
       } else if (finalGitHubDataToShow.contributions?.recentActivity && Array.isArray(finalGitHubDataToShow.contributions.recentActivity)) {
         const commitActivities = finalGitHubDataToShow.contributions.recentActivity
           .filter((activity: any) => activity.type === 'commit')
@@ -356,7 +380,7 @@ export const DeveloperDashboard: React.FC = () => {
             url: '#',
           }));
         setRecentCommits(commitActivities);
-        console.log('[Dashboard] Set commits from recentActivity:', commitActivities);
+        console.log('[DASHBOARD] Set commits from recentActivity:', commitActivities);
       } else if (finalGitHubDataToShow.contributions && Array.isArray(finalGitHubDataToShow.contributions)) {
         const formattedCommits = finalGitHubDataToShow.contributions.slice(0, 3).map((contrib: any) => ({
           sha: contrib.oid || contrib.id || Math.random().toString(36).substring(7),
@@ -366,9 +390,9 @@ export const DeveloperDashboard: React.FC = () => {
           url: contrib.commitUrl || contrib.url || '#',
         }));
         setRecentCommits(formattedCommits);
-        console.log('[Dashboard] Set commits from legacy contributions:', formattedCommits);
+        console.log('[DASHBOARD] Set commits from legacy contributions:', formattedCommits);
       } else {
-        console.log('[Dashboard] No recent commits data found');
+        console.log('[DASHBOARD] No recent commits data found');
         setRecentCommits([]);
       }
     }
@@ -379,7 +403,7 @@ export const DeveloperDashboard: React.FC = () => {
     if (finalGitHubDataToShow) {
       const ytdContributions = calculateCalendarYearContributions(finalGitHubDataToShow);
       setCalendarYearContributions(ytdContributions);
-      console.log('[Dashboard] Calendar year (YTD) contributions calculated:', ytdContributions);
+      console.log('[DASHBOARD] Calendar year (YTD) contributions calculated:', ytdContributions);
     }
   }, [finalGitHubDataToShow]);
 
@@ -387,7 +411,7 @@ export const DeveloperDashboard: React.FC = () => {
   useEffect(() => {
     if (finalGitHubDataToShow && developerData?.id) {
       let totalContributions = 0;
-      console.log('[Dashboard] Processing GitHub data for annual contributions (rolling year for DB sync):', {
+      console.log('[DASHBOARD] Processing GitHub data for annual contributions (rolling year for DB sync):', {
         hasContributions: !!finalGitHubDataToShow.contributions,
         contributionsType: typeof finalGitHubDataToShow.contributions,
         hasCalendar: !!finalGitHubDataToShow.contributions?.calendar,
@@ -419,9 +443,9 @@ export const DeveloperDashboard: React.FC = () => {
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', developerData.user_id || authUser?.id);
-            if (error) console.error('[Dashboard] Failed to update annual_contributions in database:', error);
+            if (error) console.error('[DASHBOARD] Failed to update annual_contributions in database:', error);
           } catch (updateError) {
-            console.error('[Dashboard] Error updating annual_contributions:', updateError);
+            console.error('[DASHBOARD] Error updating annual_contributions:', updateError);
           }
         };
         updateAnnualContributions();
@@ -429,24 +453,43 @@ export const DeveloperDashboard: React.FC = () => {
     }
   }, [finalGitHubDataToShow, developerData?.id, developerData?.annual_contributions, authUser?.id]);
 
-  // CRITICAL FIX: Enhanced developer profile merging with REAL-TIME AUTH DATA INJECTION
+  // CRITICAL DEBUG: Enhanced developer profile merging with REAL-TIME AUTH DATA INJECTION and comprehensive debugging
   const currentDeveloperProfile = useMemo(() => {
-    console.log('🔄 [Dashboard] Computing current developer profile...', {
+    console.log('🔄 [DASHBOARD PROFILE] ===== COMPUTING CURRENT DEVELOPER PROFILE =====');
+    console.log('🔍 [DASHBOARD PROFILE] Input data sources:', {
       hasContextProfile: !!contextDeveloperProfile,
       hasDeveloperData: !!developerData,
       hasAuthUser: !!authUser,
-      contextGithubHandle: contextDeveloperProfile?.github_handle,
-      dataGithubHandle: developerData?.github_handle,
-      authUserGithubHandle: authUser?.user_metadata?.login,
-      contextBio: contextDeveloperProfile?.bio?.length || 0,
-      dataBio: developerData?.bio?.length || 0,
-      authUserBio: authUser?.user_metadata?.bio?.length || 0
+      contextProfile: contextDeveloperProfile ? {
+        github_handle: `"${contextDeveloperProfile.github_handle}"`,
+        bio: `"${contextDeveloperProfile.bio}"`,
+        location: `"${contextDeveloperProfile.location}"`,
+        bio_length: contextDeveloperProfile.bio?.length || 0,
+        location_length: contextDeveloperProfile.location?.length || 0
+      } : 'none',
+      developerData: developerData ? {
+        github_handle: `"${developerData.github_handle}"`,
+        bio: `"${developerData.bio}"`,
+        location: `"${developerData.location}"`,
+        bio_length: developerData.bio?.length || 0,
+        location_length: developerData.location?.length || 0
+      } : 'none',
+      authUserMetadata: {
+        login: authUser?.user_metadata?.login,
+        bio: `"${authUser?.user_metadata?.bio || ''}"`,
+        location: `"${authUser?.user_metadata?.location || ''}"`,
+        bio_length: authUser?.user_metadata?.bio?.length || 0,
+        location_length: authUser?.user_metadata?.location?.length || 0,
+        github_installation_id: authUser?.user_metadata?.github_installation_id ? 'present' : 'missing',
+        installation_id: authUser?.user_metadata?.installation_id ? 'present' : 'missing'
+      }
     });
 
     // CRITICAL FIX: Always prioritize contextDeveloperProfile as it has the most up-to-date data
     let profile = contextDeveloperProfile || developerData;
     
     if (!profile && authUser?.id) {
+      console.log('🔧 [DASHBOARD PROFILE] Creating minimal profile from auth user');
       // Create a minimal profile if none exists
       profile = {
         user_id: authUser.id,
@@ -472,9 +515,19 @@ export const DeveloperDashboard: React.FC = () => {
     }
 
     if (!profile) {
-      console.log('❌ [Dashboard] No profile data available');
+      console.log('❌ [DASHBOARD PROFILE] No profile data available');
       return null;
     }
+
+    // CRITICAL DEBUG: Log pre-merge state
+    console.log('🔍 [DASHBOARD PROFILE] Profile before merging:', {
+      github_handle: `"${profile.github_handle}"`,
+      bio: `"${profile.bio}"`,
+      location: `"${profile.location}"`,
+      bio_length: profile.bio?.length || 0,
+      location_length: profile.location?.length || 0,
+      installation_id: profile.github_installation_id ? 'present' : 'missing'
+    });
 
     // CRITICAL FIX: AGGRESSIVE merging with auth user metadata to fill empty fields
     const mergedProfile = {
@@ -494,31 +547,66 @@ export const DeveloperDashboard: React.FC = () => {
       } : undefined)
     };
     
-    console.log('✅ [Dashboard] Final merged profile created:', {
-      github_handle: mergedProfile.github_handle,
+    console.log('✅ [DASHBOARD PROFILE] Final merged profile created:', {
+      github_handle: `"${mergedProfile.github_handle}"`,
+      github_handle_length: mergedProfile.github_handle?.length || 0,
+      bio: `"${mergedProfile.bio}"`,
       bio_length: mergedProfile.bio?.length || 0,
-      location: mergedProfile.location,
+      location: `"${mergedProfile.location}"`,
+      location_length: mergedProfile.location?.length || 0,
       installation_id: mergedProfile.github_installation_id ? 'present' : 'missing',
       profile_pic_url: mergedProfile.profile_pic_url ? 'present' : 'missing',
-      source: contextDeveloperProfile ? 'context+auth' : developerData ? 'database+auth' : 'auth_only'
+      source: contextDeveloperProfile ? 'context+auth' : developerData ? 'database+auth' : 'auth_only',
+      timestamp: new Date().toISOString()
+    });
+
+    // CRITICAL DEBUG: Update debug info
+    setDashboardDebugInfo({
+      timestamp: new Date().toISOString(),
+      profileSource: contextDeveloperProfile ? 'context+auth' : developerData ? 'database+auth' : 'auth_only',
+      mergedProfileData: {
+        github_handle: mergedProfile.github_handle,
+        bio_length: mergedProfile.bio?.length || 0,
+        location_length: mergedProfile.location?.length || 0,
+        installation_id: mergedProfile.github_installation_id ? 'present' : 'missing'
+      }
     });
     
+    console.log('🏁 [DASHBOARD PROFILE] ===== PROFILE COMPUTATION COMPLETE =====');
     return mergedProfile;
   }, [contextDeveloperProfile, developerData, authUser]);
 
-  // CRITICAL FIX: Force refresh profile form when auth context changes
+  // CRITICAL DEBUG: Force refresh profile form when auth context changes
   useEffect(() => {
     if (authUser?.id && contextDeveloperProfile) {
-      console.log('🔄 [Dashboard] Auth context updated, forcing profile form refresh');
-      setProfileFormKey(prev => prev + 1);
+      console.log('🔄 [DASHBOARD] Auth context updated, forcing profile form refresh');
+      console.log('🔍 [DASHBOARD] Context profile data:', {
+        github_handle: contextDeveloperProfile.github_handle,
+        bio_length: contextDeveloperProfile.bio?.length || 0,
+        location_length: contextDeveloperProfile.location?.length || 0
+      });
+      setProfileFormKey(prev => {
+        const newKey = prev + 1;
+        console.log('🔑 [DASHBOARD] Profile form key updated from', prev, 'to', newKey);
+        return newKey;
+      });
     }
   }, [authUser, contextDeveloperProfile]);
 
-  // CRITICAL FIX: Force refresh when switching to profile tab
+  // CRITICAL DEBUG: Force refresh when switching to profile tab
   useEffect(() => {
     if (activeTab === 'profile' && currentDeveloperProfile) {
-      console.log('🔄 [Dashboard] Profile tab activated, forcing form refresh');
-      setProfileFormKey(prev => prev + 1);
+      console.log('🔄 [DASHBOARD] Profile tab activated, forcing form refresh');
+      console.log('🔍 [DASHBOARD] Current profile data for form:', {
+        github_handle: currentDeveloperProfile.github_handle,
+        bio_length: currentDeveloperProfile.bio?.length || 0,
+        location_length: currentDeveloperProfile.location?.length || 0
+      });
+      setProfileFormKey(prev => {
+        const newKey = prev + 1;
+        console.log('🔑 [DASHBOARD] Profile form key updated for tab switch from', prev, 'to', newKey);
+        return newKey;
+      });
     }
   }, [activeTab, currentDeveloperProfile]);
 
@@ -547,28 +635,39 @@ export const DeveloperDashboard: React.FC = () => {
     );
   };
 
-  // ENHANCED: Handle profile form success with comprehensive refresh
+  // ENHANCED: Handle profile form success with comprehensive refresh and debugging
   const handleProfileFormSuccess = useCallback(async () => {
-    console.log('🎉 [Dashboard] Profile form success - refreshing all data...');
+    console.log('🎉 [DASHBOARD] ===== PROFILE FORM SUCCESS - STARTING REFRESH =====');
     
     try {
       // Refresh auth context first
       if (refreshProfile) {
-        console.log('🔄 [Dashboard] Refreshing auth profile...');
+        console.log('🔄 [DASHBOARD] Refreshing auth profile...');
         await refreshProfile();
+        console.log('✅ [DASHBOARD] Auth profile refresh completed');
       }
       
       // Then refresh local data
-      console.log('🔄 [Dashboard] Refreshing dashboard data...');
+      console.log('🔄 [DASHBOARD] Refreshing dashboard data...');
       await fetchDeveloperPageData();
+      console.log('✅ [DASHBOARD] Dashboard data refresh completed');
       
-      // Force refresh the profile form
-      setProfileFormKey(prev => prev + 1);
+      // Force refresh the profile form with a delay to ensure data propagation
+      setTimeout(() => {
+        console.log('🔄 [DASHBOARD] Force refreshing profile form component');
+        setProfileFormKey(prev => {
+          const newKey = prev + 1;
+          console.log('🔑 [DASHBOARD] Profile form key updated after success from', prev, 'to', newKey);
+          return newKey;
+        });
+      }, 500);
       
-      console.log('✅ [Dashboard] Profile refresh completed successfully');
+      console.log('✅ [DASHBOARD] Profile refresh completed successfully');
     } catch (error) {
-      console.error('💥 [Dashboard] Error during profile refresh:', error);
+      console.error('💥 [DASHBOARD] Error during profile refresh:', error);
     }
+
+    console.log('🏁 [DASHBOARD] ===== PROFILE FORM SUCCESS REFRESH COMPLETE =====');
   }, [refreshProfile, fetchDeveloperPageData]);
 
   if (authContextLoading || (!authUser && !authContextLoading && !dashboardPageLoading)) {
@@ -605,6 +704,33 @@ export const DeveloperDashboard: React.FC = () => {
         />
       )}
 
+      {/* CRITICAL DEBUG: Dashboard Debug Information */}
+      {process.env.NODE_ENV === 'development' && activeTab === 'profile' && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm">
+          <details>
+            <summary className="font-medium text-yellow-800 cursor-pointer">🔍 Dashboard Debug Info (Click to expand)</summary>
+            <div className="mt-2 text-yellow-600 space-y-1">
+              <p><strong>Dashboard Timestamp:</strong> {dashboardDebugInfo.timestamp || 'Not set'}</p>
+              <p><strong>Profile Source:</strong> {dashboardDebugInfo.profileSource || 'Unknown'}</p>
+              <p><strong>Profile Form Key:</strong> {profileFormKey}</p>
+              <p><strong>Auth Context Loading:</strong> {authContextLoading ? 'Yes' : 'No'}</p>
+              <p><strong>Dashboard Loading:</strong> {dashboardPageLoading ? 'Yes' : 'No'}</p>
+              <p><strong>Has Context Profile:</strong> {contextDeveloperProfile ? 'Yes' : 'No'}</p>
+              <p><strong>Has Developer Data:</strong> {developerData ? 'Yes' : 'No'}</p>
+              <p><strong>Current Profile Data:</strong> {currentDeveloperProfile ? 'Yes' : 'No'}</p>
+              {currentDeveloperProfile && (
+                <div className="mt-2 p-2 bg-white rounded border">
+                  <p><strong>GitHub Handle:</strong> "{currentDeveloperProfile.github_handle}"</p>
+                  <p><strong>Bio Length:</strong> {currentDeveloperProfile.bio?.length || 0}</p>
+                  <p><strong>Location Length:</strong> {currentDeveloperProfile.location?.length || 0}</p>
+                  <p><strong>Installation ID:</strong> {currentDeveloperProfile.github_installation_id ? 'Present' : 'Missing'}</p>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
+      )}
+
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
           {validTabs.map((tabName) => (
@@ -625,153 +751,3 @@ export const DeveloperDashboard: React.FC = () => {
                 <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                   {unreadMessagesBadge}
                 </span>
-              )}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'profile' && (
-        displayDeveloperProfileForForm ? (
-          <DeveloperProfileForm
-            key={`profile-form-${profileFormKey}-${currentDeveloperProfile?.id || 'new'}-${currentDeveloperProfile?.github_handle || 'no-handle'}`}
-            initialData={displayDeveloperProfileForForm}
-            onSuccess={handleProfileFormSuccess}
-            isOnboarding={false}
-          />
-        ) : (
-          <div className="text-center p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading profile form...</p>
-          </div>
-        )
-      )}
-      {activeTab === 'portfolio' && <PortfolioManager developerId={authUser?.id || ''} />}
-      {activeTab === 'github-activity' && (
-        currentDeveloperProfile?.github_handle && currentDeveloperProfile?.github_installation_id ? (
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="lg:w-2/5 flex-shrink-0">
-              <div className="max-w-md mx-auto lg:mx-0 bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-                <RealGitHubChart
-                  githubHandle={currentDeveloperProfile.github_handle}
-                  gitHubData={finalGitHubDataToShow}
-                  loading={gitHubDataLoadingToShow}
-                  error={gitHubDataErrorToShow as Error | null}
-                  className="w-full"
-                  displayMode='dashboardSnippet'
-                  isGitHubAppInstalled={!!currentDeveloperProfile?.github_installation_id}
-                />
-              </div>
-            </div>
-            <div className="lg:w-3/5 flex-grow bg-white p-4 sm:p-6 rounded-lg shadow-md border">
-              {gitHubDataLoadingToShow && (
-                <div className="flex flex-col items-center justify-center h-64">
-                  <Loader className="animate-spin h-10 w-10 text-blue-500 mb-4" />
-                  <p className="text-gray-600">
-                    {shouldUseFreshDataSource ? "Fetching latest GitHub activity..." : "Loading GitHub activity..."}
-                  </p>
-                </div>
-              )}
-              {!gitHubDataLoadingToShow && gitHubDataErrorToShow && (
-                <div className="text-center py-10 px-6 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold text-red-700">Error Loading GitHub Details</h3>
-                  <p className="text-red-600 mt-2 text-sm">
-                    {typeof gitHubDataErrorToShow === 'string' ? gitHubDataErrorToShow : (gitHubDataErrorToShow as Error)?.message || 'An unknown error occurred.'}
-                  </p>
-                  <button
-                    onClick={() => navigate('/github-setup')}
-                    className="mt-4 px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
-                  >
-                    Re-check
-                  </button>
-                </div>
-              )}
-              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && finalGitHubDataToShow?.user && (
-                <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
-              )}
-              {!gitHubDataLoadingToShow && !gitHubDataErrorToShow && !finalGitHubDataToShow?.user && (
-                <div className="text-center py-10 px-6 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <Github className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold">No GitHub Data Available</h3>
-                  <p className="text-gray-600 mt-2 text-sm">Could not retrieve GitHub activity.</p>
-                  <button
-                    onClick={async () => {
-                      setLatchedSuccessfullyFetchedFreshData(null);
-                      setHasFreshDataBeenProcessed(false);
-                      if (refreshProfile) await refreshProfile();
-                    }}
-                    className="mt-4 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                  >
-                    Refresh
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center p-8">
-            <Github className="w-16 h-16 text-gray-300 mx-auto mb-6" />
-            <h3 className="text-2xl font-semibold">Connect GitHub Account</h3>
-            <button
-              onClick={() => {
-                if (!currentDeveloperProfile?.github_handle) {
-                  navigate(`/developer?tab=profile`, { state: { ...(locationState || {}), focusGitHubHandle: true } });
-                } else {
-                  navigate('/github-setup');
-                }
-              }}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg"
-            >
-              {currentDeveloperProfile?.github_handle ? 'Connect GitHub App' : 'Add GitHub Handle in Profile'}
-            </button>
-          </div>
-        )
-      )}
-      {activeTab === 'messages' && (
-        <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-250px)]">
-          <div className="md:w-1/3 h-full">
-            <MessageList
-              onThreadSelect={(threadDetails) => {
-                setSelectedMessageThreadDetails(threadDetails);
-              }}
-            />
-          </div>
-          <div className="md:w-2/3 h-full bg-white border border-gray-200 rounded-2xl overflow-hidden">
-            {selectedMessageThreadDetails ? (
-              <MessageThread
-                key={`${selectedMessageThreadDetails.otherUserId}-${selectedMessageThreadDetails.jobContext?.id || 'general'}`}
-                otherUserId={selectedMessageThreadDetails.otherUserId}
-                otherUserName={selectedMessageThreadDetails.otherUserName}
-                otherUserRole={selectedMessageThreadDetails.otherUserRole}
-                otherUserProfilePicUrl={selectedMessageThreadDetails.otherUserProfilePicUrl}
-                jobContext={selectedMessageThreadDetails.jobContext}
-                onBack={() => setSelectedMessageThreadDetails(null)}
-              />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500">
-                <MessageSquare size={48} className="mb-4 text-gray-300" />
-                <h3 className="text-xl font-semibold">Select a conversation</h3>
-                <p className="text-sm">Choose a conversation from the list to view messages.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {activeTab === 'jobs' && <JobsTab />}
-      {activeTab === 'tests' && <DeveloperTests />}
-      {activeTab === 'endorsements' && (
-        <section className="endorsements-tab-content">
-          <EndorsementDisplay
-            endorsements={endorsements}
-            isLoading={isLoadingEndorsements}
-            error={endorsementError}
-            canManageVisibility={true}
-            onToggleVisibility={handleToggleEndorsementVisibility}
-          />
-        </section>
-      )}
-    </div>
-  );
-};
