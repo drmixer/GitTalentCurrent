@@ -53,11 +53,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('Bio BEFORE RPC:', beforeData?.bio, 'Location BEFORE RPC:', beforeData?.location);
     console.log('Updated_at BEFORE RPC:', beforeData?.updated_at);
 
+    // First, check if user already exists in users table to get their actual role
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    // Determine the correct user role
+    let userRole: string;
+    if (existingUser?.role) {
+      // Use existing role from database
+      userRole = existingUser.role;
+    } else {
+      // Fall back to localStorage, then auth metadata, then default based on provider
+      userRole = localStorage.getItem('gittalent_signup_role') || 
+                 user.user_metadata?.role ||
+                 (user.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
+    }
+
     const rpcParams = {
       user_id: user.id,
       user_email: user.email,
       user_name: user.user_metadata?.name || user.email,
-      user_role: localStorage.getItem('gittalent_signup_role') || 'developer',
+      user_role: userRole,
       company_name: localStorage.getItem('gittalent_signup_company_name') || '',
     };
 
@@ -272,6 +291,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .single();
 
         if (error && error.code === 'PGRST116') {
+          // Determine the correct user role using the same logic as ensureUserProfileExists
           const userRole =
             localStorage.getItem('gittalent_signup_role') ||
             (authUser.user_metadata as any)?.role ||
