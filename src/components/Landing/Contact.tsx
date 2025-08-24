@@ -64,7 +64,7 @@ export const Contact = () => {
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-1">Email</h4>
-                  <p className="text-gray-600">hello@gittalent.dev</p>
+                  <a href="mailto:hello@mail.gittalent.dev" className="text-gray-600 hover:text-blue-600 transition-colors">hello@mail.gittalent.dev</a>
                   <p className="text-sm text-gray-500">We'll get back to you within 24 hours</p>
                 </div>
               </div>
