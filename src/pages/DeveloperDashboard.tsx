@@ -751,3 +751,166 @@ export const DeveloperDashboard: React.FC = () => {
                 <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                   {unreadMessagesBadge}
                 </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="mt-8">
+        {activeTab === 'overview' && renderOverview()}
+
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Developer Profile</h2>
+            {displayDeveloperProfileForForm ? (
+              <DeveloperProfileForm
+                key={profileFormKey}
+                developer={displayDeveloperProfileForForm}
+                onSuccess={handleProfileFormSuccess}
+              />
+            ) : (
+              <div className="text-center text-gray-500">
+                <Loader className="animate-spin h-8 w-8 mx-auto mb-4" />
+                Loading profile data...
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'portfolio' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Portfolio</h2>
+            {currentDeveloperProfile ? (
+              <PortfolioManager
+                developerId={currentDeveloperProfile.user_id}
+                initialItems={portfolioItems}
+                onItemsChange={setPortfolioItems}
+              />
+            ) : (
+              <div className="text-center text-gray-500">Loading portfolio...</div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'github-activity' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center mb-6">
+              <Github className="h-6 w-6 mr-3 text-gray-700" />
+              <h2 className="text-2xl font-bold text-gray-900">GitHub Activity</h2>
+            </div>
+            {currentDeveloperProfile?.github_handle ? (
+              <div className="space-y-6">
+                {finalGitHubDataToShow && !gitHubDataLoadingToShow && !gitHubDataErrorToShow ? (
+                  <>
+                    <RealGitHubChart gitHubData={finalGitHubDataToShow} />
+                    <GitHubUserActivityDetails gitHubData={finalGitHubDataToShow} />
+                  </>
+                ) : gitHubDataLoadingToShow ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader className="animate-spin h-8 w-8 text-blue-500" />
+                    <span className="ml-3 text-gray-600">Loading GitHub data...</span>
+                  </div>
+                ) : gitHubDataErrorToShow ? (
+                  <div className="flex items-center justify-center py-12 text-red-600">
+                    <AlertCircle className="h-6 w-6 mr-2" />
+                    <span>Failed to load GitHub data: {gitHubDataErrorToShow}</span>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    No GitHub data available
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Github className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 mb-4">Connect your GitHub account to see your activity</p>
+                <button
+                  onClick={() => setShowGitHubConnectModal(true)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Connect GitHub
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'messages' && (
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center">
+                <MessageSquare className="h-6 w-6 mr-3 text-gray-700" />
+                <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
+              </div>
+            </div>
+            <div className="flex h-96">
+              <div className="w-1/3 border-r border-gray-200">
+                <MessageList
+                  userId={authUser?.id || ''}
+                  onSelectThread={(threadDetails) => {
+                    setSelectedMessageThreadDetails(threadDetails);
+                  }}
+                />
+              </div>
+              <div className="w-2/3">
+                {selectedMessageThreadDetails ? (
+                  <MessageThread
+                    currentUserId={authUser?.id || ''}
+                    otherUserId={selectedMessageThreadDetails.otherUserId}
+                    otherUserName={selectedMessageThreadDetails.otherUserName}
+                    otherUserRole={selectedMessageThreadDetails.otherUserRole}
+                    otherUserProfilePicUrl={selectedMessageThreadDetails.otherUserProfilePicUrl}
+                    jobContext={selectedMessageThreadDetails.jobContext}
+                    onBack={() => setSelectedMessageThreadDetails(null)}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    Select a conversation to start messaging
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'jobs' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Jobs</h2>
+            {currentDeveloperProfile ? (
+              <JobsTab developerId={currentDeveloperProfile.user_id} />
+            ) : (
+              <div className="text-center text-gray-500">Loading jobs data...</div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'endorsements' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Endorsements</h2>
+            <EndorsementDisplay
+              endorsements={endorsements}
+              loading={isLoadingEndorsements}
+              error={endorsementError}
+              onToggleVisibility={handleToggleEndorsementVisibility}
+              showVisibilityControls={true}
+            />
+          </div>
+        )}
+
+        {activeTab === 'tests' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Skill Tests</h2>
+            {currentDeveloperProfile ? (
+              <DeveloperTests developerId={currentDeveloperProfile.user_id} />
+            ) : (
+              <div className="text-center text-gray-500">Loading tests data...</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
