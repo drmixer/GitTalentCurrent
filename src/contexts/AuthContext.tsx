@@ -293,6 +293,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Only call ensureUserProfileExists for new users
       if (!existingUserCheck && !userCheckError) {
         await ensureUserProfileExists();
+      } else if (existingUserCheck) {
+        // Clear localStorage for existing users to prevent contamination
+        localStorage.removeItem('gittalent_signup_role');
+        localStorage.removeItem('gittalent_signup_name');
+        localStorage.removeItem('gittalent_signup_company_name');
       }
 
       try {
