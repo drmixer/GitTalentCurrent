@@ -305,32 +305,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             authUser.email ||
             'User';
 
-          // ✅ IMPROVED: Get company_name from multiple sources with proper precedence
           const companyName =
-            (authUser.user_metadata as any)?.company_name ||        // ✅ NEW: From auth metadata (signup)
-            localStorage.getItem('gittalent_signup_company_name') || // Existing: From localStorage
+            localStorage.getItem('gittalent_signup_company_name') ||
+            (authUser.user_metadata as any)?.company_name ||
             '';
-
-          console.log('RPC call data sources:', {
-            userName_sources: {
-              localStorage: localStorage.getItem('gittalent_signup_name'),
-              auth_metadata_name: authUser.user_metadata?.name,
-              auth_metadata_login: (authUser.user_metadata as any)?.login,
-              final: userName
-            },
-            companyName_sources: {
-              auth_metadata: (authUser.user_metadata as any)?.company_name,
-              localStorage: localStorage.getItem('gittalent_signup_company_name'),
-              final: companyName
-            }
-          });
 
           const { error: rpcError } = await supabase.rpc('create_user_profile', {
             user_id: authUser.id,
             user_email: authUser.email || 'unknown@example.com',
             user_name: userName,
             user_role: userRole,
-            company_name: companyName, // ✅ Now properly sources from auth metadata first
+            company_name: companyName,
           });
 
           if (rpcError) {
@@ -601,39 +586,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setAuthError(null);
       setLoading(true);
-
-      // ✅ FIXED: Include company_name in auth metadata for recruiters
-      const authMetadata: any = { 
-        name: userData.name, 
-        role: userData.role 
-      };
-
-      // ✅ CRITICAL FIX: Pass company_name for recruiters
-      if (userData.role === 'recruiter' && userData.company_name) {
-        authMetadata.company_name = userData.company_name;
-        // Also ensure it's in localStorage for RPC function
-        localStorage.setItem('gittalent_signup_company_name', userData.company_name);
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: authMetadata, // ✅ Now includes company_name for recruiters
+          data: { name: userData.name, role: userData.role },
           emailRedirectTo: options?.emailRedirectTo,
         },
       });
-
       if (error) {
         setAuthError(error.message);
         setLoading(false);
         return { error };
       }
-
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
-
       setLoading(false);
       return { data, error: null };
     } catch (error: any) {
