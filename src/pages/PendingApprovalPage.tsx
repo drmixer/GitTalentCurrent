@@ -21,7 +21,7 @@ const PendingApprovalPage = () => {
             className="inline-flex items-center mt-2 font-medium text-blue-600 hover:text-blue-500"
           >
             <Mail className="w-4 h-4 mr-2" />
-            support@gittalent.dev
+            support@mail.gittalent.dev
           </a>
         </div>
       </div>
