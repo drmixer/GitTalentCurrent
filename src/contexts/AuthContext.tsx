@@ -66,9 +66,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Use existing role from database
       userRole = existingUser.role;
     } else {
-      // Fall back to localStorage, then auth metadata, then default based on provider
-      userRole = localStorage.getItem('gittalent_signup_role') || 
-                 user.user_metadata?.role ||
+      // For new users only: determine role from signup data
+      userRole = user.user_metadata?.role ||
+                 localStorage.getItem('gittalent_signup_role') || 
                  (user.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
     }
 
@@ -282,7 +282,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = useCallback(
     async (authUser: SupabaseUser): Promise<User | null> => {
       setAuthError(null);
-      await ensureUserProfileExists();
+      
+      // Check if user already exists BEFORE calling ensureUserProfileExists
+      const { data: existingUserCheck, error: userCheckError } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      // Only call ensureUserProfileExists for new users
+      if (!existingUserCheck && !userCheckError) {
+        await ensureUserProfileExists();
+      }
+
       try {
         const { data: profile, error } = await supabase
           .from('users')
@@ -293,8 +305,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (error && error.code === 'PGRST116') {
           // Determine the correct user role using the same logic as ensureUserProfileExists
           const userRole =
+            authUser.user_metadata?.role ||
             localStorage.getItem('gittalent_signup_role') ||
-            (authUser.user_metadata as any)?.role ||
             (authUser.app_metadata?.provider === 'github' ? 'developer' : 'recruiter');
 
           const userName =
@@ -305,7 +317,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             authUser.email ||
             'User';
 
-          // ✅ SURGICAL FIX: Check auth metadata first for company_name (recruiters only)
+          // Check auth metadata first for company_name (recruiters only)
           const companyName =
             (authUser.user_metadata as any)?.company_name ||
             localStorage.getItem('gittalent_signup_company_name') ||
@@ -588,13 +600,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAuthError(null);
       setLoading(true);
 
-      // ✅ SURGICAL FIX: Include company_name in auth metadata for recruiters only
+      // Include company_name in auth metadata for recruiters only
       const authMetadata: any = { 
         name: userData.name, 
         role: userData.role 
       };
 
-      // ✅ CRITICAL FIX: Add company_name for recruiters only (developers don't use company names)
+      // Add company_name for recruiters only (developers don't use company names)
       if (userData.role === 'recruiter' && userData.company_name) {
         authMetadata.company_name = userData.company_name;
         // Also store in localStorage as backup for RPC function
@@ -605,7 +617,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email,
         password,
         options: {
-          data: authMetadata, // ✅ Now includes company_name for recruiters
+          data: authMetadata, // Now includes company_name for recruiters
           emailRedirectTo: options?.emailRedirectTo,
         },
       });
