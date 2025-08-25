@@ -305,9 +305,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             authUser.email ||
             'User';
 
+          // ✅ SURGICAL FIX: Check auth metadata first for company_name (recruiters only)
           const companyName =
-            localStorage.getItem('gittalent_signup_company_name') ||
             (authUser.user_metadata as any)?.company_name ||
+            localStorage.getItem('gittalent_signup_company_name') ||
             '';
 
           const { error: rpcError } = await supabase.rpc('create_user_profile', {
@@ -586,22 +587,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setAuthError(null);
       setLoading(true);
+
+      // ✅ SURGICAL FIX: Include company_name in auth metadata for recruiters only
+      const authMetadata: any = { 
+        name: userData.name, 
+        role: userData.role 
+      };
+
+      // ✅ CRITICAL FIX: Add company_name for recruiters only (developers don't use company names)
+      if (userData.role === 'recruiter' && userData.company_name) {
+        authMetadata.company_name = userData.company_name;
+        // Also store in localStorage as backup for RPC function
+        localStorage.setItem('gittalent_signup_company_name', userData.company_name);
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name: userData.name, role: userData.role },
+          data: authMetadata, // ✅ Now includes company_name for recruiters
           emailRedirectTo: options?.emailRedirectTo,
         },
       });
+
       if (error) {
         setAuthError(error.message);
         setLoading(false);
         return { error };
       }
+
       if (data.user && userData.role === 'developer') {
         await createDeveloperProfile(data.user.id, {});
       }
+
       setLoading(false);
       return { data, error: null };
     } catch (error: any) {
